@@ -4,13 +4,12 @@ var conf = require('../qiniu/conf.js');
 
 conf.ACCESS_KEY = '<Please apply your access key>';
 conf.SECRET_KEY = '<Dont send your secret key to anyone>';
-conf.ACCESS_KEY = 'RLT1NBD08g3kih5-0v8Yi6nX6cBhesa2Dju4P7mT';
-conf.SECRET_KEY = 'k6uZoSDAdKBXQcNYG3UOm4bP3spDVkTg-9hWHIKm';
 
 var conn = new digestauth.Client();
 
 var bucket = 'bucket';
 var key = 'rs_demo.js';
+var friendName = key;
 
 var DEMO_DOMAIN = 'iovip.qbox.me/bucket';
 
@@ -20,7 +19,6 @@ rs.drop(function(resp) {
 	console.log("\n===> Drop result: ", resp);
 
 	rs.putFile(function(resp) {
-
 		console.log("\n===> PutFile result: ", resp);
 		if (resp.code != 200) {
 			return;
@@ -43,6 +41,19 @@ rs.drop(function(resp) {
 					if (resp.code != 200) {
 						return;
 					}
+
+					rs.get(function(resp) {
+						console.log("\n===> Get result: ", resp);
+						if (resp.code != 200) {
+							return;
+						}
+
+						rs.remove(function(resp) {
+							console.log("\n===> Delete result: ", resp);
+						}, key);
+
+					}, key, friendName);
+
 				}, key);
 
 			}, DEMO_DOMAIN);
