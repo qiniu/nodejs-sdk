@@ -1,5 +1,5 @@
 var digestauth = require('../qiniu/digestauth.js');
-var qboxrs = require('../qiniu/rs.js');
+var qiniurs = require('../qiniu/rs.js');
 var conf = require('../qiniu/conf.js');
 
 conf.ACCESS_KEY = '<Please apply your access key>';
@@ -13,7 +13,7 @@ var friendName = key;
 
 var DEMO_DOMAIN = 'iovip.qbox.me/bucket';
 
-var rs = new qboxrs.Service(conn, bucket);
+var rs = new qiniurs.Service(conn, bucket);
 
 rs.drop(function(resp) {
 	console.log("\n===> Drop result: ", resp);
@@ -51,16 +51,10 @@ rs.drop(function(resp) {
 						rs.remove(key, function(resp) {
 							console.log("\n===> Delete result: ", resp);
 						});
-
 					});
-
 				});
-
 			});
-
 		});
-
 	});
-
 });
 
