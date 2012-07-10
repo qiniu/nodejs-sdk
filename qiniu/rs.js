@@ -19,7 +19,7 @@ Service.prototype.putAuth = function(onret) {
 	this.conn.callWith(url, null, onret);
 };
 
-Service.prototype.putAuthEx = function(onret, expires, callbackUrl) {
+Service.prototype.putAuthEx = function(expires, callbackUrl, onret) {
 	/*
 	 * func PutAuthEx(expires, callbackUrl) => PutAuthRet
 	 * 上传授权（生成一个短期有效的可匿名上传URL）
@@ -28,7 +28,7 @@ Service.prototype.putAuthEx = function(onret, expires, callbackUrl) {
 	this.conn.callWith(url, null, onret);
 };
 
-Service.prototype.put = function(onret, key, mimeType, fp, bytes) {
+Service.prototype.put = function(key, mimeType, fp, bytes, onret) {
 	/*
 	 * func Put(key string, mimeType string, fp File, bytes int64) => (data PutRet, code int, err Error)
 	 * 上传一个流
@@ -42,7 +42,7 @@ Service.prototype.put = function(onret, key, mimeType, fp, bytes) {
 	this.conn.callWith(url, binary, onret);
 };
 
-Service.prototype.putFile = function(onret, key, mimeType, localFile) {
+Service.prototype.putFile = function(key, mimeType, localFile, onret) {
 	/*
 	 * func PutFile(key string, mimeType string, localFile string) => (data PutRet, code int, err Error)
 	 * 上传文件
@@ -54,11 +54,11 @@ Service.prototype.putFile = function(onret, key, mimeType, localFile) {
 			return;
 		}
 		var fp = fs.createReadStream(localFile);
-		self.put(onret, key, mimeType, fp, fi.size);
+		self.put(key, mimeType, fp, fi.size, onret);
 	});
 };
 
-Service.prototype.get = function(onret, key, attName) {
+Service.prototype.get = function(key, attName, onret) {
 	/*
 	 * func Get(key string, attName string) => GetRet
 	 * 下载授权（生成一个短期有效的可匿名下载URL）
@@ -68,7 +68,7 @@ Service.prototype.get = function(onret, key, attName) {
 	this.conn.callWith(url, null, onret);
 };
 
-Service.prototype.getIfNotModified = function(onret, key, attName, base) {
+Service.prototype.getIfNotModified = function(key, attName, base, onret) {
 	/*
 	 * func GetIfNotModified(key string, attName string, base string) => GetRet
 	 * 下载授权（生成一个短期有效的可匿名下载URL），如果服务端文件没被人修改的话（用于断点续传）
@@ -78,7 +78,7 @@ Service.prototype.getIfNotModified = function(onret, key, attName, base) {
 	this.conn.callWith(url, null, onret);
 };
 
-Service.prototype.stat = function(onret, key) {
+Service.prototype.stat = function(key, onret) {
 	/*
 	 * func Stat(key string) => Entry
 	 * 取资源属性
@@ -88,7 +88,7 @@ Service.prototype.stat = function(onret, key) {
 	this.conn.callWith(url, null, onret);
 };
 
-Service.prototype.publish = function(onret, domain) {
+Service.prototype.publish = function(domain, onret) {
 	/*
 	 * func Publish(domain string) => Bool
 	 * 将本 Table 的内容作为静态资源发布。静态资源的url为：http://domain/key
@@ -97,7 +97,7 @@ Service.prototype.publish = function(onret, domain) {
 	this.conn.callWith(url, null, onret);
 };
 
-Service.prototype.unpublish = function(onret, domain) {
+Service.prototype.unpublish = function(domain, onret) {
 	/*
 	 * func Unpublish(domain string) => Bool
 	 * 取消发布
@@ -106,7 +106,7 @@ Service.prototype.unpublish = function(onret, domain) {
 	this.conn.callWith(url, null, onret);
 };
 
-Service.prototype.remove = function(onret, key) {
+Service.prototype.remove = function(key, onret) {
 	/*
 	 * func Delete(key string) => Bool
 	 * 删除资源
