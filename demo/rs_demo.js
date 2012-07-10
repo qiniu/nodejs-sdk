@@ -4,8 +4,6 @@ var conf = require('../qiniu/conf.js');
 
 conf.ACCESS_KEY = '<Please apply your access key>';
 conf.SECRET_KEY = '<Dont send your secret key to anyone>';
-conf.ACCESS_KEY = 'RLT1NBD08g3kih5-0v8Yi6nX6cBhesa2Dju4P7mT';
-conf.SECRET_KEY = 'k6uZoSDAdKBXQcNYG3UOm4bP3spDVkTg-9hWHIKm';
 
 var conn = new digestauth.Client();
 
