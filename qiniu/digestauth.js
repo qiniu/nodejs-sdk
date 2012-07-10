@@ -83,13 +83,8 @@ Client.prototype.execute = function(url, params, onresp, onerror) {
 Client.prototype.callWith = function(url, params, onret) {
 
 	var onresp = function(res) {
-		var out = [];
-		res.on('data', function(chunk) {
-			out.push(chunk);
-		});
-		res.on('end', function() {
-			var ctxLen = res.headers['content-length'];
-			if (!ctxLen || ctxLen == '0') {
+		util.readAll(res, function(data) {
+			if (data.length === 0) {
 				var ret = {code: res.statusCode};
 				if (res.statusCode != 200) {
 					ret.error = 'E' + res.statusCode;
@@ -97,17 +92,16 @@ Client.prototype.callWith = function(url, params, onret) {
 				onret(ret);
 				return;
 			}
-			var resp = out.join('');
 			var ret;
 			try {
-				ret = JSON.parse(resp);
+				ret = JSON.parse(data);
 				if (res.statusCode == 200) {
 					ret = {code: 200, data: ret};
 				} else {
 					ret.code = res.statusCode;
 				}
 			} catch (e) {
-				ret = {code: -2, error: e.toString()};
+				ret = {code: -2, error: e.toString(), detail: e};
 			}
 			onret(ret);
 		});
