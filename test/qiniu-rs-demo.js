@@ -1,4 +1,4 @@
-var qiniurs = require('../lib/qiniu-rs.js');
+var qiniu = require('../lib/qiniu-rs.js');
 
 var bucket = 'test_bucket'
 var key = 'qiniu-rs-demo.js';
@@ -6,9 +6,9 @@ var friendlyName = key;
 
 var DEMO_DOMAIN = 'iovip.qbox.me/' + bucket;
 
-var rs = qiniurs.QiniuRS({
-    "access_key": "RLT1NBD08g3kih5-0v8Yi6nX6cBhesa2Dju4P7mT",
-    "secret_key": "k6uZoSDAdKBXQcNYG3UOm4bP3spDVkTg-9hWHIKm",
+var rs = qiniu.QiniuRS({
+    "access_key": "<Please apply your access key>",
+    "secret_key": "<Dont send your secret key to anyone>",
     "app_bucket": bucket,
 });
 

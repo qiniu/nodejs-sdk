@@ -23,8 +23,8 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
 
 ### 示例程序
 
-    var QiniuRS = require("qiniu-rs");
-    var rs = new QiniuRS({
+    var qiniu = require("qiniu-rs");
+    var rs = qiniu.QiniuRS({
         access_key: "<YOUR_ACCESS_KEY>",
         secret_key: "<YOUR_SECRET_KEY>",
         app_bucket: "<YOUR_APP_BUCKET_NAME>"
