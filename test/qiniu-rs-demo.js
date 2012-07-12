@@ -1,19 +1,16 @@
-var digestauth = require('../qiniu/digestauth.js');
-var qiniurs = require('../qiniu/rs.js');
-var conf = require('../qiniu/conf.js');
+var qiniu = require('../lib/qiniu-rs.js');
 
-conf.ACCESS_KEY = '<Please apply your access key>';
-conf.SECRET_KEY = '<Dont send your secret key to anyone>';
+var bucket = 'test_bucket'
+var key = 'qiniu-rs-demo.js';
+var friendlyName = key;
 
-var conn = new digestauth.Client();
+var DEMO_DOMAIN = 'iovip.qbox.me/' + bucket;
 
-var bucket = 'bucket';
-var key = 'rs_demo.js';
-var friendName = key;
-
-var DEMO_DOMAIN = 'iovip.qbox.me/bucket';
-
-var rs = new qiniurs.Service(conn, bucket);
+var rs = qiniu.QiniuRS({
+    "access_key": "<Please apply your access key>",
+    "secret_key": "<Dont send your secret key to anyone>",
+    "app_bucket": bucket,
+});
 
 rs.drop(function(resp) {
 	console.log("\n===> Drop result: ", resp);
@@ -35,14 +32,14 @@ rs.drop(function(resp) {
 				if (resp.code != 200) {
 					return;
 				}
-			
+
 				rs.stat(key, function(resp) {
 					console.log("\n===> Stat result: ", resp);
 					if (resp.code != 200) {
 						return;
 					}
 
-					rs.get(key, friendName, function(resp) {
+					rs.get(key, friendlyName, function(resp) {
 						console.log("\n===> Get result: ", resp);
 						if (resp.code != 200) {
 							return;

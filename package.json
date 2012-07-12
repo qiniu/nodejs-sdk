@@ -1,0 +1,41 @@
+{
+  "name": "qiniu-rs",
+  "version": "2.0.0",
+  "description": "Node wrapper for Qiniu Resource (Cloud) Storage service's HTTP API",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error => no test specified\" && exit 1\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/qiniu/nodejs-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/qiniu/nodejs-sdk/issues"
+  },
+  "keywords": [
+    "cloud",
+    "storage",
+    "s3",
+    "qiniu",
+    "web-service"
+  ],
+  "author": "qiniutek.com",
+  "contributors": [
+    {
+      "name": "Xu Shiwei",
+      "email": "xushiweizh@gmail.com"
+    },
+    {
+      "name": "why404",
+      "email": "awhy.xu@gmail.com"
+    }
+  ],
+  "engines": [
+    "node >= 0.4.7"
+  ],
+  "license": "MIT"
+}
