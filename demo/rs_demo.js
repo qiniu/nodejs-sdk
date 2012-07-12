@@ -1,6 +1,6 @@
-var digestauth = require('../qiniu/digestauth.js');
-var qiniurs = require('../qiniu/rs.js');
-var conf = require('../qiniu/conf.js');
+var digestauth = require('../lib/digestauth.js');
+var qiniurs = require('../lib/rs.js');
+var conf = require('../lib/conf.js');
 
 conf.ACCESS_KEY = '<Please apply your access key>';
 conf.SECRET_KEY = '<Dont send your secret key to anyone>';
