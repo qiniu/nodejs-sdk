@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error => no test specified\" && exit 1\""
   },
   "repository": {
     "type": "git",
@@ -25,9 +25,17 @@
   ],
   "author": "qiniutek.com",
   "contributors": [
-    { "name": "Xu Shiwei", "email": "xushiweizh@gmail.com" },
-    { "name": "why404", "email": "awhy.xu@gmail.com" },
+    {
+      "name": "Xu Shiwei",
+      "email": "xushiweizh@gmail.com"
+    },
+    {
+      "name": "why404",
+      "email": "awhy.xu@gmail.com"
+    }
   ],
-  "engines": [ "node >= 0.4.7" ],
+  "engines": [
+    "node >= 0.4.7"
+  ],
   "license": "MIT"
 }
