@@ -1,11 +1,9 @@
-var digestauth = require('../lib/digestauth.js');
-var qiniurs = require('../lib/rs.js');
-var conf = require('../lib/conf.js');
+var qiniu = require('../index.js');
 
-conf.ACCESS_KEY = '<Please apply your access key>';
-conf.SECRET_KEY = '<Dont send your secret key to anyone>';
+qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-var conn = new digestauth.Client();
+var conn = new qiniu.digestauth.Client();
 
 var bucket = 'bucket';
 var key = 'rs_demo.js';
@@ -13,7 +11,7 @@ var friendName = key;
 
 var DEMO_DOMAIN = 'iovip.qbox.me/bucket';
 
-var rs = new qiniurs.Service(conn, bucket);
+var rs = new qiniu.rs.Service(conn, bucket);
 
 rs.drop(function(resp) {
 	console.log("\n===> Drop result: ", resp);
