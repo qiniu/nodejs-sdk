@@ -7,8 +7,13 @@ var bucket = 'test_image_bucket';
 var key = 'test.jpg'; // test.jpg must exists
 var friendlyName = key;
 
+var newkey = "test-cropped.jpg";
+var thumbnails_bucket = 'thumbnails_bucket';
+var DEMO_DOMAIN = 'iovip.qbox.me/' + thumbnails_bucket;
+
 var conn = new qiniu.digestauth.Client();
 var rs = new qiniu.rs.Service(conn, bucket);
+var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket);
 
 rs.drop(function(resp) {
 	console.log("\n===> Drop result: ", resp);
@@ -31,14 +36,23 @@ rs.drop(function(resp) {
                 "quality": 85,
                 "rotate": 45,
                 "format": "jpg",
-                "auto_orient": true,
-                "save_as": {"bucket": bucket, "key": "test-cropped.jpg"}
+                "auto_orient": true
             };
-            console.log("\n===> thumbnail url is: ", rs.thumbnail(resp.data.url, options));
-            rs.thumbnailSaveAs(resp.data.url, options, function(resp){
-                console.log("\n===> thumbnailSaveAs result: ", resp);
-            });
 
+            console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
+
+            imgrs.imgMogrifySaveAs(newkey, resp.data.url, options, function(resp){
+                console.log("\n===> thumbnailSaveAs result: ", resp);
+                if (resp.code != 200) {
+                    return;
+                }
+                imgrs.publish(DEMO_DOMAIN, function(resp) {
+                    console.log("\n===> Publish result: ", resp);
+                    if (resp.code != 200) {
+                        return;
+                    }
+                });
+            });
 		});
 	});
 });
