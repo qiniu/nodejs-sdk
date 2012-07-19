@@ -9,7 +9,7 @@ var bucket = 'bucket';
 var key = 'rs_demo.js';
 var friendName = key;
 
-var DEMO_DOMAIN = 'iovip.qbox.me/bucket';
+var DEMO_DOMAIN = 'iovip.qbox.me/' + bucket;
 
 var rs = new qiniu.rs.Service(conn, bucket);
 
@@ -33,7 +33,7 @@ rs.drop(function(resp) {
 				if (resp.code != 200) {
 					return;
 				}
-			
+
 				rs.stat(key, function(resp) {
 					console.log("\n===> Stat result: ", resp);
 					if (resp.code != 200) {
