@@ -41,8 +41,8 @@ rs.drop(function(resp) {
 
             console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
 
-            imgrs.imgMogrifySaveAs(newkey, resp.data.url, options, function(resp){
-                console.log("\n===> imgMogrifySaveAs result: ", resp);
+            imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
+                console.log("\n===> imageMogrifyAs result: ", resp);
                 if (resp.code != 200) {
                     return;
                 }
