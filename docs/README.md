@@ -27,6 +27,9 @@ title: NodeJS SDK | 七牛云存储
     - [取消公开外链](#unpublish)
     - [删除指定文件](#remove)
     - [删除所有文件（指定 bucket）](#drop)
+    - [图像处理](#fo-image)
+        - [图像处理（缩略、裁剪、旋转、转化）](#qiniu-img-mogrify)
+        - [图像处理（缩略、裁剪、旋转、转化）并持久化](#imageMogrifyAs)
 - [贡献代码](#Contributing)
 - [许可证](#License)
 
@@ -85,12 +88,12 @@ title: NodeJS SDK | 七牛云存储
         // then send the resp.data.url to your clients
         // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
     });
-    
+
 还可以使用 `rs.putAuthEx()` 方法来定制上传授权URL的有效时长，以及指定文件上传成功后七牛云存储服务器回调到您业务服务器的地址。示例代码如下：
 
     var expiresIn = 86400;
     var callbackUrl = 'http://example.com/notifications/qiniurs_callback';
-    
+
     rs.putAuthEx(expiresIn, callbackUrl, function(resp) {
         console.log("\n===> putAuthEx result: ", resp);
         if (resp.code != 200) {
@@ -99,7 +102,7 @@ title: NodeJS SDK | 七牛云存储
         // then send the resp.data.url to your clients
         // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
     });
-    
+
 **响应**
 
     {
@@ -130,7 +133,7 @@ title: NodeJS SDK | 七牛云存储
             return;
         }
     });
-    
+
 **参数**
 
 key
@@ -153,7 +156,7 @@ callback function
 如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
 
     {
-        code: 200, 
+        code: 200,
         data: {
             hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
         }
@@ -169,7 +172,7 @@ callback function
             return;
         }
     });
-    
+
 **参数**
 
 key
@@ -189,7 +192,7 @@ callback function
 如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
 
     {
-        code: 200, 
+        code: 200,
         data: {
             hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
         }
@@ -337,7 +340,7 @@ callback function
             return;
         }
     });
-    
+
 参数 和 响应的返回值 同 `rs.publish()` 规格一致。
 
 <a name="remove"></a>
@@ -352,7 +355,7 @@ callback function
             return;
         }
     });
-    
+
 **响应**
 
 如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
@@ -377,6 +380,101 @@ callback function
 如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
 
     { code: 200 }
+
+
+<a name="fo-image"></a>
+
+### 图像处理
+
+<a name="qiniu-img-mogrify"></a>
+
+### 图像处理（缩略、裁剪、旋转、转化）
+
+`qiniu.img.mogrify()` 方法支持将一个存储在七牛云存储的图片进行缩略、裁剪、旋转和格式转化处理，该方法返回一个可以直接预览缩略图的URL。
+
+    var imgMogrPreviewURL = qiniu.img.mogrify(imageDownloadURL, options);
+
+**参数**
+
+imageDownloadURL
+: 必须，字符串类型（string），指定原始图片的下载链接，可以根据 rs.get() 获取到。
+
+options
+: 必须，对象型（object），JSON 格式的图像处理参数。
+
+`options` 对象具体的规格如下：
+
+    options = {
+        "thumbnail": <ImageSizeGeometry>,
+        "gravity": <GravityType>, =NorthWest, North, NorthEast, West, Center, East, SouthWest, South, SouthEast
+        "crop": <ImageSizeAndOffsetGeometry>,
+        "quality": <ImageQuality>,
+        "rotate": <RotateDegree>,
+        "format": <DestinationImageFormat>, =jpg, gif, png, tif, etc.
+        "auto_orient": <TrueOrFalse>
+    }
+
+`qiniu.img.mogrify()` 方法是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v2/api/foimg/#fo-imageMogr)。
+
+<a name="imageMogrifyAs"></a>
+
+### 图像处理（缩略、裁剪、旋转、转化）并持久化存储处理结果
+
+`qiniu.rs` 模块提供的 `imageMogrifyAs()` 方法支持将一个存储在七牛云存储的图片进行缩略、裁剪、旋转和格式转化处理，并且将处理后的缩略图作为一个新文件持久化存储到七牛云存储服务器上，这样就可以供后续直接使用而不用每次都传入参数进行图像处理。
+
+    var conn = new qiniu.digestauth.Client();
+
+    var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket);
+
+    imgrs.imageMogrifyAs(key, SourceImageDownloadURL, options, function(resp) {
+        console.log("\n===> imageMogrifyAs result: ", resp);
+        if (resp.code != 200) {
+            return;
+        }
+    });
+
+**参数**
+
+imageDownloadURL
+: 必须，字符串类型（string），指定原始图片的下载链接，可以根据 rs.get() 获取到。
+
+options
+: 必须，对象型（object），JSON 格式的图像处理参数。
+
+`options` 对象具体的规格如下：
+
+    options = {
+        "thumbnail": <ImageSizeGeometry>,
+        "gravity": <GravityType>, =NorthWest, North, NorthEast, West, Center, East, SouthWest, South, SouthEast
+        "crop": <ImageSizeAndOffsetGeometry>,
+        "quality": <ImageQuality>,
+        "rotate": <RotateDegree>,
+        "format": <DestinationImageFormat>, =jpg, gif, png, tif, etc.
+        "auto_orient": <TrueOrFalse>
+    }
+
+`imgrs.imageMogrifyAs()` 方法同样是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v2/api/foimg/#fo-imageMogr)。
+
+**注意**
+
+在上述示例代码中，我们实例化了一个新的 `imgrs` 对象，之所以这么做是因为我们考虑到缩略图也许可以创建公开外链，即缩略图所存放的 `thumbnails_bucket` 可以通过调用 `imgrs.publish()` 方法公开从而提供静态链接直接访问，这样做的好处是限定了作用域仅限于 `thumbnails_bucket`，也使得缩略图不必通过API通道进行请求且使用静态CDN加速访问，同时也保证了原图不受任何操作影响。
+
+为了使得调用 `imgrs.imageMogrifyAs()` 方法有实际意义，客户方的业务服务器必须保存 `<thumbnails_bucket>` 和 `imgrs.imageMogrifyAs` 方法中参数 `<key>` 的值。如此，该缩略图作为一个新文件可以使用 NodeJS SDK 提供的任何方法。
+
+callback function
+: 请求完成之后执行的回调函数
+
+**响应**
+
+如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
+
+    {
+        code: 200,
+        data: {
+            hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
+        }
+    }
+
 
 <a name="Contributing"></a>
 
