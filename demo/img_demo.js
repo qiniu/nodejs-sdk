@@ -1,7 +1,7 @@
 var qiniu = require('../index.js');
 
-qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
-qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
+qiniu.conf.ACCESS_KEY = 'TkxFUGL154W7mCtZLoIyxjxroaXWlVWJesMBZL2n';
+qiniu.conf.SECRET_KEY = 'yFeysXZ9M2L3BzldkJXHZLOba-vaCuDIzMS0k2VW';
 
 var bucket = 'test_image_bucket';
 var key = 'test.jpg'; // test.jpg must exists
@@ -9,11 +9,13 @@ var friendlyName = key;
 
 var newkey = "test-cropped.jpg";
 var thumbnails_bucket = 'thumbnails_bucket';
-var DEMO_DOMAIN = 'iovip.qbox.me/' + thumbnails_bucket;
+var DEMO_DOMAIN = 'http://iovip.qbox.me' + thumbnails_bucket;
 
 var conn = new qiniu.digestauth.Client();
 var rs = new qiniu.rs.Service(conn, bucket);
 var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket);
+
+var wm = new qiniu.wm.WaterMark(conn)
 
 rs.drop(function(resp) {
 	console.log("\n===> Drop result: ", resp);
@@ -40,6 +42,45 @@ rs.drop(function(resp) {
             };
 
             console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
+
+            var params = {
+                "gravity": "SouthWest",
+            };
+
+            rs.setProtected(1, function(resp){
+                console.log("\n===> Set protected result:", resp);
+            });
+
+            rs.setSeparator("-", function(resp){
+                console.log("\n===> Set separator result:", resp);
+            });
+
+            rs.setStyle("small.jpg", "imageView/0/w/64/h/64/watermark/0", function(resp){
+                console.log("\n===> Set style result:", resp);
+
+                if (resp.code != 200) {
+                    return;
+                }
+
+                rs.unsetStyle("small.jpg", function(resp){
+                    console.log("\n===> Unset style result:", resp);
+                });
+                
+            });
+
+            wm.set("Ikbear", params, function(resp){
+                console.log("\n===> Set WaterMark Result: ", resp);
+
+                if (resp.code != 200) {
+                    return;
+                }
+                
+                wm.get("Ikbear", function(resp){
+                    console.log("\n===> Get WaterMark Result:", resp);
+                });
+
+            });
+
 
             imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
                 console.log("\n===> imageMogrifyAs result: ", resp);
