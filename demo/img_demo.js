@@ -1,7 +1,7 @@
 var qiniu = require('../index.js');
 
-qiniu.conf.ACCESS_KEY = 'TkxFUGL154W7mCtZLoIyxjxroaXWlVWJesMBZL2n';
-qiniu.conf.SECRET_KEY = 'yFeysXZ9M2L3BzldkJXHZLOba-vaCuDIzMS0k2VW';
+qiniu.conf.ACCESS_KEY = '';
+qiniu.conf.SECRET_KEY = '';
 
 var bucket = 'test_image_bucket';
 var key = 'test.jpg'; // test.jpg must exists
@@ -45,6 +45,7 @@ rs.drop(function(resp) {
 
             var params = {
                 "gravity": "SouthWest",
+                "text": "@ikbear",
             };
 
             rs.setProtected(1, function(resp){
