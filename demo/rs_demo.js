@@ -5,7 +5,7 @@ qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
 var conn = new qiniu.digestauth.Client();
 
-var bucket = 'bucket';
+var bucket = 'bucket2';
 var key = 'rs_demo.js';
 var friendName = key;
 
