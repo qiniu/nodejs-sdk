@@ -1,7 +1,7 @@
 var qiniu = require('../index.js');
 
-qiniu.conf.ACCESS_KEY = '';
-qiniu.conf.SECRET_KEY = '';
+qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
 var bucket = 'test_image_bucket';
 var key = 'test.jpg'; // test.jpg must exists
