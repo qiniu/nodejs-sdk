@@ -90,6 +90,15 @@ describe('rs.test.js', function () {
       });
     });
 
+    it('should return error when file not exists', function (done) {
+      rs.putFile('rs.test.js.not.exists', null, __filename + '123', function (res) {
+        res.should.have.keys('code', 'error', 'detail');
+        res.code.should.equal(-1);
+        res.error.should.include('ENOENT');
+        done();
+      });
+    });
+
   });
 
   describe('get()', function () {
@@ -217,7 +226,8 @@ describe('rs.test.js', function () {
 
     it('should modified a image', function (done) {
       rs.imageMogrifyAs('logo.png', sourceURL, {
-        // thumbnail: '50x50^',
+        thumbnail: '50x50^',
+        auto_orient: true,
         format: 'jpg',
       }, function (res) {
         res.should.have.property('code', 200);
