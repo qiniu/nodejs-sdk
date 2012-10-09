@@ -1,0 +1,7 @@
+test/
+.travis.yml
+coverage.html
+lib-cov/
+Makefile
+docs/
+demo/
