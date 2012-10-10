@@ -37,5 +37,10 @@
   "engines": [
     "node >= 0.4.7"
   ],
+  "devDependencies": {
+    "should": "*",
+    "pedding": "*",
+    "mocha": "*"
+  },
   "license": "MIT"
 }

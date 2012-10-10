@@ -1,0 +1,5 @@
+module.exports = {
+  ACCESS_KEY: 'your key',
+  SECRET_KEY: 'your secret',
+  bucket: 'testqiniu',
+};

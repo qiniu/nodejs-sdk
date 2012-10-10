@@ -1,6 +1,8 @@
-module.exports = qiniu = {
-    conf: require('./lib/conf.js'),
-    digestauth: require('./lib/digestauth.js'),
-    rs: require('./lib/rs.js'),
-    img: require('./lib/img.js'),
+var libpath = process.env.QINIU_COV ? './lib-cov' : './lib';
+
+module.exports = {
+    conf: require(libpath + '/conf.js'),
+    digestauth: require(libpath + '/digestauth.js'),
+    rs: require(libpath + '/rs.js'),
+    img: require(libpath + '/img.js'),
 };
