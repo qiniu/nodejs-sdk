@@ -103,6 +103,28 @@ describe('rs.test.js', function () {
       });
     });
 
+    it('should return error when req.abort()', function (done) {
+      var size = fs.statSync(__filename).size;
+      var stream = fs.createReadStream(__filename);
+
+      var req = rs.put('rs.test.js.abort', null, stream, size, function (res) {
+        res.should.have.keys('code', 'detail', 'error');
+        res.code.should.equal(-1);
+        res.error.should.equal('socket hang up');
+        res.detail.code.should.equal('ECONNRESET');
+        rs.get('rs.test.js.abort', 'test.js', function (res) {
+          res.should.have.keys('code', 'error');
+          res.code.should.equal(612);
+          res.error.should.equal('no such file or directory');
+          done();
+        });
+      });
+
+      setTimeout(function () {
+        req.abort();
+      }, 5);
+    });
+
   });
 
   describe('uploadFile() && upload()', function () {
@@ -190,6 +212,42 @@ describe('rs.test.js', function () {
           done();
         });
       });
+    });
+
+    it('should upload ReadStream and abort() the request', function (done) {
+      var s = new Stream();
+      var count = 0;
+      var size = 0;
+      var timer = setInterval(function () {
+        var text = 'I come from timer stream ' + count + '\n';
+        size += text.length;
+        count++;
+        if (count >= 5) {
+          clearInterval(timer);
+          process.nextTick(function () {
+            s.emit('end');
+          });
+        }
+        s.emit('data', text);
+      }, 1000);
+
+      var req = rs.upload(upToken, 'test/rs.test.js.upload.timer.stream.abort', null, 'stream.txt', s,
+      function (res) {
+        res.should.have.keys('code', 'detail', 'error');
+        res.code.should.equal(-1);
+        res.error.should.equal('socket hang up');
+        res.detail.code.should.equal('ECONNRESET');
+        rs.get('test/rs.test.js.upload.timer.stream.abort', 'stream.txt', function (res) {
+          res.should.have.keys('code', 'error');
+          res.code.should.equal(612);
+          res.error.should.equal('no such file or directory');
+          done();
+        });
+      });
+
+      setTimeout(function () {
+        req.abort();
+      }, 1500);
     });
 
   });
