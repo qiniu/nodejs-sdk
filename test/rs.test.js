@@ -10,12 +10,15 @@
  * Module dependencies.
  */
 
+var Stream = require('stream');
 var http = require('http');
+var fs = require('fs');
 var should = require('should');
 var qiniu = require('../');
 var config = require('./config');
 var path = require('path');
 var pedding = require('pedding');
+var urlparse = require('url').parse;
 
 qiniu.conf.ACCESS_KEY = config.ACCESS_KEY;
 qiniu.conf.SECRET_KEY = config.SECRET_KEY;
@@ -24,6 +27,7 @@ var conn = new qiniu.digestauth.Client();
 
 var bucket = config.bucket;
 var DEMO_DOMAIN = 'iovip.qbox.me/' + bucket;
+var imagefile = path.join(__dirname, 'logo.png');
 
 var rs = new qiniu.rs.Service(conn, bucket);
 
@@ -101,6 +105,95 @@ describe('rs.test.js', function () {
 
   });
 
+  describe('uploadFile() && upload()', function () {
+
+    var upToken = null;
+    beforeEach(function (done) {
+      rs.putAuth(function (res) {
+        res.code.should.equal(200);
+        upToken = res.data.url;
+        done();
+      });
+    });
+
+    it('should upload a file with key using form-data format', function (done) {
+      rs.uploadFile(upToken, 'test/rs.test.js.uploadFile', null, __filename, function (res) {
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = res.data.hash;
+        rs.get('test/rs.test.js.uploadFile', 'foo.js', function (res) {
+          res.code.should.equal(200);
+          res.data.hash.should.equal(lastHash);
+          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          res.data.fsize.should.equal(fs.statSync(__filename).size);
+          done();
+        });
+      });
+    });
+
+    it('should return error when file not exists', function (done) {
+      rs.uploadFile(upToken, 'rs.test.js.not.exists', null, __filename + '123', function (res) {
+        res.should.have.keys('code', 'error', 'detail');
+        res.code.should.equal(-1);
+        res.error.should.include('ENOENT');
+        done();
+      });
+    });
+
+    it('should upload a stream with key using form-data format', function (done) {
+      var logoStream = fs.createReadStream(imagefile);
+      rs.upload(upToken, 'test/rs.test.js.upload.logo.png', null, 'logo.png', logoStream,
+      function (res) {
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = res.data.hash;
+        rs.get('test/rs.test.js.upload.logo.png', 'qiniu-logo.png', function (res) {
+          res.code.should.equal(200);
+          res.data.hash.should.equal(lastHash);
+          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          res.data.fsize.should.equal(fs.statSync(imagefile).size);
+          done();
+        });
+      });
+    });
+
+    it('should upload any ReadStream using form-data format', function (done) {
+      var s = new Stream();
+      var count = 0;
+      var size = 0;
+      var timer = setInterval(function () {
+        var text = 'I come from timer stream ' + count + '\n';
+        size += text.length;
+        count++;
+        if (count >= 5) {
+          clearInterval(timer);
+          process.nextTick(function () {
+            s.emit('end');
+          });
+        }
+        s.emit('data', text);
+      }, 100);
+
+      rs.upload(upToken, 'test/rs.test.js.upload.timer.stream', null, 'stream.txt', s,
+      function (res) {
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = res.data.hash;
+        rs.get('test/rs.test.js.upload.timer.stream', 'stream.txt', function (res) {
+          res.code.should.equal(200);
+          res.data.hash.should.equal(lastHash);
+          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          res.data.fsize.should.equal(size);
+          done();
+        });
+      });
+    });
+
+  });
+
   describe('get()', function () {
 
     it('should return a file download url', function (done) {
@@ -110,10 +203,11 @@ describe('rs.test.js', function () {
         res.data.expires.should.equal(3600);
         res.data.fsize.should.be.a('number').with.above(0);
         res.data.hash.should.match(/^[\w\-=]{28}$/);
-        res.data.mimeType.should.equal('application/octet-stream');
+        res.data.mimeType.should.equal('application/javascript');
         res.data.url.should.match(/^http:\/\/iovip\.qbox\.me\/file\/[\w\-=]+$/);
 
-        http.get(res.data.url, function (downloadRes) {
+        var options = urlparse(res.data.url);
+        http.get(options, function (downloadRes) {
           downloadRes.statusCode.should.equal(200);
           downloadRes.should.have.header('content-disposition', 'attachment; filename="download.js"');
           downloadRes.should.have.header('content-length', res.data.fsize + '');
@@ -211,7 +305,6 @@ describe('rs.test.js', function () {
 
   describe('imageMogrifyAs()', function () {
 
-    var imagefile = path.join(__dirname, 'logo.png');
     var sourceURL = '';
     before(function (done) {
       rs.putFile('logo.png', null, imagefile, function (res) {
