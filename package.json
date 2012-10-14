@@ -37,6 +37,10 @@
   "engines": [
     "node >= 0.4.7"
   ],
+  "dependencies": {
+    "mime": "1.2.7",
+    "formstream": "0.0.1"
+  },
   "devDependencies": {
     "should": "*",
     "pedding": "*",
