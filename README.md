@@ -27,46 +27,56 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
 
 ### 示例程序
 
-    var qiniu = require("qiniu");
+   	var qiniu = require('../index.js');
+	var mime = require('mime');
 
-    qiniu.conf.ACCESS_KEY = '<YOUR_ACCESS_KEY>';
-    qiniu.conf.SECRET_KEY = '<YOUR_SECRET_KEY>';
+	qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+	qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-    var conn = new qiniu.digestauth.Client();
-    var rs = new qiniu.rs.Service(conn, "<YOUR_CUSTOM_BUCKET_NAME>");
+	var key = __filename;
+	var friendName = key;
+	var bucket = 'qiniu_test_bucket';
+	var DEMO_DOMAIN = bucket + '.dn.qbox.me';
 
-    // uploading by the server side
+	var conn = new qiniu.digestauth.Client();
 
-    var key = "test.js";
-    var friendlyName = key;
+	qiniu.rs.mkbucket(conn, bucket, function(resp) {
+  		console.log("\n===> Make bucket result: ", resp);
+  		if (resp.code != 200) {
+    		return;
+  		}
+	});
 
-    // uploading script self
-    rs.putFile(key, null, __filename, function(resp) {
-        console.log("\n===> PutFile result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
+	var rs = new qiniu.rs.Service(conn, bucket);
 
-        // get information and downalod url of the uploaded file
-        rs.get(key, friendlyName, function(resp) {
-            console.log("\n===> Get result: ", resp);
-            if (resp.code != 200) {
-                return;
-            }
-        });
-    });
+	var scpoe = bucket,
+    	expires = 3600,
+    	callbackUrl = null,
+    	callbackBodyType = "",
+    	customer = "sunikbear@gmail.com";
+	var token = new qiniu.token.UploadToken(scpoe, expires, callbackUrl, 				callbackBodyType, customer);
+	var uploadToken = token.generateToken();
+	var mimeType = mime.lookup(__filename);
 
+	rs.drop(function(resp){
+  		console.log("\n===> Drop result: ", resp);
+  		if (resp.code != 200) {
+    		return;
+  		}
 
-    // uploading by the client side
+  		var localFile = __filename;
+  		var customMeta = "";
+  		var callbackParams = {};
+  		var enableCrc32Check = false;
 
-    rs.putAuth(function(resp) {
-        console.log("\n===> PutAuth result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-        // then send the resp.data.url to your clients
-        // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
-    });
+  		rs.uploadWithToken(uploadToken, __filename, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+	    	console.log("\n===> Upload File with Token result: ", resp);
+    		if (resp.code != 200) {
+      			return;
+    		}
+  		});
+	});
+
 
 
 ## 贡献代码
