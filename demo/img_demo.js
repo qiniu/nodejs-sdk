@@ -10,7 +10,7 @@ var friendlyName = key;
 
 var newkey = "test-cropped.jpg";
 var thumbnails_bucket = 'thumbnails_bucket';
-var DEMO_DOMAIN = 'iovip.qbox.me/' + thumbnails_bucket;
+var DEMO_DOMAIN = thumbnails_bucket + '.dn.qbox.me';
 
 var conn = new qiniu.digestauth.Client();
 
@@ -19,35 +19,35 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
   if (resp.code != 200) {
     return;
   }
-});
+  var opts = {
+    scope: bucket,
+    expires: 3600,
+    callbackUrl: null,
+    callbackBodyType: null,
+    customer: "sunikbear@gmail.com"
+  };
+  var token = new qiniu.auth.UploadToken(opts);
+  var uploadToken = token.generateToken();
+  var mimeType = mime.lookup(key);
+ 
+  var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket); 
 
-var rs = new qiniu.rs.Service(conn, bucket);
-var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket);
+  var localFile = key,
+      customMeta = "",
+      callbackParams = {},
+      enableCrc32Check = false;
 
-var scpoe = bucket,
-    expires = 3600,
-    callbackUrl = null,
-    callbackBodyType = "",
-    customer = "sunikbear@gmail.com";
-var token = new qiniu.token.UploadToken(scpoe, expires, callbackUrl, callbackBodyType, customer);
-var uploadToken = token.generateToken();
-var mimeType = mime.lookup(key);
-
-rs.drop(function(resp) {
-	console.log("\n===> Drop result: ", resp);
-  var customMeta = "";
-  var callbackParams = {};
-  var enableCrc32Check = false;
-
-  rs.uploadWithToken(uploadToken, key, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
-	  console.log("\n===> Upload File with Token result: ", resp);
+  imgrs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+	  console.log("\n===> Upload Image with Token result: ", resp);
 	  if (resp.code != 200) {
+      clear(imgrs);
 		  return;
 	  }
 
-    rs.get(key, friendlyName, function(resp) {
+    imgrs.get(key, friendlyName, function(resp) {
       console.log("\n===> Get result: ", resp);
       if (resp.code != 200) {
+        clear(imgrs);
         return;
       }
       var options = {
@@ -65,15 +65,44 @@ rs.drop(function(resp) {
       imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
         console.log("\n===> imageMogrifyAs result: ", resp);
         if (resp.code != 200) {
+          clear(imgrs);
           return;
         }
         imgrs.publish(DEMO_DOMAIN, function(resp) {
           console.log("\n===> Publish result: ", resp);
           if (resp.code != 200) {
+            clear(imgrs);
             return;
           }
+
+          imgrs.stat(key, function(resp) {
+		  	    console.log("\n===> Stat result: ", resp);
+		  	    if (resp.code != 200) {
+              clear(imgrs);
+					    return;
+				    }
+
+				    imgrs.get(key, friendName, function(resp) {
+				      console.log("\n===> Get result: ", resp);
+				      if (resp.code != 200) {
+                clear(imgrs);
+				        return;
+				      }
+
+				      imgrs.remove(key, function(resp) {
+                clear(imgrs);
+				        console.log("\n===> Delete result: ", resp);
+ 				      });
+				    });
+			    });
         });
       });
 	  });
 	});
 });
+
+function clear(imgrs){
+  imgrs.drop(function(resp){
+    console.log("\n===> Drop result: ", resp);
+  });
+}
