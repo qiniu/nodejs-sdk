@@ -40,7 +40,6 @@
   "dependencies": {
     "mime": "1.2.7",
     "formstream": "0.0.1"
-    "buffer-crc32": "0.1.1"
   },
   "devDependencies": {
     "should": "*",
