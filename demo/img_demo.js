@@ -4,9 +4,6 @@ var mime = require('mime');
 qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
 qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-qiniu.conf.ACCESS_KEY = '_dt6zz6pkUADJ3PXGsV-MOLCrkmVROjK9KBX1UIX';
-qiniu.conf.SECRET_KEY = 'Pm018nNBRInaVtJoiu8ezOOv5E5UEfbV9iXxVvWr';
-
 var bucket = 'test_image_bucket';
 var key = 'test.jpg'; // test.jpg must exists
 var friendlyName = key;
