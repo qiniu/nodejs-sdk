@@ -27,46 +27,82 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
 
 ### 示例程序
 
-    var qiniu = require("qiniu");
+   	var qiniu = require('../index.js');
+	var mime = require('mime');
 
-    qiniu.conf.ACCESS_KEY = '<YOUR_ACCESS_KEY>';
-    qiniu.conf.SECRET_KEY = '<YOUR_SECRET_KEY>';
+	qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+	qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-    var conn = new qiniu.digestauth.Client();
-    var rs = new qiniu.rs.Service(conn, "<YOUR_CUSTOM_BUCKET_NAME>");
+	var key = __filename;
+	var friendName = key;
+	var bucket = 'qiniu_test_bucket';
+	var DEMO_DOMAIN = bucket + '.dn.qbox.me';
 
-    // uploading by the server side
+	var conn = new qiniu.digestauth.Client();
 
-    var key = "test.js";
-    var friendlyName = key;
+	qiniu.rs.mkbucket(conn, bucket, function(resp) {
+  		console.log("\n===> Make bucket result: ", resp);
+  		if (resp.code != 200) {
+    		return;
+  		}
+	});
 
-    // uploading script self
-    rs.putFile(key, null, __filename, function(resp) {
-        console.log("\n===> PutFile result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
+	var rs = new qiniu.rs.Service(conn, bucket);
 
-        // get information and downalod url of the uploaded file
-        rs.get(key, friendlyName, function(resp) {
-            console.log("\n===> Get result: ", resp);
-            if (resp.code != 200) {
-                return;
-            }
-        });
-    });
+	var opts = {
+    	scope: bucket,
+    	expires: 3600,
+    	callbackUrl: null,
+    	callbackBodyType: null,
+    	customer: "sunikbear@gmail.com"
+  	};
+  	var token = new qiniu.auth.UploadToken(opts);
+  	var uploadToken = token.generateToken();
+  	var mimeType = mime.lookup(key);
 
 
-    // uploading by the client side
+	rs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+    	console.log("\n===> Upload File with Token result: ", resp);
+    	if (resp.code != 200) {
+      		clear(rs);
+      		return;
+    	}
+    	rs.publish(DEMO_DOMAIN, function(resp){
+      		console.log("\n===> Publish result: ", resp);
+      		if (resp.code != 200){
+        		clear(rs);
+        		return;
+      		}
+      		rs.stat(key, function(resp) {
+		  		console.log("\n===> Stat result: ", resp);
+		  		if (resp.code != 200) {
+          		clear(rs);
+					return;
+				}
 
-    rs.putAuth(function(resp) {
-        console.log("\n===> PutAuth result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-        // then send the resp.data.url to your clients
-        // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
-    });
+				rs.get(key, friendName, function(resp) {
+				  	console.log("\n===> Get result: ", resp);
+				  	if (resp.code != 200) {
+            			clear(rs);
+				    	return;
+				  	}
+
+				  	rs.remove(key, function(resp) {
+            			clear(rs);
+				    	console.log("\n===> Delete result: ", resp);
+				  	});
+				});
+			});
+		});
+	});
+	
+	function clear(rs) {
+ 		rs.drop(function(resp){
+    		console.log("\n===> Drop result: ", resp);
+  		});
+	}
+
+
 
 
 ## 贡献代码
