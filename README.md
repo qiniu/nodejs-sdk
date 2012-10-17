@@ -49,33 +49,59 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
 
 	var rs = new qiniu.rs.Service(conn, bucket);
 
-	var scpoe = bucket,
-    	expires = 3600,
-    	callbackUrl = null,
-    	callbackBodyType = "",
-    	customer = "sunikbear@gmail.com";
-	var token = new qiniu.token.UploadToken(scpoe, expires, callbackUrl, 				callbackBodyType, customer);
-	var uploadToken = token.generateToken();
-	var mimeType = mime.lookup(__filename);
+	var opts = {
+    	scope: bucket,
+    	expires: 3600,
+    	callbackUrl: null,
+    	callbackBodyType: null,
+    	customer: "sunikbear@gmail.com"
+  	};
+  	var token = new qiniu.auth.UploadToken(opts);
+  	var uploadToken = token.generateToken();
+  	var mimeType = mime.lookup(key);
 
-	rs.drop(function(resp){
-  		console.log("\n===> Drop result: ", resp);
-  		if (resp.code != 200) {
-    		return;
-  		}
 
-  		var localFile = __filename;
-  		var customMeta = "";
-  		var callbackParams = {};
-  		var enableCrc32Check = false;
+	rs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+    	console.log("\n===> Upload File with Token result: ", resp);
+    	if (resp.code != 200) {
+      		clear(rs);
+      		return;
+    	}
+    	rs.publish(DEMO_DOMAIN, function(resp){
+      		console.log("\n===> Publish result: ", resp);
+      		if (resp.code != 200){
+        		clear(rs);
+        		return;
+      		}
+      		rs.stat(key, function(resp) {
+		  		console.log("\n===> Stat result: ", resp);
+		  		if (resp.code != 200) {
+          		clear(rs);
+					return;
+				}
 
-  		rs.uploadWithToken(uploadToken, __filename, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
-	    	console.log("\n===> Upload File with Token result: ", resp);
-    		if (resp.code != 200) {
-      			return;
-    		}
-  		});
+				rs.get(key, friendName, function(resp) {
+				  	console.log("\n===> Get result: ", resp);
+				  	if (resp.code != 200) {
+            			clear(rs);
+				    	return;
+				  	}
+
+				  	rs.remove(key, function(resp) {
+            			clear(rs);
+				    	console.log("\n===> Delete result: ", resp);
+				  	});
+				});
+			});
+		});
 	});
+	
+	function clear(rs) {
+ 		rs.drop(function(resp){
+    		console.log("\n===> Drop result: ", resp);
+  		});
+	}
+
 
 
 

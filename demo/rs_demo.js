@@ -39,6 +39,9 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       customMeta = "",
       callbackParams = {},
       enableCrc32Check = false;
+//  rs.putAuth(function(resp){
+ //   uptoken = resp.data.url;
+//    rs.uploadFile(uptoken, key, mimeType, localFile, function(resp) {
  // rs.putFile(key, mimeType, localFile, function(resp){
   rs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
     console.log("\n===> Upload File with Token result: ", resp);
@@ -74,6 +77,8 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
 			});
     });
   });
+
+ //   });
 
 });
 
