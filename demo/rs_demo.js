@@ -4,6 +4,9 @@ var mime = require('mime');
 qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
 qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
+qiniu.conf.ACCESS_KEY = '_dt6zz6pkUADJ3PXGsV-MOLCrkmVROjK9KBX1UIX';
+qiniu.conf.SECRET_KEY = 'Pm018nNBRInaVtJoiu8ezOOv5E5UEfbV9iXxVvWr';
+
 var key = __filename;
 var friendName = key;
 var bucket = 'qiniu_test_bucket';
@@ -25,18 +28,18 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
   };
   var token = new qiniu.auth.UploadToken(opts);
   var uploadToken = token.generateToken();
-  var mimeType = mime.lookup(__filename);
+  var mimeType = mime.lookup(key);
 
   console.log("Upload Token: ", uploadToken);
   console.log("Mime Type: ", mimeType);
 
   var rs = new qiniu.rs.Service(conn, bucket);
 
-  var localFile = __filename,
+  var localFile = key,
       customMeta = "",
       callbackParams = {},
       enableCrc32Check = false;
-
+ // rs.putFile(key, mimeType, localFile, function(resp){
   rs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
     console.log("\n===> Upload File with Token result: ", resp);
     if (resp.code != 200) {
