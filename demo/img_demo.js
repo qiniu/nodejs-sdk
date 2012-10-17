@@ -36,7 +36,7 @@ qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
       callbackParams = {},
       enableCrc32Check = false;
 
-  imgrs.uploadWithToken(uploadToken, localFile, thumbnails_bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+  imgrs.uploadFileWithToken(uploadToken, localFile, thumbnails_bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
 	  console.log("\n===> Upload Image with Token result: ", resp);
 	  if (resp.code != 200) {
       clear(imgrs);

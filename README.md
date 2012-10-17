@@ -40,6 +40,7 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
 
 	var conn = new qiniu.digestauth.Client();
 
+	// 创建bucket
 	qiniu.rs.mkbucket(conn, bucket, function(resp) {
   		console.log("\n===> Make bucket result: ", resp);
   		if (resp.code != 200) {
@@ -47,6 +48,7 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
   		}
 	});
 
+	// 使用新创建的bucket创建RS服务
 	var rs = new qiniu.rs.Service(conn, bucket);
 
 	var opts = {
@@ -56,53 +58,67 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
     	callbackBodyType: null,
     	customer: "sunikbear@gmail.com"
   	};
+  	
+  	// 组装Upload Token上传参数
+  	// 产生规格详见文档：http://docs.qiniutek.com/v3/api/io/
+  	var localFile = key,
+  		 customMeta = "",
+  		 callbackParams = {},
+  		 enableCrc32Check = false;
+  		 
+  	// 创建 Upload Token
   	var token = new qiniu.auth.UploadToken(opts);
   	var uploadToken = token.generateToken();
   	var mimeType = mime.lookup(key);
 
-
-	rs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+	// 使用Upload Token以multipart/form-data形式上传文件
+	rs.uploadFileWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
     	console.log("\n===> Upload File with Token result: ", resp);
     	if (resp.code != 200) {
       		clear(rs);
       		return;
     	}
-    	rs.publish(DEMO_DOMAIN, function(resp){
-      		console.log("\n===> Publish result: ", resp);
-      		if (resp.code != 200){
-        		clear(rs);
-        		return;
-      		}
-      		rs.stat(key, function(resp) {
-		  		console.log("\n===> Stat result: ", resp);
-		  		if (resp.code != 200) {
-          		clear(rs);
-					return;
+    	
+    	// 查看文件属性
+      	rs.stat(key, function(resp) {
+		  	console.log("\n===> Stat result: ", resp);
+		  	if (resp.code != 200) {
+          	clear(rs);
+				return;
+			}
+			
+			// 获取文件下载链接（含文件属性信息）
+			rs.get(key, friendName, function(resp) {
+				console.log("\n===> Get result: ", resp);
+				if (resp.code != 200) {
+            		clear(rs);
+				   return;
 				}
-
-				rs.get(key, friendName, function(resp) {
-				  	console.log("\n===> Get result: ", resp);
-				  	if (resp.code != 200) {
-            			clear(rs);
-				    	return;
-				  	}
-
-				  	rs.remove(key, function(resp) {
-            			clear(rs);
-				    	console.log("\n===> Delete result: ", resp);
-				  	});
+				
+				// 删除文件
+				rs.remove(key, function(resp) {
+            		clear(rs);
+				   console.log("\n===> Delete result: ", resp);
 				});
 			});
 		});
 	});
 	
-	function clear(rs) {
+	// 将bucket的内容作为静态内容发布
+	rs.publish(DEMO_DOMAIN, function(resp){
+      	console.log("\n===> Publish result: ", resp);
+      	if (resp.code != 200){
+        	clear(rs);
+        	return;
+   		}
+   	});   	   					  	
+      		
+   	// 删除bucket，慎用！
+ 	function clear(rs) {
  		rs.drop(function(resp){
     		console.log("\n===> Drop result: ", resp);
   		});
 	}
-
-
 
 
 ## 贡献代码

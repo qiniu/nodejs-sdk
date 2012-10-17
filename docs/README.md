@@ -127,7 +127,7 @@ customer
 #### 服务端上传文件
 
 
-    rs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+    rs.uploadFileWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
     	console.log("\n===> Upload File with Token result: ", resp);
     	if (resp.code != 200) {
       		return;
