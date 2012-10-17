@@ -4,7 +4,6 @@ var mime = require('mime');
 qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
 qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-var bucket = 'test_image_bucket';
 var key = 'test.jpg'; // test.jpg must exists
 var friendlyName = key;
 
@@ -14,13 +13,13 @@ var DEMO_DOMAIN = thumbnails_bucket + '.dn.qbox.me';
 
 var conn = new qiniu.digestauth.Client();
 
-qiniu.rs.mkbucket(conn, bucket, function(resp) {
-  console.log("\n===> Make bucket result: ", resp);
+qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
+  console.log("\n===> Make thumbnails bucket result: ", resp);
   if (resp.code != 200) {
     return;
   }
   var opts = {
-    scope: bucket,
+    scope: thumbnails_bucket,
     expires: 3600,
     callbackUrl: null,
     callbackBodyType: null,
@@ -37,39 +36,41 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       callbackParams = {},
       enableCrc32Check = false;
 
-  imgrs.uploadWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+  imgrs.uploadWithToken(uploadToken, localFile, thumbnails_bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
 	  console.log("\n===> Upload Image with Token result: ", resp);
 	  if (resp.code != 200) {
       clear(imgrs);
 		  return;
 	  }
 
-    imgrs.get(key, friendlyName, function(resp) {
-      console.log("\n===> Get result: ", resp);
+    imgrs.publish(DEMO_DOMAIN, function(resp) {
+      console.log("\n===> Publish result: ", resp);
       if (resp.code != 200) {
         clear(imgrs);
         return;
       }
-      var options = {
-        "thumbnail": "!120x120r",
-        "gravity": "center",
-        "crop": "!120x120a0a0",
-        "quality": 85,
-        "rotate": 45,
-        "format": "jpg",
-        "auto_orient": true
-      };
 
-      console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
-
-      imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
-        console.log("\n===> imageMogrifyAs result: ", resp);
+      imgrs.get(key, friendlyName, function(resp) {
+        console.log("\n===> Get result: ", resp);
         if (resp.code != 200) {
           clear(imgrs);
           return;
         }
-        imgrs.publish(DEMO_DOMAIN, function(resp) {
-          console.log("\n===> Publish result: ", resp);
+
+        var options = {
+          "thumbnail": "!120x120r",
+          "gravity": "center",
+          "crop": "!120x120a0a0",
+          "quality": 85,
+          "rotate": 45,
+          "format": "jpg",
+          "auto_orient": true
+        };
+
+        console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
+
+        imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
+          console.log("\n===> imageMogrifyAs result: ", resp);
           if (resp.code != 200) {
             clear(imgrs);
             return;
@@ -81,19 +82,11 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
               clear(imgrs);
 					    return;
 				    }
-
-				    imgrs.get(key, friendName, function(resp) {
-				      console.log("\n===> Get result: ", resp);
-				      if (resp.code != 200) {
-                clear(imgrs);
-				        return;
-				      }
-
-				      imgrs.remove(key, function(resp) {
-                clear(imgrs);
-				        console.log("\n===> Delete result: ", resp);
- 				      });
-				    });
+	
+            imgrs.remove(key, function(resp) {
+              clear(imgrs);
+				      console.log("\n===> Delete result: ", resp);
+ 				    });
 			    });
         });
       });
