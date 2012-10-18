@@ -80,7 +80,7 @@ title: NodeJS SDK | 七牛云存储
         }
     });
 
-    // 势例化 Bucket 操作对象
+    // 实例化 Bucket 操作对象
     var rs = new qiniu.rs.Service(conn, "<YOUR_CUSTOM_BUCKET_NAME>");
 
 
@@ -133,7 +133,7 @@ customer
 #### 服务端上传文件
 
 
-    rs.uploadFileWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+    rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
         console.log("\n===> Upload File with Token result: ", resp);
         if (resp.code != 200) {
             return;
@@ -148,9 +148,6 @@ uploadToken
 
 localFile
 : 必须，字符串类型（String），本地文件可被读取的有效路径
-
-bucket
-: 必须，字符串类型（String），类似传统数据库里边的表名称，我们暂且将其叫做“资源表”，指定将该数据属性信息存储到具体的资源表中 。
 
 key
 : 必须，字符串类型（String），类似传统数据库里边某个表的主键ID，给每一个文件一个UUID用于进行标示。
