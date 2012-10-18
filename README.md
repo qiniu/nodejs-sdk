@@ -2,7 +2,7 @@
 
 ![logo](http://qiniutek.com/images/logo-2.png)
 
-该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v2/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
+该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
 
 jscoverage: [85%](http://fengmk2.github.com/coverage/qiniu.html)
 
@@ -23,49 +23,100 @@ jscoverage: [85%](http://fengmk2.github.com/coverage/qiniu.html)
 
 ## 使用
 
-SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.qiniutek.com/v2/sdk/nodejs/)
+SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.qiniutek.com/v3/sdk/nodejs/)
 
 ### 示例程序
 
-    var qiniu = require("qiniu");
+    var qiniu = require('qiniu');
 
-    qiniu.conf.ACCESS_KEY = '<YOUR_ACCESS_KEY>';
-    qiniu.conf.SECRET_KEY = '<YOUR_SECRET_KEY>';
+    // 配置密钥
+    qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+    qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
+    // 实例化带授权的 HTTP Client 对象
     var conn = new qiniu.digestauth.Client();
-    var rs = new qiniu.rs.Service(conn, "<YOUR_CUSTOM_BUCKET_NAME>");
 
-    // uploading by the server side
-
-    var key = "test.js";
-    var friendlyName = key;
-
-    // uploading script self
-    rs.putFile(key, null, __filename, function(resp) {
-        console.log("\n===> PutFile result: ", resp);
+    // 创建空间，也可以在开发者自助网站创建
+    var bucket = 'yet_another_bucket';
+    qiniu.rs.mkbucket(conn, bucket, function(resp) {
+        console.log("\n===> Make bucket result: ", resp);
         if (resp.code != 200) {
             return;
         }
+    });
 
-        // get information and downalod url of the uploaded file
-        rs.get(key, friendlyName, function(resp) {
-            console.log("\n===> Get result: ", resp);
+    // 实例化 Bucket 操作对象
+    var rs = new qiniu.rs.Service(conn, bucket);
+
+    // 上传文件第1步
+    // 生成上传授权凭证（uploadToken）
+    var opts = {
+        scope: "yet_another_bucket",
+        expires: 3600,
+        callbackUrl: "http://www.example.com/notifications/qiniurs", // 可选
+        callbackBodyType: "application/x-www-form-urlencoded", // 可选
+        customer: "username@example.com" // 可选
+    };
+    var token = new qiniu.auth.UploadToken(opts);
+    var uploadToken = token.generateToken();
+
+    // 上传文件第2步
+    // 组装上传文件所需要的参数
+    var key = __filename;
+    var localFile = key,
+        customMeta = "",
+        callbackParams = {"bucket": bucket, "key": key},
+        enableCrc32Check = false,
+        mimeType = mime.lookup(key);
+
+    // 上传文件第3步
+    // 上传文件
+    rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+        console.log("\n===> Upload File with Token result: ", resp);
+        if (resp.code != 200) {
+            // ...
+            return;
+        }
+
+        // 查看已上传文件属性信息
+        rs.stat(key, function(resp) {
+            console.log("\n===> Stat result: ", resp);
             if (resp.code != 200) {
+                // ...
                 return;
             }
         });
     });
 
 
-    // uploading by the client side
-
-    rs.putAuth(function(resp) {
-        console.log("\n===> PutAuth result: ", resp);
+    // 获取文件下载链接（含文件属性信息）
+    var saveAsFriendlyName = key;
+    rs.get(key, saveAsFriendlyName, function(resp) {
+        console.log("\n===> Get result: ", resp);
         if (resp.code != 200) {
+            // ...
             return;
         }
-        // then send the resp.data.url to your clients
-        // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
+    });
+
+    // 删除已上传文件
+    rs.remove(key, function(resp) {
+        console.log("\n===> Delete result: ", resp);
+    });
+
+    // 将bucket的内容作为静态内容发布
+    var DEMO_DOMAIN = bucket + '.dn.qbox.me';
+    rs.publish(DEMO_DOMAIN, function(resp){
+        console.log("\n===> Publish result: ", resp);
+        if (resp.code != 200){
+            clear(rs);
+            return;
+        }
+    });
+
+    // 删除bucket，慎用！
+    rs.drop(function(resp){
+        console.log("\n===> Drop result: ", resp);
     });
 
 
