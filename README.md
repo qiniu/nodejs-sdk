@@ -2,7 +2,7 @@
 
 ![logo](http://qiniutek.com/images/logo-2.png)
 
-该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v2/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
+该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
 
 jscoverage: [85%](http://fengmk2.github.com/coverage/qiniu.html)
 
@@ -27,46 +27,98 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.q
 
 ### 示例程序
 
-    var qiniu = require("qiniu");
+   	var qiniu = require('../index.js');
+	var mime = require('mime');
 
-    qiniu.conf.ACCESS_KEY = '<YOUR_ACCESS_KEY>';
-    qiniu.conf.SECRET_KEY = '<YOUR_SECRET_KEY>';
+	qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+	qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-    var conn = new qiniu.digestauth.Client();
-    var rs = new qiniu.rs.Service(conn, "<YOUR_CUSTOM_BUCKET_NAME>");
+	var key = __filename;
+	var friendName = key;
+	var bucket = 'qiniu_test_bucket';
+	var DEMO_DOMAIN = bucket + '.dn.qbox.me';
 
-    // uploading by the server side
+	var conn = new qiniu.digestauth.Client();
 
-    var key = "test.js";
-    var friendlyName = key;
+	// 创建bucket
+	qiniu.rs.mkbucket(conn, bucket, function(resp) {
+  		console.log("\n===> Make bucket result: ", resp);
+  		if (resp.code != 200) {
+    		return;
+  		}
+	});
 
-    // uploading script self
-    rs.putFile(key, null, __filename, function(resp) {
-        console.log("\n===> PutFile result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
+	// 使用新创建的bucket创建RS服务
+	var rs = new qiniu.rs.Service(conn, bucket);
 
-        // get information and downalod url of the uploaded file
-        rs.get(key, friendlyName, function(resp) {
-            console.log("\n===> Get result: ", resp);
-            if (resp.code != 200) {
-                return;
-            }
-        });
-    });
+	var opts = {
+    	scope: bucket,
+    	expires: 3600,
+    	callbackUrl: null,
+    	callbackBodyType: null,
+    	customer: "sunikbear@gmail.com"
+  	};
+  	
+  	// 组装Upload Token上传参数
+  	// 产生规格详见文档：http://docs.qiniutek.com/v3/api/io/
+  	var localFile = key,
+  		 customMeta = "",
+  		 callbackParams = {},
+  		 enableCrc32Check = false;
+  		 
+  	// 创建 Upload Token
+  	var token = new qiniu.auth.UploadToken(opts);
+  	var uploadToken = token.generateToken();
+  	var mimeType = mime.lookup(key);
 
-
-    // uploading by the client side
-
-    rs.putAuth(function(resp) {
-        console.log("\n===> PutAuth result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-        // then send the resp.data.url to your clients
-        // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
-    });
+	// 使用Upload Token以multipart/form-data形式上传文件
+	rs.uploadFileWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+    	console.log("\n===> Upload File with Token result: ", resp);
+    	if (resp.code != 200) {
+      		clear(rs);
+      		return;
+    	}
+    	
+    	// 查看文件属性
+      	rs.stat(key, function(resp) {
+		  	console.log("\n===> Stat result: ", resp);
+		  	if (resp.code != 200) {
+          	clear(rs);
+				return;
+			}
+			
+			// 获取文件下载链接（含文件属性信息）
+			rs.get(key, friendName, function(resp) {
+				console.log("\n===> Get result: ", resp);
+				if (resp.code != 200) {
+            		clear(rs);
+				   return;
+				}
+				
+				// 删除文件
+				rs.remove(key, function(resp) {
+            		clear(rs);
+				   console.log("\n===> Delete result: ", resp);
+				});
+			});
+		});
+	});
+	
+	// 将bucket的内容作为静态内容发布
+	rs.publish(DEMO_DOMAIN, function(resp){
+      	console.log("\n===> Publish result: ", resp);
+      	if (resp.code != 200){
+        	clear(rs);
+        	return;
+   		}
+   	});   	   					  	
+      		
+   	// 删除bucket，慎用！
+ 	function clear(rs) {
+ 		rs.drop(function(resp){
+    		console.log("\n===> Drop result: ", resp);
+  		});
+	}
 
 
 ## 贡献代码
