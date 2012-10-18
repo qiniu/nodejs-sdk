@@ -4,7 +4,7 @@ title: NodeJS SDK | 七牛云存储
 
 # NodeJS SDK 使用指南
 
-该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v2/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
+该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
 
 七牛云存储 NodeJS SDK 开放源代码地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
 
@@ -14,12 +14,10 @@ title: NodeJS SDK | 七牛云存储
 - [使用](#Usage)
     - [获取 ACCESS_KEY 和 SECRET_KEY](#appkey)
     - [应用接入与初始化](#establish_connection!)
-    - [客户端直传](#client-side-upload)
-        - [获取客户端用于上传文件用的临时授权URL](#put-auth)
-        - [客户端直传文件](client-multipart-upload)
-    - [服务端直传](#server-side-upload)
-        - [上传一个流](#put)
-        - [上传一个文件](#putFile)
+    - [上传文件](#upload)
+        - [获取用于上传文件的临时授权凭证](#generate-token)
+        - [服务端上传文件](#server-side-upload)
+        - [客户端上传文件](#client-side-upload)
     - [获取文件属性信息](#stat)
     - [获取文件下载链接（含文件属性信息）](#get)
     - [获取文件下载链接（断点续下载）](#getIfNotModified)
@@ -66,126 +64,108 @@ title: NodeJS SDK | 七牛云存储
 
     var qiniu = require("qiniu");
 
+    // 配置密钥
     qiniu.conf.ACCESS_KEY = '<YOUR_ACCESS_KEY>';
     qiniu.conf.SECRET_KEY = '<YOUR_SECRET_KEY>';
 
+    // 实例化带授权的 HTTP Client 对象
     var conn = new qiniu.digestauth.Client();
+    var bucket = "<YOUR_CUSTOM_BUCKET_NAME>";
+
+    // 创建空间，也可以在开发者自助网站创建
+    qiniu.rs.mkbucket(conn, bucket, function(resp) {
+        console.log("\n===> Make bucket result: ", resp);
+        if (resp.code != 200) {
+            return;
+        }
+    });
+
+    // 势例化 Bucket 操作对象
     var rs = new qiniu.rs.Service(conn, "<YOUR_CUSTOM_BUCKET_NAME>");
 
-<a name="client-side-upload"></a>
 
-### 客户端直传
+<a name="upload"></a>
 
-<a name="put-auth"></a>
+### 上传文件
 
-#### 获取客户端用于上传文件用的临时授权URL
+<a name="generate-token"></a>
 
-    rs.putAuth(function(resp) {
-        console.log("\n===> putAuth result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-        // then send the resp.data.url to your clients
-        // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
-    });
+#### 获取用于上传文件的临时授权凭证
 
-还可以使用 `rs.putAuthEx()` 方法来定制上传授权URL的有效时长，以及指定文件上传成功后七牛云存储服务器回调到您业务服务器的地址。示例代码如下：
+要上传一个文件，首先需要调用 SDK 提供的 `qiniu.token.UploadToken(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
 
-    var expiresIn = 86400;
-    var callbackUrl = 'http://example.com/notifications/qiniurs_callback';
 
-    rs.putAuthEx(expiresIn, callbackUrl, function(resp) {
-        console.log("\n===> putAuthEx result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-        // then send the resp.data.url to your clients
-        // for more details, see: http://docs.qiniutek.com/v2/api/io/#rs-PutAuth
-    });
+    var options = {
+        scope: <BucketName string>,
+        expires: <ExpiresInSeconds int>,
+        callbackUrl: <CallbackURL string>,
+        callbackBodyType: <HttpRequestContentType string>,
+        customer: <EndUserId string>
+    };
+
+var token = new qiniu.token.UploadToken(options);
+var uploadToken = token.generateToken();
+
+**options参数**
+
+scope
+: 必须，字符串类型（String），设定文件要上传到的目标 `bucket`
+
+expires
+: 可选，数字类型，用于设置上传 URL 的有效期，单位：秒，缺省为 3600 秒，即 1 小时后该上传链接不再有效（但该上传URL在其生成之后的59分59秒都是可用的）。
+
+:callbackUrl
+: 可选，字符串类型（String），用于设置文件上传成功后，七牛云存储服务端要回调客户方的业务服务器地址。
+
+callbackBodyType
+: 可选，字符串类型（String），用于设置文件上传成功后，七牛云存储服务端向客户方的业务服务器发送回调请求的 `Content-Type`。比如发送POST类型的表单数据回调，可以是 `application/x-www-form-urlencoded`。
+
+customer
+: 可选，字符串类型（String），客户方终端用户（End User）的ID，该字段可以用来标示一个文件的属主，这在一些特殊场景下（比如给终端用户上传的图片打上名字水印）非常有用。
 
 **响应**
 
-    {
-        code: 200,
-        data: {
-            expiresIn: 86400, // 缺省情况下是 3600 秒
-            url: 'http://<io-node-n>.qbox.me/upload/<UploadHandle>'
-        }
-    }
+返回一个字符串类型（String）的用于上传文件用的临时授权 `uploadToken`。
 
-<a name="client-multipart-upload"></a>
-
-#### 客户端直传文件
-
-一旦取得上传授权的URL后，客户端比如浏览器或者手持设备端就可以往这个URL开始上传文件了。如果是手持端，您可以参考七牛云存储的 ObjC 或者 Java SDK 提供的文件上传方法，如果是网页直传，您可以参考协议规格：[客户端直传](/v2/api/io/#rs-PutAuth)，也可以参考示例程序：[https://github.com/qiniu/nodejs-ajax-upload-example](https://github.com/qiniu/nodejs-ajax-upload-example)。
 
 <a name="server-side-upload"></a>
 
-### 服务端直传
+#### 服务端上传文件
 
-<a name="put"></a>
 
-#### 上传一个流
-
-    rs.put(key, mimeType, fp, bytes, function(resp){
-        console.log("\n===> put result: ", resp);
+    rs.uploadFileWithToken(uploadToken, localFile, bucket, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+        console.log("\n===> Upload File with Token result: ", resp);
         if (resp.code != 200) {
             return;
         }
     });
 
-**参数**
-
-key
-: 资源的ID
-
-mimeType
-: 资源的 MIME 类型
-
-fp
-: 数据流句柄
-
-bytes
-: 数据块大小
-
-callback function
-: 请求完成之后执行的回调函数
-
-**响应**
-
-如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
-
-    {
-        code: 200,
-        data: {
-            hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
-        }
-    }
-
-<a name="putFile"></a>
-
-#### 上传一个文件
-
-    rs.putFile(key, mimeType, localFile, function(resp){
-        console.log("\n===> putFile result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-    });
 
 **参数**
 
-key
-: 资源ID
-
-mimeType
-: 资源的 MIME 类型
+uploadToken
+: 必须，字符串类型（String），调用 `Qiniu::RS.generate_upload_token` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)
 
 localFile
-: 文件所在路径
+: 必须，字符串类型（String），本地文件可被读取的有效路径
 
-callback function
-: 请求完成之后执行的回调函数
+bucket
+: 必须，字符串类型（String），类似传统数据库里边的表名称，我们暂且将其叫做“资源表”，指定将该数据属性信息存储到具体的资源表中 。
+
+key
+: 必须，字符串类型（String），类似传统数据库里边某个表的主键ID，给每一个文件一个UUID用于进行标示。
+
+mimeType
+: 可选，字符串类型（String），文件的 mime-type 值。如若不传入，SDK 会自行计算得出，若计算失败缺省使用 `application/octet-stream` 代替之。
+
+customMeta
+: 可选，字符串类型（String），为文件添加备注信息。
+
+callbackParams
+: 可选，String 或者 Hash 类型，文件上传成功后，七牛云存储向客户方业务服务器发送的回调参数。
+
+enableCrc32Check
+: 可选，Boolean 类型，是否启用文件上传 crc32 校验，缺省为 false 。
 
 **响应**
 
@@ -197,6 +177,19 @@ callback function
             hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
         }
     }
+
+<a name="client-side-upload"></a>
+
+#### 客户端直传文件
+
+客户端上传流程和服务端上传类似，差别在于：客户端直传文件所需的 `uploadToken` 可以选择在客户方的业务服务器端生成，也可以选择在客户方的客户端程序里边生成。选择前者，可以和客户方的业务揉合得更紧密和安全些，比如防伪造请求。
+
+简单来讲，客户端上传流程也分为两步：
+
+1. 获取 `uploadToken`（[用于上传文件的临时授权凭证](#generate-upload-token)）
+2. 将该 `uploadToken` 作为文件上传流 `multipart/form-data` 中的一部分实现上传操作
+
+如果您的网络程序是从云端（服务端程序）到终端（手持设备应用）的架构模型，且终端用户有使用您移动端App上传文件（比如照片或视频）的需求，可以把您服务器得到的此 `uploadToken` 返回给手持设备端的App，然后您的移动 App 可以使用 [七牛云存储 Objective-SDK （iOS）](http://docs.qiniutek.com/v3/sdk/objc/) 或 [七牛云存储 Android-SDK](http://docs.qiniutek.com/v3/sdk/android/) 的相关上传函数或参照 [七牛云存储API之文件上传](http://docs.qiniutek.com/v3/api/io/#upload) 直传文件。这样，您的终端用户即可把数据（比如图片或视频）直接上传到七牛云存储服务器上无须经由您的服务端中转，而且在上传之前，七牛云存储做了智能加速，终端用户上传数据始终是离他物理距离最近的存储节点。当终端用户上传成功后，七牛云存储服务端会向您指定的 `callbackUrl` 发送回调数据。如果 `callbackUrl` 所在的服务处理完毕后输出 `JSON` 格式的数据，七牛云存储服务端会将该回调请求所得的响应信息原封不动地返回给终端应用程序。
 
 <a name="stat"></a>
 
@@ -414,7 +407,7 @@ options
         "auto_orient": <TrueOrFalse>
     }
 
-`qiniu.img.mogrify()` 方法是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v2/api/foimg/#fo-imageMogr)。
+`qiniu.img.mogrify()` 方法是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v3/api/foimg/#fo-imageMogr)。
 
 <a name="imageMogrifyAs"></a>
 
@@ -453,7 +446,7 @@ options
         "auto_orient": <TrueOrFalse>
     }
 
-`imgrs.imageMogrifyAs()` 方法同样是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v2/api/foimg/#fo-imageMogr)。
+`imgrs.imageMogrifyAs()` 方法同样是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v3/api/foimg/#fo-imageMogr)。
 
 **注意**
 
