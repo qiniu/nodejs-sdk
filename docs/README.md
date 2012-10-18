@@ -401,7 +401,7 @@ options
         "auto_orient": <TrueOrFalse>
     }
 
-`qiniu.img.mogrify()` 方法是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v2/api/foimg/#fo-imageMogr)。
+`qiniu.img.mogrify()` 方法是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v3/api/foimg/#fo-imageMogr)。
 
 <a name="imageMogrifyAs"></a>
 
@@ -440,7 +440,7 @@ options
         "auto_orient": <TrueOrFalse>
     }
 
-`imgrs.imageMogrifyAs()` 方法同样是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v2/api/foimg/#fo-imageMogr)。
+`imgrs.imageMogrifyAs()` 方法同样是对七牛云存储图像处理高级接口的完整包装，关于 `options` 参数里边的具体含义和使用方式，可以参考文档：[图像处理高级接口](#/v3/api/foimg/#fo-imageMogr)。
 
 **注意**
 

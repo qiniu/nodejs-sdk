@@ -23,7 +23,7 @@ jscoverage: [85%](http://fengmk2.github.com/coverage/qiniu.html)
 
 ## 使用
 
-SDK 使用文档参考：[http://docs.qiniutek.com/v2/sdk/nodejs/](http://docs.qiniutek.com/v2/sdk/nodejs/)
+SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.qiniutek.com/v3/sdk/nodejs/)
 
 ### 示例程序
 
