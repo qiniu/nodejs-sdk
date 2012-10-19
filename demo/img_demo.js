@@ -1,58 +1,101 @@
 var qiniu = require('../index.js');
+var mime = require('mime');
 
 qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
 qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-var bucket = 'test_image_bucket';
 var key = 'test.jpg'; // test.jpg must exists
 var friendlyName = key;
 
 var newkey = "test-cropped.jpg";
 var thumbnails_bucket = 'thumbnails_bucket';
-var DEMO_DOMAIN = 'iovip.qbox.me/' + thumbnails_bucket;
+var DEMO_DOMAIN = thumbnails_bucket + '.dn.qbox.me';
 
 var conn = new qiniu.digestauth.Client();
-var rs = new qiniu.rs.Service(conn, bucket);
-var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket);
 
-rs.drop(function(resp) {
-	console.log("\n===> Drop result: ", resp);
+qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
+  console.log("\n===> Make thumbnails bucket result: ", resp);
+  if (resp.code != 200) {
+    return;
+  }
+  var opts = {
+    scope: thumbnails_bucket,
+    expires: 3600,
+    callbackUrl: null,
+    callbackBodyType: null,
+    customer: null
+  };
+  var token = new qiniu.auth.UploadToken(opts);
+  var uploadToken = token.generateToken();
+  var mimeType = mime.lookup(key);
 
-	rs.putFile(key, "image/jpg", friendlyName, function(resp) {
-		console.log("\n===> PutFile result: ", resp);
-		if (resp.code != 200) {
-			return;
-		}
+  var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket);
 
-        rs.get(key, friendlyName, function(resp) {
-            console.log("\n===> Get result: ", resp);
-            if (resp.code != 200) {
-                return;
-            }
-            var options = {
-                "thumbnail": "!120x120r",
-                "gravity": "center",
-                "crop": "!120x120a0a0",
-                "quality": 85,
-                "rotate": 45,
-                "format": "jpg",
-                "auto_orient": true
-            };
+  var localFile = key,
+      customMeta = "",
+      callbackParams = {},
+      enableCrc32Check = false;
 
-            console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
+  imgrs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+      console.log("\n===> Upload Image with Token result: ", resp);
+      if (resp.code != 200) {
+          clear(imgrs);
+          return;
+      }
 
-            imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
-                console.log("\n===> imageMogrifyAs result: ", resp);
-                if (resp.code != 200) {
-                    return;
-                }
-                imgrs.publish(DEMO_DOMAIN, function(resp) {
-                    console.log("\n===> Publish result: ", resp);
-                    if (resp.code != 200) {
-                        return;
-                    }
-                });
-            });
-		});
-	});
+      imgrs.publish(DEMO_DOMAIN, function(resp) {
+          console.log("\n===> Publish result: ", resp);
+          if (resp.code != 200) {
+              clear(imgrs);
+              return;
+          }
+
+          imgrs.get(key, friendlyName, function(resp) {
+              console.log("\n===> Get result: ", resp);
+              if (resp.code != 200) {
+                  clear(imgrs);
+                  return;
+              }
+
+              var options = {
+                  "thumbnail": "!120x120r",
+                  "gravity": "center",
+                  "crop": "!120x120a0a0",
+                  "quality": 85,
+                  "rotate": 45,
+                  "format": "jpg",
+                  "auto_orient": true
+              };
+
+              console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
+
+              imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
+                  console.log("\n===> imageMogrifyAs result: ", resp);
+                  if (resp.code != 200) {
+                      clear(imgrs);
+                      return;
+                  }
+
+                  imgrs.stat(key, function(resp) {
+                      console.log("\n===> Stat result: ", resp);
+                      if (resp.code != 200) {
+                          clear(imgrs);
+                          return;
+                      }
+
+                      imgrs.remove(key, function(resp) {
+                          clear(imgrs);
+                          console.log("\n===> Delete result: ", resp);
+                      });
+                  });
+              });
+          });
+      });
+  });
 });
+
+function clear(imgrs){
+  imgrs.drop(function(resp){
+    console.log("\n===> Drop result: ", resp);
+  });
+}

@@ -5,4 +5,5 @@ module.exports = {
     digestauth: require(libpath + '/digestauth.js'),
     rs: require(libpath + '/rs.js'),
     img: require(libpath + '/img.js'),
+    auth: require(libpath + '/auth.js'),
 };

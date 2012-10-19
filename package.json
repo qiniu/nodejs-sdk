@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "1.4.1",
+  "version": "2.2.0",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {
@@ -32,6 +32,10 @@
     {
       "name": "why404",
       "email": "awhy.xu@gmail.com"
+    },
+    {
+      "name": "ikbear",
+      "email": "sunikbear@gmail.com"
     }
   ],
   "engines": [
@@ -39,7 +43,8 @@
   ],
   "dependencies": {
     "mime": "1.2.7",
-    "formstream": "0.0.1"
+    "formstream": "0.0.2",
+    "crc": "0.2.0"
   },
   "devDependencies": {
     "should": "*",
