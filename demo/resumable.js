@@ -1,15 +1,24 @@
-var qiniu = require('../index.js');
+var fs = require("fs");
 var mime = require('mime');
+var qiniu = require('../index.js');
 
 qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
 qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-var key = __filename;
+var key = "bigfile.txt";
+
 var friendName = key;
 var bucket = 'qiniu_test_bucket';
 var DEMO_DOMAIN = bucket + '.dn.qbox.me';
 
 var conn = new qiniu.digestauth.Client();
+
+// 创建一个大文件，时间较长，可以自己选定一个已存在的大文件进行上传
+for (var i = 0; i < 10000000; i++) {
+  var random = Math.floor((Math.random()*10)+1);
+  random = random.toString() + " ";
+  fs.appendFileSync(key, random);
+}
 
 qiniu.rs.mkbucket(conn, bucket, function(resp) {
   console.log("\n===> Make bucket result: ", resp);
@@ -35,7 +44,7 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
 
   var rs = new qiniu.rs.Service(conn, bucket);
   var resumable = new qiniu.up.ResumableUpload(conn, uploadToken, bucket, key, mimeType, customMeta, customer, callbackParams);
-  var result = resumable.upload(__filename, function(resp){
+  var result = resumable.upload(key, function(resp){
     rs.get(key, friendName, function(resp) {
       console.log("\n===> Get result: ", resp);
       if (resp.code != 200) {
@@ -46,6 +55,9 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       rs.remove(key, function(resp) {
           clear(rs);
           console.log("\n===> Delete result: ", resp);
+          fs.unlink(key, function(resp){
+            console.log("Big file deleted.");
+          });
       });
     });
 
@@ -61,4 +73,3 @@ function clear(rs) {
     console.log("\n===> Drop result: ", resp);
   });
 }
-
