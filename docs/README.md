@@ -17,6 +17,10 @@ title: NodeJS SDK | 七牛云存储
     - [上传文件](#upload)
         - [获取用于上传文件的临时授权凭证](#generate-token)
         - [服务端上传文件](#server-side-upload)
+            - [断点续上传方式](#resumable-upload)
+            - [非断点续传方式](#normal-upload)
+            - [默认上传方式](#default-upload)
+            - [针对NotFound处理场景](#upload-file-not-found)
         - [客户端上传文件](#client-side-upload)
     - [获取文件属性信息](#stat)
     - [获取文件下载链接（含文件属性信息）](#get)
@@ -132,6 +136,65 @@ customer
 
 #### 服务端上传文件
 
+<a name="resumable-upload"></a>
+
+##### 断点续上传方式
+
+如果您的客户所需上传的文件不一定能够一次性上传完成，上传的过程中可能中断，就需要使用断点续上传功能。组装用于断点续上传的up.ResumableUpload类。
+
+    var resumable = new up.ResumableUpload(conn, uploadToken, bucket, key, mimeType, customMeta, customer, callbackParams);
+    var result = resumable.upload(key, function(resp){
+        rs.get(key, friendName, function(resp) {
+            console.log("\n===> Get result: ", resp);
+            if (resp.code != 200) {
+                clear(rs);
+                return;
+            }
+        }
+    }
+
+**参数**
+
+conn
+: 必须，digestauth.Client()类型，用于处理向七牛云存储服务器端发出http请求。
+
+uploadToken
+: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-token)
+
+bucket
+: 必须，字符串类型（String），文件上传后所保存的bucket。
+
+key
+: 必须，字符串类型（String），类似传统数据库里边某个表的主键ID，给每一个文件一个UUID用于进行标示。
+
+mimeType
+: 可选，字符串类型（String），文件的 mime-type 值。如若不传入，SDK 会自行计算得出，若计算失败缺省使用 `application/octet-stream` 代替之。
+
+customMeta
+: 可选，字符串类型（String），为文件添加备注信息。
+
+customer
+: 可选，字符串类型（String），标记客户信息。
+
+callbackParams
+: 可选，String 或者 Hash 类型，文件上传成功后，七牛云存储向客户方业务服务器发送的回调参数。
+
+**响应**
+
+up.ResumableUpload类组装完成后，即可使用它提供的upload(filename, callback)方法来上传文件。其中filename为要上传文件的文件名，也可以是一个本地路径。如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
+
+    {
+        code: 200,
+        data: {
+            hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
+        }
+    }
+
+<a name="normal-upload"></a>
+
+##### 非断点续上传方式
+
+如果您确定客户端上传的东西无需使用断点续上传方式进行上传，可以使用rs.uploadFileWithToken()。
 
     rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
         console.log("\n===> Upload File with Token result: ", resp);
@@ -144,7 +207,7 @@ customer
 **参数**
 
 uploadToken
-: 必须，字符串类型（String），调用 `Qiniu::RS.generate_upload_token` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)
+: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-token)
 
 localFile
 : 必须，字符串类型（String），本地文件可被读取的有效路径
@@ -174,6 +237,26 @@ enableCrc32Check
             hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
         }
     }
+
+<a name="default-upload"></a>
+
+##### 默认上传方式
+
+up.Upload()函数封装了以上断点续上传和非断点续上传的方式。如果您上传的文件大于设置的BLOCK大小（该值可以在conf.js配置文件中进行设置），则默认采用断点续上传的方式进行上传。否则，采用普通的方式进行上传。
+
+<a name="upload-file-not-found"></a>
+
+##### 针对 NotFound 场景处理
+
+您可以上传一个应对 HTTP 404 出错处理的文件，当您 [创建公开外链](#publish) 后，若公开的外链找不到该文件，即可使用您上传的“自定义404文件”代替之。要这么做，您只须使用 `up.Upload()` 函数上传一个 `key` 为固定字符串类型的值 `errno-404` 即可。
+
+除了使用 SDK 提供的方法，同样也可以借助七牛云存储提供的命令行辅助工具 [qboxrsctl](https://github.com/qiniu/devtools/tags) 达到同样的目的：
+
+    qboxrsctl put <Bucket> <Key> <LocalFile>
+
+将其中的 `<Key>` 换作  `errno-404` 即可。
+
+注意，每个 `<Bucket>` 里边有且只有一个 `errno-404` 文件，上传多个，最后的那一个会覆盖前面所有的。
 
 <a name="client-side-upload"></a>
 
@@ -488,3 +571,4 @@ Copyright (c) 2012 qiniutek.com
 基于 MIT 协议发布:
 
 * [www.opensource.org/licenses/MIT](http://www.opensource.org/licenses/MIT)
+
