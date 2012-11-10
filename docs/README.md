@@ -96,7 +96,7 @@ title: NodeJS SDK | 七牛云存储
 
 #### 获取用于上传文件的临时授权凭证
 
-要上传一个文件，首先需要调用 SDK 提供的 `qiniu.token.UploadToken(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
+要上传一个文件，首先需要调用 SDK 提供的 `qiniu.auth.UploadToken(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
 
 
     var options = {
@@ -107,7 +107,7 @@ title: NodeJS SDK | 七牛云存储
         customer: <EndUserId string>
     };
 
-var token = new qiniu.token.UploadToken(options);
+var token = new qiniu.auth.UploadToken(options);
 var uploadToken = token.generateToken();
 
 **options参数**
