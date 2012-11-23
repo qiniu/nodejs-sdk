@@ -17,7 +17,6 @@ title: NodeJS SDK | 七牛云存储
     - [上传文件](#upload)
         - [获取用于上传文件的临时授权凭证](#generate-token)
         - [服务端上传文件](#server-side-upload)
-            - [断点续上传方式](#resumable-upload)
             - [非断点续传方式](#normal-upload)
             - [默认上传方式](#default-upload)
             - [针对NotFound处理场景](#upload-file-not-found)
@@ -135,60 +134,6 @@ customer
 <a name="server-side-upload"></a>
 
 #### 服务端上传文件
-
-<a name="resumable-upload"></a>
-
-##### 断点续上传方式
-
-如果您的客户所需上传的文件不一定能够一次性上传完成，上传的过程中可能中断，就需要使用断点续上传功能。组装用于断点续上传的up.ResumableUpload类。
-
-    var resumable = new up.ResumableUpload(conn, uploadToken, bucket, key, mimeType, customMeta, customer, callbackParams);
-    var result = resumable.upload(key, function(resp){
-        rs.get(key, friendName, function(resp) {
-            console.log("\n===> Get result: ", resp);
-            if (resp.code != 200) {
-                clear(rs);
-                return;
-            }
-        }
-    }
-
-**参数**
-
-conn
-: 必须，digestauth.Client()类型，用于处理向七牛云存储服务器端发出http请求。
-
-uploadToken
-: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-token)
-
-bucket
-: 必须，字符串类型（String），文件上传后所保存的bucket。
-
-key
-: 必须，字符串类型（String），类似传统数据库里边某个表的主键ID，给每一个文件一个UUID用于进行标示。
-
-mimeType
-: 可选，字符串类型（String），文件的 mime-type 值。如若不传入，SDK 会自行计算得出，若计算失败缺省使用 `application/octet-stream` 代替之。
-
-customMeta
-: 可选，字符串类型（String），为文件添加备注信息。
-
-customer
-: 可选，字符串类型（String），标记客户信息。
-
-callbackParams
-: 可选，String 或者 Hash 类型，文件上传成功后，七牛云存储向客户方业务服务器发送的回调参数。
-
-**响应**
-
-up.ResumableUpload类组装完成后，即可使用它提供的upload(filename, callback)方法来上传文件。其中filename为要上传文件的文件名，也可以是一个本地路径。如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
-
-    {
-        code: 200,
-        data: {
-            hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
-        }
-    }
 
 <a name="normal-upload"></a>
 
