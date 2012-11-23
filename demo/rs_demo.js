@@ -6,7 +6,7 @@ qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
 var key = __filename;
 var friendName = key;
-var bucket = 'qiniu_test_bucket';
+var bucket = 'qiniu_test_bucket_ikbear';
 var DEMO_DOMAIN = bucket + '.dn.qbox.me';
 
 var conn = new qiniu.digestauth.Client();
