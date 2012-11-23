@@ -17,6 +17,9 @@ title: NodeJS SDK | 七牛云存储
     - [上传文件](#upload)
         - [获取用于上传文件的临时授权凭证](#generate-token)
         - [服务端上传文件](#server-side-upload)
+            - [非断点续传方式](#normal-upload)
+            - [默认上传方式](#default-upload)
+            - [针对NotFound处理场景](#upload-file-not-found)
         - [客户端上传文件](#client-side-upload)
     - [获取文件属性信息](#stat)
     - [获取文件下载链接（含文件属性信息）](#get)
@@ -92,7 +95,7 @@ title: NodeJS SDK | 七牛云存储
 
 #### 获取用于上传文件的临时授权凭证
 
-要上传一个文件，首先需要调用 SDK 提供的 `qiniu.token.UploadToken(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
+要上传一个文件，首先需要调用 SDK 提供的 `qiniu.auth.UploadToken(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
 
 
     var options = {
@@ -103,7 +106,7 @@ title: NodeJS SDK | 七牛云存储
         customer: <EndUserId string>
     };
 
-var token = new qiniu.token.UploadToken(options);
+var token = new qiniu.auth.UploadToken(options);
 var uploadToken = token.generateToken();
 
 **options参数**
@@ -132,6 +135,11 @@ customer
 
 #### 服务端上传文件
 
+<a name="normal-upload"></a>
+
+##### 非断点续上传方式
+
+如果您确定客户端上传的东西无需使用断点续上传方式进行上传，可以使用rs.uploadFileWithToken()。
 
     rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
         console.log("\n===> Upload File with Token result: ", resp);
@@ -144,7 +152,7 @@ customer
 **参数**
 
 uploadToken
-: 必须，字符串类型（String），调用 `Qiniu::RS.generate_upload_token` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)
+: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-token)
 
 localFile
 : 必须，字符串类型（String），本地文件可被读取的有效路径
@@ -174,6 +182,26 @@ enableCrc32Check
             hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs'
         }
     }
+
+<a name="default-upload"></a>
+
+##### 默认上传方式
+
+up.Upload()函数封装了以上断点续上传和非断点续上传的方式。如果您上传的文件大于设置的BLOCK大小（该值可以在conf.js配置文件中进行设置），则默认采用断点续上传的方式进行上传。否则，采用普通的方式进行上传。
+
+<a name="upload-file-not-found"></a>
+
+##### 针对 NotFound 场景处理
+
+您可以上传一个应对 HTTP 404 出错处理的文件，当您 [创建公开外链](#publish) 后，若公开的外链找不到该文件，即可使用您上传的“自定义404文件”代替之。要这么做，您只须使用 `up.Upload()` 函数上传一个 `key` 为固定字符串类型的值 `errno-404` 即可。
+
+除了使用 SDK 提供的方法，同样也可以借助七牛云存储提供的命令行辅助工具 [qboxrsctl](https://github.com/qiniu/devtools/tags) 达到同样的目的：
+
+    qboxrsctl put <Bucket> <Key> <LocalFile>
+
+将其中的 `<Key>` 换作  `errno-404` 即可。
+
+注意，每个 `<Bucket>` 里边有且只有一个 `errno-404` 文件，上传多个，最后的那一个会覆盖前面所有的。
 
 <a name="client-side-upload"></a>
 
@@ -488,3 +516,4 @@ Copyright (c) 2012 qiniutek.com
 基于 MIT 协议发布:
 
 * [www.opensource.org/licenses/MIT](http://www.opensource.org/licenses/MIT)
+

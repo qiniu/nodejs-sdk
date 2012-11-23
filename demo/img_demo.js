@@ -8,7 +8,7 @@ var key = 'test.jpg'; // test.jpg must exists
 var friendlyName = key;
 
 var newkey = "test-cropped.jpg";
-var thumbnails_bucket = 'thumbnails_bucket';
+var thumbnails_bucket = 'thumbnails_bucket_ikbear';
 var DEMO_DOMAIN = thumbnails_bucket + '.dn.qbox.me';
 
 var conn = new qiniu.digestauth.Client();
