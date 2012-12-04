@@ -2,10 +2,10 @@ var fs = require("fs");
 var mime = require('mime');
 var qiniu = require('../index.js');
 
-qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
-qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
+qiniu.conf.ACCESS_KEY = 'L1-jLRHQoeKzZTNEbKllYdUFX3GbpoqKIuuy8zPe';
+qiniu.conf.SECRET_KEY = 'YCPWm5CDIEO7x1ZYarEHQ97fZYi4M4q9T8InM_zt';
 
-var key = "bigfile.txt";
+var key = "SocialFolders.pkg";
 
 var friendName = key;
 var bucket = 'qiniu_test_bucket';
@@ -14,11 +14,13 @@ var DEMO_DOMAIN = bucket + '.dn.qbox.me';
 var conn = new qiniu.digestauth.Client();
 
 // 创建一个大文件，时间较长，可以自己选定一个已存在的大文件进行上传
+/*
 for (var i = 0; i < 10000000; i++) {
   var random = Math.floor((Math.random()*10)+1);
   random = random.toString() + " ";
   fs.appendFileSync(key, random);
 }
+*/
 
 qiniu.rs.mkbucket(conn, bucket, function(resp) {
   console.log("\n===> Make bucket result: ", resp);
@@ -44,6 +46,7 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
 
   var rs = new qiniu.rs.Service(conn, bucket);
   var resumable = new qiniu.up.ResumableUpload(conn, uploadToken, bucket, key, mimeType, customMeta, customer, callbackParams);
+  
   var result = resumable.upload(key, function(resp){
     rs.get(key, friendName, function(resp) {
       console.log("\n===> Get result: ", resp);

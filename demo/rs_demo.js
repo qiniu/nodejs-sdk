@@ -1,8 +1,8 @@
 var qiniu = require('../index.js');
 var mime = require('mime');
 
-qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
-qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
+qiniu.conf.ACCESS_KEY = 'L1-jLRHQoeKzZTNEbKllYdUFX3GbpoqKIuuy8zPe';
+qiniu.conf.SECRET_KEY = 'YCPWm5CDIEO7x1ZYarEHQ97fZYi4M4q9T8InM_zt';
 
 var key = __filename;
 var friendName = key;
@@ -23,11 +23,11 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
     callbackBodyType: null,
     customer: null
   };
-  var token = new qiniu.auth.UploadToken(opts);
-  var uploadToken = token.generateToken();
-  var mimeType = mime.lookup(key);
-
-  var rs = new qiniu.rs.Service(conn, bucket);
+  
+  var token = new qiniu.auth.UploadToken(opts),
+      uploadToken = token.generateToken(),
+      mimeType = mime.lookup(key),
+      rs = new qiniu.rs.Service(conn, bucket);
 
   var localFile = key,
       customMeta = "",
