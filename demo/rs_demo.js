@@ -1,13 +1,13 @@
 var qiniu = require('../index.js');
 var mime = require('mime');
 
-qiniu.conf.ACCESS_KEY = 'L1-jLRHQoeKzZTNEbKllYdUFX3GbpoqKIuuy8zPe';
-qiniu.conf.SECRET_KEY = 'YCPWm5CDIEO7x1ZYarEHQ97fZYi4M4q9T8InM_zt';
+qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-var key = __filename;
+var key = "rs_demo_test_bucket_ikbear";
 var friendName = key;
-var bucket = 'qiniu_test_bucket_ikbear';
-var DEMO_DOMAIN = bucket + '.dn.qbox.me';
+var bucket = 'qiniudn_upload';
+var DEMO_DOMAIN = bucket + '.qiniudn.com';
 
 var conn = new qiniu.digestauth.Client();
 
@@ -29,7 +29,7 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       mimeType = mime.lookup(key),
       rs = new qiniu.rs.Service(conn, bucket);
 
-  var localFile = key,
+  var localFile = "test.jpg",
       customMeta = "",
       callbackParams = {},
       enableCrc32Check = false;

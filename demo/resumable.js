@@ -2,25 +2,16 @@ var fs = require("fs");
 var mime = require('mime');
 var qiniu = require('../index.js');
 
-qiniu.conf.ACCESS_KEY = 'L1-jLRHQoeKzZTNEbKllYdUFX3GbpoqKIuuy8zPe';
-qiniu.conf.SECRET_KEY = 'YCPWm5CDIEO7x1ZYarEHQ97fZYi4M4q9T8InM_zt';
+qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
+qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
-var key = "SocialFolders.pkg";
+var key = "test.jpg";
 
 var friendName = key;
 var bucket = 'qiniu_test_bucket';
-var DEMO_DOMAIN = bucket + '.dn.qbox.me';
+var DEMO_DOMAIN = bucket + '.qiniudn.com';
 
 var conn = new qiniu.digestauth.Client();
-
-// 创建一个大文件，时间较长，可以自己选定一个已存在的大文件进行上传
-/*
-for (var i = 0; i < 10000000; i++) {
-  var random = Math.floor((Math.random()*10)+1);
-  random = random.toString() + " ";
-  fs.appendFileSync(key, random);
-}
-*/
 
 qiniu.rs.mkbucket(conn, bucket, function(resp) {
   console.log("\n===> Make bucket result: ", resp);
@@ -41,27 +32,24 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
   var localFile = key,
       customMeta = "",
       customer = null,
+      rotate = null,
       callbackParams = {},
       enableCrc32Check = false;
 
   var rs = new qiniu.rs.Service(conn, bucket);
-  var resumable = new qiniu.up.ResumableUpload(conn, uploadToken, bucket, key, mimeType, customMeta, customer, callbackParams);
-  
+  var resumable = new qiniu.up.ResumableUpload(conn, uploadToken, bucket, key, mimeType, customMeta, customer, callbackParams, rotate);
+
   var result = resumable.upload(key, function(resp){
     rs.get(key, friendName, function(resp) {
       console.log("\n===> Get result: ", resp);
       if (resp.code != 200) {
-          clear(rs);
           return;
       }
 
-      rs.remove(key, function(resp) {
-          clear(rs);
+/*      rs.remove(key, function(resp) {
           console.log("\n===> Delete result: ", resp);
-          fs.unlink(key, function(resp){
-            console.log("Big file deleted.");
-          });
       });
+*/
     });
 
     console.log(resp);
@@ -70,9 +58,3 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
     }
   });
 });
-
-function clear(rs) {
-  rs.drop(function(resp){
-    console.log("\n===> Drop result: ", resp);
-  });
-}
