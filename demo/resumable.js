@@ -44,17 +44,24 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       console.log("\n===> Get result: ", resp);
       if (resp.code != 200) {
           return;
+          clear(rs);
       }
 
-/*      rs.remove(key, function(resp) {
-          console.log("\n===> Delete result: ", resp);
+      rs.remove(key, function(resp) {
+        console.log("\n===> Delete result: ", resp);
+        clear(rs);
       });
-*/
+
     });
 
-    console.log(resp);
     if (Math.floor(resp.code/100) === 2) {
       console.log("Upload Success(from ResumableUpload)!");
     }
   });
 });
+
+function clear(rs) {
+  rs.drop(function(resp){
+    console.log("\n===> Drop result: ", resp);
+  });
+}
