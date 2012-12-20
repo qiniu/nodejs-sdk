@@ -1,5 +1,7 @@
-var qiniu = require('../index.js');
+var fs = require('fs');
 var mime = require('mime');
+var path = require('path');
+var qiniu = require('../index.js');
 
 qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
 qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
@@ -33,9 +35,11 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       customMeta = "",
       callbackParams = {},
       enableCrc32Check = false;
-
-  rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
-    console.log("\n===> Upload File with Token result: ", resp);
+  
+  var stream = fs.createReadStream(localFile);
+  var filename = path.basename(localFile);
+  rs.uploadWithToken(uploadToken, filename, stream, key, mimeType, customMeta, callbackParams, function(resp){
+    console.log("\n===> Upload Stream with Token result: ", resp);
     if (resp.code != 200) {
       clear(rs);
       return;
