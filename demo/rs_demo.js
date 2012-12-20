@@ -32,7 +32,7 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
   var localFile = key,
       customMeta = "",
       callbackParams = {},
-      enableCrc32Check = false;
+      enableCrc32Check = true;
 
   rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
     console.log("\n===> Upload File with Token result: ", resp);
