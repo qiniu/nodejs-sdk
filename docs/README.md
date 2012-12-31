@@ -467,7 +467,7 @@ options
         "crop": <ImageSizeAndOffsetGeometry>,
         "quality": <ImageQuality>,
         "rotate": <RotateDegree>,
-        "format": <DestinationImageFormat>, =jpg, gif, png, tif, etc.
+        "format": <DestinationImageFormat>, = jpg, gif, png, tif, etc.
         "auto_orient": <TrueOrFalse>
     }
 

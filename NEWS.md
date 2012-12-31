@@ -1,5 +1,14 @@
 #CHANGELOG
 
+## v2.3.2
+
+2012-12-31
+
+updated:
+
+- 修复crc32编码but
+- 修复使用UploadToken方式上传时流式上传bug，流式上传不检查crc32
+
 ## v2.3.0
 
 2012-11-23
