@@ -6,7 +6,7 @@
 
 updated:
 
-- 修复crc32编码but
+- 修复crc32编码
 - 修复使用UploadToken方式上传时流式上传bug，流式上传不检查crc32
 
 ## v2.3.0
