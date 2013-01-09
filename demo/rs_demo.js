@@ -36,10 +36,8 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       callbackParams = {},
       enableCrc32Check = true;
 
-  var stream = fs.createReadStream(localFile);
-  var filename = path.basename(localFile);
-  rs.uploadWithToken(uploadToken, filename, stream, key, mimeType, customMeta, callbackParams, function(resp){
-    console.log("\n===> Upload Stream with Token result: ", resp);
+  rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
+    console.log("\n===> Upload File with Token result: ", resp);
     if (resp.code != 200) {
       clear(rs);
       return;
