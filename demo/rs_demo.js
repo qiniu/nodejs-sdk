@@ -1,5 +1,7 @@
-var qiniu = require('../index.js');
+var fs = require('fs');
+var path = require('path');
 var mime = require('mime');
+var qiniu = require('../index.js');
 
 qiniu.conf.ACCESS_KEY = '<Please apply your access key>';
 qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
