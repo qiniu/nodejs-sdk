@@ -19,3 +19,4 @@ node_modules
 npm-debug.log
 demo/test.jpg
 test/config.js
+demo/config.js
