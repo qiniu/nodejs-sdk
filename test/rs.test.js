@@ -192,8 +192,7 @@ describe('rs.test.js', function () {
         s.emit('data', text);
       }, 100);
 
-      rs.upload(upToken, 'test/rs.test.js.upload.timer.stream', null, 'stream.txt', s,
-      function (res) {
+      rs.upload(upToken, 'test/rs.test.js.upload.timer.stream', null, 'stream.txt', s, function (res) {
         res.should.have.keys('code', 'data');
         res.code.should.equal(200);
         res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
@@ -225,8 +224,7 @@ describe('rs.test.js', function () {
         s.emit('data', text);
       }, 1000);
 
-      var req = rs.upload(upToken, 'test/rs.test.js.upload.timer.stream.abort', null, 'stream.txt', s,
-      function (res) {
+      var req = rs.upload(upToken, 'test/rs.test.js.upload.timer.stream.abort', null, 'stream.txt', s, function (res) {
         res.should.have.keys('code', 'detail', 'error');
         res.code.should.equal(-1);
         res.error.should.equal('socket hang up');
