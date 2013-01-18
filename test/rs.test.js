@@ -40,13 +40,6 @@ describe('rs.test.js', function () {
     });
   });
 
-  after(function (done){
-    rs.drop(function (res) {
-      res.should.have.property('code', 200);
-      done();
-    });
-  });
-
   describe('putAuth()', function () {
 
     it('should return the auth upload url with default expires time 3600 seconds', function (done) {
