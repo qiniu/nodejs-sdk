@@ -23,35 +23,29 @@ var urlparse = require('url').parse;
 qiniu.conf.ACCESS_KEY = config.ACCESS_KEY;
 qiniu.conf.SECRET_KEY = config.SECRET_KEY;
 
-var conn = new qiniu.digestauth.Client();
+var bucket = config.bucket,
+    DEMO_DOMAIN = bucket + '.qiniudn.com',
+    imagefile = path.join(__dirname, 'logo.png');
 
-var bucket = config.bucket;
-var DEMO_DOMAIN = 'iovip.qbox.me/' + bucket;
-var imagefile = path.join(__dirname, 'logo.png');
-
-var rs = new qiniu.rs.Service(conn, bucket);
-
-function drop(done) {
-  rs.drop(function (res) {
-    res.should.have.property('code', 200);
-    done();
-  });
-}
+var conn = new qiniu.digestauth.Client(),
+    rs = new qiniu.rs.Service(conn, bucket);
 
 describe('rs.test.js', function () {
   var lastHash = null;
 
   before(function (done) {
-    drop(function () {
-      rs.putFile('rs.test.js.get', null, __filename, function (res) {
-        res.code.should.equal(200);
-        lastHash = res.data.hash;
-        done();
-      });
+    qiniu.rs.mkbucket(conn, bucket, function(res){
+      res.should.have.property('code', 200);
+      done();
     });
   });
 
-  after(drop);
+  after(function (done){
+    rs.drop(function (res) {
+      res.should.have.property('code', 200);
+      done();
+    });
+  });
 
   describe('putAuth()', function () {
 
@@ -252,7 +246,89 @@ describe('rs.test.js', function () {
 
   });
 
+  describe('uploadWithToken() && uploadFileWithToken()', function () {
+    var upToken = null;
+    beforeEach(function (done) {
+      var opts = {
+        scope: bucket,
+        expires: 3600,
+        callbackUrl: null,
+        callbackBodyType: null,
+        customer: null
+      };
+      var token = new qiniu.auth.UploadToken(opts);
+      upToken = token.generateToken();
+      done();
+    });
+
+    it('should upload a stream with key using upToken and form-date format', function (done) {
+
+      var s = new Stream();
+      var count = 0;
+      var size = 0;
+      var timer = setInterval(function () {
+        var text = 'I come from timer stream ' + count + '\n';
+        size += text.length;
+        count++;
+        if (count >= 5) {
+          clearInterval(timer);
+          process.nextTick(function () {
+            s.emit('end');
+          });
+        }
+        s.emit('data', text);
+      }, 100);
+
+      rs.uploadWithToken(upToken, s, "stream.txt", null, null, null, null, function (res) {
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = res.data.hash;
+        rs.get('stream.txt', 'stream.txt', function (res) {
+          res.code.should.equal(200);
+          res.data.hash.should.equal(lastHash);
+          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          res.data.fsize.should.equal(size);
+          done();
+        });
+      });
+    });
+
+    it('should upload a file with key using upToken and form-date format', function (done) {
+      var fstat = fs.statSync(__filename)
+        , size = fstat.size;
+
+      rs.uploadFileWithToken(upToken, __filename, "uploadfilewithtoken.txt", null, null, {}, false, function(res){
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = res.data.hash;
+        rs.get('uploadfilewithtoken.txt', 'uploadfilewithtoken.txt', function (res) {
+          res.code.should.equal(200);
+          res.data.hash.should.equal(lastHash);
+          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          res.data.fsize.should.equal(size);
+          done();
+        });
+      });
+
+    });
+
+  });
+
   describe('get()', function () {
+
+    var lastHash = null;
+
+    beforeEach(function (done) {
+      rs.putFile('rs.test.js.get', null, __filename, function (res) {
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        lastHash = res.data.hash;
+        done();
+      });
+    });
 
     it('should return a file download url', function (done) {
       rs.get('rs.test.js.get', 'download.js', function (res) {
