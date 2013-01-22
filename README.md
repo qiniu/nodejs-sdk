@@ -1,6 +1,6 @@
 # Node wrapper for Qiniu Resource (Cloud) Storage API
 
-[![Build Status](https://travis-ci.org/qiniu/nodejs-sdk.png?branch=master)](undefined)
+[![Build Status](https://travis-ci.org/qiniu/nodejs-sdk.png?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
 
 ![logo](http://qiniutek.com/images/logo-2.png)
 
