@@ -23,7 +23,7 @@ var urlparse = require('url').parse;
 qiniu.conf.ACCESS_KEY = config.ACCESS_KEY;
 qiniu.conf.SECRET_KEY = config.SECRET_KEY;
 
-var bucket = config.bucket,
+var bucket = "qiniutest" + Math.round(new Date().getTime() / 1000),
     DEMO_DOMAIN = bucket + '.qiniudn.com',
     imagefile = path.join(__dirname, 'logo.png');
 

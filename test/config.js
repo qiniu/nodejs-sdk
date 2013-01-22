@@ -1,5 +1,4 @@
 module.exports = {
-  ACCESS_KEY: 'ZXNF7bDoBmq-Qms9wPNPBAPtMMhOIe9UgL6hr9H_',
-  SECRET_KEY: 'O9yirPRXghIwEdQuf0XGt16uIDp4s-8DmTRcAxCq',
-  bucket: 'qiniutest',
+  ACCESS_KEY: '2FRuiVGEsA511NS9pNd2uvuSB3k5ozXE_DHCH8Ov',
+  SECRET_KEY: 'CIRtcmymB3VeIfXebFvYxmMmH9u2oLKW6rffVvoK',
 };
