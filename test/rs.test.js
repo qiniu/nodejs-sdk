@@ -15,13 +15,12 @@ var http = require('http');
 var fs = require('fs');
 var should = require('should');
 var qiniu = require('../');
-var config = require('./config.js');
 var path = require('path');
 var pedding = require('pedding');
 var urlparse = require('url').parse;
 
-qiniu.conf.ACCESS_KEY = config.ACCESS_KEY;
-qiniu.conf.SECRET_KEY = config.SECRET_KEY;
+qiniu.conf.ACCESS_KEY = "2FRuiVGEsA511NS9pNd2uvuSB3k5ozXE_DHCH8Ov";
+qiniu.conf.SECRET_KEY = "CIRtcmymB3VeIfXebFvYxmMmH9u2oLKW6rffVvoK";
 
 var bucket = "qiniutest" + Math.round(new Date().getTime() / 1000),
     DEMO_DOMAIN = bucket + '.qiniudn.com',
