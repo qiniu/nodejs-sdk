@@ -19,8 +19,8 @@ var path = require('path');
 var pedding = require('pedding');
 var urlparse = require('url').parse;
 
-qiniu.conf.ACCESS_KEY = "2FRuiVGEsA511NS9pNd2uvuSB3k5ozXE_DHCH8Ov";
-qiniu.conf.SECRET_KEY = "CIRtcmymB3VeIfXebFvYxmMmH9u2oLKW6rffVvoK";
+qiniu.conf.ACCESS_KEY = QINIU_ACCESS_KEY;
+qiniu.conf.SECRET_KEY = QINIU_SECRET_KEY;
 
 var bucket = "qiniutest" + Math.round(new Date().getTime() / 1000),
     DEMO_DOMAIN = bucket + '.qiniudn.com',
