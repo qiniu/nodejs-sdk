@@ -22,7 +22,8 @@ var urlparse = require('url').parse;
 qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
 qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
 
-var bucket = "qiniutest" + Math.round(new Date().getTime() / 1000),
+var currentTime = new Date().getTime();
+var bucket = "qiniutest" + currentTime,
     DEMO_DOMAIN = bucket + '.qiniudn.com',
     imagefile = path.join(__dirname, 'logo.png');
 
@@ -34,6 +35,13 @@ describe('rs.test.js', function () {
 
   before(function (done) {
     qiniu.rs.mkbucket(conn, bucket, function(res){
+      res.should.have.property('code', 200);
+      done();
+    });
+  });
+
+  after(function (done) {
+    rs.drop(function (res) {
       res.should.have.property('code', 200);
       done();
     });
