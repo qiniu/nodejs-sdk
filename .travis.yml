@@ -3,4 +3,5 @@ node_js:
   - 0.8
   - 0.6
 before_script:
-  export QINIU_ACCESS_KEY="2FRuiVGEsA511NS9pNd2uvuSB3k5ozXE_DHCH8Ov" QINIU_SECRET_KEY="CIRtcmymB3VeIfXebFvYxmMmH9u2oLKW6rffVvoK"
+  - export QINIU_ACCESS_KEY="2FRuiVGEsA511NS9pNd2uvuSB3k5ozXE_DHCH8Ov"
+  - export QINIU_SECRET_KEY="CIRtcmymB3VeIfXebFvYxmMmH9u2oLKW6rffVvoK"
