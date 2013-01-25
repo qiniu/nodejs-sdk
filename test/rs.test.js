@@ -309,7 +309,49 @@ describe('rs.test.js', function () {
           done();
         });
       });
+    });
 
+    it('should upload a image with key using upToken with returnBody config', function (done) {
+      var fstat = fs.statSync(imagefile)
+        , size = fstat.size
+        , returnBody = '{ \
+          "author": "ikbear", \
+          "size": $(fsize), \
+          "hash": $(etag), \
+          "w": $(imageInfo.width), \
+          "h": $(imageInfo.height), \
+          "color": $(exif.ColorSpace.val) \
+        }'
+      var opts = {
+        scope: bucket,
+        expires: 3600,
+        callbackUrl: null,
+        callbackBodyType: null,
+        customer: null,
+        returnBody: returnBody
+      };
+      var token = new qiniu.auth.UploadToken(opts);
+      upToken = token.generateToken();
+
+      rs.uploadFileWithToken(upToken, imagefile, "logo.png", null, null, {}, false, function(res) {
+        res.should.have.keys('code', 'data');
+        res.data.should.have.keys('author', 'size', 'hash', 'w', 'h', 'color');
+
+        res.code.should.equal(200);
+        res.data.author.should.equal('ikbear');
+        res.data.size.should.equal(size);
+
+        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = res.data.hash;
+
+        rs.get('logo.png', 'logo.png', function(res) {
+          res.code.should.equal(200);
+          res.data.hash.should.equal(lastHash);
+          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          res.data.fsize.should.equal(size);
+          done();
+        });
+      });
     });
 
   });
