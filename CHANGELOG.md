@@ -1,5 +1,13 @@
 #CHANGELOG
 
+## v3.0.0
+
+2013-1-29
+
+updated:
+
+- 将 callback 方式由原来的 callback(resp) 改成 callback(err, data)。
+
 ## v2.3.2
 
 2012-12-31
