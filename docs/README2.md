@@ -18,7 +18,7 @@ title: NodeJS SDK | 七牛云存储
     - [文件上传](#upload)
         - [生成上传授权凭证（uploadToken）](#generate-upload-token)
         - [Node.js 服务端上传文件](#upload-server-side)
-            - [开启断点续上传](#resumable-upload)
+        - [Node.js 服务端上传流](#server-side-upload-stream)
         - [iOS / Android / Web 端直传文件说明](#upload-client-side)
     - [文件下载](#download)
         - [公有资源下载](#download-public-files)
@@ -79,12 +79,15 @@ title: NodeJS SDK | 七牛云存储
     var conn = new qiniu.digestauth.Client();
     var bucket = "<YOUR_CUSTOM_BUCKET_NAME>";
 
-    // 创建空间，也可以在开发者自助网站创建
-    qiniu.rs.mkbucket(conn, bucket, function(resp) {
-        console.log("\n===> Make bucket result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
+    // 创建空间，也可以在开发者自助网站（https://dev.qiniutek.com/ ）创建。
+    // 由于创建空间是一次性操作，建议开发者在网站后台自助创建以了解更多细节。
+    
+    qiniu.rs.mkbucket(conn, bucket, function(err, data) {
+      if (err) {
+        console.log("\n===> Make bucket error: ", err);
+        return;
+      }
+      console.log("\n===> Make bucket result: ", data);
     });
 
     // 实例化 Bucket 操作对象
@@ -172,8 +175,12 @@ title: NodeJS SDK | 七牛云存储
 							 , customMeta
 							 , callbackParams
 							 , enableCrc32Check
-							 , function(resp){
-								console.log("\n===> Upload File with Token result: ", resp);
+							 , function(err, data){
+							 	if (err) {
+							 		console.log("\n===> Upload File with Token error: ", err);
+							 		return;
+							 	}
+								console.log("\n===> Upload File with Token result: ", data);
 	});
 
 **参数**
@@ -198,6 +205,56 @@ callbackParams
 
 enableCrc32Check
 : 可选，Boolean 类型，是否启用文件上传 crc32 校验，缺省为 false 。
+
+**返回值**
+
+上传成功，返回如下一个 Hash：
+
+    {"hash"=>"FgHk-_iqpnZji6PsNr4ghsK5qEwR"}
+
+<a name="server-side-upload-stream"></a>
+
+#### Node.js 服务端上传流
+
+服务端可以通过 rs.uploadWithToken() 函数将一个流上传至七牛云端。使用方式如下：
+
+	rs.uploadWithToken(uploadToken
+						, stream
+						, key
+						, mimeType
+						, customMeta
+						, callbackParams
+						, crc32
+						, function(err, data){
+							if (err) {
+								console.log("\n===> Upload stream with token error: ", err);
+								return;
+							}
+						console.log("\n===> Upload stream with token result: ", data);
+	});
+	
+**参数**
+
+:uploadToken
+: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)。
+
+stream
+: 必须，用于上传的流。
+
+key
+: 必须，字符串类型（String），类似传统数据库里边某个表的主键ID，给每一个文件一个UUID用于进行标示。
+
+mimeType
+: 可选，字符串类型（String），文件的 mime-type 值。如若不传入，SDK 会自行计算得出，若计算失败缺省使用 `application/octet-stream` 代替之。
+
+customMeta
+: 可选，字符串类型（String），为文件添加备注信息。
+
+callbackParams
+: 可选，String 或者 Hash 类型，文件上传成功后，七牛云存储向客户方业务服务器发送的回调参数。
+
+crc32
+: 可选，数字类型，流的 crc32 校验码。若指定该值，则上传的时候会将该校验码上传至云端校验。
 
 **返回值**
 
@@ -312,11 +369,12 @@ pattern
 
 #### 查看单个文件属性信息
 
-    rs.stat(key, function(resp) {
-    	console.log("\n===> Stat result: ", resp);
-    	if (resp.code != 200) {
-       	return;
+    rs.stat(key, function(err, data) {
+    	if (err) {
+    		console.log("\n===> Stat result: ", err);
+    		return;
     	}
+    	console.log("\n===> Stat result: ", data);
 	});
 
 通过 SDK 提供的 rs.stat() 函数来查看单个文件的属性信息。
@@ -360,12 +418,12 @@ putTime
 
 #### 复制单个文件
 
-    rs.copy(sourceBucket, sourceKey, targetBucket, targetKey, function(resp) {
-    	if (resp === true) {
-       	console.log("Copy success!");
-    	} else {
+    rs.copy(sourceBucket, sourceKey, targetBucket, targetKey, function(err, data) {
+    	if (err) {
     		console.log("Copy fail!");
+    		return;
     	}
+    	console.log("Copy success!");
 	});
 
 可以通过 SDK 提供的 rs.copy() 函数来进行文件复制操作。
@@ -393,12 +451,12 @@ targetKey
 
 #### 移动单个文件
 
-    rs.move(sourceBucket, sourceKey, targetBucket, targetKey, function(resp) {
-    	if (resp === true) {
-       	console.log("Move success!");
-    	} else {
+    rs.move(sourceBucket, sourceKey, targetBucket, targetKey, function(err, data) {
+		if (err) {
     		console.log("Move fail!");
+    		return;
     	}
+    	console.log("Move success!");
 	});
 
 可以通过 SDK 提供的 rs.move() 函数来移动单个文件。
@@ -426,12 +484,12 @@ targetKey
 
 ### 删除单个文件
 
-    rs.remove(key, function(resp) {
-    	if (resp === true) {
-       	console.log("Delete success!");
-    	} else {
-    		console.log("Delete fail!");
+    rs.remove(key, function(err, data) {
+    	if (err) {
+    		console.log("Remove fail!");
+    		return;
     	}
+    	console.log("Remove success!");
 	});
 
 通过 SDK 提供的 rs.remove() 函数来删除单个文件。
@@ -453,11 +511,12 @@ key
 
 #### 批量获取文件属性信息
 
-    rs.batchGet(bucket, keys, function(resp) {
-    	console.log("\n===> Batch get result: ", resp);
-    	if (resp.code !== 200) {
-    		returnl;
+    rs.batchGet(bucket, keys, function(err, data) {
+    	if (err) {
+    		console.log("\n===> Batch get error: ", err);
+    		return;
     	}
+    	console.log("\n===> Batch get result: ", data);
     });
 
 rs.batchGet函数用于批量获取文件属性信息（含下载链接）的功能。
@@ -493,13 +552,30 @@ keys
 
 #### 批量复制文件
 
-    rs.batchCopy(entries, function(resp) {
-    	if (resp === true) {
-       	console.log("Batch copy success!");
-    	} else {
+    rs.batchCopy(entries, function(err, data) {
+    	if (err) {
     		console.log("Batch copy fail!");
+    		return;
     	}
-    });    
+    	console.log("Batch copy success!");
+    });
+    
+SDK 提供的 rs.batchCopy() 函数提供了进行批量复制的功能。
+
+**参数**
+
+entries
+: 必须，进行批量复制的源bucket:key与目标bucket:key对。示例：
+
+	entries = [
+		["sourceBucket1", "sourceKey1", "destBucket1", "destKey1"],
+		["sourceBucket2", "sourceKey2", "destBucket2", "destKey2"],
+		["sourceBucket3", "sourceKey3", "destBucket3", "destKey3"],
+		["sourceBucket4", "sourceKey4", "destBucket4", "destKey4"],
+		["sourceBucket5", "sourceKey5", "destBucket5", "destKey5"],
+		["sourceBucket6", "sourceKey6", "destBucket6", "destKey6"],
+		["sourceBucket7", "sourceKey7", "destBucket7", "destKey7"],
+	]
 
 **返回值**
 
@@ -510,14 +586,29 @@ keys
 
 #### 批量移动文件
 
-    rs.batchMove(entries, function(resp) {
-    	if (resp === true) {
-       	console.log("Batch move success!");
-    	} else {
+    rs.batchMove(entries, function(err, data) {
+    	if (err) {
     		console.log("Batch move fail!");
+    		return;
     	}
+    	console.log("Batch move success!");
     });
 
+**参数**
+
+entries
+: 必须，进行批量移动的源bucket:key与目标bucket:key对。示例：
+
+	entries = [
+		["sourceBucket1", "sourceKey1", "destBucket1", "destKey1"],
+		["sourceBucket2", "sourceKey2", "destBucket2", "destKey2"],
+		["sourceBucket3", "sourceKey3", "destBucket3", "destKey3"],
+		["sourceBucket4", "sourceKey4", "destBucket4", "destKey4"],
+		["sourceBucket5", "sourceKey5", "destBucket5", "destKey5"],
+		["sourceBucket6", "sourceKey6", "destBucket6", "destKey6"],
+		["sourceBucket7", "sourceKey7", "destBucket7", "destKey7"],
+	]
+	
 **返回值**
 
 如果批量移动成功，返回 `true` ，否则为 `false` 。
@@ -527,12 +618,12 @@ keys
 
 #### 批量删除文件
 
-    rs.batchDelete(bucket, keys, function(resp) {
-    	if (resp === true) {
-       	console.log("Batch delete success!");
-    	} else {
+    rs.batchDelete(bucket, keys, function(err, data) {
+    	if (err) {
     		console.log("Batch delete fail!");
+    		return;
     	}
+    	console.log("Batch delete success!");
     });
 
 参数同 `rs.batchGet()` 的参数一样。
@@ -541,12 +632,11 @@ keys
 
 如果批量删除成功，返回 `true` ，否则为 `false` 。
 
-
 <a name="Contributing"></a>
 
 ## 贡献代码
 
-七牛云存储 Ruby SDK 源码地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
+七牛云存储 Node.js SDK 源码地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
 
 1. 登录 [github.com](https://github.com)
 2. Fork [https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
@@ -559,7 +649,7 @@ keys
 
 ## 许可证
 
-Copyright (c) 2012 qiniutek.com
+Copyright (c) 2012-2013 qiniutek.com
 
 基于 MIT 协议发布:
 
