@@ -210,7 +210,7 @@ enableCrc32Check
 
 上传成功，返回如下一个 Hash：
 
-    {"hash"=>"FgHk-_iqpnZji6PsNr4ghsK5qEwR"}
+    {"hash" : "FgHk-_iqpnZji6PsNr4ghsK5qEwR"}
 
 <a name="server-side-upload-stream"></a>
 
@@ -260,7 +260,7 @@ crc32
 
 上传成功，返回如下一个 Hash：
 
-    {"hash"=>"FgHk-_iqpnZji6PsNr4ghsK5qEwR"}
+    {"hash" : "FgHk-_iqpnZji6PsNr4ghsK5qEwR"}
 
 
 #### iOS / Android / Web 端直传文件说明
@@ -389,11 +389,11 @@ callback function
 
 **返回值**
 
-如果操作成功，回调函数的 resp 参数返回如下一段 json 信息：
+如果操作成功，回调函数的 data 参数返回如下一段 json 信息：
 
     {
         code: 200,
-        data: {
+        detail: {
             fsize: 1275, // 资源大小
             hash: 'FrOXNat8VhBVmcMF3uGrILpTu8Cs', // 资源摘要值
             mimeType: 'application/octet-stream', // 资源的 MIME 类型
@@ -535,13 +535,13 @@ keys
 
     [
         {
-            "code" => 200,
-            "data" => {
-                "expires"  => 3600,
-                "fsize"    => 3053,
-                "hash"     => "Fu9lBSwQKbWNlBLActdx8-toAajv",
-                "mimeType" => "application/x-ruby",
-                "url"      => "http://iovip.qbox.me/file/<an-authorized-token>"
+            "code": 200,
+            "detail": {
+                "expires" 	: 3600,
+                "fsize"    : 3053,
+                "hash"     : "Fu9lBSwQKbWNlBLActdx8-toAajv",
+                "mimeType" : "application/x-ruby",
+                "url"      : "http://iovip.qbox.me/file/<an-authorized-token>"
             }
         },
         ...
