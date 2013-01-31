@@ -35,7 +35,7 @@ describe('rs.test.js', function () {
 
   before(function (done) {
     qiniu.rs.mkbucket(conn, bucket, function(err, data){
-      should.equal(err, null);
+      should.not.exists(err);
       data.should.have.property('code', 200);
       done();
     });
@@ -43,7 +43,7 @@ describe('rs.test.js', function () {
 
   after(function (done) {
     rs.drop(function (err, data) {
-      should.equal(err, null);
+      should.not.exists(err);
       data.should.have.property('code', 200);
       done();
     });
@@ -53,7 +53,7 @@ describe('rs.test.js', function () {
 
     it('should return the auth upload url with default expires time 3600 seconds', function (done) {
       rs.putAuth(function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.keys(['expiresIn', 'url']);
@@ -69,7 +69,7 @@ describe('rs.test.js', function () {
 
     it('should return the auth upload url with custom expires time 60 seconds and callback url', function (done) {
       rs.putAuthEx(60, 'http://127.0.0.1/callback', function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.keys(['expiresIn', 'url']);
@@ -85,7 +85,7 @@ describe('rs.test.js', function () {
 
     it('should upload a file with key', function (done) {
       rs.putFile('rs.test.js', null, __filename, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
@@ -107,15 +107,10 @@ describe('rs.test.js', function () {
       var stream = fs.createReadStream(__filename);
 
       var req = rs.put('rs.test.js.abort', null, stream, size, function (err, data) {
-        should.equal(err, "socket hang up");
-        data.should.have.keys('code', 'detail');
-        data.code.should.equal(-1);
-        data.detail.code.should.equal('ECONNRESET');
+        err.code.should.equal('ECONNRESET');
+
         rs.get('rs.test.js.abort', 'test.js', function (err, data) {
-          should.equal(err, 'E612');
-          data.should.have.keys('code', 'detail');
-          data.code.should.equal(612);
-          data.detail.error.should.equal('no such file or directory');
+          should.equal(err, 'Error: E612 : no such file or directory');
           done();
         });
       });
@@ -132,7 +127,7 @@ describe('rs.test.js', function () {
     var upToken = null;
     beforeEach(function (done) {
       rs.putAuth(function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.code.should.equal(200);
         upToken = data.detail.url;
         done();
@@ -141,13 +136,13 @@ describe('rs.test.js', function () {
 
     it('should upload a file with key using form-data format', function (done) {
       rs.uploadFile(upToken, 'test/rs.test.js.uploadFile', null, __filename, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
         var lastHash = data.detail.hash;
         rs.get('test/rs.test.js.uploadFile', 'foo.js', function (err, data) {
-          should.equal(err, null);
+          should.not.exists(err);
           data.code.should.equal(200);
           data.detail.hash.should.equal(lastHash);
           data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
@@ -171,7 +166,7 @@ describe('rs.test.js', function () {
     it('should upload a stream with key using form-data format', function (done) {
       var logoStream = fs.createReadStream(imagefile);
       rs.upload(upToken, 'test/rs.test.js.upload.logo.png', null, 'logo.png', logoStream, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
@@ -204,7 +199,7 @@ describe('rs.test.js', function () {
       }, 100);
 
       rs.upload(upToken, 'test/rs.test.js.upload.timer.stream', null, 'stream.txt', s, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
@@ -237,16 +232,11 @@ describe('rs.test.js', function () {
       }, 1000);
 
       var req = rs.upload(upToken, 'test/rs.test.js.upload.timer.stream.abort', null, 'stream.txt', s, function (err, data) {
-        should.equal(err, 'socket hang up');
-        data.should.have.keys('code', 'detail');
-        data.code.should.equal(-1);
-        data.detail.code.should.equal('ECONNRESET');
+        should.exists(err);
+        err.code.should.equal('ECONNRESET');
         rs.get('test/rs.test.js.upload.timer.stream.abort', 'stream.txt', function (err, data) {
-          should.equal(err, "E612");
-          data.should.have.keys('code', 'detail');
-          data.detail.should.have.key('error');
-          data.code.should.equal(612);
-          data.detail.error.should.equal('no such file or directory');
+          should.equal(err, 'Error: E612 : no such file or directory');
+
           done();
         });
       });
@@ -292,7 +282,7 @@ describe('rs.test.js', function () {
       }, 100);
 
       rs.uploadWithToken(upToken, s, "stream.txt", null, null, null, null, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
@@ -313,7 +303,7 @@ describe('rs.test.js', function () {
         , size = fstat.size;
 
       rs.uploadFileWithToken(upToken, __filename, "uploadfilewithtoken.txt", null, null, {}, false, function(err, data){
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
@@ -352,7 +342,7 @@ describe('rs.test.js', function () {
       upToken = token.generateToken();
 
       rs.uploadFileWithToken(upToken, imagefile, "logo.png", null, null, {}, false, function(err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.detail.should.have.keys('author', 'size', 'hash', 'w', 'h', 'color');
 
@@ -364,7 +354,7 @@ describe('rs.test.js', function () {
         var lastHash = data.detail.hash;
 
         rs.get('logo.png', 'logo.png', function(err, data) {
-          should.equal(err, null);
+          should.not.exists(err);
           data.should.have.keys('code', 'detail');
           data.code.should.equal(200);
           data.detail.hash.should.equal(lastHash);
@@ -383,7 +373,7 @@ describe('rs.test.js', function () {
 
     beforeEach(function (done) {
       rs.putFile('rs.test.js.get', null, __filename, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
@@ -394,7 +384,7 @@ describe('rs.test.js', function () {
 
     it('should return a file download url', function (done) {
       rs.get('rs.test.js.get', 'download.js', function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.code.should.equal(200);
         data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
         data.detail.expires.should.equal(3600);
@@ -422,18 +412,14 @@ describe('rs.test.js', function () {
 
     it('should return "file modified" when hash not match', function (done) {
       rs.getIfNotModified('rs.test.js.get', 'getIfNotModified.js', 'nohash', function (err, data) {
-        should.equal(err, "E608");
-        data.should.have.keys('detail', 'code');
-        data.detail.should.have.key('error');
-        data.code.should.equal(608);
-        data.detail.error.should.equal('file modified');
+        should.equal(err, 'Error: E608 : file modified');
         done();
       });
     });
 
     it('should return download url when hash match', function (done) {
       rs.getIfNotModified('rs.test.js.get', 'getIfNotModified.js', lastHash, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('detail', 'code');
         data.code.should.equal(200);
         data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
@@ -449,17 +435,11 @@ describe('rs.test.js', function () {
     it('should return "no such file or directory" when get the not exists key', function (done) {
       done = pedding(2, done);
       rs.get('not exists key', 'abc', function (err, data) {
-        should.equal(err, 'E612');
-        data.should.have.keys('code', 'detail');
-        data.code.should.equal(612);
-        data.detail.error.should.equal('no such file or directory');
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
       rs.getIfNotModified('not exists key', 'abc', 'hash', function (err, data) {
-        should.equal(err, 'E612');
-        data.should.have.keys('code', 'detail');
-        data.code.should.equal(612);
-        data.detail.error.should.equal('no such file or directory');
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
     });
@@ -470,7 +450,7 @@ describe('rs.test.js', function () {
 
     it('should return key stat info', function (done) {
       rs.stat('rs.test.js.get', function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.code.should.equal(200);
         data.detail.should.have.keys('fsize', 'hash', 'mimeType', 'putTime');
@@ -480,10 +460,7 @@ describe('rs.test.js', function () {
 
     it('should return "no such file or directory"', function (done) {
       rs.stat('not exists file', function (err, data) {
-        should.equal(err, 'E612');
-        data.should.have.keys('code', 'detail');
-        data.code.should.equal(612);
-        data.detail.error.should.equal('no such file or directory');
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
     });
@@ -493,7 +470,7 @@ describe('rs.test.js', function () {
   describe('remove()', function () {
     before(function (done) {
       rs.putFile('rs.test.js.remove', null, __filename, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.property('code', 200);
         done();
       });
@@ -501,14 +478,11 @@ describe('rs.test.js', function () {
 
     it('should remove a file by key', function (done) {
       rs.remove('rs.test.js.remove', function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.eql({ code: 200 });
         // remove a gain will error
         rs.remove('rs.test.js.remove', function (err, data) {
-          should.equal(err, 'E612');
-          data.should.have.keys('code', 'detail');
-          data.code.should.equal(612);
-          data.detail.error.should.equal('no such file or directory');
+          should.equal(err, 'Error: E612 : no such file or directory');
           done();
         });
       });
@@ -516,10 +490,7 @@ describe('rs.test.js', function () {
 
     it('should return "no such file or directory" when key not exists', function (done) {
       rs.remove('not exists file', function (err, data) {
-        should.equal(err, 'E612');
-        data.should.have.keys('code', 'detail');
-        data.code.should.equal(612);
-        data.detail.error.should.equal('no such file or directory');
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
     });
@@ -531,7 +502,7 @@ describe('rs.test.js', function () {
     var sourceURL = '';
     before(function (done) {
       rs.putFile('logo.png', null, imagefile, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.code.should.equal(200);
         rs.get('logo.png', 'abc', function (err, data) {
           data.should.have.property('code', 200);
@@ -547,7 +518,7 @@ describe('rs.test.js', function () {
         auto_orient: true,
         format: 'jpg',
       }, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.property('code', 200);
         data.detail.should.have.property('hash').with.match(/^[\w\-=]+$/);
         done();
@@ -560,7 +531,7 @@ describe('rs.test.js', function () {
 
     it('should publish a domain', function (done) {
       rs.publish(DEMO_DOMAIN, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.property('code', 200);
         // again will no problem
         rs.publish(DEMO_DOMAIN, function (err, data) {
@@ -573,14 +544,11 @@ describe('rs.test.js', function () {
 
     it('should unpublish a domain', function (done) {
       rs.unpublish(DEMO_DOMAIN, function (err, data) {
-        should.equal(err, null);
+        should.not.exists(err);
         data.should.have.property('code', 200);
         // again will error
         rs.unpublish(DEMO_DOMAIN, function (err, data) {
-          should.equal(err, "E599");
-          data.should.have.keys('code', 'detail');
-          data.code.should.equal(599);
-          data.detail.error.should.equal('Document not found');
+          should.equal(err, 'Error: E599 : Document not found');
           done();
         });
       });
