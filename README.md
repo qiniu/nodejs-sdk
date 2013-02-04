@@ -38,33 +38,40 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.q
     // 实例化带授权的 HTTP Client 对象
     var conn = new qiniu.digestauth.Client();
 
-    // 创建空间，也可以在开发者自助网站创建
+    // 空间名，开发者需自己在后台(http://dev.qiniutek.com)创建空间，并绑定一个域名
     var bucket = 'yet_another_bucket';
-    qiniu.rs.mkbucket(conn, bucket, function(resp) {
-        console.log("\n===> Make bucket result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-    });
 
     // 实例化 Bucket 操作对象
     var rs = new qiniu.rs.Service(conn, bucket);
 
     // 上传文件第1步
     // 生成上传授权凭证（uploadToken）
+    
+    // 自定义返回参数，文件上传完成后服务端会将这些参数返回给客户端。
+    
+    var returnBody = '{ \
+    	"author": "ikbear", \
+      	"size": $(fsize), \
+       "hash": $(etag), \
+       "w": $(imageInfo.width), \
+       "h": $(imageInfo.height), \
+       "color": $(exif.ColorSpace.val) \
+    }'
+        
     var opts = {
         scope: "yet_another_bucket",
         expires: 3600,
         callbackUrl: "http://www.example.com/notifications/qiniurs", // 可选
         callbackBodyType: "application/x-www-form-urlencoded", // 可选
         customer: "username@example.com" // 可选
+        returnBody: returnBody // 可选
     };
     var token = new qiniu.auth.UploadToken(opts);
     var uploadToken = token.generateToken();
 
     // 上传文件第2步
     // 组装上传文件所需要的参数
-    var key = __filename;
+    var key = "test.jpg";
     var localFile = key,
         customMeta = "",
         callbackParams = {"bucket": bucket, "key": key},
@@ -104,16 +111,6 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.q
     // 删除已上传文件
     rs.remove(key, function(resp) {
         console.log("\n===> Delete result: ", resp);
-    });
-
-    // 将bucket的内容作为静态内容发布
-    var DEMO_DOMAIN = bucket + '.dn.qbox.me';
-    rs.publish(DEMO_DOMAIN, function(resp){
-        console.log("\n===> Publish result: ", resp);
-        if (resp.code != 200){
-            clear(rs);
-            return;
-        }
     });
 
     // 删除bucket，慎用！
