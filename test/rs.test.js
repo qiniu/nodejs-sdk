@@ -25,7 +25,8 @@ qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
 var currentTime = new Date().getTime();
 var bucket = "qiniutest" + currentTime,
     DEMO_DOMAIN = bucket + '.qiniudn.com',
-    imagefile = path.join(__dirname, 'logo.png');
+    imagefile = path.join(__dirname, 'logo.png'),
+    gogopher = path.join(__dirname, 'gogopher.jpg');
 
 var conn = new qiniu.digestauth.Client(),
     rs = new qiniu.rs.Service(conn, bucket);
@@ -320,7 +321,7 @@ describe('rs.test.js', function () {
     });
 
     it('should upload a image with key using upToken with returnBody config', function (done) {
-      var fstat = fs.statSync(imagefile)
+      var fstat = fs.statSync(gogopher)
         , size = fstat.size
         , returnBody = '{ \
           "author": "ikbear", \
@@ -329,19 +330,32 @@ describe('rs.test.js', function () {
           "w": $(imageInfo.width), \
           "h": $(imageInfo.height), \
           "color": $(exif.ColorSpace.val) \
-        }'
+        }';
+
       var opts = {
+        escape: 1,
         scope: bucket,
         expires: 3600,
         callbackUrl: null,
-        callbackBodyType: null,
-        customer: null,
-        returnBody: returnBody
+        callbackBodyType: 'application/json',
+        customer: 'ikbear',
+        returnBody: returnBody,
+        asyncOps: 'imageMogr/auto-orient/thumbnail/!256x256r/gravity/center/crop/!256x256/quality/80/rotate/45'
       };
+
+      var  callbackParams = '{ \
+        "from": "ikbear", \
+        size: $(fsize), \
+        etag: $(etag), \
+        w: $(imageInfo.width), \
+        h: $(imageInfo.height), \
+        exif: $(exif) \
+      }';
+
       var token = new qiniu.auth.UploadToken(opts);
       upToken = token.generateToken();
 
-      rs.uploadFileWithToken(upToken, imagefile, "logo.png", null, null, {}, false, function(err, data) {
+      rs.uploadFileWithToken(upToken, gogopher, "gogopher.png", null, null, callbackParams, false, function(err, data) {
         should.not.exists(err);
         data.should.have.keys('code', 'detail');
         data.detail.should.have.keys('author', 'size', 'hash', 'w', 'h', 'color');
@@ -353,7 +367,7 @@ describe('rs.test.js', function () {
         data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
         var lastHash = data.detail.hash;
 
-        rs.get('logo.png', 'logo.png', function(err, data) {
+        rs.get("gogopher.png", 'gogopher.png', function(err, data) {
           should.not.exists(err);
           data.should.have.keys('code', 'detail');
           data.code.should.equal(200);
