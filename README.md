@@ -82,8 +82,8 @@ Nodejs SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http:/
     
     // 生成 UploadToken 所需参数以及相应的逻辑请参考相关文档(http://docs.qiniutek.com/v3/api/io/#upload-token) 
     
-    var token = new qiniu.auth.UploadToken(opts);
-    var uploadToken = token.generateToken();
+    var policy = new qiniu.auth.PutPolicy(opts);
+    var uploadToken = policy.generateToken();
 
     // 上传文件第2步
     // 组装上传文件所需要的参数
@@ -136,8 +136,8 @@ Nodejs SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http:/
     // downloadToken的生成逻辑详见文档：http://docs.qiniutek.com/v3/api/io/#private-download
     
     // 生成 downloadToken
-    var download = new qiniu.auth.DownloadToken();
-    var downloadToken = download.generateToken();
+    var policy = new qiniu.auth.GetPolicy();
+    var downloadToken = policy.generateToken();
     console.log("\n ===> Download token: ", downloadToken);
     
     // 图像处理，详见相关文档：http://docs.qiniutek.com/v3/api/foimg/

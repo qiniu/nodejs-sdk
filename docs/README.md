@@ -107,7 +107,7 @@ title: NodeJS SDK | 七牛云存储
 
 #### 生成上传授权凭证（uploadToken）
 
-要上传一个文件，首先需要调用 SDK 提供的 `qiniu.auth.UploadToken(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
+要上传一个文件，首先需要调用 SDK 提供的 `qiniu.auth.PutPolicy(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
 
 	var options = {
         scope: <BucketName string>,
@@ -119,9 +119,9 @@ title: NodeJS SDK | 七牛云存储
         asyncOps: <AsyncOps string>,
         returnBody: <ReturnBody string>,
     };
-    var token = new qiniu.auth.UploadToken(options);
-    var uploadToken = token.generateToken();
-
+    var policy = new qiniu.auth.PutPolicy(opts);
+    var uploadToken = policy.generateToken();
+    
 **参数**
 
 :scope
@@ -186,7 +186,7 @@ title: NodeJS SDK | 七牛云存储
 **参数**
 
 :uploadToken
-: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)
+: 必须，字符串类型（String），调用 `PutPolicy.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)
 
 localFile
 : 必须，字符串类型（String），本地文件可被读取的有效路径
@@ -236,7 +236,7 @@ enableCrc32Check
 **参数**
 
 :uploadToken
-: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)。
+: 必须，字符串类型（String），调用 `PutPolicy.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-upload-token)。
 
 stream
 : 必须，用于上传的流。
@@ -322,8 +322,8 @@ crc32
         expires: <ExpiresInSeconds int>,
         pattern: <DownloadPattern string>
     };
-    var token = new qiniu.auth.DownloadToken(options);
-    var downloadToken = token.generateToken();
+    var policy = new qiniu.auth.GetPolicy(options);
+    var downloadToken = policy.generateToken();
 
 **参数**
 

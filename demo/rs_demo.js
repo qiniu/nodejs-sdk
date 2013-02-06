@@ -29,8 +29,8 @@ qiniu.rs.mkbucket(conn, bucket, function(err, data) {
     callbackBodyType: null,
     customer: null
   };
-  var token = new qiniu.auth.UploadToken(opts);
-  var uploadToken = token.generateToken();
+  var policy = new qiniu.auth.PutPolicy(opts);
+  var uploadToken = policy.generateToken();
   var mimeType = mime.lookup(key);
 
   var rs = new qiniu.rs.Service(conn, bucket);

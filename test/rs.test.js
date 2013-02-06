@@ -259,8 +259,8 @@ describe('rs.test.js', function () {
         callbackBodyType: null,
         customer: null
       };
-      var token = new qiniu.auth.UploadToken(opts);
-      upToken = token.generateToken();
+      var policy = new qiniu.auth.PutPolicy(opts);
+      upToken = policy.generateToken();
       done();
     });
 
@@ -352,8 +352,8 @@ describe('rs.test.js', function () {
         exif: $(exif) \
       }';
 
-      var token = new qiniu.auth.UploadToken(opts);
-      upToken = token.generateToken();
+      var policy = new qiniu.auth.PutPolicy(opts);
+      upToken = policy .generateToken();
 
       rs.uploadFileWithToken(upToken, gogopher, "gogopher.png", null, null, callbackParams, false, function(err, data) {
         should.not.exists(err);
