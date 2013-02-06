@@ -8,16 +8,17 @@ var key = 'test.jpg'; // test.jpg must exists
 var friendlyName = key;
 
 var newkey = "test-cropped.jpg";
-var thumbnails_bucket = 'thumbnails_bucket_ikbear';
-var DEMO_DOMAIN = thumbnails_bucket + '.dn.qbox.me';
+var thumbnails_bucket = 'thumbnails';
+var DEMO_DOMAIN = thumbnails_bucket + '.qiniudn.com';
 
 var conn = new qiniu.digestauth.Client();
 
-qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
-  console.log("\n===> Make thumbnails bucket result: ", resp);
-  if (resp.code != 200) {
+qiniu.rs.mkbucket(conn, thumbnails_bucket, function(err, data) {
+  if (err) {
+    console.log("\n ===> Make bucket error: ", err);
     return;
   }
+  console.log("\n===> Make thumbnails bucket result: ", data);
   var opts = {
     scope: thumbnails_bucket,
     expires: 3600,
@@ -25,8 +26,8 @@ qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
     callbackBodyType: null,
     customer: null
   };
-  var token = new qiniu.auth.UploadToken(opts);
-  var uploadToken = token.generateToken();
+  var policy = new qiniu.auth.PutPolicy(opts);
+  var uploadToken = policy.generateToken();
   var mimeType = mime.lookup(key);
 
   var imgrs = new qiniu.rs.Service(conn, thumbnails_bucket);
@@ -36,26 +37,29 @@ qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
       callbackParams = {},
       enableCrc32Check = false;
 
-  imgrs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
-      console.log("\n===> Upload Image with Token result: ", resp);
-      if (resp.code != 200) {
-          clear(imgrs);
-          return;
+  imgrs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(err, data) {
+      if (err) {
+        console.log("\n ===> Upload Image with Token Error: ", err);
+        clear(imgrs);
+        return;
       }
+      console.log("\n===> Upload Image with Token result: ", data);
 
-      imgrs.publish(DEMO_DOMAIN, function(resp) {
-          console.log("\n===> Publish result: ", resp);
-          if (resp.code != 200) {
-              clear(imgrs);
-              return;
+      imgrs.publish(DEMO_DOMAIN, function(err, data) {
+          if (err) {
+            console.log("\n ===> Publish error: ", err);
+            clear(imgrs);
+            return;
           }
+          console.log("\n===> Publish result: ", data);
 
-          imgrs.get(key, friendlyName, function(resp) {
-              console.log("\n===> Get result: ", resp);
-              if (resp.code != 200) {
-                  clear(imgrs);
-                  return;
+          imgrs.get(key, friendlyName, function(err, data) {
+              if (err) {
+                clear(imgrs);
+                console.log("\n ===> Get error: ", err);
+                return;
               }
+              console.log("\n===> Get result: ", data);
 
               var options = {
                   "thumbnail": "!120x120r",
@@ -67,25 +71,33 @@ qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
                   "auto_orient": true
               };
 
-              console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(resp.data.url, options));
+              console.log("\n===> thumbnail url is: ", qiniu.img.mogrify(data.detail.url, options));
 
-              imgrs.imageMogrifyAs(newkey, resp.data.url, options, function(resp){
-                  console.log("\n===> imageMogrifyAs result: ", resp);
-                  if (resp.code != 200) {
-                      clear(imgrs);
-                      return;
+              imgrs.imageMogrifyAs(newkey, data.detail.url, options, function(err, data){
+                  if (err) {
+                    clear(imgrs);
+                    console.log("\n ===> imageMogrifyAs error: ", err);
+                    return;
                   }
+                  console.log("\n===> imageMogrifyAs result: ", data);
 
-                  imgrs.stat(key, function(resp) {
-                      console.log("\n===> Stat result: ", resp);
-                      if (resp.code != 200) {
-                          clear(imgrs);
-                          return;
+                  imgrs.stat(key, function(err, data) {
+                      if (err) {
+                        clear(imgrs);
+                        console.log("\n ===> Stat error: ", err);
+                        return;
                       }
+                      console.log("\n===> Stat result: ", data);
 
-                      imgrs.remove(key, function(resp) {
+                      imgrs.remove(key, function(err, data) {
+                          if (err) {
+                            clear(imgrs);
+                            console.log("\n ===> Delete error: ", err);
+                            return;
+                          }
+
                           clear(imgrs);
-                          console.log("\n===> Delete result: ", resp);
+                          console.log("\n===> Delete result: ", data);
                       });
                   });
               });
@@ -95,7 +107,11 @@ qiniu.rs.mkbucket(conn, thumbnails_bucket, function(resp) {
 });
 
 function clear(imgrs){
-  imgrs.drop(function(resp){
-    console.log("\n===> Drop result: ", resp);
+  imgrs.drop(function(err, data){
+    if (err) {
+      console.log("\n ===> Drop bucket error: ", err);
+      return;
+    }
+    console.log("\n===> Drop result: ", data);
   });
 }

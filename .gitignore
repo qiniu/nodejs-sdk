@@ -17,7 +17,4 @@ results
 
 node_modules
 npm-debug.log
-demo/*.jpg
-demo/rtest.js
-demo/itest.js
-demo/put.sh
+demo

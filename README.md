@@ -4,7 +4,7 @@
 
 ![logo](http://qiniutek.com/images/logo-2.png)
 
-该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
+该 SDK 适用于 NodeJS 0.6 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
 
 jscoverage: [85%](http://fengmk2.github.com/coverage/qiniu.html)
 
@@ -25,10 +25,23 @@ jscoverage: [85%](http://fengmk2.github.com/coverage/qiniu.html)
 
 ## 使用
 
-SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.qiniutek.com/v3/sdk/nodejs/)
+### 七牛云存储 API 文档
+
+七牛云存储的 API 文档是根本，涵盖了七牛提供的所有服务的 API 描述。Node.js SDK 以及相应的文档就是参考七牛云存储 API 文档写成的。目前，该文档包含以下内容：
+
+1. [应用接入与认证授权](http://docs.qiniutek.com/v3/api/auth/)
+2. [云存储接口](http://docs.qiniutek.com/v3/api/io/)
+3. [图像处理接口](http://docs.qiniutek.com/v3/api/foimg/)
+4. [音频 / 视频处理接口](http://docs.qiniutek.com/v3/api/avfop/)
+5. [理解常用术语](http://docs.qiniutek.com/v3/api/words/)
+6. [错误码参照表](http://docs.qiniutek.com/v3/api/code/)
+
+Nodejs SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.qiniutek.com/v3/sdk/nodejs/)
+
 
 ### 示例程序
 
+	// 载入七牛的 Node.js SDK
     var qiniu = require('qiniu');
 
     // 配置密钥
@@ -38,87 +51,107 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.q
     // 实例化带授权的 HTTP Client 对象
     var conn = new qiniu.digestauth.Client();
 
-    // 创建空间，也可以在开发者自助网站创建
+    // 空间名，开发者需自己在后台(http://dev.qiniutek.com)创建空间，并绑定一个域名
     var bucket = 'yet_another_bucket';
-    qiniu.rs.mkbucket(conn, bucket, function(resp) {
-        console.log("\n===> Make bucket result: ", resp);
-        if (resp.code != 200) {
-            return;
-        }
-    });
 
     // 实例化 Bucket 操作对象
     var rs = new qiniu.rs.Service(conn, bucket);
 
     // 上传文件第1步
     // 生成上传授权凭证（uploadToken）
+    
+    // 自定义返回参数，文件上传完成后服务端会将这些参数返回给客户端。
+    var returnBody = '{ \
+    	"author": "ikbear", \ //自定义返回字符串
+      	"size": $(fsize), \
+       "hash": $(etag), \
+       "w": $(imageInfo.width), \  // w、h 和 color 值都用于图片
+       "h": $(imageInfo.height), \
+       "color": $(exif.ColorSpace.val) \
+    }'
+        
     var opts = {
-        scope: "yet_another_bucket",
-        expires: 3600,
+    	 escape: 1,
+    	 scope: bucket,
+        expires: 3600, // 该 UploadToken 的有效期为 3600 秒，也即一个小时
         callbackUrl: "http://www.example.com/notifications/qiniurs", // 可选
         callbackBodyType: "application/x-www-form-urlencoded", // 可选
         customer: "username@example.com" // 可选
+        returnBody: returnBody // 可选
     };
-    var token = new qiniu.auth.UploadToken(opts);
-    var uploadToken = token.generateToken();
+    
+    // 生成 UploadToken 所需参数以及相应的逻辑请参考相关文档(http://docs.qiniutek.com/v3/api/io/#upload-token) 
+    
+    var policy = new qiniu.auth.PutPolicy(opts);
+    var uploadToken = policy.generateToken();
 
     // 上传文件第2步
     // 组装上传文件所需要的参数
-    var key = __filename;
+    var key = "test.jpg";
     var localFile = key,
         customMeta = "",
-        callbackParams = {"bucket": bucket, "key": key},
         enableCrc32Check = false,
         mimeType = mime.lookup(key);
+    
+    // 上传文件时指定的回掉参数    
+    var  callbackParams = '{ \
+        "from": "ikbear", \
+        size: $(fsize), \
+        etag: $(etag), \
+        w: $(imageInfo.width), \
+        h: $(imageInfo.height), \
+        exif: $(exif) \
+    }';
 
     // 上传文件第3步
     // 上传文件
-    rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
-        console.log("\n===> Upload File with Token result: ", resp);
-        if (resp.code != 200) {
-            // ...
+    rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(err, data){
+        if (err) {
+            // 上传文件失败
+            console.log("\n ===> Upload error!");
             return;
         }
+        
+        // 上传文件成功
+        console.log("\n ===> Upload file result: ", data);
 
         // 查看已上传文件属性信息
-        rs.stat(key, function(resp) {
-            console.log("\n===> Stat result: ", resp);
-            if (resp.code != 200) {
-                // ...
+        rs.stat(key, function(err, data) {
+            if (err) {
+                // 查看文件属性失败
+                console.log("\n ===> Stat error.");
                 return;
             }
+            
+            // 查看文件属性成功
+            console.log("\n ===> Stat result: ", data);
         });
     });
 
 
-    // 获取文件下载链接（含文件属性信息）
-    var saveAsFriendlyName = key;
-    rs.get(key, saveAsFriendlyName, function(resp) {
-        console.log("\n===> Get result: ", resp);
-        if (resp.code != 200) {
-            // ...
-            return;
-        }
-    });
-
+    // 获取文件，目前获取文件的方式有两种：
+    // 1) 针对公有资源，可以直接通过以下格式下载：http://<绑定域名>/<key>
+    // 2) 针对私有资源，无法通过获取公有资源的形式下载，只能通过 downloadToken 的形式下载。
+    // 下载方式：http://<bucket>.qiniudn.com/x.jpg?token=<token>，其中 <token> 为服务端颁发的 downloadToken。
+    // downloadToken的生成逻辑详见文档：http://docs.qiniutek.com/v3/api/io/#private-download
+    
+    // 生成 downloadToken
+    var policy = new qiniu.auth.GetPolicy();
+    var downloadToken = policy.generateToken();
+    console.log("\n ===> Download token: ", downloadToken);
+    
+    // 图像处理，详见相关文档：http://docs.qiniutek.com/v3/api/foimg/
+    // 音频/视频处理，详见相关文档：http://docs.qiniutek.com/v3/api/avfop/
+    
     // 删除已上传文件
-    rs.remove(key, function(resp) {
-        console.log("\n===> Delete result: ", resp);
-    });
-
-    // 将bucket的内容作为静态内容发布
-    var DEMO_DOMAIN = bucket + '.dn.qbox.me';
-    rs.publish(DEMO_DOMAIN, function(resp){
-        console.log("\n===> Publish result: ", resp);
-        if (resp.code != 200){
-            clear(rs);
-            return;
+    rs.remove(key, function(err, data) {
+        if (err) {
+        	// 删除文件失败
+        	console.log("\n ===> Remove key error.");
+        	return;
         }
-    });
-
-    // 删除bucket，慎用！
-    rs.drop(function(resp){
-        console.log("\n===> Drop result: ", resp);
+        
+        console.log("\n ===> Remove result: ", data);
     });
 
 

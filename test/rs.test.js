@@ -25,7 +25,8 @@ qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
 var currentTime = new Date().getTime();
 var bucket = "qiniutest" + currentTime,
     DEMO_DOMAIN = bucket + '.qiniudn.com',
-    imagefile = path.join(__dirname, 'logo.png');
+    imagefile = path.join(__dirname, 'logo.png'),
+    gogopher = path.join(__dirname, 'gogopher.jpg');
 
 var conn = new qiniu.digestauth.Client(),
     rs = new qiniu.rs.Service(conn, bucket);
@@ -34,15 +35,17 @@ describe('rs.test.js', function () {
   var lastHash = null;
 
   before(function (done) {
-    qiniu.rs.mkbucket(conn, bucket, function(res){
-      res.should.have.property('code', 200);
+    qiniu.rs.mkbucket(conn, bucket, function(err, data){
+      should.not.exists(err);
+      data.should.have.property('code', 200);
       done();
     });
   });
 
   after(function (done) {
-    rs.drop(function (res) {
-      res.should.have.property('code', 200);
+    rs.drop(function (err, data) {
+      should.not.exists(err);
+      data.should.have.property('code', 200);
       done();
     });
   });
@@ -50,12 +53,13 @@ describe('rs.test.js', function () {
   describe('putAuth()', function () {
 
     it('should return the auth upload url with default expires time 3600 seconds', function (done) {
-      rs.putAuth(function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.keys(['expiresIn', 'url']);
-        res.data.expiresIn.should.equal(3600);
-        res.data.url.should.match(/^http:\/\/iovip\.qbox\.me\/upload\/[\w\-]+$/);
+      rs.putAuth(function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.keys(['expiresIn', 'url']);
+        data.detail.expiresIn.should.equal(3600);
+        data.detail.url.should.match(/^http:\/\/iovip\.qbox\.me\/upload\/[\w\-]+$/);
         done();
       });
     });
@@ -65,12 +69,13 @@ describe('rs.test.js', function () {
   describe('putAuthEx()', function () {
 
     it('should return the auth upload url with custom expires time 60 seconds and callback url', function (done) {
-      rs.putAuthEx(60, 'http://127.0.0.1/callback', function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.keys(['expiresIn', 'url']);
-        res.data.expiresIn.should.equal(60);
-        res.data.url.should.match(/^http:\/\/iovip\.qbox\.me\/upload\/[\w\-=]+$/);
+      rs.putAuthEx(60, 'http://127.0.0.1/callback', function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.keys(['expiresIn', 'url']);
+        data.detail.expiresIn.should.equal(60);
+        data.detail.url.should.match(/^http:\/\/iovip\.qbox\.me\/upload\/[\w\-=]+$/);
         done();
       });
     });
@@ -80,19 +85,20 @@ describe('rs.test.js', function () {
   describe('putFile()', function () {
 
     it('should upload a file with key', function (done) {
-      rs.putFile('rs.test.js', null, __filename, function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+      rs.putFile('rs.test.js', null, __filename, function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
         done();
       });
     });
 
     it('should return error when file not exists', function (done) {
-      rs.putFile('rs.test.js.not.exists', null, __filename + '123', function (res) {
-        res.should.have.keys('code', 'error', 'detail');
-        res.code.should.equal(-1);
-        res.error.should.include('ENOENT');
+      rs.putFile('rs.test.js.not.exists', null, __filename + '123', function (err, data) {
+        err.should.have.keys('code', 'error', 'detail');
+        err.code.should.equal(-1);
+        err.error.should.include('ENOENT');
         done();
       });
     });
@@ -101,15 +107,11 @@ describe('rs.test.js', function () {
       var size = fs.statSync(__filename).size;
       var stream = fs.createReadStream(__filename);
 
-      var req = rs.put('rs.test.js.abort', null, stream, size, function (res) {
-        res.should.have.keys('code', 'detail', 'error');
-        res.code.should.equal(-1);
-        res.error.should.equal('socket hang up');
-        res.detail.code.should.equal('ECONNRESET');
-        rs.get('rs.test.js.abort', 'test.js', function (res) {
-          res.should.have.keys('code', 'error');
-          res.code.should.equal(612);
-          res.error.should.equal('no such file or directory');
+      var req = rs.put('rs.test.js.abort', null, stream, size, function (err, data) {
+        err.code.should.equal('ECONNRESET');
+
+        rs.get('rs.test.js.abort', 'test.js', function (err, data) {
+          should.equal(err, 'Error: E612 : no such file or directory');
           done();
         });
       });
@@ -125,51 +127,56 @@ describe('rs.test.js', function () {
 
     var upToken = null;
     beforeEach(function (done) {
-      rs.putAuth(function (res) {
-        res.code.should.equal(200);
-        upToken = res.data.url;
+      rs.putAuth(function (err, data) {
+        should.not.exists(err);
+        data.code.should.equal(200);
+        upToken = data.detail.url;
         done();
       });
     });
 
     it('should upload a file with key using form-data format', function (done) {
-      rs.uploadFile(upToken, 'test/rs.test.js.uploadFile', null, __filename, function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
-        var lastHash = res.data.hash;
-        rs.get('test/rs.test.js.uploadFile', 'foo.js', function (res) {
-          res.code.should.equal(200);
-          res.data.hash.should.equal(lastHash);
-          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
-          res.data.fsize.should.equal(fs.statSync(__filename).size);
+      rs.uploadFile(upToken, 'test/rs.test.js.uploadFile', null, __filename, function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = data.detail.hash;
+        rs.get('test/rs.test.js.uploadFile', 'foo.js', function (err, data) {
+          should.not.exists(err);
+          data.code.should.equal(200);
+          data.detail.hash.should.equal(lastHash);
+          data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          data.detail.fsize.should.equal(fs.statSync(__filename).size);
           done();
         });
       });
     });
 
     it('should return error when file not exists', function (done) {
-      rs.uploadFile(upToken, 'rs.test.js.not.exists', null, __filename + '123', function (res) {
-        res.should.have.keys('code', 'error', 'detail');
-        res.code.should.equal(-1);
-        res.error.should.include('ENOENT');
+      rs.uploadFile(upToken, 'rs.test.js.not.exists', null, __filename + '123', function (err, data) {
+        err.should.have.keys('code', 'error', 'detail');
+        err.code.should.equal(-1);
+        err.error.should.include('ENOENT');
+        err.detail.code.should.equal('ENOENT');
+        err.detail.path.should.equal(__filename + '123');
         done();
       });
     });
 
     it('should upload a stream with key using form-data format', function (done) {
       var logoStream = fs.createReadStream(imagefile);
-      rs.upload(upToken, 'test/rs.test.js.upload.logo.png', null, 'logo.png', logoStream,
-      function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
-        var lastHash = res.data.hash;
-        rs.get('test/rs.test.js.upload.logo.png', 'qiniu-logo.png', function (res) {
-          res.code.should.equal(200);
-          res.data.hash.should.equal(lastHash);
-          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
-          res.data.fsize.should.equal(fs.statSync(imagefile).size);
+      rs.upload(upToken, 'test/rs.test.js.upload.logo.png', null, 'logo.png', logoStream, function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = data.detail.hash;
+        rs.get('test/rs.test.js.upload.logo.png', 'qiniu-logo.png', function (err, data) {
+          data.code.should.equal(200);
+          data.detail.hash.should.equal(lastHash);
+          data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          data.detail.fsize.should.equal(fs.statSync(imagefile).size);
           done();
         });
       });
@@ -192,16 +199,17 @@ describe('rs.test.js', function () {
         s.emit('data', text);
       }, 100);
 
-      rs.upload(upToken, 'test/rs.test.js.upload.timer.stream', null, 'stream.txt', s, function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
-        var lastHash = res.data.hash;
-        rs.get('test/rs.test.js.upload.timer.stream', 'stream.txt', function (res) {
-          res.code.should.equal(200);
-          res.data.hash.should.equal(lastHash);
-          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
-          res.data.fsize.should.equal(size);
+      rs.upload(upToken, 'test/rs.test.js.upload.timer.stream', null, 'stream.txt', s, function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = data.detail.hash;
+        rs.get('test/rs.test.js.upload.timer.stream', 'stream.txt', function (err, data) {
+          data.code.should.equal(200);
+          data.detail.hash.should.equal(lastHash);
+          data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          data.detail.fsize.should.equal(size);
           done();
         });
       });
@@ -224,15 +232,12 @@ describe('rs.test.js', function () {
         s.emit('data', text);
       }, 1000);
 
-      var req = rs.upload(upToken, 'test/rs.test.js.upload.timer.stream.abort', null, 'stream.txt', s, function (res) {
-        res.should.have.keys('code', 'detail', 'error');
-        res.code.should.equal(-1);
-        res.error.should.equal('socket hang up');
-        res.detail.code.should.equal('ECONNRESET');
-        rs.get('test/rs.test.js.upload.timer.stream.abort', 'stream.txt', function (res) {
-          res.should.have.keys('code', 'error');
-          res.code.should.equal(612);
-          res.error.should.equal('no such file or directory');
+      var req = rs.upload(upToken, 'test/rs.test.js.upload.timer.stream.abort', null, 'stream.txt', s, function (err, data) {
+        should.exists(err);
+        err.code.should.equal('ECONNRESET');
+        rs.get('test/rs.test.js.upload.timer.stream.abort', 'stream.txt', function (err, data) {
+          should.equal(err, 'Error: E612 : no such file or directory');
+
           done();
         });
       });
@@ -254,8 +259,8 @@ describe('rs.test.js', function () {
         callbackBodyType: null,
         customer: null
       };
-      var token = new qiniu.auth.UploadToken(opts);
-      upToken = token.generateToken();
+      var policy = new qiniu.auth.PutPolicy(opts);
+      upToken = policy.generateToken();
       done();
     });
 
@@ -277,16 +282,18 @@ describe('rs.test.js', function () {
         s.emit('data', text);
       }, 100);
 
-      rs.uploadWithToken(upToken, s, "stream.txt", null, null, null, null, function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
-        var lastHash = res.data.hash;
-        rs.get('stream.txt', 'stream.txt', function (res) {
-          res.code.should.equal(200);
-          res.data.hash.should.equal(lastHash);
-          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
-          res.data.fsize.should.equal(size);
+      rs.uploadWithToken(upToken, s, "stream.txt", null, null, null, null, function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = data.detail.hash;
+        rs.get('stream.txt', 'stream.txt', function (err, data) {
+          should.equal(err, null);
+          data.code.should.equal(200);
+          data.detail.hash.should.equal(lastHash);
+          data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          data.detail.fsize.should.equal(size);
           done();
         });
       });
@@ -296,20 +303,80 @@ describe('rs.test.js', function () {
       var fstat = fs.statSync(__filename)
         , size = fstat.size;
 
-      rs.uploadFileWithToken(upToken, __filename, "uploadfilewithtoken.txt", null, null, {}, false, function(res){
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
-        var lastHash = res.data.hash;
-        rs.get('uploadfilewithtoken.txt', 'uploadfilewithtoken.txt', function (res) {
-          res.code.should.equal(200);
-          res.data.hash.should.equal(lastHash);
-          res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
-          res.data.fsize.should.equal(size);
+      rs.uploadFileWithToken(upToken, __filename, "uploadfilewithtoken.txt", null, null, {}, false, function(err, data){
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = data.detail.hash;
+        rs.get('uploadfilewithtoken.txt', 'uploadfilewithtoken.txt', function (err, data) {
+          should.equal(err, null);
+          data.code.should.equal(200);
+          data.detail.hash.should.equal(lastHash);
+          data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          data.detail.fsize.should.equal(size);
           done();
         });
       });
+    });
 
+    it('should upload a image with key using upToken with returnBody config', function (done) {
+      var fstat = fs.statSync(gogopher)
+        , size = fstat.size
+        , returnBody = '{ \
+          "author": "ikbear", \
+          "size": $(fsize), \
+          "hash": $(etag), \
+          "w": $(imageInfo.width), \
+          "h": $(imageInfo.height), \
+          "color": $(exif.ColorSpace.val) \
+        }';
+
+      var opts = {
+        escape: 1,
+        scope: bucket,
+        expires: 3600,
+        callbackUrl: null,
+        callbackBodyType: 'application/json',
+        customer: 'ikbear',
+        returnBody: returnBody,
+        asyncOps: 'imageMogr/auto-orient/thumbnail/!256x256r/gravity/center/crop/!256x256/quality/80/rotate/45'
+      };
+
+      var  callbackParams = '{ \
+        "from": "ikbear", \
+        size: $(fsize), \
+        etag: $(etag), \
+        w: $(imageInfo.width), \
+        h: $(imageInfo.height), \
+        exif: $(exif) \
+      }';
+
+      var policy = new qiniu.auth.PutPolicy(opts);
+      upToken = policy .generateToken();
+
+      rs.uploadFileWithToken(upToken, gogopher, "gogopher.png", null, null, callbackParams, false, function(err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.detail.should.have.keys('author', 'size', 'hash', 'w', 'h', 'color');
+
+        data.code.should.equal(200);
+        data.detail.author.should.equal('ikbear');
+        data.detail.size.should.equal(size);
+
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        var lastHash = data.detail.hash;
+
+        rs.get("gogopher.png", 'gogopher.png', function(err, data) {
+          should.not.exists(err);
+          data.should.have.keys('code', 'detail');
+          data.code.should.equal(200);
+          data.detail.hash.should.equal(lastHash);
+          data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+          data.detail.fsize.should.equal(size);
+          done();
+        });
+      });
     });
 
   });
@@ -319,36 +386,38 @@ describe('rs.test.js', function () {
     var lastHash = null;
 
     beforeEach(function (done) {
-      rs.putFile('rs.test.js.get', null, __filename, function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
-        lastHash = res.data.hash;
+      rs.putFile('rs.test.js.get', null, __filename, function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]{28}$/);
+        lastHash = data.detail.hash;
         done();
       });
     });
 
     it('should return a file download url', function (done) {
-      rs.get('rs.test.js.get', 'download.js', function (res) {
-        res.code.should.equal(200);
-        res.data.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
-        res.data.expires.should.equal(3600);
-        res.data.fsize.should.be.a('number').with.above(0);
-        res.data.hash.should.match(/^[\w\-=]{28}$/);
-        res.data.mimeType.should.equal('application/javascript');
-        res.data.url.should.match(/^http:\/\/iovip\.qbox\.me\/file\/[\w\-=]+$/);
+      rs.get('rs.test.js.get', 'download.js', function (err, data) {
+        should.not.exists(err);
+        data.code.should.equal(200);
+        data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+        data.detail.expires.should.equal(3600);
+        data.detail.fsize.should.be.a('number').with.above(0);
+        data.detail.hash.should.match(/^[\w\-=]{28}$/);
+        data.detail.mimeType.should.equal('application/javascript');
+        data.detail.url.should.match(/^http:\/\/iovip\.qbox\.me\/file\/[\w\-=]+$/);
 
-        var options = urlparse(res.data.url);
+        var options = urlparse(data.detail.url);
         http.get(options, function (downloadRes) {
           downloadRes.statusCode.should.equal(200);
           downloadRes.should.have.header('content-disposition', 'attachment; filename="download.js"');
-          downloadRes.should.have.header('content-length', res.data.fsize + '');
+          downloadRes.should.have.header('content-length', data.detail.fsize + '');
           var size = 0;
           downloadRes.on('data', function (chunk) {
             size += chunk.length;
           });
           downloadRes.on('end', function () {
-            size.should.equal(res.data.fsize);
+            size.should.equal(data.detail.fsize);
             done();
           });
         });
@@ -356,31 +425,35 @@ describe('rs.test.js', function () {
     });
 
     it('should return "file modified" when hash not match', function (done) {
-      rs.getIfNotModified('rs.test.js.get', 'getIfNotModified.js', 'nohash', function (res) {
-        res.should.have.keys('error', 'code');
-        res.code.should.equal(608);
-        res.error.should.equal('file modified');
+      rs.getIfNotModified('rs.test.js.get', 'getIfNotModified.js', 'nohash', function (err, data) {
+        should.equal(err, 'Error: E608 : file modified');
         done();
       });
     });
 
     it('should return download url when hash match', function (done) {
-      rs.getIfNotModified('rs.test.js.get', 'getIfNotModified.js', lastHash, function (res) {
-        res.should.have.keys('data', 'code');
-        res.code.should.equal(200);
-        res.data.url.should.match(/^http:\/\/iovip\.qbox\.me\/file\/[\w\-=]+$/);
+      rs.getIfNotModified('rs.test.js.get', 'getIfNotModified.js', lastHash, function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('detail', 'code');
+        data.code.should.equal(200);
+        data.detail.should.have.keys('expires', 'fsize', 'hash', 'mimeType', 'url');
+        data.detail.expires.should.equal(3600);
+        data.detail.fsize.should.be.a('number').with.above(0);
+        data.detail.hash.should.match(/^[\w\-=]{28}$/);
+        data.detail.mimeType.should.equal('application/javascript');
+        data.detail.url.should.match(/^http:\/\/iovip\.qbox\.me\/file\/[\w\-=]+$/);
         done();
       });
     });
 
     it('should return "no such file or directory" when get the not exists key', function (done) {
       done = pedding(2, done);
-      rs.get('not exists key', 'abc', function (res) {
-        res.should.eql({ error: 'no such file or directory', code: 612 });
+      rs.get('not exists key', 'abc', function (err, data) {
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
-      rs.getIfNotModified('not exists key', 'abc', 'hash', function (res) {
-        res.should.eql({ error: 'no such file or directory', code: 612 });
+      rs.getIfNotModified('not exists key', 'abc', 'hash', function (err, data) {
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
     });
@@ -390,17 +463,18 @@ describe('rs.test.js', function () {
   describe('stat()', function () {
 
     it('should return key stat info', function (done) {
-      rs.stat('rs.test.js.get', function (res) {
-        res.should.have.keys('code', 'data');
-        res.code.should.equal(200);
-        res.data.should.have.keys('fsize', 'hash', 'mimeType', 'putTime');
+      rs.stat('rs.test.js.get', function (err, data) {
+        should.not.exists(err);
+        data.should.have.keys('code', 'detail');
+        data.code.should.equal(200);
+        data.detail.should.have.keys('fsize', 'hash', 'mimeType', 'putTime');
         done();
       });
     });
 
     it('should return "no such file or directory"', function (done) {
-      rs.stat('not exists file', function (res) {
-        res.should.eql({ error: 'no such file or directory', code: 612 });
+      rs.stat('not exists file', function (err, data) {
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
     });
@@ -409,26 +483,28 @@ describe('rs.test.js', function () {
 
   describe('remove()', function () {
     before(function (done) {
-      rs.putFile('rs.test.js.remove', null, __filename, function (res) {
-        res.should.have.property('code', 200);
+      rs.putFile('rs.test.js.remove', null, __filename, function (err, data) {
+        should.not.exists(err);
+        data.should.have.property('code', 200);
         done();
       });
     });
 
     it('should remove a file by key', function (done) {
-      rs.remove('rs.test.js.remove', function (res) {
-        res.should.eql({ code: 200 });
+      rs.remove('rs.test.js.remove', function (err, data) {
+        should.not.exists(err);
+        data.should.eql({ code: 200 });
         // remove a gain will error
-        rs.remove('rs.test.js.remove', function (res) {
-          res.should.eql({ error: 'no such file or directory', code: 612 });
+        rs.remove('rs.test.js.remove', function (err, data) {
+          should.equal(err, 'Error: E612 : no such file or directory');
           done();
         });
       });
     });
 
     it('should return "no such file or directory" when key not exists', function (done) {
-      rs.remove('not exists file', function (res) {
-        res.should.eql({ error: 'no such file or directory', code: 612 });
+      rs.remove('not exists file', function (err, data) {
+        should.equal(err, 'Error: E612 : no such file or directory');
         done();
       });
     });
@@ -439,11 +515,12 @@ describe('rs.test.js', function () {
 
     var sourceURL = '';
     before(function (done) {
-      rs.putFile('logo.png', null, imagefile, function (res) {
-        res.code.should.equal(200);
-        rs.get('logo.png', 'abc', function (res) {
-          res.should.have.property('code', 200);
-          sourceURL = res.data.url;
+      rs.putFile('logo.png', null, imagefile, function (err, data) {
+        should.not.exists(err);
+        data.code.should.equal(200);
+        rs.get('logo.png', 'abc', function (err, data) {
+          data.should.have.property('code', 200);
+          sourceURL = data.detail.url;
           done();
         });
       });
@@ -454,10 +531,10 @@ describe('rs.test.js', function () {
         thumbnail: '50x50^',
         auto_orient: true,
         format: 'jpg',
-      }, function (res) {
-        res.should.have.property('code', 200);
-        res.should.have.property('data');
-        res.data.should.have.property('hash').with.match(/^[\w\-=]+$/);
+      }, function (err, data) {
+        should.not.exists(err);
+        data.should.have.property('code', 200);
+        data.detail.should.have.property('hash').with.match(/^[\w\-=]+$/);
         done();
       });
     });
@@ -467,22 +544,25 @@ describe('rs.test.js', function () {
   describe('publish() && unpublish()', function () {
 
     it('should publish a domain', function (done) {
-      rs.publish(DEMO_DOMAIN, function (res) {
-        res.should.have.property('code', 200);
+      rs.publish(DEMO_DOMAIN, function (err, data) {
+        should.not.exists(err);
+        data.should.have.property('code', 200);
         // again will no problem
-        rs.publish(DEMO_DOMAIN, function (res) {
-          res.should.have.property('code', 200);
+        rs.publish(DEMO_DOMAIN, function (err, data) {
+          should.equal(err, null);
+          data.should.have.property('code', 200);
           done();
         });
       });
     });
 
     it('should unpublish a domain', function (done) {
-      rs.unpublish(DEMO_DOMAIN, function (res) {
-        res.should.have.property('code', 200);
+      rs.unpublish(DEMO_DOMAIN, function (err, data) {
+        should.not.exists(err);
+        data.should.have.property('code', 200);
         // again will error
-        rs.unpublish(DEMO_DOMAIN, function (res) {
-          res.should.eql({ error: 'Document not found', code: 599 });
+        rs.unpublish(DEMO_DOMAIN, function (err, data) {
+          should.equal(err, 'Error: E599 : Document not found');
           done();
         });
       });
