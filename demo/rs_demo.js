@@ -8,16 +8,20 @@ qiniu.conf.SECRET_KEY = '<Dont send your secret key to anyone>';
 
 var key = __filename;
 var friendName = key;
-var bucket = 'qiniu_test_bucket_ikbear2';
-var DEMO_DOMAIN = bucket + '.dn.qbox.me';
+var bucket = 'qiniutest';
+var DEMO_DOMAIN = bucket + '.qiniudn.com';
 
 var conn = new qiniu.digestauth.Client();
 
-qiniu.rs.mkbucket(conn, bucket, function(resp) {
-  console.log("\n===> Make bucket result: ", resp);
-  if (resp.code != 200) {
+qiniu.rs.mkbucket(conn, bucket, function(err, data) {
+  if (err) {
+    console.log("\n ===> Make bucket error: ", err);
+    clear(rs);
     return;
   }
+
+  console.log("\n===> Make bucket result: ", data);
+
   var opts = {
     scope: bucket,
     expires: 3600,
@@ -36,35 +40,50 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
       callbackParams = {},
       enableCrc32Check = true;
 
-  rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(resp){
-    console.log("\n===> Upload File with Token result: ", resp);
-    if (resp.code != 200) {
+  rs.uploadFileWithToken(uploadToken, localFile, key, mimeType, customMeta, callbackParams, enableCrc32Check, function(err, data){
+    if (err) {
+      console.log("\n ===> Upload file with token error: ", err);
       clear(rs);
       return;
     }
-    rs.publish(DEMO_DOMAIN, function(resp){
-      console.log("\n===> Publish result: ", resp);
-      if (resp.code != 200){
+
+    console.log("\n===> Upload File with Token result: ", data);
+
+    rs.publish(DEMO_DOMAIN, function(err, data){
+      if (err) {
+        console.log("\n ===> Make bucket error: ", err);
         clear(rs);
         return;
       }
-      rs.stat(key, function(resp) {
-          console.log("\n===> Stat result: ", resp);
-          if (resp.code != 200) {
-              clear(rs);
-              return;
+
+      console.log("\n===> Publish result: ", data);
+
+      rs.stat(key, function(err, data) {
+          if (err) {
+            console.log("\n ===> Make bucket error: ", err);
+            clear(rs);
+            return;
           }
 
-          rs.get(key, friendName, function(resp) {
-              console.log("\n===> Get result: ", resp);
-              if (resp.code != 200) {
-                  clear(rs);
-                  return;
+          console.log("\n===> Stat result: ", data);
+
+          rs.get(key, friendName, function(err, data) {
+              if (err) {
+                console.log("\n ===> Make bucket error: ", err);
+                clear(rs);
+                return;
               }
 
-              rs.remove(key, function(resp) {
+              console.log("\n===> Get result: ", data);
+
+              rs.remove(key, function(err, data) {
+                if (err) {
+                  console.log("\n ===> Make bucket error: ", err);
                   clear(rs);
-                  console.log("\n===> Delete result: ", resp);
+                  return;
+                }
+                clear(rs);
+                console.log("\n===> Delete result: ", data);
               });
           });
       });
@@ -73,7 +92,11 @@ qiniu.rs.mkbucket(conn, bucket, function(resp) {
 });
 
 function clear(rs) {
-  rs.drop(function(resp){
-    console.log("\n===> Drop result: ", resp);
+  rs.drop(function(err, data){
+    if (err) {
+      console.log("Drop bucket error: ", err);
+      return;
+    }
+    console.log("\n===> Drop result: ", data);
   });
 }
