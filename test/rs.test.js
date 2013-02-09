@@ -254,8 +254,8 @@ describe('rs.test.js', function () {
         callbackBodyType: null,
         customer: null
       };
-      var token = new qiniu.auth.UploadToken(opts);
-      upToken = token.generateToken();
+      var policy = new qiniu.auth.PutPolicy(opts);
+      upToken = policy.token();
       done();
     });
 
