@@ -95,24 +95,24 @@ title: NodeJS SDK | 七牛云存储
 
 #### 获取用于上传文件的临时授权凭证
 
-要上传一个文件，首先需要调用 SDK 提供的 `qiniu.auth.UploadToken(options)`创建一个token对象，然后使用它提供的generateToken()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
+要上传一个文件，首先需要调用 SDK 提供的 `qiniu.auth.PutPolicy(options)`创建一个PutPolicy对象，然后使用它提供的token()方法生成用于临时匿名上传的upload_token——经过数字签名的一组数据信息，该 upload_token 作为文件上传流中 multipart/form-data 的一部分进行传输。
 
 
-    var options = {
-        scope: <BucketName string>,
-        expires: <ExpiresInSeconds int>,
-        callbackUrl: <CallbackURL string>,
-        callbackBodyType: <HttpRequestContentType string>,
-        customer: <EndUserId string>
-    };
+	var options = {
+		scope: <BucketOrEntryURI string>, // 可以是 "<bucketName>" 或 "<bucketName>:<key>"
+		expires: <ExpiresInSeconds int>,
+		callbackUrl: <CallbackURL string>, // 可选
+		callbackBodyType: <HttpRequestContentType string>, // 可选
+		customer: <EndUserId string> // 可选
+	};
 
-var token = new qiniu.auth.UploadToken(options);
-var uploadToken = token.generateToken();
+	var uploadPolicy = new qiniu.auth.PutPolicy(options);
+	var uploadToken = uploadPolicy.token();
 
 **options参数**
 
 scope
-: 必须，字符串类型（String），设定文件要上传到的目标 `bucket`
+: 必须，字符串类型（String），设定文件要上传到的目标 `bucket`，也可以限定上传的目标必须为 `bucket:key`。
 
 expires
 : 可选，数字类型，用于设置上传 URL 的有效期，单位：秒，缺省为 3600 秒，即 1 小时后该上传链接不再有效（但该上传URL在其生成之后的59分59秒都是可用的）。
@@ -152,7 +152,7 @@ customer
 **参数**
 
 uploadToken
-: 必须，字符串类型（String），调用 `UploadToken.generateToken()` 生成的 [用于上传文件的临时授权凭证](#generate-token)
+: 必须，字符串类型（String），调用 `PutPolicy.token()` 生成的 [用于上传文件的临时授权凭证](#generate-token)
 
 localFile
 : 必须，字符串类型（String），本地文件可被读取的有效路径

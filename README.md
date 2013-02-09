@@ -53,14 +53,13 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.q
     // 上传文件第1步
     // 生成上传授权凭证（uploadToken）
     var opts = {
-        scope: "yet_another_bucket",
+        scope: "yet_another_bucket", // 可以是 "<bucketName>" 或 "<bucketName>:<key>"
         expires: 3600,
         callbackUrl: "http://www.example.com/notifications/qiniurs", // 可选
         callbackBodyType: "application/x-www-form-urlencoded", // 可选
-        customer: "username@example.com" // 可选
     };
-    var token = new qiniu.auth.UploadToken(opts);
-    var uploadToken = token.generateToken();
+    var uploadPolicy = new qiniu.auth.PutPolicy(opts);
+    var uploadToken = uploadPolicy.token();
 
     // 上传文件第2步
     // 组装上传文件所需要的参数
