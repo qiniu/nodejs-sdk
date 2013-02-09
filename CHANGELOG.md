@@ -1,5 +1,16 @@
 #CHANGELOG
 
+## v2.4.2
+
+Issue [#48](https://github.com/qiniu/nodejs-sdk/pull/48):
+
+- 去除 auth.GetPolicy.scope 的默认值："*/*"
+
+Issue [#46](https://github.com/qiniu/nodejs-sdk/pull/46):
+
+- 更新 v2.4.1 的文档(docs/README.md)
+
+
 ## v2.4.1
 
 2013-02-09
