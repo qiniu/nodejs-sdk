@@ -2,6 +2,8 @@
 
 ## v2.4.1
 
+2013-02-09
+
 Issue [#43](https://github.com/qiniu/nodejs-sdk/pull/43):
 
 - imageMogr bugfix: auto-orient
