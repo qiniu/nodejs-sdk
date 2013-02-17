@@ -2,6 +2,10 @@
 
 ## v2.4.2
 
+Issue [#52](https://github.com/qiniu/nodejs-sdk/pull/52):
+
+- 去除对自定义 generateQueryString() 函数的依赖，使用 querystring 包的 stringify() 函数。
+
 Issue [#48](https://github.com/qiniu/nodejs-sdk/pull/48):
 
 - 去除 auth.GetPolicy.scope 的默认值："*/*"
