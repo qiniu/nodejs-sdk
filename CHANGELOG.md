@@ -1,5 +1,13 @@
 #CHANGELOG
 
+## v2.4.3
+
+2013-02-17
+
+Issue [#52](https://github.com/qiniu/nodejs-sdk/pull/52):
+
+- 去除对自定义 generateQueryString() 函数的依赖，使用 querystring 包的 stringify() 函数。
+
 ## v2.4.2
 
 Issue [#48](https://github.com/qiniu/nodejs-sdk/pull/48):
