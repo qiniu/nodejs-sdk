@@ -1,5 +1,14 @@
 #CHANGELOG
 
+## v2.4.3
+
+2013-02-22
+
+Issue [#54](https://github.com/qiniu/nodejs-sdk/pull/54):
+
+- 去除对自定义 generateQueryString() 函数的依赖，使用 querystring 包的 stringify() 函数。
+- auth.PutPolicy 增加对 returnBody 的支持，用户可自定义上传完文件后的返回值。
+
 ## v2.4.2
 
 Issue [#48](https://github.com/qiniu/nodejs-sdk/pull/48):
