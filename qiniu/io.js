@@ -1,0 +1,117 @@
+
+var conf = require('./conf');
+var util = require('./util');
+var rpc = require('./rpc');
+var fs = require('fs');
+var getCrc32 = require('crc32');
+var url = require('url');
+var mime = require('mime');
+var formstream = require('formstream');
+
+exports.UNDEFINED_KEY = '?'
+exports.PutExtra = PutExtra;
+exports.PutRet = PutRet;
+exports.put = put;
+exports.putWithoutKey = putWithoutKey;
+exports.putFile = putFile;
+exports.putFileWithoutKey = putFileWithoutKey;
+
+function PutExtra(params, mimeType, crc32, checkCrc) {
+  this.paras = params || {};
+  this.mimeType = mimeType || null;
+  this.crc32 = crc32 || null;
+  this.checkCrc = checkCrc || 0;
+}
+
+function PutRet(hash, key) {
+  this.hash = hash || null;
+  this.key = key || null;
+} 
+
+// onret: callback function instead of ret 
+function put(uptoken, key, body, extra, onret) {
+  if(!extra) {
+    extra = new PutExtra();
+  }
+  if (!extra.mimeType) {
+    extra.mimeType = 'application/octet-stream';
+  }
+
+  function parseRet(data) {
+      var ret = data;
+      if (ret.code !== 200) {
+        onret(ret);
+        return;
+      }
+      try {
+        var dt = JSON.parse(ret.data);
+        ret.data = dt;
+      } catch (e) {
+        ret = {code: -2, error: e.toString()};
+      }
+      onret(ret);
+  }
+
+  if(!key) {
+    key = exports.UNDEFINED_KEY;
+  }
+
+  var form = getMultipart(uptoken, key, body, extra);
+
+  rpc.postMultipart(conf.UP_HOST, form, parseRet);
+}
+
+function putWithoutKey(uptoken, body, extra, onret) {
+  put(uptoken, null, body, extra, onret);
+}
+
+function getMultipart(uptoken, key, body, extra) {
+
+  var form = formstream();
+
+  form.field('token', uptoken);
+  if(key != exports.UNDEFINED_KEY) {
+    form.field('key', key);
+  }
+
+  form.buffer('file', new Buffer(body), key, extra.mimeType);
+
+  //extra['checkcrc']
+  if (extra.checkCrc == 1) {
+    var bodyCrc32 = getCrc32(body);
+    extra.crc32 = '' + parseInt(bodyCrc32, 16);
+  }
+
+  if(extra.checkCrc) {
+    form.field('crc32', extra.crc32);
+  }
+
+  for (k in extra.params) {
+    form.field(k, extra.params[k]);
+  }
+
+  return form;
+}
+
+function putFile(uptoken, key, loadFile, extra, onret) {
+  fs.readFile(loadFile, function(err, data) {
+    if(err) {
+      onret({code: -1, error: err.toString(), detail: err});
+      return;
+    }
+
+    if(!extra) {
+      extra = new PutExtra();
+    }
+
+    if(!extra.mimeType) {
+      extra.mimeType = mime.lookup(loadFile);
+    }
+    put(uptoken, key, data, extra, onret);
+  });
+}
+
+function putFileWithoutKey(uptoken, loadFile, extra, onret) {
+  putFile(uptoken, null, loadFile, extra, onret);
+}
+
