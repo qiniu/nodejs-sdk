@@ -38,7 +38,10 @@ SDK 下载地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qini
 ## 概述
 
 <sdk基本介绍\>
-该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 七牛云存储官方API 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
+该 SDK 适用于 Node.js 0.4.7 及其以上版本，基于 七牛云存储官方API 构建。
+若您的服务端是一个基于 Node.js 编写的网络程序，使用此 SDK ，
+能让您以非常便捷地方式将数据安全地存储到七牛云存储上。
+以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
 
 <sdk内容构成\>
 Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](https://github.com/qiniu/sdkspec)
@@ -60,14 +63,14 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 
 ### 环境依赖
 <sdk环境依赖\>
-适用于 NodeJS 0.4.7 及其以上版本
+适用于 Node.js 0.4.7 及其以上版本
 
 <a name="install"></a>
 
 ### 安装
 
 <sdk安装说明\>
-通过 npm 以 node 模块化的方式安装：
+通过 npm 以 node 模块化的方式安装：  
 `npm node qiniu`
 
 <a name="appkey"></a>
@@ -95,7 +98,6 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 @gist(gist/server.js#init)
 ```
 
-<a设置AccessKey和SecretKey说明\>
 *服务端操作时请务必初始化这两个变量*
 
 <a name="io-put"></a>
@@ -231,8 +233,8 @@ PutExtra是上传时的可选信息，默认为null
 
 ##### 断点续下载
 
-<a断点续下载说明\>
 无论是公有资源还是私有资源，获得的下载 url 支持标准的 HTTP 断点续传协议。考虑到多数语言都有相应的断点续下载支持的成熟方法，七牛 Nodejs-SDK 并不提供断点续下载相关代码。
+
 <a name="rs"></a>
 
 ### 资源操作
@@ -277,7 +279,6 @@ PutExtra是上传时的可选信息，默认为null
 
 #### 批量操作
 
-<a批量操作\>
 当您需要一次性进行多个操作时, 可以使用批量操作。
 
 ####批量获取文件信息
