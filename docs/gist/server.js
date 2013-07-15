@@ -1,7 +1,9 @@
 var qiniu = require('../..');
 
+// @gist init
 qiniu.conf.ACCESS_KEY = '<Your Access Key>'
 qiniu.conf.SECRET_KEY = '<Your Secret Key>'
+// @endgist
 
 // @gist uptoken
 function uptoken(bucketname) {

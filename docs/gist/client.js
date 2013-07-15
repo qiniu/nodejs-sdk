@@ -21,8 +21,8 @@ function uploadFile(localFile, key, uptoken) {
 }
 // @endgist
 
-// @gist uploadBufDemo
-function uploadBufDemo(body, key, uptoken) {
+// @gist uploadBuf
+function uploadBuf(body, key, uptoken) {
   var extra = new qiniu.io.PutExtra();
   //extra.params = params;
   //extra.mimeType = mimeType;
