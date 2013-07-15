@@ -9,6 +9,10 @@ var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
 var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
 var imageFile = path.join(__dirname, 'logo.png');
 
+var logo  = Math.random() + 'logo.png';
+var logo1 = Math.random() + 'logo1.png';
+var logo2 = Math.random() + 'logo2.png';
+var logo3 = Math.random() + 'logo3.png';
 describe('test start step2:', function() {
 
   describe('rs.test.js', function() {
@@ -23,10 +27,10 @@ describe('test start step2:', function() {
       before(function(done) {
         var putPolicy = new qiniu.rs.PutPolicy(TEST_BUCKET);
         var uptoken = putPolicy.token();
-        qiniu.io.putFile(uptoken, 'logo2.png', imageFile, null, function(ret) {
+        qiniu.io.putFile(uptoken, logo2, imageFile, null, function(ret) {
           ret.code.should.equal(200);
         });
-        qiniu.io.putFile(uptoken, 'logo.png', imageFile, null, function(ret) {
+        qiniu.io.putFile(uptoken, logo, imageFile, null, function(ret) {
           ret.code.should.equal(200);
           done();
         });
@@ -34,7 +38,7 @@ describe('test start step2:', function() {
 
       describe('rs.Client#stat()', function() {
         it('get the stat of a file', function(done) {
-          client.stat(TEST_BUCKET, 'logo.png', function(ret) {
+          client.stat(TEST_BUCKET, logo, function(ret) {
             ret.code.should.equal(200);
             ret.data.should.have.keys('hash', 'fsize', 'putTime', 'mimeType');
             done();
@@ -44,7 +48,7 @@ describe('test start step2:', function() {
 
       describe('rs.Client#copy()', function() {
         it('copy logo.png to logo1.png', function(done) {
-          client.copy(TEST_BUCKET, 'logo.png', TEST_BUCKET, 'logo1.png', function(ret) {
+          client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo1, function(ret) {
             ret.code.should.equal(200);
             done();
           });
@@ -53,7 +57,7 @@ describe('test start step2:', function() {
 
       describe('rs.Client#remove()', function() {
         it('remove logo.png', function(done) {
-          client.remove(TEST_BUCKET, 'logo.png', function(ret) {
+          client.remove(TEST_BUCKET, logo, function(ret) {
             ret.code.should.equal(200);
             done();
           });
@@ -62,7 +66,7 @@ describe('test start step2:', function() {
 
       describe('rs.Client#move()', function() {
         it('move logo1.png to logo.png', function(done) {
-          client.move(TEST_BUCKET, 'logo1.png', TEST_BUCKET, 'logo.png', function(ret) {
+          client.move(TEST_BUCKET, logo1, TEST_BUCKET, logo, function(ret) {
             ret.code.should.equal(200);
             done();
           });
@@ -73,7 +77,7 @@ describe('test start step2:', function() {
     describe('batch file handle', function() {
 
       after(function(done) {
-        var entries = [new EntryPath(TEST_BUCKET, 'logo.png'), new EntryPath(TEST_BUCKET, 'logo2.png')];
+        var entries = [new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo2)];
 
         client.batchDelete(entries, function(ret) {
           ret.code.should.equal(200);
@@ -84,8 +88,8 @@ describe('test start step2:', function() {
       describe('rs.Client#batchStat()', function() {
         it('get the stat of logo.png and logo2.png', function(done) {
           var entries = [
-            new EntryPath(TEST_BUCKET, 'logo.png'), 
-            new EntryPath(TEST_BUCKET, 'logo2.png')];
+            new EntryPath(TEST_BUCKET, logo), 
+            new EntryPath(TEST_BUCKET, logo2)];
 
             client.batchStat(entries, function(ret) {
               ret.code.should.equal(200);
@@ -101,7 +105,7 @@ describe('test start step2:', function() {
         it('should return code 298 when partial ok', function(done) {
 
           var entries = [
-            new EntryPath(TEST_BUCKET, 'logo.png'), 
+            new EntryPath(TEST_BUCKET, logo), 
             new EntryPath(TEST_BUCKET, 'not exist file')];
 
             client.batchStat(entries, function(ret) {
@@ -124,8 +128,8 @@ describe('test start step2:', function() {
 
       describe('rs.Client#batchCopy', function() {
         var entries = [];
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, 'logo.png'), new EntryPath(TEST_BUCKET, 'logo1.png')));
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, 'logo2.png'), new EntryPath(TEST_BUCKET, 'logo3.png')));
+        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo1)));
+        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo2), new EntryPath(TEST_BUCKET, logo3)));
 
         it('copy from logo, logo2 to logo1, logo3', function(done) {
           client.batchCopy(entries, function(ret) {
@@ -136,7 +140,7 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#batchDelete', function() {
-        var entries = [new EntryPath(TEST_BUCKET, 'logo.png'), new EntryPath(TEST_BUCKET, 'logo2.png')];
+        var entries = [new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo2)];
 
         it('delete logo.png, logo2.png', function(done) {
           client.batchDelete(entries, function(ret) {
@@ -148,8 +152,8 @@ describe('test start step2:', function() {
 
       describe('rs.Client#batchMove', function() {
         var entries = [];
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, 'logo1.png'), new EntryPath(TEST_BUCKET, 'logo.png')));
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, 'logo3.png'), new EntryPath(TEST_BUCKET, 'logo2.png')));
+        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo1), new EntryPath(TEST_BUCKET, logo)));
+        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo3), new EntryPath(TEST_BUCKET, logo2)));
 
         it('move from logo1.png, logo3.png to logo.png, logo2.png', function(done) {
           client.batchMove(entries, function(ret) {
