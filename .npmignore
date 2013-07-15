@@ -5,5 +5,3 @@ coverage.html
 lib-cov/
 Makefile
 docs/
-node_modules/mocha/
-node_modules/should/
