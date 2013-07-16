@@ -16,12 +16,14 @@ exports.putWithoutKey = putWithoutKey;
 exports.putFile = putFile;
 exports.putFileWithoutKey = putFileWithoutKey;
 
+// @gist PutExtra
 function PutExtra(params, mimeType, crc32, checkCrc) {
   this.paras = params || {};
   this.mimeType = mimeType || null;
   this.crc32 = crc32 || null;
   this.checkCrc = checkCrc || 0;
 }
+// @endgist
 
 function PutRet(hash, key) {
   this.hash = hash || null;

@@ -162,7 +162,7 @@ function getEncodedEntryUri(bucket, key) {
 
 
 // ----- token --------
-
+// @gist PutPolicy
 function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
                   asyncOps, endUser, expires) {
   this.scope = scope || null;
@@ -174,6 +174,7 @@ function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
   this.endUser = endUser || null;
   this.expires = expires || 3600;
 }
+// @endgist
 
 PutPolicy.prototype.token = function(mac) {
   if (mac == null) {
