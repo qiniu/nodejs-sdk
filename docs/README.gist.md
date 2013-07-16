@@ -94,7 +94,7 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 
 对于服务端而言，常规程序流程是：
 
-```
+```{javascript}
 @gist(gist/server.js#init)
 ```
 
@@ -138,7 +138,7 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 
 [uptoken](http://docs.qiniu.com/api/put.html#uploadToken) 实际上是用 AccessKey/SecretKey 进行数字签名的上传策略(`rs.PutPolicy`)，它控制则整个上传流程的行为。让我们快速过一遍你都能够决策啥：
 
-```
+```{javascript}
 @gist(../qiniu/rs.js#PutPolicy)
 ```
 
@@ -158,7 +158,7 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 
 服务端生成 [uptoken](http://docs.qiniu.com/api/put.html#uploadToken) 代码如下：
 
-```
+```{javascript}
 @gist(gist/server.js#uptoken)
 ```
 
@@ -170,7 +170,8 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 
 <a name="upload-do"></a>
 PutExtra是上传时的可选信息，默认为null
-```
+
+```{javascript}
 @gist(../qiniu/io.js#PutExtra)
 ```
 
@@ -187,13 +188,14 @@ PutExtra是上传时的可选信息，默认为null
 上传文件到七牛（通常是客户端完成，但也可以发生在服务端）：
 
 直接上传二进制流：
-```
+
+```{javascript}
 @gist(gist/client.js#uploadBuf)
 ```
 
 上传本地文件：
 
-```
+```{javascript}
 @gist(gist/client.js#uploadFile)
 ```
 
@@ -221,7 +223,7 @@ PutExtra是上传时的可选信息，默认为null
 
 其中 dntoken 是由业务服务器签发的一个[临时下载授权凭证](http://docs.qiniu.com/api/get.html#download-token)，deadline 是 dntoken 的有效期。dntoken不需要单独生成，SDK 提供了生成完整 downloadUrl 的方法（包含了 dntoken），示例代码如下：
 
-```
+```{javascript}
 @gist(gist/server.js#downloadUrl)
 ```
 
@@ -240,7 +242,8 @@ PutExtra是上传时的可选信息，默认为null
 ### 资源操作
 
 资源操作限在服务端操作，先进行初始化
-```
+
+```{javascript}
 @gist(gist/rs.js#init)
 ```
 
@@ -249,7 +252,8 @@ PutExtra是上传时的可选信息，默认为null
 #### 获取文件信息
 
 <a获取文件信息说明\>
-```
+
+```{javascript}
 @gist(gist/rs.js#stat)
 ```
 
@@ -257,8 +261,7 @@ PutExtra是上传时的可选信息，默认为null
 
 #### 删除文件
 
-<a删除文件说明\>
-```
+```{javascript}
 @gist(gist/rs.js#remove)
 ```
 
@@ -266,12 +269,11 @@ PutExtra是上传时的可选信息，默认为null
 
 #### 复制/移动文件
 
-<a复制移动文件说明\>
-```
+```{javascript}
 @gist(gist/rs.js#copy)
 ```
 
-```
+```{javascript}
 @gist(gist/rs.js#move)
 ```
 
@@ -282,19 +284,26 @@ PutExtra是上传时的可选信息，默认为null
 当您需要一次性进行多个操作时, 可以使用批量操作。
 
 ####批量获取文件信息
-```
+
+```{javascript}
 @gist(gist/rs.js#batchStat)
 ```
+
 ####批量复制文件
-```
+
+```{javascript}
 @gist(gist/rs.js#batchCopy)
 ```
+
 ####批量移动文件
-```
+
+```{javascript}
 @gist(gist/rs.js#batchMove)
 ```
+
 ####批量删除文件
-```
+
+```{javascript}
 @gist(gist/rs.js#batchDelete)
 ```
 
@@ -305,24 +314,31 @@ PutExtra是上传时的可选信息，默认为null
 <a高级管理操作\>
 ####列出文件
 请求某个存储空间（bucket）下的文件列表，如果有前缀，可以按前缀（prefix）进行过滤；第一次调用时置marker为null，之后的调用填上服务器返回的marker(如果有)，则列出刚刚为列完的文件
-```
+
+```{javascript}
 @gist(gist/rsf.js#listPrefix)
 ```
+
 <a name="fop"></a>
 
 ### 云处理
 
 <a云处理使用说明\>
 ####查看图像信息
-```
+
+```{javascript}
 @gist(gist/fop.js#makeImageInfoUrl)
 ```
+
 ####查看图像Exif
-```
+
+```{javascript}
 @gist(gist/fop.js#makeExifUrl)
 ```
+
 ####生成缩略图
-```
+
+```{javascript}
 @gist(gist/fop.js#makeImageViewUrl)
 ```
 
