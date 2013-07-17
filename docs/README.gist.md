@@ -281,25 +281,25 @@ PutExtra是上传时的可选信息，默认为null
 
 当您需要一次性进行多个操作时, 可以使用批量操作。
 
-####批量获取文件信息
+#### 批量获取文件信息
 
 ```{javascript}
 @gist(gist/rs.js#batchStat)
 ```
 
-####批量复制文件
+#### 批量复制文件
 
 ```{javascript}
 @gist(gist/rs.js#batchCopy)
 ```
 
-####批量移动文件
+#### 批量移动文件
 
 ```{javascript}
 @gist(gist/rs.js#batchMove)
 ```
 
-####批量删除文件
+#### 批量删除文件
 
 ```{javascript}
 @gist(gist/rs.js#batchDelete)
@@ -322,19 +322,19 @@ PutExtra是上传时的可选信息，默认为null
 ### 云处理
 
 <a云处理使用说明\>
-####查看图像信息
+#### 查看图像信息
 
 ```{javascript}
 @gist(gist/fop.js#makeImageInfoUrl)
 ```
 
-####查看图像Exif
+#### 查看图像Exif
 
 ```{javascript}
 @gist(gist/fop.js#makeExifUrl)
 ```
 
-####生成缩略图
+#### 生成缩略图
 
 ```{javascript}
 @gist(gist/fop.js#makeImageViewUrl)

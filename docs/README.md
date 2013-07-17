@@ -379,7 +379,7 @@ client.move(bucketSrc, keySrc, bucketDestm keyDest, function(ret) {
 
 当您需要一次性进行多个操作时, 可以使用批量操作。
 
-####批量获取文件信息
+#### 批量获取文件信息
 
 ```{javascript}
 var path0 = new qiniu.rs.EntryPath(bucketName, key0);
@@ -398,7 +398,7 @@ client.batchStat([path0, path1, path2], function(ret) {
 });
 ```
 
-####批量复制文件
+#### 批量复制文件
 
 ```{javascript}
 var pathSrc0 = new qiniu.rs.EntryPath(bucketName, key0);
@@ -419,7 +419,7 @@ client.batchCopy([pair0, pair1], function(ret) {
 });
 ```
 
-####批量移动文件
+#### 批量移动文件
 
 ```{javascript}
 var pathSrc0 = new qiniu.rs.EntryPath(bucketName, key0);
@@ -440,7 +440,7 @@ client.batchMove([pair0, pair1], function(ret) {
 });
 ```
 
-####批量删除文件
+#### 批量删除文件
 
 ```{javascript}
 var path0 = new qiniu.rs.EntryPath(bucketName, key0);
@@ -485,7 +485,7 @@ qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(ret) {
 ### 云处理
 
 <a云处理使用说明\>
-####查看图像信息
+#### 查看图像信息
 
 ```{javascript}
 // 生成访问图片的url
@@ -503,7 +503,7 @@ url = policy.makeRequest(url);
 console.log('在浏览器输入: ' + url);
 ```
 
-####查看图像Exif
+#### 查看图像Exif
 
 ```{javascript}
 // 生成访问图片的url
@@ -521,7 +521,7 @@ url = policy.makeRequest(url);
 console.log('在浏览器输入: ' + url);
 ```
 
-####生成缩略图
+#### 生成缩略图
 
 ```{javascript}
 // 生成访问图片的url
