@@ -463,7 +463,7 @@ client.batchDelete([path0, path1, path2], function(ret) {
 ### 高级管理操作
 
 <a高级管理操作\>
-####列出文件
+#### 列出文件
 请求某个存储空间（bucket）下的文件列表，如果有前缀，可以按前缀（prefix）进行过滤；第一次调用时置marker为null，之后的调用填上服务器返回的marker(如果有)，则列出刚刚为列完的文件
 
 ```{javascript}
