@@ -1,8 +1,6 @@
 ---
-title: Node.js SDK 使用指南 | 七牛云存储
+title: Node.js SDK 使用指南
 ---
-
-# Node.js SDK 使用指南
 
 <sdk介绍\>
 
