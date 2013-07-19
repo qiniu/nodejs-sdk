@@ -52,8 +52,8 @@ title: NodeJS SDK
 
 您可以通过如下步骤获得 `ACCESS_KEY` 和 `SECRET_KEY`：
 
-1. [开通七牛开发者帐号](https://dev.qiniutek.com/signup)
-2. [登录七牛开发者自助平台，查看 ACCESS_KEY 和 SECRET_KEY](https://dev.qiniutek.com/account/keys)
+1. [开通七牛开发者帐号](https://portal.qiniu.com/signup)
+2. [登录七牛开发者自助平台，查看 ACCESS_KEY 和 SECRET_KEY](https://portal.qiniu.com/setting/key)
 
 获取到 `ACCESS_KEY` 和 `SECRET_KEY` 之后，您就可以参考下面将要介绍的用法进行接入使用了。
 
@@ -212,7 +212,7 @@ up.Upload()函数封装了以上断点续上传和非断点续上传的方式。
 1. 获取 `uploadToken`（[用于上传文件的临时授权凭证](#generate-upload-token)）
 2. 将该 `uploadToken` 作为文件上传流 `multipart/form-data` 中的一部分实现上传操作
 
-如果您的网络程序是从云端（服务端程序）到终端（手持设备应用）的架构模型，且终端用户有使用您移动端App上传文件（比如照片或视频）的需求，可以把您服务器得到的此 `uploadToken` 返回给手持设备端的App，然后您的移动 App 可以使用 [七牛云存储 Objective-SDK （iOS）](http://docs.qiniutek.com/v3/sdk/objc/) 或 [七牛云存储 Android-SDK](http://docs.qiniutek.com/v3/sdk/android/) 的相关上传函数或参照 [七牛云存储API之文件上传](http://docs.qiniutek.com/v3/api/io/#upload) 直传文件。这样，您的终端用户即可把数据（比如图片或视频）直接上传到七牛云存储服务器上无须经由您的服务端中转，而且在上传之前，七牛云存储做了智能加速，终端用户上传数据始终是离他物理距离最近的存储节点。当终端用户上传成功后，七牛云存储服务端会向您指定的 `callbackUrl` 发送回调数据。如果 `callbackUrl` 所在的服务处理完毕后输出 `JSON` 格式的数据，七牛云存储服务端会将该回调请求所得的响应信息原封不动地返回给终端应用程序。
+如果您的网络程序是从云端（服务端程序）到终端（手持设备应用）的架构模型，且终端用户有使用您移动端App上传文件（比如照片或视频）的需求，可以把您服务器得到的此 `uploadToken` 返回给手持设备端的App，然后您的移动 App 可以使用 [七牛云存储 Objective-SDK （iOS）](http://docs.qiniu.com/ios-sdk/index.html) 或 [七牛云存储 Android-SDK](http://docs.qiniu.com/android-sdk/index.html) 的相关上传函数或参照 [七牛云存储API之文件上传](http://docs.qiniu.com/api/put.html) 直传文件。这样，您的终端用户即可把数据（比如图片或视频）直接上传到七牛云存储服务器上无须经由您的服务端中转，而且在上传之前，七牛云存储做了智能加速，终端用户上传数据始终是离他物理距离最近的存储节点。当终端用户上传成功后，七牛云存储服务端会向您指定的 `callbackUrl` 发送回调数据。如果 `callbackUrl` 所在的服务处理完毕后输出 `JSON` 格式的数据，七牛云存储服务端会将该回调请求所得的响应信息原封不动地返回给终端应用程序。
 
 <a name="stat"></a>
 
@@ -509,7 +509,7 @@ callback function
 
 ## 许可证
 
-Copyright (c) 2012 qiniutek.com
+Copyright (c) 2012 qiniu.com
 
 基于 MIT 协议发布:
 
