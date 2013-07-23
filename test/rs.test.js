@@ -407,6 +407,28 @@ describe('rs.test.js', function () {
 
   });
 
+  describe('list()', function () {
+
+    it('should return file list', function (done) {
+      rs.list(null, null, null, function (res) {
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.keys('items');
+        done();
+      });
+    });
+
+    it('should return file list', function (done) {
+      rs.list(null, 2, null, function (res) {
+        res.should.have.keys('code', 'data');
+        res.code.should.equal(200);
+        res.data.should.have.keys('marker', 'items');
+        done();
+      });
+    });
+
+  });
+
   describe('remove()', function () {
     before(function (done) {
       rs.putFile('rs.test.js.remove', null, __filename, function (res) {
