@@ -1,10 +1,10 @@
-# Node wrapper for Qiniu Resource (Cloud) Storage API
+# Node.js wrapper for Qiniu Resource (Cloud) Storage API
 
 [![Build Status](https://travis-ci.org/qiniu/nodejs-sdk.png?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
 
 ![logo](http://qiniutek.com/images/logo-2.png)
 
-该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
+该 SDK 适用于 Node.js 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 Node.js 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
 
 jscoverage: [85%](http://fengmk2.github.com/coverage/qiniu.html)
 
@@ -131,7 +131,7 @@ SDK 使用文档参考：[http://docs.qiniutek.com/v3/sdk/nodejs/](http://docs.q
 
 ## 许可证
 
-Copyright (c) 2012 qiniutek.com
+Copyright (c) 2012 qiniu.com
 
 基于 MIT 协议发布:
 

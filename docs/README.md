@@ -1,10 +1,10 @@
 ---
-title: NodeJS SDK
+title: Node.js SDK
 ---
 
-该 SDK 适用于 NodeJS 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 NodeJS 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
+该 SDK 适用于 Node.js 0.4.7 及其以上版本，基于 [七牛云存储官方API](/v3/api/) 构建。若您的服务端是一个基于 Node.js 编写的网络程序，使用此 SDK ，能让您以非常便捷地方式将数据安全地存储到七牛云存储上。以便让您应用的终端用户进行高速上传和下载，同时也使得您的服务端更加轻盈。
 
-七牛云存储 NodeJS SDK 开放源代码地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
+七牛云存储 Node.js SDK 开放源代码地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
 
 **文档大纲**
 
@@ -475,7 +475,7 @@ options
 
 在上述示例代码中，我们实例化了一个新的 `imgrs` 对象，之所以这么做是因为我们考虑到缩略图也许可以创建公开外链，即缩略图所存放的 `thumbnails_bucket` 可以通过调用 `imgrs.publish()` 方法公开从而提供静态链接直接访问，这样做的好处是限定了作用域仅限于 `thumbnails_bucket`，也使得缩略图不必通过API通道进行请求且使用静态CDN加速访问，同时也保证了原图不受任何操作影响。
 
-为了使得调用 `imgrs.imageMogrifyAs()` 方法有实际意义，客户方的业务服务器必须保存 `<thumbnails_bucket>` 和 `imgrs.imageMogrifyAs` 方法中参数 `<key>` 的值。如此，该缩略图作为一个新文件可以使用 NodeJS SDK 提供的任何方法。
+为了使得调用 `imgrs.imageMogrifyAs()` 方法有实际意义，客户方的业务服务器必须保存 `<thumbnails_bucket>` 和 `imgrs.imageMogrifyAs` 方法中参数 `<key>` 的值。如此，该缩略图作为一个新文件可以使用 Node.js SDK 提供的任何方法。
 
 callback function
 : 请求完成之后执行的回调函数
@@ -496,7 +496,7 @@ callback function
 
 ## 贡献代码
 
-七牛云存储 NodeJS SDK 开放源代码地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
+七牛云存储 Node.js SDK 开放源代码地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
 
 1. 登录 [github.com](https://github.com)
 2. Fork [https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
