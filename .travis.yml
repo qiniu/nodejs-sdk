@@ -4,7 +4,7 @@ node_js:
   - 0.8
   - 0.6
 before_script:
-  - export QINIU_ACCESS_KEY="8Y7uZY0cqHxAyGK27V_B2Bxf8IhAkqEPOHr6iwwc"
-  - export QINIU_SECRET_KEY="1uvFVvk9IqFRQ6t4TCr-DdeXybTbSS0gauJrYiJN"
-  - export QINIU_TEST_BUCKET="test963"
-  - export QINIU_TEST_DOMAIN="test963.qiniudn.com"
+  - export QINIU_ACCESS_KEY="nnwjTeUgpQdfZp9cb4-iHK0EUlebKCNk4kXwoStq"
+  - export QINIU_SECRET_KEY="Ia9pXC-XEcGF6hvu1V5fdRhwFLpeUkCbt0Gxk5NW"
+  - export QINIU_TEST_BUCKET="test741"
+  - export QINIU_TEST_DOMAIN="test741.qiniudn.com"
