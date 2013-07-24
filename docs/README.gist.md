@@ -79,8 +79,8 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 
 可以通过如下步骤获得：
 
-1. [开通七牛开发者帐号](https://dev.qiniutek.com/signup)
-2. [登录七牛开发者自助平台，查看 AccessKey 和 SecretKey](https://dev.qiniutek.com/account/keys) 。
+1. [开通七牛开发者帐号](https://portal.qiniu.com/signup)
+2. [登录七牛开发者自助平台，查看 AccessKey 和 SecretKey](https://portal.qiniu.com/setting/key) 。
 
 <a name="sdk-usage"></a>
 
