@@ -1,6 +1,7 @@
 Qiniu Resource Storage SDK for Node.js
 ===
 
+[![Build Status](https://travis-ci.org/qiniu/nodejs-sdk.png?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
 [![Qiniu Logo](http://qiniutek.com/images/logo-2.png)](http://qiniu.com/)
 
 ## 使用
@@ -17,7 +18,7 @@ Qiniu Resource Storage SDK for Node.js
 
 ## 许可证
 
-Copyright (c) 2012 qiniu.com
+Copyright (c) 2013 qiniu.com
 
 基于 MIT 协议发布:
 
