@@ -73,3 +73,29 @@ exports.generateAccessToken = function(uri, body) {
   var safeDigest = exports.base64ToUrlSafe(digest);
   return 'QBox ' + conf.ACCESS_KEY + ':' + safeDigest;
 }
+
+// --------------------
+// getResp
+
+exports.getResp = function(onret) {
+  var onresp = function(res) {
+    exports.readAll(res, function(data) {
+      var ret = {};
+      var err = {};
+
+      if (Math.floor(res.statusCode/100) === 2) {
+        if (data.length !== 0) {
+          try {
+            ret = JSON.parse(data);
+          } catch (e) {
+          }
+        }
+      } else {
+        err = {code: res.statusCode, error: data.toString()};
+      }
+      onret(err, ret);
+    })
+  };
+  
+  return onresp;
+}

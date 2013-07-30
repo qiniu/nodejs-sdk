@@ -6,18 +6,7 @@ exports.listPrefix = function(bucket, prefix, marker, limit, onret) {
   var uri = getPrefixUri(bucket, prefix, marker, limit);
   var digest = util.generateAccessToken(uri, null);
 
-  function parseRet(ret) {
-    if (ret.code === 200 && ret.data) {
-      try {
-        ret.data = JSON.parse(ret.data);
-      } catch (e) {
-        ret['error'] = e.toString();
-      }
-    }
-    onret(ret);
-  }
-
-  rpc.postWithoutForm(uri, digest, parseRet);
+  rpc.postWithoutForm(uri, digest, onret)
 }
 
 function getPrefixUri(bucket, prefix, marker, limit) {

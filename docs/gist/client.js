@@ -8,13 +8,14 @@ function uploadFile(localFile, key, uptoken) {
   //extra.crc32 = crc32;
   //extra.checkCrc = checkCrc;
 
-  io.putFile(uptoken, key, localFile, extra, function(ret) {
-    if(ret.code === 200) {
+  io.putFile(uptoken, key, localFile, extra, function(err, ret) {
+    if(!err) {
       // 上传成功， 处理返回值
-      // ret.data.key & ret.data.hash
+      console.log(ret.key, ret.hash);
+      // ret.key & ret.hash
     } else {
       // 上传失败， 处理返回代码
-      // ret.code
+      console.log(err);
       // http://docs.qiniu.com/api/put.html#error-code
     }
   });
@@ -29,13 +30,14 @@ function uploadBuf(body, key, uptoken) {
   //extra.crc32 = crc32;
   //extra.checkCrc = checkCrc;
 
-  io.put(uptoken, key, body, extra, function(ret) {
-    if(ret.code === 200) {
+  io.put(uptoken, key, body, extra, function(err, ret) {
+    if (!err) {
       // 上传成功， 处理返回值
-      // ret.data.key & ret.data.hash
+      console.log(ret.key, ret.hash);
+      // ret.key & ret.hash
     } else {
       // 上传失败， 处理返回代码
-      // ret.code
+      console.log(err)
       // http://docs.qiniu.com/api/put.html#error-code
     }
   });

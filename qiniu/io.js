@@ -39,28 +39,13 @@ function put(uptoken, key, body, extra, onret) {
     extra.mimeType = 'application/octet-stream';
   }
 
-  function parseRet(data) {
-      var ret = data;
-      if (ret.code !== 200) {
-        onret(ret);
-        return;
-      }
-      try {
-        var dt = JSON.parse(ret.data);
-        ret.data = dt;
-      } catch (e) {
-        ret = {code: -2, error: e.toString()};
-      }
-      onret(ret);
-  }
-
   if(!key) {
     key = exports.UNDEFINED_KEY;
   }
 
   var form = getMultipart(uptoken, key, body, extra);
 
-  rpc.postMultipart(conf.UP_HOST, form, parseRet);
+  rpc.postMultipart(conf.UP_HOST, form, onret);
 }
 
 function putWithoutKey(uptoken, body, extra, onret) {
@@ -98,7 +83,7 @@ function getMultipart(uptoken, key, body, extra) {
 function putFile(uptoken, key, loadFile, extra, onret) {
   fs.readFile(loadFile, function(err, data) {
     if(err) {
-      onret({code: -1, error: err.toString(), detail: err});
+      onret({code: -1, error: err.toString()}, {});
       return;
     }
 

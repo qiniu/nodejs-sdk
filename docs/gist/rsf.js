@@ -4,11 +4,11 @@ var qiniu = require('../../');
 qiniu.conf.ACCESS_KEY = '<Your Access Key>';
 qiniu.conf.SECRET_KEY = '<Your Secret Key>';
 
-qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(ret) {
-  if(ret.code === 200) {
+qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(err, ret) {
+  if (!err) {
     // process ret.data.marker & ret.data.items
   } else {
-    // something error, see ret.code according to
+    console.log(err)
     // http://docs.qiniu.com/api/file-handle.html#list
   }
 });

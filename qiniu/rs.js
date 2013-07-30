@@ -29,21 +29,7 @@ Client.prototype.stat = function(bucket, key, onret) {
   var uri = conf.RS_HOST + '/stat/' + encodedEntryUri;
   var digest = util.generateAccessToken(uri, null);
 
-  function parseRet(ret) {
-    if (ret.code != 200 || !ret.data) {
-      onret(ret);
-      return;
-    }
-    try {
-      var dt = JSON.parse(ret.data);
-      ret.data = dt;
-    } catch (e) {
-      ret = {code: -2, error: e.toString()};
-    }
-    onret(ret);
-  }
-
-  rpc.postWithoutForm(uri, digest, parseRet);
+  rpc.postWithoutForm(uri, digest, onret);
 }
 
 Client.prototype.remove = function(bucket, key, onret) {
@@ -117,32 +103,19 @@ function BatchStatItemRet(data, error, code) {
 }
 
 Client.prototype.batchStat = function(entries, onret) {
-  fileHandle('stat', entries, batchRet(onret));
+  fileHandle('stat', entries, onret);
 }
 
 Client.prototype.batchDelete = function(entries, onret) {
-  fileHandle('delete', entries, batchRet(onret));
+  fileHandle('delete', entries, onret);
 }
 
 Client.prototype.batchMove = function(entries, onret) {
-  fileHandle('move', entries, batchRet(onret));
+  fileHandle('move', entries, onret);
 }
 
 Client.prototype.batchCopy = function(entries, onret) {
-  fileHandle('copy', entries, batchRet(onret));
-}
-
-function batchRet(onret) {
-  return function(ret){
-    if (ret.data) {
-      try {
-        ret.data = JSON.parse(ret.data);
-      } catch (e) {
-        ret = {code: -2, error: e.toString()};
-      }
-    }
-    onret(ret);
-  }
+  fileHandle('copy', entries, onret);
 }
 
 function fileHandle(op, entries, onret) {
@@ -159,7 +132,6 @@ function fileHandle(op, entries, onret) {
 function getEncodedEntryUri(bucket, key) {
   return util.urlsafeBase64Encode(bucket + ':' + key);
 }
-
 
 // ----- token --------
 // @gist PutPolicy

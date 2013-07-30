@@ -27,20 +27,20 @@ describe('test start step2:', function() {
       before(function(done) {
         var putPolicy = new qiniu.rs.PutPolicy(TEST_BUCKET);
         var uptoken = putPolicy.token();
-        qiniu.io.putFile(uptoken, logo2, imageFile, null, function(ret) {
-          ret.code.should.equal(200);
+        qiniu.io.putFile(uptoken, logo2, imageFile, null, function(err, ret) {
+          err.should.eql({});
         });
-        qiniu.io.putFile(uptoken, logo, imageFile, null, function(ret) {
-          ret.code.should.equal(200);
+        qiniu.io.putFile(uptoken, logo, imageFile, null, function(err, ret) {
+          err.should.eql({});
           done();
         });
       });
 
       describe('rs.Client#stat()', function() {
         it('get the stat of a file', function(done) {
-          client.stat(TEST_BUCKET, logo, function(ret) {
-            ret.code.should.equal(200);
-            ret.data.should.have.keys('hash', 'fsize', 'putTime', 'mimeType');
+          client.stat(TEST_BUCKET, logo, function(err, ret) {
+            err.should.eql({});
+            ret.should.have.keys('hash', 'fsize', 'putTime', 'mimeType');
             done();
           });
         });
@@ -48,8 +48,8 @@ describe('test start step2:', function() {
 
       describe('rs.Client#copy()', function() {
         it('copy logo.png to logo1.png', function(done) {
-          client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo1, function(ret) {
-            ret.code.should.equal(200);
+          client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo1, function(err, ret) {
+            err.should.eql({});
             done();
           });
         });
@@ -57,8 +57,8 @@ describe('test start step2:', function() {
 
       describe('rs.Client#remove()', function() {
         it('remove logo.png', function(done) {
-          client.remove(TEST_BUCKET, logo, function(ret) {
-            ret.code.should.equal(200);
+          client.remove(TEST_BUCKET, logo, function(err, ret) {
+            err.should.eql({});
             done();
           });
         });
@@ -66,8 +66,8 @@ describe('test start step2:', function() {
 
       describe('rs.Client#move()', function() {
         it('move logo1.png to logo.png', function(done) {
-          client.move(TEST_BUCKET, logo1, TEST_BUCKET, logo, function(ret) {
-            ret.code.should.equal(200);
+          client.move(TEST_BUCKET, logo1, TEST_BUCKET, logo, function(err, ret) {
+            err.should.eql({});
             done();
           });
         });
@@ -79,8 +79,8 @@ describe('test start step2:', function() {
       after(function(done) {
         var entries = [new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo2)];
 
-        client.batchDelete(entries, function(ret) {
-          ret.code.should.equal(200);
+        client.batchDelete(entries, function(err, ret) {
+          err.should.eql({});
           done();
         });
       });
@@ -91,12 +91,12 @@ describe('test start step2:', function() {
             new EntryPath(TEST_BUCKET, logo), 
             new EntryPath(TEST_BUCKET, logo2)];
 
-            client.batchStat(entries, function(ret) {
-              ret.code.should.equal(200);
-              ret.data.length.should.equal(2);
-              for (i in ret.data) {
-                ret.data[i].code.should.equal(200);
-                ret.data[i].data.should.have.keys('fsize', 'hash', 'mimeType', 'putTime');
+            client.batchStat(entries, function(err, ret) {
+              err.should.eql({});
+              ret.length.should.equal(2);
+              for (i in ret) {
+                ret[i].code.should.equal(200);
+                ret[i].data.should.have.keys('fsize', 'hash', 'mimeType', 'putTime');
               }
               done();
             });
@@ -108,15 +108,14 @@ describe('test start step2:', function() {
             new EntryPath(TEST_BUCKET, logo), 
             new EntryPath(TEST_BUCKET, 'not exist file')];
 
-            client.batchStat(entries, function(ret) {
+            client.batchStat(entries, function(err, ret) {
+              err.should.eql({}); // 298
+              ret.length.should.equal(2);
 
-              ret.code.should.equal(298);
-              ret.data.length.should.equal(2);
-
-              for (i in ret.data) {
-                if (ret.data[i].code !== 200) {
-                  ret.data[i].code.should.equal(612);
-                  ret.data[i].data.should.have.keys('error');
+              for (i in ret) {
+                if (ret[i].code !== 200) {
+                  ret[i].code.should.equal(612);
+                  ret[i].data.should.have.keys('error');
                 }
               }
 
@@ -132,8 +131,9 @@ describe('test start step2:', function() {
         entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo2), new EntryPath(TEST_BUCKET, logo3)));
 
         it('copy from logo, logo2 to logo1, logo3', function(done) {
-          client.batchCopy(entries, function(ret) {
-            ret.code.should.equal(200);
+          client.batchCopy(entries, function(err, ret) {
+            err.should.eql({});
+            console.log(ret);
             done();
           });
         });
@@ -143,8 +143,8 @@ describe('test start step2:', function() {
         var entries = [new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo2)];
 
         it('delete logo.png, logo2.png', function(done) {
-          client.batchDelete(entries, function(ret) {
-            ret.code.should.equal(200);
+          client.batchDelete(entries, function(err, ret) {
+            err.should.eql({});
             done();
           });
         });
@@ -156,8 +156,8 @@ describe('test start step2:', function() {
         entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo3), new EntryPath(TEST_BUCKET, logo2)));
 
         it('move from logo1.png, logo3.png to logo.png, logo2.png', function(done) {
-          client.batchMove(entries, function(ret) {
-            ret.code.should.equal(200);
+          client.batchMove(entries, function(err, ret) {
+            err.should.eql({});
             done();
           });
         });

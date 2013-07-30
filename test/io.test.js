@@ -29,8 +29,8 @@ describe('test start step1:', function() {
     }
 
     var client = new qiniu.rs.Client();
-    client.batchDelete(entries, function(ret) {
-      ret.code.should.equal(200);
+    client.batchDelete(entries, function(err, ret) {
+      err.should.eql({});
       done();
     });
   });
@@ -47,11 +47,11 @@ describe('test start step1:', function() {
       describe('io.put()', function() {
         it('test upload from memory', function(done) {
           var key = 'filename' + Math.random(1000);
-          qiniu.io.put(uptoken, key, 'content', null, function(ret) {
-            ret.code.should.equal(200);
-            ret.data.should.have.keys('hash', 'key');
-            ret.data.key.should.equal(key);
-            keys.push(ret.data.key);
+          qiniu.io.put(uptoken, key, 'content', null, function(err, ret) {
+            err.should.eql({});
+            ret.should.have.keys('hash', 'key');
+            ret.key.should.equal(key);
+            keys.push(ret.key);
             done();
           });
         });
@@ -60,11 +60,11 @@ describe('test start step1:', function() {
       describe('io.putWithoutKey()', function() {
         it('test upload from memory without key', function(done) {
           var content = 'content' + Math.random(1000);
-          qiniu.io.putWithoutKey(uptoken, content, null, function(ret) {
-            ret.code.should.equal(200);
-            ret.data.should.have.keys('hash', 'key');
-            ret.data.key.should.equal(ret.data.hash);
-            keys.push(ret.data.key);
+          qiniu.io.putWithoutKey(uptoken, content, null, function(err, ret) {
+            err.should.eql({});
+            ret.should.have.keys('hash', 'key');
+            ret.key.should.equal(ret.hash);
+            keys.push(ret.key);
             done();
           });
         });
@@ -73,11 +73,11 @@ describe('test start step1:', function() {
       describe('io.putFile()', function() {
         it('test upload from a file', function(done) {
           var key = Math.random() + 'logo.png';
-          qiniu.io.putFile(uptoken, key, imageFile, null, function(ret) {
-            ret.code.should.equal(200);
-            ret.data.should.have.keys('key', 'hash');
-            ret.data.key.should.equal(key);
-            keys.push(ret.data.key);
+          qiniu.io.putFile(uptoken, key, imageFile, null, function(err, ret) {
+            err.should.eql({});
+            ret.should.have.keys('key', 'hash');
+            ret.key.should.equal(key);
+            keys.push(ret.key);
             done();
           });
         });
@@ -86,11 +86,11 @@ describe('test start step1:', function() {
           var extra = new qiniu.io.PutExtra();
           extra.checkCrc = 1;
           var key = Math.random() + 'logo_crc32.png';
-          qiniu.io.putFile(uptoken, key, imageFile, extra, function(ret) {
-            ret.code.should.equal(200);
-            ret.data.should.have.keys('key', 'hash');
-            ret.data.key.should.equal(key);
-            keys.push(ret.data.key);
+          qiniu.io.putFile(uptoken, key, imageFile, extra, function(err, ret) {
+            err.should.eql({});
+            ret.should.have.keys('key', 'hash');
+            ret.key.should.equal(key);
+            keys.push(ret.key);
             done();
           });
         });
@@ -114,12 +114,12 @@ describe('test start step1:', function() {
     describe('file handle', function() {
       describe('rsf.listPrefix()', function() {
         it('list all file in test bucket', function(done) {
-          qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, function(ret) {
-            ret.code.should.equal(200);
+          qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, function(err, ret) {
+            err.should.eql({});
 //            ret.data.items.length.should.equal(keys.length);
             for (i in ret.items) {
-              ret.data.items[i].should.has.keys('key', 'time', 'hash', 'fsize', 'mimeType', 'customer');
-              keys.indexOf(ret.data.items[i].key).should.above(-1);
+              ret.items[i].should.have.keys('key', 'putTime', 'hash', 'fsize', 'mimeType');
+              keys.indexOf(ret.items[i].key).should.above(-1);
             }
             done();
           });

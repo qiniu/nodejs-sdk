@@ -221,13 +221,14 @@ function uploadBuf(body, key, uptoken) {
   //extra.crc32 = crc32;
   //extra.checkCrc = checkCrc;
 
-  io.put(uptoken, key, body, extra, function(ret) {
-    if(ret.code === 200) {
+  io.put(uptoken, key, body, extra, function(err, ret) {
+    if (!err) {
       // 上传成功， 处理返回值
-      // ret.data.key & ret.data.hash
+      console.log(ret.key, ret.hash);
+      // ret.key & ret.hash
     } else {
       // 上传失败， 处理返回代码
-      // ret.code
+      console.log(err)
       // http://docs.qiniu.com/api/put.html#error-code
     }
   });
@@ -244,13 +245,14 @@ function uploadFile(localFile, key, uptoken) {
   //extra.crc32 = crc32;
   //extra.checkCrc = checkCrc;
 
-  io.putFile(uptoken, key, localFile, extra, function(ret) {
-    if(ret.code === 200) {
+  io.putFile(uptoken, key, localFile, extra, function(err, ret) {
+    if(!err) {
       // 上传成功， 处理返回值
-      // ret.data.key & ret.data.hash
+      console.log(ret.key, ret.hash);
+      // ret.key & ret.hash
     } else {
       // 上传失败， 处理返回代码
-      // ret.code
+      console.log(err);
       // http://docs.qiniu.com/api/put.html#error-code
     }
   });
@@ -318,12 +320,12 @@ qiniu.conf.SECRET_KEY = '<Your Secret Key>';
 
 ```{javascript}
 var client = new qiniu.rs.Client();
-client.stat(bucketName, key, function(ret) {
-  if (ret.code === 200) {
-    // process 
-    // ret.data has keys (hash, fsize, putTime, mimeType)
+client.stat(bucketName, key, function(err, ret) {
+  if (!err) {
+    // ok 
+    // ret has keys (hash, fsize, putTime, mimeType)
   } else {
-    // something error, process ret.code 
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 });
@@ -335,11 +337,11 @@ client.stat(bucketName, key, function(ret) {
 
 ```{javascript}
 var client = new qiniu.rs.Client();
-client.remove(bucketName, key, function(ret) {
-  if (ret.code === 200) {
+client.remove(bucketName, key, function(err, ret) {
+  if (!err) {
     // ok
   } else {
-    // something error, process ret.code
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 })
@@ -351,11 +353,11 @@ client.remove(bucketName, key, function(ret) {
 
 ```{javascript}
 var client = new qiniu.rs.Client();
-client.copy(bucketSrc, keySrc, bucketDestm keyDest, function(ret) {
-  if (ret.code === 200) {
+client.copy(bucketSrc, keySrc, bucketDest, keyDest, function(err, ret) {
+  if (!err) {
     // ok
   } else {
-    // something error, process ret.code
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 });
@@ -363,11 +365,11 @@ client.copy(bucketSrc, keySrc, bucketDestm keyDest, function(ret) {
 
 ```{javascript}
 var client = new qiniu.rs.Client();
-client.move(bucketSrc, keySrc, bucketDestm keyDest, function(ret) {
-  if (ret.code === 200) {
+client.move(bucketSrc, keySrc, bucketDest, keyDest, function(err, ret) {
+  if (!err) {
     // ok
   } else {
-    // something error, process ret.code
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 });
@@ -377,7 +379,14 @@ client.move(bucketSrc, keySrc, bucketDestm keyDest, function(ret) {
 
 #### 批量操作
 
-当您需要一次性进行多个操作时, 可以使用批量操作。
+当您需要一次性进行多个操作时, 可以使用批量操作。  
+批量操作的几个函数中，当返回值`err`为`null`的时候，有两种情况：  
+
+1. 批量操作的所有操作都成功  
+2. 批量操作仅仅部分成功  
+
+因此在返回成功的时候还需要检查各个子项目的返回值（详细见各个示例）。  
+注意：批量操作不是对单个文件操作的包装，而是有独立的接口。
 
 #### 批量获取文件信息
 
@@ -386,13 +395,20 @@ var path0 = new qiniu.rs.EntryPath(bucketName, key0);
 var path1 = new qiniu.rs.EntryPath(bucketName, key1);
 var path2 = new qiniu.rs.EntryPath(bucketName, key2);
 var client = new qiniu.rs.Client();
-client.batchStat([path0, path1, path2], function(ret) {
-  if (ret.code === 200) {
-    // ok, parse ret.data
-    // each item in ret.data has keys (code, data)
-    // ret.data[i].data has keys (hash, fsize, putTime, mimeType)
+
+client.batchStat([path0, path1, path2], function(err, ret) {
+  if (!err) {
+    for (i in ret) {
+      if (ret[i].code === 200) {
+        //ok, ret[i].data has keys (hash, fsize, putTime, mimeType)
+      } else {
+        // parse error code
+        console.log(ret[i].code, ret[i].data);
+        // http://docs.qiniu.com/api/file-handle.html#error-code
+      }
+    }
   } else {
-    // something error, process ret.code
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 });
@@ -405,15 +421,24 @@ var pathSrc0 = new qiniu.rs.EntryPath(bucketName, key0);
 var pathDest0 = new qiniu.rs.EntryPath(bucketName, key1);
 var pathSrc1 = new qiniu.rs.EntryPath(bucketName, key2);
 var pathDest1 = new qiniu.rs.EntryPath(bucketName, key3);
+
 var pair0 = new qiniu.rs.EntryPathPair(pathSrc0, pathDest0);
 var pair1 = new qiniu.rs.EntryPathPair(pathSrc1, pathDest1);
+
 var client = new qiniu.rs.Client();
 
-client.batchCopy([pair0, pair1], function(ret) {
-  if (ret.code === 200) {
-    // ok
+client.batchCopy([pair0, pair1], function(err, ret) {
+  if (!err) {
+    for (i in ret) {
+      if (ret[i].code !== 200) {
+        // parse error code
+        console.log(ret[i].code, ret[i].data);
+        // http://docs.qiniu.com/api/file-handle.html#error-code
+      }
+    }
+
   } else {
-    // something error, process ret.code
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 });
@@ -426,15 +451,23 @@ var pathSrc0 = new qiniu.rs.EntryPath(bucketName, key0);
 var pathDest0 = new qiniu.rs.EntryPath(bucketName, key1);
 var pathSrc1 = new qiniu.rs.EntryPath(bucketName, key2);
 var pathDest1 = new qiniu.rs.EntryPath(bucketName, key3);
+
 var pair0 = new qiniu.rs.EntryPathPair(pathSrc0, pathDest0);
 var pair1 = new qiniu.rs.EntryPathPair(pathSrc1, pathDest1);
+
 var client = new qiniu.rs.Client();
 
-client.batchMove([pair0, pair1], function(ret) {
-  if (ret.code === 200) {
-    // ok
+client.batchMove([pair0, pair1], function(err, ret) {
+  if (!err) {
+    for (i in ret) {
+      if (ret[i] !== 200) {
+        // parse error code
+        console.log(ret[i].code, ret[i].data);
+        // http://docs.qiniu.com/api/file-handle.html#error-code
+      }
+    }
   } else {
-    // something error, process ret.code
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 });
@@ -446,13 +479,20 @@ client.batchMove([pair0, pair1], function(ret) {
 var path0 = new qiniu.rs.EntryPath(bucketName, key0);
 var path1 = new qiniu.rs.EntryPath(bucketName, key1);
 var path2 = new qiniu.rs.EntryPath(bucketName, key2);
+
 var client = new qiniu.rs.Client();
 
-client.batchDelete([path0, path1, path2], function(ret) {
-  if (ret.code === 200) {
-    // ok
+client.batchDelete([path0, path1, path2], function(err, ret) {
+  if (!err) {
+    for (i in ret) {
+      if (ret[i].code !== 200) {
+        // parse error code
+        console.log(ret[i].code, ret[i].data);
+        // http://docs.qiniu.com/api/file-handle.html#error-code
+      }
+    }
   } else {
-    // something error, process ret.code
+    console.log(err);
     // http://docs.qiniu.com/api/file-handle.html#error-code
   }
 });
@@ -470,11 +510,11 @@ client.batchDelete([path0, path1, path2], function(ret) {
 qiniu.conf.ACCESS_KEY = '<Your Access Key>';
 qiniu.conf.SECRET_KEY = '<Your Secret Key>';
 
-qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(ret) {
-  if(ret.code === 200) {
+qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(err, ret) {
+  if (!err) {
     // process ret.data.marker & ret.data.items
   } else {
-    // something error, see ret.code according to
+    console.log(err)
     // http://docs.qiniu.com/api/file-handle.html#list
   }
 });
