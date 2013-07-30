@@ -6,7 +6,8 @@ Qiniu Resource Storage SDK for Node.js
 
 ## 使用
 
-参考文档：[七牛云存储 Node.js SDK 使用指南](https://github.com/qiniu/nodejs-sdk/tree/develop/docs)
+参考文档：[七牛云存储 Node.js SDK 使用指南](https://github.com/qiniu/nodejs-sdk/tree/develop/docs)  
+旧版本的SDK(version < 6.0.0) [戳这里](http://docs.qiniutek.com/v3/sdk/nodejs/)
 
 ## 贡献代码
 
