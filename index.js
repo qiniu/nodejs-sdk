@@ -1,9 +1,10 @@
-var libpath = process.env.QINIU_COV ? './lib-cov' : './lib';
+
+var libpath = process.env.QINIU_COV ? './lib-cov' : './qiniu';
 
 module.exports = {
-    conf: require(libpath + '/conf.js'),
-    digestauth: require(libpath + '/digestauth.js'),
-    rs: require(libpath + '/rs.js'),
-    img: require(libpath + '/img.js'),
-    auth: require(libpath + '/auth.js'),
+  io: require(libpath + '/io.js'),
+  rs: require(libpath + '/rs.js'),
+  rsf: require(libpath + '/rsf.js'),
+  fop: require(libpath + '/fop.js'),
+  conf: require(libpath + '/conf.js'),
 };
