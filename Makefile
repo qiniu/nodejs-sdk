@@ -1,20 +1,25 @@
 TESTS = test/*.test.js
+TIMEOUT = 15000
 REPORTER = spec
-TIMEOUT = 10000
+MOCHA_OPTS = 
+test: 
+		@NODE_ENV=test ./node_modules/.bin/mocha \
+			--require should \
+			--reporter $(REPORTER) \
+			--timeout $(TIMEOUT) \
+			$(MOCHA_OPTS) \
+			$(TESTS)
 
-test:
-		@NODE_ENV=test ./node_modules/mocha/bin/mocha \
-				--reporter $(REPORTER) \
-				--timeout $(TIMEOUT) \
-				$(TESTS)
-
-test-cov:
-		@rm -rf ./lib-cov
-		@$(MAKE) lib-cov
-		@QINIU_COV=1 $(MAKE) test REPORTER=dot
+test-cov: lib-cov
+#		@QINIU_COV=1 $(MAKE) test REPORTER=dot
 		@QINIU_COV=1 $(MAKE) test REPORTER=html-cov > coverage.html
+		@rm -rf ./lib-cov
+		
 
 lib-cov:
-		@jscoverage lib $@
+		@jscoverage --no-highlight qiniu $@
 
-.PHONY: test-cov test lib-cov
+clean:
+		rm -rf ./lib-cov coverage.html
+
+.PHONY: test-cov lib-cov test
