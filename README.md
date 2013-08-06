@@ -11,7 +11,7 @@
 这是我们建议的方式
 
 ```
-npm node qiniu
+npm install qiniu
 ```
 
 ### 从 release 版本下载
