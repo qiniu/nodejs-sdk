@@ -1,5 +1,4 @@
 # Qiniu Resource Storage SDK for Node.js
-===
 
 [![Build Status](https://travis-ci.org/qiniu/nodejs-sdk.png?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
 
