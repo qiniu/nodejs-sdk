@@ -221,7 +221,7 @@ function uploadBuf(body, key, uptoken) {
   //extra.crc32 = crc32;
   //extra.checkCrc = checkCrc;
 
-  io.put(uptoken, key, body, extra, function(err, ret) {
+  qiniu.io.put(uptoken, key, body, extra, function(err, ret) {
     if (!err) {
       // 上传成功， 处理返回值
       console.log(ret.key, ret.hash);
@@ -245,7 +245,7 @@ function uploadFile(localFile, key, uptoken) {
   //extra.crc32 = crc32;
   //extra.checkCrc = checkCrc;
 
-  io.putFile(uptoken, key, localFile, extra, function(err, ret) {
+  qiniu.io.putFile(uptoken, key, localFile, extra, function(err, ret) {
     if(!err) {
       // 上传成功， 处理返回值
       console.log(ret.key, ret.hash);
@@ -285,8 +285,8 @@ function uploadFile(localFile, key, uptoken) {
 
 ```{javascript}
 function downloadUrl(domain, key) {
-  var baseUrl = rs.makeBaseUrl(domain, key);
-  var policy = new rs.GetPolicy();
+  var baseUrl = qiniu.rs.makeBaseUrl(domain, key);
+  var policy = new qiniu.rs.GetPolicy();
   return policy.makeRequest(baseUrl);
 }
 ```
