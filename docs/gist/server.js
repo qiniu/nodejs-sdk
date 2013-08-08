@@ -1,4 +1,4 @@
-var qiniu = require('../..');
+var qiniu = require('../../');
 
 // @gist init
 qiniu.conf.ACCESS_KEY = '<Your Access Key>'
@@ -21,8 +21,8 @@ function uptoken(bucketname) {
 
 // @gist downloadUrl
 function downloadUrl(domain, key) {
-  var baseUrl = rs.makeBaseUrl(domain, key);
-  var policy = new rs.GetPolicy();
+  var baseUrl = qiniu.rs.makeBaseUrl(domain, key);
+  var policy = new qiniu.rs.GetPolicy();
   return policy.makeRequest(baseUrl);
 }
 // @endgist
