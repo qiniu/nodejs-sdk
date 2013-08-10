@@ -80,8 +80,7 @@ exports.generateAccessToken = function(uri, body) {
 exports.getResp = function(onret) {
   var onresp = function(res) {
     exports.readAll(res, function(data) {
-      var ret = {};
-      var err = {};
+      var err, ret;
 
       if (Math.floor(res.statusCode/100) === 2) {
         if (data.length !== 0) {
