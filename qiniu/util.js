@@ -87,6 +87,7 @@ exports.getResp = function(onret) {
           try {
             ret = JSON.parse(data);
           } catch (e) {
+            err = {code: res.statusCode, err: e.toString()};
           }
         }
       } else {
