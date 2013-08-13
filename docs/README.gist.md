@@ -93,8 +93,7 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 对于服务端而言，常规程序流程是：
 
 ```{javascript}
-qiniu.conf.ACCESS_KEY = '<Your Access Key>'
-qiniu.conf.SECRET_KEY = '<Your Secret Key>'
+@gist(gist/server.js#init)
 ```
 
 *服务端操作时请务必初始化这两个变量*
@@ -138,17 +137,7 @@ qiniu.conf.SECRET_KEY = '<Your Secret Key>'
 [uptoken](http://docs.qiniu.com/api/put.html#uploadToken) 实际上是用 AccessKey/SecretKey 进行数字签名的上传策略(`rs.PutPolicy`)，它控制则整个上传流程的行为。让我们快速过一遍你都能够决策啥：
 
 ```{javascript}
-function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
-                  asyncOps, endUser, expires) {
-  this.scope = scope || null;
-  this.callbackUrl = callbackUrl || null;
-  this.callbackBody = callbackBody || null;
-  this.returnUrl = returnUrl || null;
-  this.returnBody = returnBody || null;
-  this.asyncOps = asyncOps || null;
-  this.endUser = endUser || null;
-  this.expires = expires || 3600;
-}
+@gist(../qiniu/rs.js#PutPolicy)
 ```
 
 * `scope` 限定客户端的权限。如果 `scope` 是 bucket，则客户端只能新增文件到指定的 bucket，不能修改文件。如果 `scope` 为 bucket:key，则客户端可以修改指定的文件。
@@ -168,17 +157,7 @@ function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
 服务端生成 [uptoken](http://docs.qiniu.com/api/put.html#uploadToken) 代码如下：
 
 ```{javascript}
-function uptoken(bucketname) {
-  var putPolicy = new qiniu.rs.PutPolicy(bucketname);
-  //putPolicy.callbackUrl = callbackUrl;
-  //putPolicy.callbackBody = callbackBody;
-  //putPolicy.returnUrl = returnUrl;
-  //putPolicy.returnBody = returnBody;
-  //putPolicy.asyncOps = asyncOps;
-  //putPolicy.expires = expires;
-
-  return putPolicy.token();
-}
+@gist(gist/server.js#uptoken)
 ```
 
 <a name="put-extra"></a>
@@ -191,12 +170,7 @@ function uptoken(bucketname) {
 PutExtra是上传时的可选信息，默认为null
 
 ```{javascript}
-function PutExtra(params, mimeType, crc32, checkCrc) {
-  this.paras = params || {};
-  this.mimeType = mimeType || null;
-  this.crc32 = crc32 || null;
-  this.checkCrc = checkCrc || 0;
-}
+@gist(../qiniu/io.js#PutExtra)
 ```
 
 * `params` 是一个字典。[自定义变量](http://docs.qiniu.com/api/put.html#xVariables)，key必须以 x: 开头命名，不限个数。可以在 uploadToken 的 callbackBody 选项中求值。
@@ -214,49 +188,13 @@ function PutExtra(params, mimeType, crc32, checkCrc) {
 直接上传二进制流：
 
 ```{javascript}
-function uploadBuf(body, key, uptoken) {
-  var extra = new qiniu.io.PutExtra();
-  //extra.params = params;
-  //extra.mimeType = mimeType;
-  //extra.crc32 = crc32;
-  //extra.checkCrc = checkCrc;
-
-  qiniu.io.put(uptoken, key, body, extra, function(err, ret) {
-    if (!err) {
-      // 上传成功， 处理返回值
-      console.log(ret.key, ret.hash);
-      // ret.key & ret.hash
-    } else {
-      // 上传失败， 处理返回代码
-      console.log(err)
-      // http://docs.qiniu.com/api/put.html#error-code
-    }
-  });
-}
+@gist(gist/client.js#uploadBuf)
 ```
 
 上传本地文件：
 
 ```{javascript}
-function uploadFile(localFile, key, uptoken) {
-  var extra = new qiniu.io.PutExtra();
-  //extra.params = params;
-  //extra.mimeType = mimeType;
-  //extra.crc32 = crc32;
-  //extra.checkCrc = checkCrc;
-
-  qiniu.io.putFile(uptoken, key, localFile, extra, function(err, ret) {
-    if(!err) {
-      // 上传成功， 处理返回值
-      console.log(ret.key, ret.hash);
-      // ret.key & ret.hash
-    } else {
-      // 上传失败， 处理返回代码
-      console.log(err);
-      // http://docs.qiniu.com/api/put.html#error-code
-    }
-  });
-}
+@gist(gist/client.js#uploadFile)
 ```
 
 <a name="io-get"></a>
@@ -284,11 +222,7 @@ function uploadFile(localFile, key, uptoken) {
 其中 dntoken 是由业务服务器签发的一个[临时下载授权凭证](http://docs.qiniu.com/api/get.html#download-token)，deadline 是 dntoken 的有效期。dntoken不需要单独生成，SDK 提供了生成完整 downloadUrl 的方法（包含了 dntoken），示例代码如下：
 
 ```{javascript}
-function downloadUrl(domain, key) {
-  var baseUrl = qiniu.rs.makeBaseUrl(domain, key);
-  var policy = new qiniu.rs.GetPolicy();
-  return policy.makeRequest(baseUrl);
-}
+@gist(gist/server.js#downloadUrl)
 ```
 
 生成 downloadUrl 后，服务端下发 downloadUrl 给客户端。客户端收到 downloadUrl 后，和公有资源类似，直接用任意的 HTTP 客户端就可以下载该资源了。唯一需要注意的是，在 downloadUrl 失效却还没有完成下载时，需要重新向服务器申请授权。
@@ -308,8 +242,7 @@ function downloadUrl(domain, key) {
 资源操作限在服务端操作，先进行初始化
 
 ```{javascript}
-qiniu.conf.ACCESS_KEY = '<Your Access Key>';
-qiniu.conf.SECRET_KEY = '<Your Secret Key>';
+@gist(gist/rs.js#init)
 ```
 
 <a name="rs-stat"></a>
@@ -319,16 +252,7 @@ qiniu.conf.SECRET_KEY = '<Your Secret Key>';
 <a获取文件信息说明\>
 
 ```{javascript}
-var client = new qiniu.rs.Client();
-client.stat(bucketName, key, function(err, ret) {
-  if (!err) {
-    // ok 
-    // ret has keys (hash, fsize, putTime, mimeType)
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-});
+@gist(gist/rs.js#stat)
 ```
 
 <a name="rs-delete"></a>
@@ -336,15 +260,7 @@ client.stat(bucketName, key, function(err, ret) {
 #### 删除文件
 
 ```{javascript}
-var client = new qiniu.rs.Client();
-client.remove(bucketName, key, function(err, ret) {
-  if (!err) {
-    // ok
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-})
+@gist(gist/rs.js#remove)
 ```
 
 <a name="rs-copy-move"></a>
@@ -352,27 +268,11 @@ client.remove(bucketName, key, function(err, ret) {
 #### 复制/移动文件
 
 ```{javascript}
-var client = new qiniu.rs.Client();
-client.copy(bucketSrc, keySrc, bucketDest, keyDest, function(err, ret) {
-  if (!err) {
-    // ok
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-});
+@gist(gist/rs.js#copy)
 ```
 
 ```{javascript}
-var client = new qiniu.rs.Client();
-client.move(bucketSrc, keySrc, bucketDest, keyDest, function(err, ret) {
-  if (!err) {
-    // ok
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-});
+@gist(gist/rs.js#move)
 ```
 
 <a name="rs-batch"></a>
@@ -391,111 +291,25 @@ client.move(bucketSrc, keySrc, bucketDest, keyDest, function(err, ret) {
 #### 批量获取文件信息
 
 ```{javascript}
-var path0 = new qiniu.rs.EntryPath(bucketName, key0);
-var path1 = new qiniu.rs.EntryPath(bucketName, key1);
-var path2 = new qiniu.rs.EntryPath(bucketName, key2);
-var client = new qiniu.rs.Client();
-
-client.batchStat([path0, path1, path2], function(err, ret) {
-  if (!err) {
-    for (i in ret) {
-      if (ret[i].code === 200) {
-        //ok, ret[i].data has keys (hash, fsize, putTime, mimeType)
-      } else {
-        // parse error code
-        console.log(ret[i].code, ret[i].data);
-        // http://docs.qiniu.com/api/file-handle.html#error-code
-      }
-    }
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-});
+@gist(gist/rs.js#batchStat)
 ```
 
 #### 批量复制文件
 
 ```{javascript}
-var pathSrc0 = new qiniu.rs.EntryPath(bucketName, key0);
-var pathDest0 = new qiniu.rs.EntryPath(bucketName, key1);
-var pathSrc1 = new qiniu.rs.EntryPath(bucketName, key2);
-var pathDest1 = new qiniu.rs.EntryPath(bucketName, key3);
-
-var pair0 = new qiniu.rs.EntryPathPair(pathSrc0, pathDest0);
-var pair1 = new qiniu.rs.EntryPathPair(pathSrc1, pathDest1);
-
-var client = new qiniu.rs.Client();
-
-client.batchCopy([pair0, pair1], function(err, ret) {
-  if (!err) {
-    for (i in ret) {
-      if (ret[i].code !== 200) {
-        // parse error code
-        console.log(ret[i].code, ret[i].data);
-        // http://docs.qiniu.com/api/file-handle.html#error-code
-      }
-    }
-
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-});
+@gist(gist/rs.js#batchCopy)
 ```
 
 #### 批量移动文件
 
 ```{javascript}
-var pathSrc0 = new qiniu.rs.EntryPath(bucketName, key0);
-var pathDest0 = new qiniu.rs.EntryPath(bucketName, key1);
-var pathSrc1 = new qiniu.rs.EntryPath(bucketName, key2);
-var pathDest1 = new qiniu.rs.EntryPath(bucketName, key3);
-
-var pair0 = new qiniu.rs.EntryPathPair(pathSrc0, pathDest0);
-var pair1 = new qiniu.rs.EntryPathPair(pathSrc1, pathDest1);
-
-var client = new qiniu.rs.Client();
-
-client.batchMove([pair0, pair1], function(err, ret) {
-  if (!err) {
-    for (i in ret) {
-      if (ret[i] !== 200) {
-        // parse error code
-        console.log(ret[i].code, ret[i].data);
-        // http://docs.qiniu.com/api/file-handle.html#error-code
-      }
-    }
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-});
+@gist(gist/rs.js#batchMove)
 ```
 
 #### 批量删除文件
 
 ```{javascript}
-var path0 = new qiniu.rs.EntryPath(bucketName, key0);
-var path1 = new qiniu.rs.EntryPath(bucketName, key1);
-var path2 = new qiniu.rs.EntryPath(bucketName, key2);
-
-var client = new qiniu.rs.Client();
-
-client.batchDelete([path0, path1, path2], function(err, ret) {
-  if (!err) {
-    for (i in ret) {
-      if (ret[i].code !== 200) {
-        // parse error code
-        console.log(ret[i].code, ret[i].data);
-        // http://docs.qiniu.com/api/file-handle.html#error-code
-      }
-    }
-  } else {
-    console.log(err);
-    // http://docs.qiniu.com/api/file-handle.html#error-code
-  }
-});
+@gist(gist/rs.js#batchDelete)
 ```
 
 <a name="adv-file-handle"></a>
@@ -507,17 +321,7 @@ client.batchDelete([path0, path1, path2], function(err, ret) {
 请求某个存储空间（bucket）下的文件列表，如果有前缀，可以按前缀（prefix）进行过滤；第一次调用时置marker为null，之后的调用填上服务器返回的marker(如果有)，则列出刚刚为列完的文件
 
 ```{javascript}
-qiniu.conf.ACCESS_KEY = '<Your Access Key>';
-qiniu.conf.SECRET_KEY = '<Your Secret Key>';
-
-qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(err, ret) {
-  if (!err) {
-    // process ret.marker & ret.items
-  } else {
-    console.log(err)
-    // http://docs.qiniu.com/api/file-handle.html#list
-  }
-});
+@gist(gist/rsf.js#listPrefix)
 ```
 
 <a name="fop"></a>
@@ -528,56 +332,19 @@ qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(err, ret) {
 #### 查看图像信息
 
 ```{javascript}
-// 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
-
-// 生成fop_url
-var ii = new qiniu.fop.ImageInfo();
-url = ii.makeRequest(url);
-
-// 签名，生成private_url。如果是公有bucket则此步可以省略
-// 服务端操作使用，或者发送给客户端
-var policy = new qiniu.rs.GetPolicy();
-url = policy.makeRequest(url);
-
-console.log('在浏览器输入: ' + url);
+@gist(gist/fop.js#makeImageInfoUrl)
 ```
 
 #### 查看图像Exif
 
 ```{javascript}
-// 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
-
-// 生成fop_url
-var exif = new qiniu.fop.Exif();
-url = exif.makeRequest(url);
-
-// 签名，生成private_url。如果是公有bucket则此步可以省略
-// 服务端操作使用，或者发送给客户端
-var policy = new qiniu.rs.GetPolicy();
-url = policy.makeRequest(url);
-
-console.log('在浏览器输入: ' + url);
+@gist(gist/fop.js#makeExifUrl)
 ```
 
 #### 生成缩略图
 
 ```{javascript}
-// 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
-
-// 生成fop_url
-var iv = new qiniu.fop.ImageView();
-iv.width = 100;
-url = iv.makeRequest(url);
-
-// 签名，生成private_url。如果是公有bucket则此步可以省略
-// 服务端操作使用，或者发送给客户端
-var policy = new qiniu.rs.GetPolicy();
-url = policy.makeRequest(url);
-
-console.log('在浏览器输入: ' + url);
+@gist(gist/fop.js#makeImageViewUrl)
 ```
 
 ## 贡献代码
@@ -595,4 +362,3 @@ console.log('在浏览器输入: ' + url);
 ## 基于 MIT 协议发布:
 
 > [www.opensource.org/licenses/MIT](http://www.opensource.org/licenses/MIT)
-
