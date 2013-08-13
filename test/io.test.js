@@ -30,7 +30,7 @@ describe('test start step1:', function() {
 
     var client = new qiniu.rs.Client();
     client.batchDelete(entries, function(err, ret) {
-      err.should.eql({});
+      should.not.exist(err);
       done();
     });
   });
@@ -48,7 +48,7 @@ describe('test start step1:', function() {
         it('test upload from memory', function(done) {
           var key = 'filename' + Math.random(1000);
           qiniu.io.put(uptoken, key, 'content', null, function(err, ret) {
-            err.should.eql({});
+            should.not.exist(err);
             ret.should.have.keys('hash', 'key');
             ret.key.should.equal(key);
             keys.push(ret.key);
@@ -61,7 +61,7 @@ describe('test start step1:', function() {
         it('test upload from memory without key', function(done) {
           var content = 'content' + Math.random(1000);
           qiniu.io.putWithoutKey(uptoken, content, null, function(err, ret) {
-            err.should.eql({});
+            should.not.exist(err);
             ret.should.have.keys('hash', 'key');
             ret.key.should.equal(ret.hash);
             keys.push(ret.key);
@@ -74,7 +74,7 @@ describe('test start step1:', function() {
         it('test upload from a file', function(done) {
           var key = Math.random() + 'logo.png';
           qiniu.io.putFile(uptoken, key, imageFile, null, function(err, ret) {
-            err.should.eql({});
+            should.not.exist(err);
             ret.should.have.keys('key', 'hash');
             ret.key.should.equal(key);
             keys.push(ret.key);
@@ -87,7 +87,7 @@ describe('test start step1:', function() {
           extra.checkCrc = 1;
           var key = Math.random() + 'logo_crc32.png';
           qiniu.io.putFile(uptoken, key, imageFile, extra, function(err, ret) {
-            err.should.eql({});
+            should.not.exist(err);
             ret.should.have.keys('key', 'hash');
             ret.key.should.equal(key);
             keys.push(ret.key);
@@ -115,7 +115,7 @@ describe('test start step1:', function() {
       describe('rsf.listPrefix()', function() {
         it('list all file in test bucket', function(done) {
           qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, function(err, ret) {
-            err.should.eql({});
+            should.not.exist(err);
 //            ret.data.items.length.should.equal(keys.length);
             for (i in ret.items) {
               ret.items[i].should.have.keys('key', 'putTime', 'hash', 'fsize', 'mimeType');
