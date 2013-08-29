@@ -133,7 +133,7 @@ describe('test start step2:', function() {
         it('copy from logo, logo2 to logo1, logo3', function(done) {
           client.batchCopy(entries, function(err, ret) {
             should.not.exist(err);
-            console.log(ret);
+            ret.should.eql([ { code: 200 }, { code: 200 } ]);
             done();
           });
         });

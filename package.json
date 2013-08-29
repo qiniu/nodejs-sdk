@@ -56,8 +56,9 @@
   ],
   "dependencies": {
     "mime": "1.2.9",
-    "formstream": "0.0.5",
-    "crc32": "0.2.2"
+    "formstream": "0.0.7",
+    "crc32": "0.2.2",
+    "urllib": "0.5.1"
   },
   "devDependencies": {
     "should": "*",

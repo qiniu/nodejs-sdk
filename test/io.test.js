@@ -31,6 +31,11 @@ describe('test start step1:', function() {
     var client = new qiniu.rs.Client();
     client.batchDelete(entries, function(err, ret) {
       should.not.exist(err);
+      should.exist(ret);
+      ret.length.should.equal(entries.length);
+      ret.forEach(function (result) {
+        result.should.eql({code: 200});
+      });
       done();
     });
   });
@@ -51,6 +56,7 @@ describe('test start step1:', function() {
             should.not.exist(err);
             ret.should.have.keys('hash', 'key');
             ret.key.should.equal(key);
+            ret.hash.should.be.a('string');
             keys.push(ret.key);
             done();
           });
