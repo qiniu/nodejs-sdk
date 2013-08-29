@@ -94,7 +94,7 @@ describe('test start step2:', function() {
             client.batchStat(entries, function(err, ret) {
               should.not.exist(err);
               ret.length.should.equal(2);
-              for (i in ret) {
+              for (var i in ret) {
                 ret[i].code.should.equal(200);
                 ret[i].data.should.have.keys('fsize', 'hash', 'mimeType', 'putTime');
               }
@@ -112,7 +112,7 @@ describe('test start step2:', function() {
               should.not.exist(err); // 298
               ret.length.should.equal(2);
 
-              for (i in ret) {
+              for (var i in ret) {
                 if (ret[i].code !== 200) {
                   ret[i].code.should.equal(612);
                   ret[i].data.should.have.keys('error');

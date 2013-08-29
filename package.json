@@ -7,7 +7,16 @@
     "test": "test"
   },
   "scripts": {
-    "test": "make test"
+    "test": "make test",
+    "blanket": { 
+      "pattern": "qiniu/qiniu",
+      "data-cover-flags": {
+        "debug": false
+      }
+    },
+    "travis-cov": {
+      "threshold": 90
+    }
   },
   "repository": {
     "type": "git",
@@ -53,7 +62,9 @@
   "devDependencies": {
     "should": "*",
     "pedding": "*",
-    "mocha": "*"
+    "mocha": "*",
+    "blanket": "*",
+    "travis-cov": "*"
   },
   "license": "MIT"
 }

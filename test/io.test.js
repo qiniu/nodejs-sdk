@@ -23,8 +23,8 @@ describe('test start step1:', function() {
   var keys = [];
 
   after(function(done) {
-    entries = [];
-    for (i in keys) {
+    var entries = [];
+    for (var i in keys) {
       entries.push(new qiniu.rs.EntryPath(TEST_BUCKET, keys[i]));
     }
 
@@ -117,7 +117,7 @@ describe('test start step1:', function() {
           qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, function(err, ret) {
             should.not.exist(err);
 //            ret.data.items.length.should.equal(keys.length);
-            for (i in ret.items) {
+            for (var i in ret.items) {
               ret.items[i].should.have.keys('key', 'putTime', 'hash', 'fsize', 'mimeType');
 //              keys.indexOf(ret.items[i].key).should.above(-1);
             }
