@@ -45,6 +45,7 @@ function post(uri, form, headers, onresp) {
     method: 'POST',
     content: content,
     dataType: 'json',
+    timeout: conf.RPC_TIMEOUT,
   }, function (err, result, res) {
     if (err) {
       err.code = res && res.statusCode || -1;
