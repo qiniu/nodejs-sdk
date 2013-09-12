@@ -120,7 +120,7 @@ Client.prototype.batchCopy = function(entries, onret) {
 
 function fileHandle(op, entries, onret) {
   var body = '';
-  for (i in entries) {
+  for (var i in entries) {
     body += entries[i].toStr(op);
   }
 

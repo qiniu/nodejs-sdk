@@ -17,3 +17,4 @@ results
 
 node_modules
 npm-debug.log
+test/config.js
