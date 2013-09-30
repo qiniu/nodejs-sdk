@@ -16,12 +16,11 @@ exports.putFile = putFile;
 exports.putFileWithoutKey = putFileWithoutKey;
 
 // @gist PutExtra
-function PutExtra(params, mimeType, crc32, checkCrc,encoding) {
+function PutExtra(params, mimeType, crc32, checkCrc) {
   this.paras = params || {};
   this.mimeType = mimeType || null;
   this.crc32 = crc32 || null;
   this.checkCrc = checkCrc || 0;
-  this.encoding = encoding || 'utf8';//add config for buff encoding;
 }
 // @endgist
 
@@ -61,7 +60,7 @@ function getMultipart(uptoken, key, body, extra) {
     form.field('key', key);
   }
 
-  form.buffer('file', new Buffer(body,extra.encoding), key, extra.mimeType);
+  form.buffer('file', new Buffer(body), key, extra.mimeType);
 
   //extra['checkcrc']
   if (extra.checkCrc == 1) {
