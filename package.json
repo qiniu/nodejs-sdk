@@ -61,7 +61,7 @@
     "urllib": "0.5.1"
   },
   "devDependencies": {
-    "should": "*",
+    "should": "1.2.2",
     "pedding": "*",
     "mocha": "*",
     "blanket": "*",
