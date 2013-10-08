@@ -23,14 +23,19 @@ describe('test start step1:', function() {
   var keys = [];
 
   after(function(done) {
-    entries = [];
-    for (i in keys) {
+    var entries = [];
+    for (var i in keys) {
       entries.push(new qiniu.rs.EntryPath(TEST_BUCKET, keys[i]));
     }
 
     var client = new qiniu.rs.Client();
     client.batchDelete(entries, function(err, ret) {
       should.not.exist(err);
+      should.exist(ret);
+      ret.length.should.equal(entries.length);
+      ret.forEach(function (result) {
+        result.should.eql({code: 200});
+      });
       done();
     });
   });
@@ -51,6 +56,7 @@ describe('test start step1:', function() {
             should.not.exist(err);
             ret.should.have.keys('hash', 'key');
             ret.key.should.equal(key);
+            ret.hash.should.be.a('string');
             keys.push(ret.key);
             done();
           });
@@ -117,7 +123,7 @@ describe('test start step1:', function() {
           qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, function(err, ret) {
             should.not.exist(err);
 //            ret.data.items.length.should.equal(keys.length);
-            for (i in ret.items) {
+            for (var i in ret.items) {
               ret.items[i].should.have.keys('key', 'putTime', 'hash', 'fsize', 'mimeType');
 //              keys.indexOf(ret.items[i].key).should.above(-1);
             }

@@ -79,7 +79,7 @@ EntryPath.prototype.encode = function() {
 }
 
 EntryPath.prototype.toStr = function(op) {
-  return 'op=/' + op + '/' + getEncodedEntryUri(this.bucket, this.key) + '&'; 
+  return 'op=/' + op + '/' + getEncodedEntryUri(this.bucket, this.key) + '&';
 }
 
 function EntryPathPair(src, dest) {
@@ -120,7 +120,7 @@ Client.prototype.batchCopy = function(entries, onret) {
 
 function fileHandle(op, entries, onret) {
   var body = '';
-  for (i in entries) {
+  for (var i in entries) {
     body += entries[i].toStr(op);
   }
 
@@ -166,7 +166,7 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
     flags['scope'] = this.scope;
   }
   if (this.callbackUrl != null) {
-    flags['callbackUrl'] = this.scope;
+    flags['callbackUrl'] = this.callbackUrl;
   }
   if (this.callbackBody != null) {
     flags['callbackBody'] = this.callbackBody;
