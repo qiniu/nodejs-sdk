@@ -1,4 +1,3 @@
-
 var conf = require('./conf');
 var util = require('./util');
 var rpc = require('./rpc');
@@ -73,7 +72,7 @@ function getMultipart(uptoken, key, body, extra) {
     form.field('crc32', extra.crc32);
   }
 
-  for (k in extra.params) {
+  for (var k in extra.params) {
     form.field(k, extra.params[k]);
   }
 

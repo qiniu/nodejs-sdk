@@ -10,14 +10,11 @@ test:
 			$(MOCHA_OPTS) \
 			$(TESTS)
 
-test-cov: lib-cov
-#		@QINIU_COV=1 $(MAKE) test REPORTER=dot
-		@QINIU_COV=1 $(MAKE) test REPORTER=html-cov > coverage.html
-		@rm -rf ./lib-cov
-		
-
-lib-cov:
-		@jscoverage --no-highlight qiniu $@
+test-cov:
+	@rm -f coverage.html
+	@$(MAKE) test MOCHA_OPTS='--require blanket' REPORTER=html-cov > coverage.html
+	#@$(MAKE) test MOCHA_OPTS='--require blanket' REPORTER=travis-cov
+	@ls -lh coverage.html
 
 clean:
 		rm -rf ./lib-cov coverage.html
