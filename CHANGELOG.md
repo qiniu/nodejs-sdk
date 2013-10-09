@@ -1,6 +1,6 @@
 ## CHANGE LOG
 
-### v6.0.1
+### v6.1.0
 
 2013-10-08 issues [#81](https://github.com/qiniu/nodejs-sdk/pull/81)
 
