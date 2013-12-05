@@ -27,9 +27,9 @@ function PutExtra(params, mimeType, crc32, checkCrc) {
 function PutRet(hash, key) {
   this.hash = hash || null;
   this.key = key || null;
-} 
+}
 
-// onret: callback function instead of ret 
+// onret: callback function instead of ret
 function put(uptoken, key, body, extra, onret) {
   if(!extra) {
     extra = new PutExtra();
@@ -60,7 +60,7 @@ function getMultipart(uptoken, key, body, extra) {
     form.field('key', key);
   }
 
-  form.buffer('file', new Buffer(body), key, extra.mimeType);
+  form.buffer('file', body, key, extra.mimeType);
 
   //extra['checkcrc']
   if (extra.checkCrc == 1) {
@@ -100,4 +100,3 @@ function putFile(uptoken, key, loadFile, extra, onret) {
 function putFileWithoutKey(uptoken, loadFile, extra, onret) {
   putFile(uptoken, null, loadFile, extra, onret);
 }
-
