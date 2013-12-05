@@ -59,8 +59,8 @@ function getMultipart(uptoken, key, body, extra) {
   if(key != exports.UNDEFINED_KEY) {
     form.field('key', key);
   }
-
-  form.buffer('file', body, key, extra.mimeType);
+  var buf = Buffer.isBuffer(body) ? body : new Buffer(body);
+  form.buffer('file', buf, key, extra.mimeType);
 
   //extra['checkcrc']
   if (extra.checkCrc == 1) {
