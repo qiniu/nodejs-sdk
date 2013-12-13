@@ -35,10 +35,14 @@ function post(uri, form, headers, onresp) {
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
 
   var content = null;
+  var content.length = 0;
   if (Buffer.isBuffer(form) || typeof form === 'string') {
     content = form;
+    contentLength = content.length;
     form = null;
   }
+  
+  headers['Content-Length'] = contentLength;
 
   var req = urllib.request(uri, {
     headers: headers,
