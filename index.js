@@ -6,5 +6,5 @@ module.exports = {
   rs: require(libpath + '/rs.js'),
   rsf: require(libpath + '/rsf.js'),
   fop: require(libpath + '/fop.js'),
-  conf: require(libpath + '/conf.js'),
+  conf: require(libpath + '/conf.js')
 };
