@@ -3,11 +3,11 @@ var qiniu = require('../../');
 qiniu.conf.ACCESS_KEY = '8Y7uZY0cqHxAyGK27V_B2Bxf8IhAkqEPOHr6iwwc';
 qiniu.conf.SECRET_KEY = '1uvFVvk9IqFRQ6t4TCr-DdeXybTbSS0gauJrYiJN';
 
-var bucketName = 'test369.qiniudn.com';
+var domain = 'test369.qiniudn.com';
 var key = 'logo.png';
 // @gist makeImageInfoUrl
 // 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
+var url = qiniu.rs.makeBaseUrl(domain, key);
 
 // 生成fop_url
 var ii = new qiniu.fop.ImageInfo();
@@ -23,7 +23,7 @@ console.log('在浏览器输入: ' + url);
 
 // @gist makeExifUrl
 // 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
+var url = qiniu.rs.makeBaseUrl(domain, key);
 
 // 生成fop_url
 var exif = new qiniu.fop.Exif();
@@ -40,7 +40,7 @@ console.log('在浏览器输入: ' + url);
 // @gist makeImageViewUrl
 
 // 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
+var url = qiniu.rs.makeBaseUrl(domain, key);
 
 // 生成fop_url
 var iv = new qiniu.fop.ImageView();

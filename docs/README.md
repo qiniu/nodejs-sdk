@@ -2,8 +2,6 @@
 title: Node.js SDK 使用指南
 ---
 
-# Node.js SDK 使用指南
-
 <sdk介绍\>
 
 SDK 下载地址：[https://github.com/qiniu/nodejs-sdk](https://github.com/qiniu/nodejs-sdk)
@@ -71,7 +69,7 @@ Node.js SDK 主要包含对七牛云存储API的包装，遵循[qiniu sdkspec](h
 
 <sdk安装说明\>
 通过 npm 以 node 模块化的方式安装：  
-`npm node qiniu`
+`$ npm install qiniu`
 
 <a name="appkey"></a>
 
@@ -535,7 +533,7 @@ qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(err, ret) {
 
 ```{javascript}
 // 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
+var url = qiniu.rs.makeBaseUrl(domain, key);
 
 // 生成fop_url
 var ii = new qiniu.fop.ImageInfo();
@@ -553,7 +551,7 @@ console.log('在浏览器输入: ' + url);
 
 ```{javascript}
 // 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
+var url = qiniu.rs.makeBaseUrl(domain, key);
 
 // 生成fop_url
 var exif = new qiniu.fop.Exif();
@@ -571,7 +569,7 @@ console.log('在浏览器输入: ' + url);
 
 ```{javascript}
 // 生成访问图片的url
-var url = qiniu.rs.makeBaseUrl(bucketName, key);
+var url = qiniu.rs.makeBaseUrl(domain, key);
 
 // 生成fop_url
 var iv = new qiniu.fop.ImageView();
