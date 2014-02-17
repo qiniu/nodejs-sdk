@@ -34,27 +34,27 @@ function post(uri, form, headers, onresp) {
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
 
-  var content = null;
-  if (Buffer.isBuffer(form) || typeof form === 'string') {
-    content = form;
-    form = null;
-  }
-
-  var req = urllib.request(uri, {
+  var data = {
     headers: headers,
     method: 'POST',
-    content: content,
     dataType: 'json',
     timeout: conf.RPC_TIMEOUT,
-  }, function (err, result, res) {
-    if (err) {
-      err.code = res && res.statusCode || -1;
-    }
-    onresp(err, result, res);
-  });
+  };
 
-  if (form) {
-    form.pipe(req);
-  }
+  if (Buffer.isBuffer(form) || typeof form === 'string') {
+    data.content = form;
+  } else if (form) {
+    data.stream = form;
+  } else {
+    data.headers['Content-Length'] = 0;
+  };
+
+  var req = urllib.request(uri, data, function(err, result, res) {
+    var rerr = null;
+    if (err || Math.floor(res.statusCode/100) !== 2) {
+      rerr = {code: res&&res.statusCode||-1, error: err||result.error||''};
+    }
+    onresp(rerr, result, res);
+  });
 }
 
