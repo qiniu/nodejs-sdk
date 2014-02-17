@@ -1,5 +1,12 @@
 ## CHANGE LOG
 
+### v6.1.2
+
+2014-2-17 issue [#96](https://github.com/qiniu/nodejs-sdk/pull/96)
+
+- Content-Length = 0 时的细节修复
+
+
 ### v6.1.1
 
 2013-12-5 issue [#90](https://github.com/qiniu/nodejs-sdk/pull/90)
