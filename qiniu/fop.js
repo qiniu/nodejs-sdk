@@ -1,8 +1,10 @@
-
+var util = require('./util');
+var rpc = require('./rpc');
 
 exports.ImageView = ImageView;
 exports.ImageInfo = ImageInfo;
 exports.Exif = Exif;
+exports.pfop = pfop;
 
 function ImageView(mode, width, height, quality, format) {
   this.mode = mode || 1;
@@ -48,4 +50,12 @@ Exif.prototype.makeRequest = function(url) {
   return url + '?exif'
 }
 
+
+function pfop(bucket, key, fops, notify, onret) {
+
+  var uri = 'http://api.qiniu.com/pfop/';
+  var body = 'bucket='+bucket+'&key='+key+'&fops='+fops+'&notifyURL='+notify;
+  var auth = util.generateAccessToken(uri, body);
+  rpc.postWithForm(uri, body, auth, onret);
+}
 
