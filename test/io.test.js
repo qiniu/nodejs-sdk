@@ -133,4 +133,16 @@ describe('test start step1:', function() {
       });
     });
   });
+
+  describe('pfop', function() {
+    it('do pfop', function(done) {
+// @gist pfop
+// pfop
+      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyUrl: 'www.test.com', force: true}, function(err, ret) {
+        ret.should.have.keys('persistentId');
+        done();
+      });
+// @endgist
+    })
+  });
 });

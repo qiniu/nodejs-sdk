@@ -51,10 +51,14 @@ Exif.prototype.makeRequest = function(url) {
 }
 
 
-function pfop(bucket, key, fops, notify, onret) {
+function pfop(bucket, key, fops, opts, onret) {
+
+  opts = opts || {};
+  var notifyStr = '&notifyURL=' + opts.notifyURL || '';
+  var forceStr = opts.force && '&force=1' || '';
 
   var uri = 'http://api.qiniu.com/pfop/';
-  var body = 'bucket='+bucket+'&key='+key+'&fops='+fops+'&notifyURL='+notify;
+  var body = 'bucket='+bucket+'&key='+key+'&fops='+fops+ notifyStr + forceStr;
   var auth = util.generateAccessToken(uri, body);
   rpc.postWithForm(uri, body, auth, onret);
 }
