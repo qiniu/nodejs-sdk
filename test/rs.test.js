@@ -164,6 +164,25 @@ describe('test start step2:', function() {
       });
     });
 
+    describe('rs.isQiniuCallBack', function() {
+
+      it('test isQiniuCallback true', function(done) {
+// @gist isQiniuCallback
+// ------ auth应该是来自请求的header的'Authrization'字段，path是请求的路径，content是请求的内容
+        var auth = 'QBox nnwjTeUgpQdfZp9cb4-iHK0EUlebKCNk4kXwoStq:kyFuG6yYh6FlX1fZO0alTgJK2Jw=';
+        var path = '/callback';
+        var content = 'key=43850.6579994258936495&hash=FllOJrhvzorEKnyMwE-o7pfciiha';
+// ------
+
+        var ok = qiniu.util.isQiniuCallback(path, content, auth);
+        ok.should.be.ok;
+// @endgist
+        done();
+      });
+
+
+    });
+
     // rs.GetPolicy#makeRequest()
 
   });
