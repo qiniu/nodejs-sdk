@@ -138,7 +138,7 @@ describe('test start step1:', function() {
     it('do pfop', function(done) {
 // @gist pfop
 // pfop
-      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyUrl: 'www.test.com', force: true}, function(err, ret) {
+      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyURL: 'www.test.com'}, function(err, ret) {
         ret.should.have.keys('persistentId');
         done();
       });
