@@ -4,6 +4,8 @@ var path = require('path');
 var crypto = require('crypto');
 var conf = require('./conf');
 
+exports.isQiniuCallback = isQiniuCallback;
+
 // ------------------------------------------------------------------------------------------
 // func encode
 
@@ -40,4 +42,10 @@ exports.generateAccessToken = function(uri, body) {
   var digest = exports.hmacSha1(access, conf.SECRET_KEY);
   var safeDigest = exports.base64ToUrlSafe(digest);
   return 'QBox ' + conf.ACCESS_KEY + ':' + safeDigest;
+}
+
+function isQiniuCallback(path, body, callbackAuth) {
+
+  var auth = exports.generateAccessToken(path, body)
+  return auth === callbackAuth;
 }
