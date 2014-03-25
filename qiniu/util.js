@@ -44,8 +44,8 @@ exports.generateAccessToken = function(uri, body) {
   return 'QBox ' + conf.ACCESS_KEY + ':' + safeDigest;
 }
 
-function isQiniuCallback(path, body, auth) {
+function isQiniuCallback(path, body, callbackAuth) {
 
-  var auth1 = exports.generateAccessToken(path, body)
-  return auth === auth1;
+  var auth = exports.generateAccessToken(path, body)
+  return auth === callbackAuth;
 }
