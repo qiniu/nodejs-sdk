@@ -184,10 +184,10 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
     flags['endUser'] = this.endUser;
   }
   if (this.persistentOps != null) {
-    flag['persistentOps'] = this.persistentOps;
+    flags['persistentOps'] = this.persistentOps;
   }
   if (this.persistentNotifyUrl != null) {
-    flag['persistentNotifyUrl'] = this.persistentNotifyUrl;
+    flags['persistentNotifyUrl'] = this.persistentNotifyUrl;
   }
   flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
   return flags;
