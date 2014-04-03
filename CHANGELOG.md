@@ -1,5 +1,12 @@
 ## CHANGE LOG
 
+### v6.1.3
+
+2014-4-03 issue [#102](https://github.com/qiniu/nodejs-sdk/pull/102)
+
+- [#98] 增加pfop 功能
+- [#99] 增加针对七牛callback的检查
+
 ### v6.1.2
 
 2014-2-17 issue [#96](https://github.com/qiniu/nodejs-sdk/pull/96)
