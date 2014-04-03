@@ -174,7 +174,8 @@ function uptoken(bucketname) {
   //putPolicy.callbackBody = callbackBody;
   //putPolicy.returnUrl = returnUrl;
   //putPolicy.returnBody = returnBody;
-  //putPolicy.asyncOps = asyncOps;
+  //putpolicy.persistentOps = persistentops;
+  //putPolicy.persistentNotifyUrl = persistentNotifyUrl;
   //putPolicy.expires = expires;
 
   return putPolicy.token();
@@ -529,6 +530,23 @@ qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(err, ret) {
 ### 云处理
 
 <a云处理使用说明\>
+
+#### pfop
+`pfop`的作用是对已存在七牛服务器上的文件做持久化的fop，具体见[api文档](http://developer.qiniu.com/docs/v6/api/overview/fop/persistent-fop.html)
+
+```{javascript}
+// 原型
+func pfop(bucketName, keyName, fops, opts, callback);
+
+// 例子
+// pfop
+      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyUrl: 'www.test.com', force: true}, function(err, ret) {
+        ret.should.have.keys('persistentId');
+        done();
+      });
+
+```
+
 #### 查看图像信息
 
 ```{javascript}
@@ -582,6 +600,22 @@ var policy = new qiniu.rs.GetPolicy();
 url = policy.makeRequest(url);
 
 console.log('在浏览器输入: ' + url);
+```
+
+### 实用函数
+
+#### 测试是否来自七牛的callback
+在上传的`putPolicy`中指定`callbackUrl`和`callbackBody`，在上传成功后七牛会有一个回调函数，这个函数用来检测回调是否来自七牛。  
+
+```{javascript}
+// ------ auth应该是来自请求的header的'Authrization'字段，path是请求的路径，content是请求的内容
+        var auth = 'QBox nnwjTeUgpQdfZp9cb4-iHK0EUlebKCNk4kXwoStq:kyFuG6yYh6FlX1fZO0alTgJK2Jw=';
+        var path = '/callback';
+        var content = 'key=43850.6579994258936495&hash=FllOJrhvzorEKnyMwE-o7pfciiha';
+// ------
+
+        var ok = qiniu.util.isQiniuCallback(path, content, auth);
+        ok.should.be.ok;
 ```
 
 ## 贡献代码

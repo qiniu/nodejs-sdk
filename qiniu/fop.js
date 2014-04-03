@@ -1,8 +1,12 @@
+var util = require('./util');
+var rpc = require('./rpc');
 
+var querystring = require('querystring');
 
 exports.ImageView = ImageView;
 exports.ImageInfo = ImageInfo;
 exports.Exif = Exif;
+exports.pfop = pfop;
 
 function ImageView(mode, width, height, quality, format) {
   this.mode = mode || 1;
@@ -48,4 +52,28 @@ Exif.prototype.makeRequest = function(url) {
   return url + '?exif'
 }
 
+
+function pfop(bucket, key, fops, opts, onret) {
+
+  opts = opts || {};
+
+  param = {
+    bucket: bucket,
+    key: key,
+    fops: fops
+  };
+  if (opts.notifyURL) {
+    param.notifyURL = opts.notifyURL;
+  } else {
+    param.notifyURL = 'www.test.com';
+  }
+  if (opts.force) {
+    param.force = 1;
+  }
+
+  var uri = 'http://api.qiniu.com/pfop/';
+  var body = querystring.stringify(param);
+  var auth = util.generateAccessToken(uri, body);
+  rpc.postWithForm(uri, body, auth, onret);
+}
 

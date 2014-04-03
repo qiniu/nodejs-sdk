@@ -7,4 +7,6 @@ module.exports = {
   rsf: require(libpath + '/rsf.js'),
   fop: require(libpath + '/fop.js'),
   conf: require(libpath + '/conf.js'),
+  rpc: require(libpath + '/rpc.js'),
+  util: require(libpath + '/util.js')
 };

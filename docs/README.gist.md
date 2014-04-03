@@ -333,6 +333,19 @@ PutExtra是上传时的可选信息，默认为null
 ### 云处理
 
 <a云处理使用说明\>
+
+#### pfop
+`pfop`的作用是对已存在七牛服务器上的文件做持久化的fop，具体见[api文档](http://developer.qiniu.com/docs/v6/api/overview/fop/persistent-fop.html)
+
+```{javascript}
+// 原型
+func pfop(bucketName, keyName, fops, opts, callback);
+
+// 例子
+@gist(../test/io.test.js#pfop)
+
+```
+
 #### 查看图像信息
 
 ```{javascript}
@@ -349,6 +362,15 @@ PutExtra是上传时的可选信息，默认为null
 
 ```{javascript}
 @gist(gist/fop.js#makeImageViewUrl)
+```
+
+### 实用函数
+
+#### 测试是否来自七牛的callback
+在上传的`putPolicy`中指定`callbackUrl`和`callbackBody`，在上传成功后七牛会有一个回调函数，这个函数用来检测回调是否来自七牛。  
+
+```{javascript}
+@gist(../test/rs.test.js#isQiniuCallback)
 ```
 
 ## 贡献代码
