@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "6.1.0",
+  "version": "6.1.3",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "make test",
-    "blanket": { 
+    "blanket": {
       "pattern": "qiniu/qiniu",
       "data-cover-flags": {
         "debug": false
