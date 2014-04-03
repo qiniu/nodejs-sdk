@@ -530,6 +530,23 @@ qiniu.rsf.listPrefix(bucketname, prefix, marker, limit, function(err, ret) {
 ### 云处理
 
 <a云处理使用说明\>
+
+#### pfop
+`pfop`的作用是对已存在七牛服务器上的文件做持久化的fop，具体见[api文档](http://developer.qiniu.com/docs/v6/api/overview/fop/persistent-fop.html)
+
+```{javascript}
+// 原型
+func pfop(bucketName, keyName, fops, opts, callback);
+
+// 例子
+// pfop
+      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyUrl: 'www.test.com', force: true}, function(err, ret) {
+        ret.should.have.keys('persistentId');
+        done();
+      });
+
+```
+
 #### 查看图像信息
 
 ```{javascript}
