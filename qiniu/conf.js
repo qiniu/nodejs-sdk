@@ -2,7 +2,7 @@
 exports.ACCESS_KEY = '<PLEASE APPLY YOUR ACCESS KEY>';
 exports.SECRET_KEY = '<DONT SEND YOUR SECRET KEY TO ANYONE>';
 
-exports.USER_AGENT = 'qiniu nodejs-sdk v6.0.0';
+exports.USER_AGENT = 'qiniu nodejs-sdk v6.1.3';
 
 exports.UP_HOST = 'http://up.qbox.me';
 exports.RS_HOST = 'http://rs.qbox.me';
