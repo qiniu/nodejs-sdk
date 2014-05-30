@@ -189,12 +189,6 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
   if (this.persistentNotifyUrl != null) {
     flags['persistentNotifyUrl'] = this.persistentNotifyUrl;
   }
-  if (this.transform != null) {
-    flags['transform'] = this.transform;
-  }
-  if (this.fopTimeout != null) {
-    flags['fopTimeout'] = this.fopTimeout;
-  }
   flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
   return flags;
 }
