@@ -45,7 +45,6 @@ exports.generateAccessToken = function(uri, body) {
 }
 
 function isQiniuCallback(path, body, callbackAuth) {
-
-  var auth = exports.generateAccessToken(path, body)
+  var auth = exports.generateAccessToken(path, body);
   return auth === callbackAuth;
 }

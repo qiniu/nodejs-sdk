@@ -88,7 +88,7 @@ describe('test start step2:', function() {
       describe('rs.Client#batchStat()', function() {
         it('get the stat of logo.png and logo2.png', function(done) {
           var entries = [
-            new EntryPath(TEST_BUCKET, logo), 
+            new EntryPath(TEST_BUCKET, logo),
             new EntryPath(TEST_BUCKET, logo2)];
 
             client.batchStat(entries, function(err, ret) {
@@ -105,7 +105,7 @@ describe('test start step2:', function() {
         it('should return code 298 when partial ok', function(done) {
 
           var entries = [
-            new EntryPath(TEST_BUCKET, logo), 
+            new EntryPath(TEST_BUCKET, logo),
             new EntryPath(TEST_BUCKET, 'not exist file')];
 
             client.batchStat(entries, function(err, ret) {
@@ -167,23 +167,14 @@ describe('test start step2:', function() {
     describe('rs.isQiniuCallBack', function() {
 
       it('test isQiniuCallback true', function(done) {
-// @gist isQiniuCallback
-// ------ auth应该是来自请求的header的'Authrization'字段，path是请求的路径，content是请求的内容
-        var auth = 'QBox nnwjTeUgpQdfZp9cb4-iHK0EUlebKCNk4kXwoStq:kyFuG6yYh6FlX1fZO0alTgJK2Jw=';
+        var auth = 'QBox QWYn5TFQsLLU1pL5MFEmX3s5DmHdUThav9WyOWOm:4GcOC2_eiw97QBNsHiwLzSqxelI=';
         var path = '/callback';
         var content = 'key=43850.6579994258936495&hash=FllOJrhvzorEKnyMwE-o7pfciiha';
-// ------
-
         var ok = qiniu.util.isQiniuCallback(path, content, auth);
         ok.should.be.ok;
-// @endgist
         done();
       });
-
-
     });
-
-    // rs.GetPolicy#makeRequest()
 
   });
 });

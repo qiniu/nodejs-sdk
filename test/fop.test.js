@@ -2,7 +2,7 @@ var fop = require('../').fop;
 
 describe('test start step 0', function() {
   describe('fop.js', function() {
-    var pic = 'http://test963.qiniudn.com/logo.png';
+    var pic = 'http://private-res.qiniudn.com/gogopher.jpg';
 
     describe('fop.Exif#makeRequest()', function() {
       it('test makeRequest', function(done) {

@@ -1,8 +1,16 @@
+var fs = require('fs');
+var path = require('path');
+var os = require('os');
 
 exports.ACCESS_KEY = '<PLEASE APPLY YOUR ACCESS KEY>';
 exports.SECRET_KEY = '<DONT SEND YOUR SECRET KEY TO ANYONE>';
 
-exports.USER_AGENT = 'qiniu nodejs-sdk v6.1.3';
+var pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../', 'package.json')));
+var ua = function(){
+    return 'QiniuNodejs/' + pkg.version + ' (' + os.type() + '; ' + os.platform() + '; ' + os.arch() + '; )';
+}
+
+exports.USER_AGENT = ua();
 
 exports.UP_HOST = 'http://upload.qiniu.com';
 exports.RS_HOST = 'http://rs.qbox.me';
