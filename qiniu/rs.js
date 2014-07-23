@@ -199,6 +199,9 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
   if (this.detectMime != null) {
     flags['detectMime'] = this.detectMime;
   }
+  if (this.saveKey != null) {
+    flags['saveKey'] = this.saveKey;
+  }
   flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
   return flags;
 }
