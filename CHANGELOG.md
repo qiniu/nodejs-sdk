@@ -2,10 +2,10 @@
 
 ### v6.1.5
 
-2014-4-03 issue [#110](https://github.com/qiniu/nodejs-sdk/pull/102)
+2014-4-03 issue [#111](https://github.com/qiniu/nodejs-sdk/pull/111)
 
 - [#109] 统一user agent
-
+- [#110] 更新put policy
 
 ### v6.1.4
 
