@@ -1,8 +1,6 @@
 language: node_js
 node_js:
   - 0.10
-  - 0.8
-  - 0.6
 before_script:
   - export QINIU_ACCESS_KEY=QWYn5TFQsLLU1pL5MFEmX3s5DmHdUThav9WyOWOm
   - export QINIU_SECRET_KEY=Bxckh6FA-Fbs9Yt3i3cbKVK22UPBmAOHJcL95pGz

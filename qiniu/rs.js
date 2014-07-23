@@ -136,15 +136,16 @@ function getEncodedEntryUri(bucket, key) {
 // ----- token --------
 // @gist PutPolicy
 function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
-                  asyncOps, endUser, expires) {
+                  asyncOps, endUser, expires, persistentOps, persistentNotifyUrl) {
   this.scope = scope || null;
   this.callbackUrl = callbackUrl || null;
   this.callbackBody = callbackBody || null;
   this.returnUrl = returnUrl || null;
   this.returnBody = returnBody || null;
-  this.asyncOps = asyncOps || null;
   this.endUser = endUser || null;
   this.expires = expires || 3600;
+  this.persistentOps = persistentOps || null;
+  this.persistentNotifyUrl = persistentNotifyUrl || null;
 }
 // @endgist
 
@@ -177,9 +178,6 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
   if (this.returnBody != null) {
     flags['returnBody'] = this.returnBody;
   }
-  if (this.asyncOps != null) {
-    flags['asyncOps'] = this.asyncOps;
-  }
   if (this.endUser != null) {
     flags['endUser'] = this.endUser;
   }
@@ -189,10 +187,21 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
   if (this.persistentNotifyUrl != null) {
     flags['persistentNotifyUrl'] = this.persistentNotifyUrl;
   }
+  if (this.persistentPipeline != null) {
+    flags['persistentPipeline'] = this.persistentPipeline;
+  }
+  if (this.mimeLimit != null) {
+    flags['mimeLimit'] = this.mimeLimit;
+  }
+  if (this.insertOnly != null) {
+    flags['insertOnly'] = this.insertOnly;
+  }
+  if (this.detectMime != null) {
+    flags['detectMime'] = this.detectMime;
+  }
   flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
   return flags;
 }
-
 
 function GetPolicy(expires) {
   this.expires = expires || 3600;
