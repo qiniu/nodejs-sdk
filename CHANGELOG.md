@@ -1,5 +1,19 @@
 ## CHANGE LOG
 
+### v6.1.5
+
+2014-4-03 issue [#110](https://github.com/qiniu/nodejs-sdk/pull/102)
+
+- [#109] 统一user agent
+
+
+### v6.1.4
+
+2014-4-03 issue [#108](https://github.com/qiniu/nodejs-sdk/pull/108)
+
+- [#107] 调整上传host
+
+
 ### v6.1.3
 
 2014-4-03 issue [#102](https://github.com/qiniu/nodejs-sdk/pull/102)
