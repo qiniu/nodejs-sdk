@@ -230,8 +230,8 @@ GetPolicy.prototype.makeRequest = function(baseUrl, mac) {
 
   return baseUrl + '&token=' + downloadToken;
 }
-
-function makeBaseUrl(domain, key) {
+// query like '-thumbnail', '?imageMogr2/thumbnail/960x' and so on
+function makeBaseUrl(domain, key, query) {
   key = new Buffer(key);
-  return 'http://' + domain + '/' + querystring.escape(key);
+  return 'http://' + domain + '/' + querystring.escape(key) + (query||'');
 }
