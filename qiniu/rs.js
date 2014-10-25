@@ -196,6 +196,12 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
     flags['fopTimeout'] = this.fopTimeout;
   }
   flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
+  if (this.fsizeLimit != null) {
+    flags['fsizeLimit'] = this.fsizeLimit;
+  }
+  if (this.insertOnly != null) {
+    flags['insertOnly'] = this.insertOnly;
+  }
   return flags;
 }
 
