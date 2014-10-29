@@ -193,6 +193,12 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
   if (this.mimeLimit != null) {
     flags['mimeLimit'] = this.mimeLimit;
   }
+  
+  if (this.fsizeLimit != null) {
+    flags['fsizeLimit'] = this.fsizeLimit;
+  }
+
+
   if (this.insertOnly != null) {
     flags['insertOnly'] = this.insertOnly;
   }
