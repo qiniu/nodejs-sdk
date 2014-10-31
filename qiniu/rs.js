@@ -203,6 +203,12 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
     flags['saveKey'] = this.saveKey;
   }
   flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
+  if (this.fsizeLimit != null) {
+    flags['fsizeLimit'] = this.fsizeLimit;
+  }
+  if (this.insertOnly != null) {
+    flags['insertOnly'] = this.insertOnly;
+  }
   return flags;
 }
 
@@ -230,8 +236,8 @@ GetPolicy.prototype.makeRequest = function(baseUrl, mac) {
 
   return baseUrl + '&token=' + downloadToken;
 }
-
-function makeBaseUrl(domain, key) {
+// query like '-thumbnail', '?imageMogr2/thumbnail/960x' and so on
+function makeBaseUrl(domain, key, query) {
   key = new Buffer(key);
-  return 'http://' + domain + '/' + querystring.escape(key);
+  return 'http://' + domain + '/' + querystring.escape(key) + (query||'');
 }
