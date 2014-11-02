@@ -58,6 +58,13 @@ Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) 
   rpc.postWithoutForm(uri, digest, onret);
 }
 
+Client.prototype.fetch = function(url, bucket, key, onret) {
+    var bucketUri = getEncodedEntryUri(bucket, key);
+    var fetchUrl = util.urlsafeBase64Encode(url);
+    var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
+    var digest = util.generateAccessToken(uri, null);
+    rpc.postWithoutForm(uri, digest, onret);
+}
 
 function Entry(hash, fsize, putTime, mimeType, endUser) {
   this.hash = hash || null;
