@@ -1,4 +1,3 @@
-
 var url = require('url');
 var crypto = require('crypto');
 var formstream = require('formstream');
@@ -59,11 +58,11 @@ Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) 
 }
 
 Client.prototype.fetch = function(url, bucket, key, onret) {
-    var bucketUri = getEncodedEntryUri(bucket, key);
-    var fetchUrl = util.urlsafeBase64Encode(url);
-    var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
-    var digest = util.generateAccessToken(uri, null);
-    rpc.postWithoutForm(uri, digest, onret);
+  var bucketUri = getEncodedEntryUri(bucket, key);
+  var fetchUrl = util.urlsafeBase64Encode(url);
+  var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
+  var digest = util.generateAccessToken(uri, null);
+  rpc.postWithoutForm(uri, digest, onret);
 }
 
 function Entry(hash, fsize, putTime, mimeType, endUser) {
@@ -142,17 +141,16 @@ function getEncodedEntryUri(bucket, key) {
 
 // ----- token --------
 // @gist PutPolicy
-function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
-                  asyncOps, endUser, expires, persistentOps, persistentNotifyUrl) {
-  this.scope = scope || null;
-  this.callbackUrl = callbackUrl || null;
-  this.callbackBody = callbackBody || null;
-  this.returnUrl = returnUrl || null;
-  this.returnBody = returnBody || null;
-  this.endUser = endUser || null;
-  this.expires = expires || 3600;
-  this.persistentOps = persistentOps || null;
-  this.persistentNotifyUrl = persistentNotifyUrl || null;
+function PutPolicy(putPolicyObj) {
+  this.scope = putPolicyObj.scope || null;
+  this.callbackUrl = putPolicyObj.callbackUrl || null;
+  this.callbackBody = putPolicyObj.callbackBody || null;
+  this.returnUrl = putPolicyObj.returnUrl || null;
+  this.returnBody = putPolicyObj.returnBody || null;
+  this.endUser = putPolicyObj.endUser || null;
+  this.expires = putPolicyObj.expires || 3600;
+  this.persistentOps = putPolicyObj.persistentOps || null;
+  this.persistentNotifyUrl = putPolicyObj.persistentNotifyUrl || null;
 }
 // @endgist
 
@@ -246,5 +244,5 @@ GetPolicy.prototype.makeRequest = function(baseUrl, mac) {
 // query like '-thumbnail', '?imageMogr2/thumbnail/960x' and so on
 function makeBaseUrl(domain, key, query) {
   key = new Buffer(key);
-  return 'http://' + domain + '/' + querystring.escape(key) + (query||'');
+  return 'http://' + domain + '/' + querystring.escape(key) + (query || '');
 }
