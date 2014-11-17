@@ -142,6 +142,11 @@ function getEncodedEntryUri(bucket, key) {
 // ----- token --------
 // @gist PutPolicy
 function PutPolicy(putPolicyObj) {
+
+  if (typeof putPolicyObj !== 'object') {
+    return false;
+  }
+
   this.scope = putPolicyObj.scope || null;
   this.expires = putPolicyObj.expires || 3600;
   this.insertOnly = putPolicyObj.insertOnly || null;
