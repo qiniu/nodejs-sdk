@@ -226,9 +226,7 @@ PutPolicy.prototype.getFlags = function() {
   if (this.fsizeLimit != null) {
     flags['fsizeLimit'] = this.fsizeLimit;
   }
-  if (this.insertOnly != null) {
-    flags['insertOnly'] = this.insertOnly;
-  }
+
   return flags;
 }
 
