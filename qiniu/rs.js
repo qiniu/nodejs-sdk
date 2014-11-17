@@ -147,7 +147,6 @@ function PutPolicy(putPolicyObj) {
   this.insertOnly = putPolicyObj.insertOnly || null;
 
   this.saveKey = putPolicyObj.saveKey || null;
-
   this.endUser = putPolicyObj.endUser || null;
 
   this.returnUrl = putPolicyObj.returnUrl || null;
@@ -186,21 +185,35 @@ PutPolicy.prototype.getFlags = function() {
   if (this.scope != null) {
     flags['scope'] = this.scope;
   }
-  if (this.callbackUrl != null) {
-    flags['callbackUrl'] = this.callbackUrl;
+  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
+  if (this.insertOnly != null) {
+    flags['insertOnly'] = this.insertOnly;
   }
-  if (this.callbackBody != null) {
-    flags['callbackBody'] = this.callbackBody;
+
+  if (this.saveKey != null) {
+    flags['saveKey'] = this.saveKey;
   }
+  if (this.endUser != null) {
+    flags['endUser'] = this.endUser;
+  }
+
   if (this.returnUrl != null) {
     flags['returnUrl'] = this.returnUrl;
   }
   if (this.returnBody != null) {
     flags['returnBody'] = this.returnBody;
   }
-  if (this.endUser != null) {
-    flags['endUser'] = this.endUser;
+
+  if (this.callbackUrl != null) {
+    flags['callbackUrl'] = this.callbackUrl;
   }
+  if (this.callbackHost != null) {
+    flags['callbackHost'] = this.callbackHost;
+  }
+  if (this.callbackBody != null) {
+    flags['callbackBody'] = this.callbackBody;
+  }
+
   if (this.persistentOps != null) {
     flags['persistentOps'] = this.persistentOps;
   }
@@ -210,21 +223,17 @@ PutPolicy.prototype.getFlags = function() {
   if (this.persistentPipeline != null) {
     flags['persistentPipeline'] = this.persistentPipeline;
   }
-  if (this.mimeLimit != null) {
-    flags['mimeLimit'] = this.mimeLimit;
+
+  if (this.fsizeLimit != null) {
+    flags['fsizeLimit'] = this.fsizeLimit;
   }
-  if (this.insertOnly != null) {
-    flags['insertOnly'] = this.insertOnly;
-  }
+
   if (this.detectMime != null) {
     flags['detectMime'] = this.detectMime;
   }
-  if (this.saveKey != null) {
-    flags['saveKey'] = this.saveKey;
-  }
-  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
-  if (this.fsizeLimit != null) {
-    flags['fsizeLimit'] = this.fsizeLimit;
+
+  if (this.mimeLimit != null) {
+    flags['mimeLimit'] = this.mimeLimit;
   }
 
   return flags;
