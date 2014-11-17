@@ -166,7 +166,7 @@ PutPolicy.prototype.token = function(mac) {
   return uploadToken;
 }
 
-PutPolicy.prototype.getFlags = function(putPolicy) {
+PutPolicy.prototype.getFlags = function() {
   var flags = {};
   if (this.scope != null) {
     flags['scope'] = this.scope;
