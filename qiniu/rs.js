@@ -143,14 +143,29 @@ function getEncodedEntryUri(bucket, key) {
 // @gist PutPolicy
 function PutPolicy(putPolicyObj) {
   this.scope = putPolicyObj.scope || null;
-  this.callbackUrl = putPolicyObj.callbackUrl || null;
-  this.callbackBody = putPolicyObj.callbackBody || null;
+  this.expires = putPolicyObj.expires || 3600;
+  this.insertOnly = putPolicyObj.insertOnly || null;
+
+  this.saveKey = putPolicyObj.saveKey || null;
+
+  this.endUser = putPolicyObj.endUser || null;
+
   this.returnUrl = putPolicyObj.returnUrl || null;
   this.returnBody = putPolicyObj.returnBody || null;
-  this.endUser = putPolicyObj.endUser || null;
-  this.expires = putPolicyObj.expires || 3600;
+
+  this.callbackUrl = putPolicyObj.callbackUrl || null;
+  this.callbackHost = putPolicyObj.callbackHost || null;
+  this.callbackBody = putPolicyObj.callbackBody || null;
+
   this.persistentOps = putPolicyObj.persistentOps || null;
   this.persistentNotifyUrl = putPolicyObj.persistentNotifyUrl || null;
+  this.persistentPipeline = putPolicyObj.persistentPipeline || null;
+
+  this.fsizeLimit = putPolicyObj.fsizeLimit || null;
+
+  this.detectMime = putPolicyObj.detectMime || null;
+
+  this.mimeLimit = putPolicyObj.mimeLimit || null;
 }
 // @endgist
 
