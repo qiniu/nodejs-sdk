@@ -25,7 +25,9 @@ describe('test start step2:', function() {
     describe('single file handle', function() {
 
       before(function(done) {
-        var putPolicy = new qiniu.rs.PutPolicy();
+        var putPolicy = new qiniu.rs.PutPolicy({
+          scope: TEST_BUCKET
+        });
         var uptoken = putPolicy.token();
         qiniu.io.putFile(uptoken, logo2, imageFile, null, function(err, ret) {
           should.not.exist(err);
