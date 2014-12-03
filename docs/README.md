@@ -540,7 +540,7 @@ func pfop(bucketName, keyName, fops, opts, callback);
 
 // 例子
 // pfop
-      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyUrl: 'www.test.com', force: true}, function(err, ret) {
+      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyURL: 'www.test.com', force: true}, function(err, ret) {
         ret.should.have.keys('persistentId');
         done();
       });
