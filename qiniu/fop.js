@@ -70,6 +70,9 @@ function pfop(bucket, key, fops, opts, onret) {
   if (opts.force) {
     param.force = 1;
   }
+  if (opts.pipeline) {
+    param.pipeline = opts.pipeline;
+  }
 
   var uri = 'http://api.qiniu.com/pfop/';
   var body = querystring.stringify(param);
