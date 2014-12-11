@@ -1,4 +1,3 @@
-
 var url = require('url');
 var crypto = require('crypto');
 var formstream = require('formstream');
@@ -59,11 +58,11 @@ Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) 
 }
 
 Client.prototype.fetch = function(url, bucket, key, onret) {
-    var bucketUri = getEncodedEntryUri(bucket, key);
-    var fetchUrl = util.urlsafeBase64Encode(url);
-    var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
-    var digest = util.generateAccessToken(uri, null);
-    rpc.postWithoutForm(uri, digest, onret);
+  var bucketUri = getEncodedEntryUri(bucket, key);
+  var fetchUrl = util.urlsafeBase64Encode(url);
+  var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
+  var digest = util.generateAccessToken(uri, null);
+  rpc.postWithoutForm(uri, digest, onret);
 }
 
 function Entry(hash, fsize, putTime, mimeType, endUser) {
@@ -142,17 +141,35 @@ function getEncodedEntryUri(bucket, key) {
 
 // ----- token --------
 // @gist PutPolicy
-function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
-                  asyncOps, endUser, expires, persistentOps, persistentNotifyUrl) {
-  this.scope = scope || null;
-  this.callbackUrl = callbackUrl || null;
-  this.callbackBody = callbackBody || null;
-  this.returnUrl = returnUrl || null;
-  this.returnBody = returnBody || null;
-  this.endUser = endUser || null;
-  this.expires = expires || 3600;
-  this.persistentOps = persistentOps || null;
-  this.persistentNotifyUrl = persistentNotifyUrl || null;
+function PutPolicy(putPolicyObj) {
+
+  if (typeof putPolicyObj !== 'object') {
+    return false;
+  }
+
+  this.scope = putPolicyObj.scope || null;
+  this.expires = putPolicyObj.expires || 3600;
+  this.insertOnly = putPolicyObj.insertOnly || null;
+
+  this.saveKey = putPolicyObj.saveKey || null;
+  this.endUser = putPolicyObj.endUser || null;
+
+  this.returnUrl = putPolicyObj.returnUrl || null;
+  this.returnBody = putPolicyObj.returnBody || null;
+
+  this.callbackUrl = putPolicyObj.callbackUrl || null;
+  this.callbackHost = putPolicyObj.callbackHost || null;
+  this.callbackBody = putPolicyObj.callbackBody || null;
+
+  this.persistentOps = putPolicyObj.persistentOps || null;
+  this.persistentNotifyUrl = putPolicyObj.persistentNotifyUrl || null;
+  this.persistentPipeline = putPolicyObj.persistentPipeline || null;
+
+  this.fsizeLimit = putPolicyObj.fsizeLimit || null;
+
+  this.detectMime = putPolicyObj.detectMime || null;
+
+  this.mimeLimit = putPolicyObj.mimeLimit || null;
 }
 // @endgist
 
@@ -168,26 +185,40 @@ PutPolicy.prototype.token = function(mac) {
   return uploadToken;
 }
 
-PutPolicy.prototype.getFlags = function(putPolicy) {
+PutPolicy.prototype.getFlags = function() {
   var flags = {};
   if (this.scope != null) {
     flags['scope'] = this.scope;
   }
-  if (this.callbackUrl != null) {
-    flags['callbackUrl'] = this.callbackUrl;
+  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
+  if (this.insertOnly != null) {
+    flags['insertOnly'] = this.insertOnly;
   }
-  if (this.callbackBody != null) {
-    flags['callbackBody'] = this.callbackBody;
+
+  if (this.saveKey != null) {
+    flags['saveKey'] = this.saveKey;
   }
+  if (this.endUser != null) {
+    flags['endUser'] = this.endUser;
+  }
+
   if (this.returnUrl != null) {
     flags['returnUrl'] = this.returnUrl;
   }
   if (this.returnBody != null) {
     flags['returnBody'] = this.returnBody;
   }
-  if (this.endUser != null) {
-    flags['endUser'] = this.endUser;
+
+  if (this.callbackUrl != null) {
+    flags['callbackUrl'] = this.callbackUrl;
   }
+  if (this.callbackHost != null) {
+    flags['callbackHost'] = this.callbackHost;
+  }
+  if (this.callbackBody != null) {
+    flags['callbackBody'] = this.callbackBody;
+  }
+
   if (this.persistentOps != null) {
     flags['persistentOps'] = this.persistentOps;
   }
@@ -197,25 +228,19 @@ PutPolicy.prototype.getFlags = function(putPolicy) {
   if (this.persistentPipeline != null) {
     flags['persistentPipeline'] = this.persistentPipeline;
   }
-  if (this.mimeLimit != null) {
-    flags['mimeLimit'] = this.mimeLimit;
-  }
-  if (this.insertOnly != null) {
-    flags['insertOnly'] = this.insertOnly;
-  }
-  if (this.detectMime != null) {
-    flags['detectMime'] = this.detectMime;
-  }
-  if (this.saveKey != null) {
-    flags['saveKey'] = this.saveKey;
-  }
-  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
+
   if (this.fsizeLimit != null) {
     flags['fsizeLimit'] = this.fsizeLimit;
   }
-  if (this.insertOnly != null) {
-    flags['insertOnly'] = this.insertOnly;
+
+  if (this.detectMime != null) {
+    flags['detectMime'] = this.detectMime;
   }
+
+  if (this.mimeLimit != null) {
+    flags['mimeLimit'] = this.mimeLimit;
+  }
+
   return flags;
 }
 
@@ -246,5 +271,5 @@ GetPolicy.prototype.makeRequest = function(baseUrl, mac) {
 // query like '-thumbnail', '?imageMogr2/thumbnail/960x' and so on
 function makeBaseUrl(domain, key, query) {
   key = new Buffer(key);
-  return 'http://' + domain + '/' + querystring.escape(key) + (query||'');
+  return 'http://' + domain + '/' + querystring.escape(key) + (query || '');
 }
