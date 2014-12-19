@@ -187,59 +187,15 @@ PutPolicy.prototype.token = function(mac) {
 
 PutPolicy.prototype.getFlags = function() {
   var flags = {};
-  if (this.scope != null) {
-    flags['scope'] = this.scope;
+  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit', 'detectMime', 'mimeLimit'];
+
+  for (var i = attrs.length - 1; i >= 0; i--) {
+    if (this[attrs[i]] !== null) {
+      flags[attrs[i]] = this[attrs[i]];
+    }
   }
+
   flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
-  if (this.insertOnly != null) {
-    flags['insertOnly'] = this.insertOnly;
-  }
-
-  if (this.saveKey != null) {
-    flags['saveKey'] = this.saveKey;
-  }
-  if (this.endUser != null) {
-    flags['endUser'] = this.endUser;
-  }
-
-  if (this.returnUrl != null) {
-    flags['returnUrl'] = this.returnUrl;
-  }
-  if (this.returnBody != null) {
-    flags['returnBody'] = this.returnBody;
-  }
-
-  if (this.callbackUrl != null) {
-    flags['callbackUrl'] = this.callbackUrl;
-  }
-  if (this.callbackHost != null) {
-    flags['callbackHost'] = this.callbackHost;
-  }
-  if (this.callbackBody != null) {
-    flags['callbackBody'] = this.callbackBody;
-  }
-
-  if (this.persistentOps != null) {
-    flags['persistentOps'] = this.persistentOps;
-  }
-  if (this.persistentNotifyUrl != null) {
-    flags['persistentNotifyUrl'] = this.persistentNotifyUrl;
-  }
-  if (this.persistentPipeline != null) {
-    flags['persistentPipeline'] = this.persistentPipeline;
-  }
-
-  if (this.fsizeLimit != null) {
-    flags['fsizeLimit'] = this.fsizeLimit;
-  }
-
-  if (this.detectMime != null) {
-    flags['detectMime'] = this.detectMime;
-  }
-
-  if (this.mimeLimit != null) {
-    flags['mimeLimit'] = this.mimeLimit;
-  }
 
   return flags;
 }
