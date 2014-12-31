@@ -18,7 +18,7 @@ function ImageView(mode, width, height, quality, format) {
 }
 
 ImageView.prototype.makeRequest = function(url) {
-  url += '?imageView/' + this.mode;
+  url += '?imageView2/' + this.mode;
 
   if (this.width > 0) {
     url += '/w/' + this.width;
