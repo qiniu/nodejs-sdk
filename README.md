@@ -2,10 +2,8 @@
 
 [![@qiniu on weibo](http://img.shields.io/badge/weibo-%40qiniutek-blue.svg)](http://weibo.com/qiniutek)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE.md)
-
 [![Build Status](https://travis-ci.org/qiniu/nodejs-sdk.png?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
 [![Code Climate](https://codeclimate.com/github/qiniu/nodejs-sdk.png)](https://codeclimate.com/github/qiniu/nodejs-sdk)
-
 [![Latest Stable Version](https://img.shields.io/npm/v/qiniu.svg)](https://www.npmjs.com/package/qiniu)
 
 ## 下载
