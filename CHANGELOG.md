@@ -1,10 +1,19 @@
 ## CHANGE LOG
 
+### v6.1.7
+
+2015-05-09
+
+- 上传策略增加 callbackHost、persistentPipeline, callbackFetchKey
+- 增加fetch 函数
+- imageview -> imageview2
+
+
 ### v6.1.6
 
 2014-10-31
 
-- 增加fsizelimit, insertonly
+- 上传策略增加fsizelimit, insertonly
 
 
 ### v6.1.5
