@@ -19,12 +19,12 @@ describe('test start step 0', function() {
         iv.height = 100;
         iv.width = 40;
         var returl = iv.makeRequest(pic);
-        returl.should.equal(pic + '?imageView/1/w/40/h/100');
+        returl.should.equal(pic + '?imageView2/1/w/40/h/100');
 
         iv.quality = 20;
         iv.format = 'jpg';
         returl = iv.makeRequest(pic);
-        returl.should.equal(pic + '?imageView/1/w/40/h/100/q/20/format/jpg');
+        returl.should.equal(pic + '?imageView2/1/w/40/h/100/q/20/format/jpg');
         done();
       });
     });

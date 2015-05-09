@@ -1,5 +1,12 @@
 ## CHANGE LOG
 
+### v6.1.6
+
+2014-10-31
+
+- 增加fsizelimit, insertonly
+
+
 ### v6.1.5
 
 2014-7-23 issue [#111](https://github.com/qiniu/nodejs-sdk/pull/111)

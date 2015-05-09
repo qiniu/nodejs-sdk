@@ -1,5 +1,6 @@
 var util = require('./util');
 var rpc = require('./rpc');
+var conf = require('./conf');
 
 var querystring = require('querystring');
 
@@ -17,7 +18,7 @@ function ImageView(mode, width, height, quality, format) {
 }
 
 ImageView.prototype.makeRequest = function(url) {
-  url += '?imageView/' + this.mode;
+  url += '?imageView2/' + this.mode;
 
   if (this.width > 0) {
     url += '/w/' + this.width;
@@ -38,15 +39,13 @@ ImageView.prototype.makeRequest = function(url) {
   return url;
 }
 
-function ImageInfo() {
-}
+function ImageInfo() {}
 
 ImageInfo.prototype.makeRequest = function(url) {
   return url + '?imageInfo'
 }
 
-function Exif() {
-}
+function Exif() {}
 
 Exif.prototype.makeRequest = function(url) {
   return url + '?exif'
@@ -70,10 +69,12 @@ function pfop(bucket, key, fops, opts, onret) {
   if (opts.force) {
     param.force = 1;
   }
+  if (opts.pipeline) {
+    param.pipeline = opts.pipeline;
+  }
 
-  var uri = 'http://api.qiniu.com/pfop/';
+  var uri = conf.API_HOST + '/pfop/';
   var body = querystring.stringify(param);
   var auth = util.generateAccessToken(uri, body);
   rpc.postWithForm(uri, body, auth, onret);
 }
-
