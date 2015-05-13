@@ -44,9 +44,9 @@ describe('test start step1:', function() {
     describe('upload#', function() {
       var uptoken = null;
       beforeEach(function(done) {
-        var putPolicy = new qiniu.rs.PutPolicy({
+        var putPolicy = new qiniu.rs.PutPolicy(
           TEST_BUCKET
-        });
+        );
 	      uptoken = putPolicy.token();
         done();
       });
