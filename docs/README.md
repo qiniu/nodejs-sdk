@@ -169,7 +169,7 @@ function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
 
 ```{javascript}
 function uptoken(bucketname) {
-  var putPolicy = new qiniu.rs.PutPolicy(bucketname);
+  var putPolicy = new qiniu.rs.PutPolicy({scope: bucketname});
   //putPolicy.callbackUrl = callbackUrl;
   //putPolicy.callbackBody = callbackBody;
   //putPolicy.returnUrl = returnUrl;
