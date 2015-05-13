@@ -1,8 +1,8 @@
 TESTS = test/*.test.js
 TIMEOUT = 25000
 REPORTER = spec
-MOCHA_OPTS = 
-test: 
+MOCHA_OPTS =
+test:
 		@NODE_ENV=test ./node_modules/.bin/mocha \
 			--require should \
 			--reporter $(REPORTER) \
