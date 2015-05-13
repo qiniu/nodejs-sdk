@@ -45,9 +45,9 @@ describe('test start step1:', function() {
       var uptoken = null;
       beforeEach(function(done) {
         var putPolicy = new qiniu.rs.PutPolicy({
-          scope: TEST_BUCKET
+          TEST_BUCKET
         });
-	uptoken = putPolicy.token();
+	      uptoken = putPolicy.token();
         done();
       });
 
