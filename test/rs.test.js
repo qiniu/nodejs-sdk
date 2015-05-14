@@ -169,15 +169,11 @@ describe('test start step2:', function() {
     describe('rs.isQiniuCallBack', function() {
 
       it('test isQiniuCallback true', function(done) {
-        // @gist isQiniuCallback
-        // ------ auth应该是来自请求的header的'Authrization'字段，path是请求的路径，content是请求的内容
         var auth = 'QBox QWYn5TFQsLLU1pL5MFEmX3s5DmHdUThav9WyOWOm:4GcOC2_eiw97QBNsHiwLzSqxelI=';
         var path = '/callback';
         var content = 'key=43850.6579994258936495&hash=FllOJrhvzorEKnyMwE-o7pfciiha';
-        // ------
         var ok = qiniu.util.isQiniuCallback(path, content, auth);
         ok.should.be.ok;
-        // @endgist 
         done();
       });
     });
