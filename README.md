@@ -20,7 +20,7 @@ $ npm install qiniu
 
 下载地址：https://github.com/qiniu/nodejs-sdk/releases
 
-这里可以下载到旧版本的SDK，release 版本有版本号，有 [CHANGELOG](https://github.com/qiniu/nodejs-sdk/blob/develop/CHANGELOG.md)，使用规格也会比较稳定。
+这里可以下载到旧版本的SDK，release 版本有版本号，有 [CHANGELOG](https://github.com/qiniu/nodejs-sdk/blob/master/CHANGELOG.md)，使用规格也会比较稳定。
 
 ### 从 git 库下载
 
