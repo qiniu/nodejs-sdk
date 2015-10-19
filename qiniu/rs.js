@@ -137,7 +137,7 @@ function fileHandle(op, entries, onret) {
 }
 
 function getEncodedEntryUri(bucket, key) {
-  return util.urlsafeBase64Encode(bucket + ':' + key);
+  return util.urlsafeBase64Encode(bucket + (key ? ':' + key : ''));
 }
 
 // ----- token --------
