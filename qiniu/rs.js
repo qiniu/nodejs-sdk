@@ -209,6 +209,8 @@ function PutPolicy2(putPolicyObj) {
 
   this.fsizeLimit = putPolicyObj.fsizeLimit || null;
 
+  this.fsizeMin = putPolicyObj.fsizeMin || null;
+
   this.detectMime = putPolicyObj.detectMime || null;
 
   this.mimeLimit = putPolicyObj.mimeLimit || null;
