@@ -267,8 +267,10 @@ GetPolicy.prototype.makeRequest = function(baseUrl, mac) {
 
   return baseUrl + '&token=' + downloadToken;
 }
+
+// domain maybe 'http://hello.qiniu.com', 'https://hello.qiniu.com' and 'hello.qiniu.com'
 // query like '-thumbnail', '?imageMogr2/thumbnail/960x' and so on
 function makeBaseUrl(domain, key, query) {
   key = new Buffer(key);
-  return 'http://' + domain + '/' + querystring.escape(key) + (query || '');
+  return (/^https?:\/\//.test(domain) ? domain : 'http://' + domain) + '/' + querystring.escape(key) + (query || '');
 }
