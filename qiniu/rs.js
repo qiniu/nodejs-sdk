@@ -202,6 +202,7 @@ function PutPolicy2(putPolicyObj) {
   this.callbackUrl = putPolicyObj.callbackUrl || null;
   this.callbackHost = putPolicyObj.callbackHost || null;
   this.callbackBody = putPolicyObj.callbackBody || null;
+  this.callbackBodyType = putPolicyObj.callbackBodyType || null;
 
   this.persistentOps = putPolicyObj.persistentOps || null;
   this.persistentNotifyUrl = putPolicyObj.persistentNotifyUrl || null;
