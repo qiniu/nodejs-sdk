@@ -24,13 +24,11 @@ $ npm install qiniu
 
 ### 从 git 库下载
 
-你可以直接用 git clone 下载源代码来使用。但是请注意非 master 分支的代码在规格上可能承受变更，应谨慎使用。
+你可以直接用 git clone 下载源代码来使用。但是请注意非 master 分支的代码可能会变更，应谨慎使用。
 
 ## 使用
 
 参考文档：[七牛云存储 Node.js SDK 使用指南](http://developer.qiniu.com/docs/v6/sdk/nodejs-sdk.html)
-
-旧版本的SDK(version < 6.0.0) [戳这里](http://docs.qiniutek.com/v3/sdk/nodejs/)
 
 ## 贡献代码
 
@@ -42,7 +40,7 @@ $ npm install qiniu
 
 ## 许可证
 
-Copyright (c) 2014 qiniu.com
+Copyright (c) 2015 qiniu.com
 
 基于 MIT 协议发布:
 
