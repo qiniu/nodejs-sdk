@@ -1,5 +1,14 @@
 ## CHANGE LOG
 
+### v6.1.9
+
+2015-12-03
+
+- Make secure base url 
+- policy add fsizeMin 
+- 修正 getEncodedEntryUri(bucket, key) 
+- 文档修正 
+
 ### v6.1.8
 
 2015-05-13
