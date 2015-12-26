@@ -1,6 +1,7 @@
 var qiniu = require('../');
 var should = require('should');
 var path = require('path');
+var fs = require('fs');
 
 qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
 qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
@@ -49,6 +50,21 @@ describe('test start step1:', function() {
         );
 	      uptoken = putPolicy.token();
         done();
+      });
+
+      describe('io.putReadable()', function() {
+        it('test upload from readableStrem', function(done) {
+          var key = 'filename' + Math.random(1000);
+          var rs = fs.createReadStream(imageFile);
+          qiniu.io.putReadable(uptoken, key, rs, null, function(err, ret) {
+            should.not.exist(err);
+            ret.should.have.keys('hash', 'key');
+            ret.key.should.equal(key);
+            ret.hash.should.be.a('string');
+            keys.push(ret.key);
+            done();
+          });
+        });
       });
 
       describe('io.put()', function() {
