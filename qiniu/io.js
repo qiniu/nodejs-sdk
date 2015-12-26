@@ -5,6 +5,7 @@ var fs = require('fs');
 var getCrc32 = require('crc32');
 var url = require('url');
 var mime = require('mime');
+var Readable = require('stream').Readable;
 var formstream = require('formstream');
 
 exports.UNDEFINED_KEY = '?'
@@ -13,6 +14,7 @@ exports.PutRet = PutRet;
 exports.put = put;
 exports.putWithoutKey = putWithoutKey;
 exports.putFile = putFile;
+exports.putReadable = putReadable;
 exports.putFileWithoutKey = putFileWithoutKey;
 
 // @gist PutExtra
@@ -30,7 +32,7 @@ function PutRet(hash, key) {
 }
 
 // onret: callback function instead of ret
-function put(uptoken, key, body, extra, onret) {
+function putReadable (uptoken, key, rs, extra, onret) {
   if(!extra) {
     extra = new PutExtra();
   }
@@ -42,16 +44,35 @@ function put(uptoken, key, body, extra, onret) {
     key = exports.UNDEFINED_KEY;
   }
 
-  var form = getMultipart(uptoken, key, body, extra);
+  rs.on("error", function (err) {
+      onret({code: -1, error: err.toString()}, {});
+  });
+  
+  var form = getMultipart(uptoken, key, rs, extra);
 
   rpc.postMultipart(conf.UP_HOST, form, onret);
+}
+
+function put(uptoken, key, body, extra, onret) {
+  var rs = new Readable();
+  rs.push(body);
+  rs.push(null);
+
+  if(!extra) {
+    extra = new PutExtra();
+  }
+  if (extra.checkCrc == 1) {
+    var bodyCrc32 = getCrc32(body);
+    extra.crc32 = '' + parseInt(bodyCrc32, 16);
+  }
+  putReadable(uptoken, key, rs, extra, onret)
 }
 
 function putWithoutKey(uptoken, body, extra, onret) {
   put(uptoken, null, body, extra, onret);
 }
 
-function getMultipart(uptoken, key, body, extra) {
+function getMultipart(uptoken, key, rs, extra) {
 
   var form = formstream();
 
@@ -59,18 +80,7 @@ function getMultipart(uptoken, key, body, extra) {
   if(key != exports.UNDEFINED_KEY) {
     form.field('key', key);
   }
-  var buf = Buffer.isBuffer(body) ? body : new Buffer(body);
-  form.buffer('file', buf, key, extra.mimeType);
-
-  //extra['checkcrc']
-  if (extra.checkCrc == 1) {
-    var bodyCrc32 = getCrc32(body);
-    extra.crc32 = '' + parseInt(bodyCrc32, 16);
-  }
-
-  if(extra.checkCrc) {
-    form.field('crc32', extra.crc32);
-  }
+  form.stream('file', rs, key, extra.mimeType);
 
   for (var k in extra.params) {
     form.field(k, extra.params[k]);
@@ -80,21 +90,21 @@ function getMultipart(uptoken, key, body, extra) {
 }
 
 function putFile(uptoken, key, loadFile, extra, onret) {
-  fs.readFile(loadFile, function(err, data) {
-    if(err) {
-      onret({code: -1, error: err.toString()}, {});
-      return;
-    }
 
-    if(!extra) {
-      extra = new PutExtra();
-    }
+  var rs = fs.createReadStream(loadFile);
 
-    if(!extra.mimeType) {
-      extra.mimeType = mime.lookup(loadFile);
-    }
-    put(uptoken, key, data, extra, onret);
-  });
+  if(!extra) {
+    extra = new PutExtra();
+  }
+  if (extra.checkCrc == 1) {
+    var fileCrc32 = getCrc32(fs.readFileSync(loadFile));
+    extra.crc32 = '' + parseInt(fileCrc32, 16);
+  }
+  if(!extra.mimeType) {
+    extra.mimeType = mime.lookup(loadFile);
+  }
+
+  putReadable(uptoken, key, rs, extra, onret);
 }
 
 function putFileWithoutKey(uptoken, loadFile, extra, onret) {
