@@ -3,7 +3,9 @@ var conf = require('./conf');
 var util = require('./util');
 
 exports.listPrefix = function(bucket, prefix, marker, limit, delimiter, onret) {
+  
   var uri = getPrefixUri(bucket, prefix, marker, limit, delimiter);
+
   var digest = util.generateAccessToken(uri, null);
 
   rpc.postWithoutForm(uri, digest, onret)
@@ -26,6 +28,7 @@ function getPrefixUri(bucket, prefix, marker, limit, delimiter) {
   if(delimiter){
     uri += '&' + 'delimiter=' + delimiter;
   }
+
   return uri;
 }
 
