@@ -52,7 +52,7 @@ function post(uri, form, headers, onresp) {
   var req = urllib.request(uri, data, function(err, result, res) {
     var rerr = null;
     if (err || Math.floor(res.statusCode/100) !== 2) {
-      rerr = {code: res&&res.statusCode||-1, error: err||result.error||''};
+      rerr = {code: res&&res.statusCode||-1, error: err||result&&result.error||''};
     }
     onresp(rerr, result, res);
   });
