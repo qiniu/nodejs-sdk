@@ -50,7 +50,7 @@ function putReadable (uptoken, key, rs, extra, onret) {
   
   var form = getMultipart(uptoken, key, rs, extra);
 
-  rpc.postMultipart(conf.UP_HOST, form, onret);
+  return rpc.postMultipart(conf.UP_HOST, form, onret);
 }
 
 function put(uptoken, key, body, extra, onret) {
@@ -65,11 +65,11 @@ function put(uptoken, key, body, extra, onret) {
     var bodyCrc32 = getCrc32(body);
     extra.crc32 = '' + parseInt(bodyCrc32, 16);
   }
-  putReadable(uptoken, key, rs, extra, onret)
+  return putReadable(uptoken, key, rs, extra, onret)
 }
 
 function putWithoutKey(uptoken, body, extra, onret) {
-  put(uptoken, null, body, extra, onret);
+  return put(uptoken, null, body, extra, onret);
 }
 
 function getMultipart(uptoken, key, rs, extra) {
@@ -104,9 +104,9 @@ function putFile(uptoken, key, loadFile, extra, onret) {
     extra.mimeType = mime.lookup(loadFile);
   }
 
-  putReadable(uptoken, key, rs, extra, onret);
+  return putReadable(uptoken, key, rs, extra, onret);
 }
 
 function putFileWithoutKey(uptoken, loadFile, extra, onret) {
-  putFile(uptoken, null, loadFile, extra, onret);
+  return putFile(uptoken, null, loadFile, extra, onret);
 }

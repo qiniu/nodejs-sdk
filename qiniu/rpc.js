@@ -7,7 +7,7 @@ exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
 
 function postMultipart(uri, form, onret) {
-  post(uri, form, form.headers(), onret);
+  return post(uri, form, form.headers(), onret);
 }
 
 function postWithForm(uri, form, token, onret) {
@@ -17,7 +17,7 @@ function postWithForm(uri, form, token, onret) {
   if (token) {
     headers['Authorization'] = token;
   }
-  post(uri, form, headers, onret);
+  return post(uri, form, headers, onret);
 }
 
 function postWithoutForm(uri, token, onret) {
@@ -27,7 +27,7 @@ function postWithoutForm(uri, token, onret) {
   if (token) {
     headers['Authorization'] = token;
   }
-  post(uri, null, headers, onret);
+  return post(uri, null, headers, onret);
 }
 
 function post(uri, form, headers, onresp) {
@@ -56,5 +56,7 @@ function post(uri, form, headers, onresp) {
     }
     onresp(rerr, result, res);
   });
+
+  return req;
 }
 
