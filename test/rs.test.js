@@ -133,7 +133,7 @@ describe('test start step2:', function() {
         entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo2), new EntryPath(TEST_BUCKET, logo3)));
 
         it('copy from logo, logo2 to logo1, logo3', function(done) {
-          client.batchCopy(entries, function(err, ret) {
+          client.batchCopy(entries, 1, function(err, ret) {
             should.not.exist(err);
             ret.should.eql([ { code: 200 }, { code: 200 } ]);
             done();
@@ -158,7 +158,7 @@ describe('test start step2:', function() {
         entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo3), new EntryPath(TEST_BUCKET, logo2)));
 
         it('move from logo1.png, logo3.png to logo.png, logo2.png', function(done) {
-          client.batchMove(entries, function(err, ret) {
+          client.batchMove(entries, 1, function(err, ret) {
             should.not.exist(err);
             done();
           });
