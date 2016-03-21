@@ -142,8 +142,7 @@ function getEncodedEntryUri(bucket, key) {
 
 // ----- token --------
 // @gist PutPolicy
-function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody,
-                  asyncOps, endUser, expires, persistentOps, persistentNotifyUrl) {
+function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody, endUser, expires, persistentOps, persistentNotifyUrl) {
   this.scope = scope || null;
   this.callbackUrl = callbackUrl || null;
   this.callbackBody = callbackBody || null;
