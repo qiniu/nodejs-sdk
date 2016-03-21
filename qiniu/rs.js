@@ -86,8 +86,8 @@ EntryPath.prototype.encode = function() {
   return getEncodedEntryUri(this.bucket, this.key);
 }
 
-EntryPath.prototype.toStr = function(op, forcepara) {
-  return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '/force/' + forcepara + '&';
+EntryPath.prototype.toStr = function(op) {
+  return 'op=/' + op + '/' + getEncodedEntryUri(this.bucket, this.key) + '&';
 }
 
 function EntryPathPair(src, dest) {
@@ -95,8 +95,8 @@ function EntryPathPair(src, dest) {
   this.dest = dest || null;
 }
 
-EntryPathPair.prototype.toStr = function(op) {
-  return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '&';
+EntryPathPair.prototype.toStr = function(op, forcepara) {
+  return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '/force/' + forcepara + '&';
 }
 
 function BatchItemRet(error, code) {
