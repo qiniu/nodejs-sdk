@@ -138,7 +138,7 @@ describe('test start step1:', function() {
     describe('file handle', function() {
       describe('rsf.listPrefix()', function() {
         it('list all file in test bucket', function(done) {
-          qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, function(err, ret) {
+          qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, null, function(err, ret) {
             should.not.exist(err);
 //            ret.data.items.length.should.equal(keys.length);
             for (var i in ret.items) {
