@@ -56,5 +56,6 @@ function post(uri, form, headers, onresp) {
     }
     onresp(rerr, result, res);
   });
+  return req;
 }
 
