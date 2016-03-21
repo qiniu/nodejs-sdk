@@ -119,14 +119,25 @@ Client.prototype.batchDelete = function(entries, onret) {
 }
 
 Client.prototype.batchMove = function(entries, forcepara, onret) {
-  fileHandle('move', entries, forcepara, onret);
+  fileHandleForce('move', entries, forcepara, onret);
 }
 
 Client.prototype.batchCopy = function(entries, forcepara, onret) {
-  fileHandle('copy', entries, forcepara, onret);
+  fileHandleForce('copy', entries, forcepara, onret);
 }
 
-function fileHandle(op, entries, forcepara, onret) {
+function fileHandle(op, entries, onret) {
+  var body = '';
+  for (var i in entries) {
+    body += entries[i].toStr(op);
+  }
+
+  var uri = conf.RS_HOST + '/batch';
+  var digest = util.generateAccessToken(uri, body);
+  rpc.postWithForm(uri, body, digest, onret);
+}
+
+function fileHandleForce(op, entries, forcepara, onret) {
   var body = '';
   for (var i in entries) {
     body += entries[i].toStr(op, forcepara);
@@ -136,6 +147,9 @@ function fileHandle(op, entries, forcepara, onret) {
   var digest = util.generateAccessToken(uri, body);
   rpc.postWithForm(uri, body, digest, onret);
 }
+
+
+
 
 function getEncodedEntryUri(bucket, key) {
   return util.urlsafeBase64Encode(bucket + (key ? ':' + key : ''));
