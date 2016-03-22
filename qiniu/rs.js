@@ -42,18 +42,21 @@ Client.prototype.remove = function(bucket, key, onret) {
   rpc.postWithoutForm(uri, digest, onret);
 }
 
-Client.prototype.move = function(bucketSrc, keySrc, bucketDest, keyDest, onret) {
+Client.prototype.move = function(bucketSrc, keySrc, bucketDest, keyDest, forcepara, onret) {
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
+  
+  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+forcepara;
+
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
 
-Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) {
+Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, forcepara, onret) {
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
+  var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest
+  +'/force/'+forcepara;
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
@@ -94,8 +97,8 @@ function EntryPathPair(src, dest) {
   this.dest = dest || null;
 }
 
-EntryPathPair.prototype.toStr = function(op) {
-  return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '&';
+EntryPathPair.prototype.toStr = function(op, forcepara) {
+  return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '/force/' + forcepara + '&';
 }
 
 function BatchItemRet(error, code) {
@@ -117,18 +120,18 @@ Client.prototype.batchDelete = function(entries, onret) {
   fileHandle('delete', entries, onret);
 }
 
-Client.prototype.batchMove = function(entries, onret) {
-  fileHandle('move', entries, onret);
+Client.prototype.batchMove = function(entries, forcepara, onret) {
+  fileHandle('move', entries, forcepara, onret);
 }
 
-Client.prototype.batchCopy = function(entries, onret) {
-  fileHandle('copy', entries, onret);
+Client.prototype.batchCopy = function(entries, forcepara, onret) {
+  fileHandle('copy', entries, forcepara, onret);
 }
 
-function fileHandle(op, entries, onret) {
+function fileHandle(op, entries, forcepara, onret) {
   var body = '';
   for (var i in entries) {
-    body += entries[i].toStr(op);
+    body += entries[i].toStr(op, forcepara);
   }
 
   var uri = conf.RS_HOST + '/batch';
