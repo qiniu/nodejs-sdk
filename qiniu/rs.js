@@ -42,18 +42,21 @@ Client.prototype.remove = function(bucket, key, onret) {
   rpc.postWithoutForm(uri, digest, onret);
 }
 
-Client.prototype.move = function(bucketSrc, keySrc, bucketDest, keyDest, onret) {
+Client.prototype.move = function(bucketSrc, keySrc, bucketDest, keyDest, forcepara, onret) {
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
+  
+  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+forcepara;
+
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
 
-Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) {
+Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, forcepara, onret) {
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
+  var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest
+  +'/force/'+forcepara;
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
