@@ -215,8 +215,6 @@ describe('test start step2:', function() {
     });
 
 
-
-
     describe('rs.isQiniuCallBack', function() {
 
       it('test isQiniuCallback true', function(done) {
@@ -228,6 +226,5 @@ describe('test start step2:', function() {
         done();
       });
     });
+
     
-  });
-});
