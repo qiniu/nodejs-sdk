@@ -13,6 +13,9 @@ var logo  = Math.random() + 'logo.png';
 var logo1 = Math.random() + 'logo1.png';
 var logo2 = Math.random() + 'logo2.png';
 var logo3 = Math.random() + 'logo3.png';
+var logo4 = Math.random() + 'logo4.png';
+var logo5 = Math.random() + 'logo5.png';
+
 describe('test start step2:', function() {
 
   describe('rs.test.js', function() {
@@ -77,8 +80,8 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#move()', function() {
-        it('move logo1.png to logo.png', function(done) {
-          client.move(TEST_BUCKET, logo1, TEST_BUCKET, logo, function(err, ret) {
+        it('move logo.png to logo3.png', function(done) {
+          client.move(TEST_BUCKET, logo, TEST_BUCKET, logo3, function(err, ret) {
             should.not.exist(err);
             done();
           });
@@ -86,8 +89,8 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#forceMove()', function() {
-        it('move logo1.png to logo.png', function(done) {
-          client.forceMove(TEST_BUCKET, logo1, TEST_BUCKET, logo, 1, function(err, ret) {
+        it('move logo3.png to logo.png', function(done) {
+          client.forceMove(TEST_BUCKET, logo3, TEST_BUCKET, logo, 1, function(err, ret) {
             should.not.exist(err);
             done();
           });
@@ -200,10 +203,10 @@ describe('test start step2:', function() {
 
       describe('rs.Client#forceBatchMove', function() {
         var entries = [];
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo1), new EntryPath(TEST_BUCKET, logo)));
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo3), new EntryPath(TEST_BUCKET, logo2)));
+        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo1)));
+        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo2), new EntryPath(TEST_BUCKET, logo3)));
 
-        it('move from logo1.png, logo3.png to logo.png, logo2.png', function(done) {
+        it('move from logo.png, logo2.png to logo1.png, logo3.png', function(done) {
           client.forceBatchMove(entries, 1, function(err, ret) {
             should.not.exist(err);
             done();
