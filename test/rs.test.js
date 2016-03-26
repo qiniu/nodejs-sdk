@@ -36,21 +36,12 @@ describe('test start step2:', function() {
           TEST_BUCKET
         );
         var uptoken = putPolicy.token();
+
         qiniu.io.putFile(uptoken, logo, imageFile, null, function(err, ret) {
           should.not.exist(err);
         });
 
-        qiniu.io.putFile(uptoken, logo1, imageFile, null, function(err, ret) {
-          should.not.exist(err);
-          done();
-        });
-
         qiniu.io.putFile(uptoken, logo2, imageFile, null, function(err, ret) {
-          should.not.exist(err);
-          done();
-        });
-
-        qiniu.io.putFile(uptoken, logo3, imageFile, null, function(err, ret) {
           should.not.exist(err);
           done();
         });
@@ -68,7 +59,7 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#copy()', function() {
-        it('copy logo.png to logo5.png', function(done) {
+        it('copy logo.png to logo1.png', function(done) {
           client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo5, function(err, ret) {
             should.not.exist(err);
             done();
@@ -77,7 +68,7 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#forceCopy()', function() {
-        it('copy logo.png to logo1.png', function(done) {
+        it('copy logo.png to logo3.png', function(done) {
           client.forceCopy(TEST_BUCKET, logo, TEST_BUCKET, logo1, 1, function(err, ret) {
             should.not.exist(err);
             done();
