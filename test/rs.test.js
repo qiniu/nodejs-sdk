@@ -59,7 +59,7 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#copy()', function() {
-        it('copy logo.png to logo1.png', function(done) {
+        it('copy logo.png to logo5.png', function(done) {
           client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo5, function(err, ret) {
             should.not.exist(err);
             done();
@@ -68,8 +68,8 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#forceCopy()', function() {
-        it('copy logo.png to logo3.png', function(done) {
-          client.forceCopy(TEST_BUCKET, logo, TEST_BUCKET, logo1, 1, function(err, ret) {
+        it('copy logo.png to logo1.png', function(done) {
+          client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo1, 1, function(err, ret) {
             should.not.exist(err);
             done();
           });
@@ -97,7 +97,7 @@ describe('test start step2:', function() {
 
       describe('rs.Client#forceMove()', function() {
         it('move logo5.png to logo.png', function(done) {
-          client.forceMove(TEST_BUCKET, logo5, TEST_BUCKET, logo, 1, function(err, ret) {
+          client.move(TEST_BUCKET, logo5, TEST_BUCKET, logo, 1, function(err, ret) {
             should.not.exist(err);
             done();
           });
