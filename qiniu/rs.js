@@ -55,6 +55,7 @@ Client.prototype.forceMove = function(bucketSrc, keySrc, bucketDest, keyDest, fo
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
   var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+force;  
+
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
@@ -63,6 +64,7 @@ Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) 
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
   var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
+
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
@@ -72,6 +74,7 @@ Client.prototype.forceCopy = function(bucketSrc, keySrc, bucketDest, keyDest, fo
     var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
     var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
     var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+force;
+    
     var digest = util.generateAccessToken(uri, null);
     rpc.postWithoutForm(uri, digest, onret);
 }

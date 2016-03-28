@@ -59,7 +59,7 @@ describe('test start step2:', function() {
       });
 
       describe('rs.Client#copy()', function() {
-        it('copy logo.png to logo1.png', function(done) {
+        it('copy logo.png to logo5.png', function(done) {
           client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo5, function(err, ret) {
             should.not.exist(err);
             done();
