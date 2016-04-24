@@ -19,7 +19,7 @@ exports.putFileWithoutKey = putFileWithoutKey;
 
 // @gist PutExtra
 function PutExtra(params, mimeType, crc32, checkCrc) {
-  this.paras = params || {};
+  this.params = params || {};
   this.mimeType = mimeType || null;
   this.crc32 = crc32 || null;
   this.checkCrc = checkCrc || 0;
