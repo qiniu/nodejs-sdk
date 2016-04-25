@@ -1,5 +1,16 @@
 ## CHANGE LOG
 
+### v6.1.10
+
+2016-04-25
+
+- list 增加delimiter 支持
+- 增加强制copy/move
+- 底层使用putReadable 谢谢 @thesadabc
+- 修正result 处理 谢谢 @loulin
+- fix Unhandled stream error in pipe 谢谢@loulin
+- putExtra 修正 paras 为 params
+
 ### v6.1.9
 
 2015-12-03
