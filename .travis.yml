@@ -1,8 +1,15 @@
 language: node_js
 node_js:
-  - 0.10
+- 0.1
 before_script:
-  - export QINIU_ACCESS_KEY=QWYn5TFQsLLU1pL5MFEmX3s5DmHdUThav9WyOWOm
-  - export QINIU_SECRET_KEY=Bxckh6FA-Fbs9Yt3i3cbKVK22UPBmAOHJcL95pGz
-  - export QINIU_TEST_BUCKET="nodesdk"
-  - export QINIU_TEST_DOMAIN="nodesdk.qiniudn.com"
+- export QINIU_ACCESS_KEY=QWYn5TFQsLLU1pL5MFEmX3s5DmHdUThav9WyOWOm
+- export QINIU_SECRET_KEY=Bxckh6FA-Fbs9Yt3i3cbKVK22UPBmAOHJcL95pGz
+- export QINIU_TEST_BUCKET="nodesdk"
+- export QINIU_TEST_DOMAIN="nodesdk.qiniudn.com"
+deploy:
+  provider: npm
+  email: "sdk@qiniu.com"
+  api_key:
+    secure: O46FsywFgTyqwdf2tN5AXIJe3gnCjSHZT8tPfxl1TGY+p3iu0clixN8+nBvAqdnQvKu3Z4hmNhOd3zLdDbSsZoEWu6AhS+ySJWkkvM0rdIt9+wcVNWDyKd6WcW3bm1kq5KsLi1xM9VPfto5M/qYQRMg1RoCGDdxaAra4a6SH2Bs=
+  on:
+    tags: true
