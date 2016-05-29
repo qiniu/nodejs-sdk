@@ -268,6 +268,9 @@ function PutPolicy2(putPolicyObj) {
   this.detectMime = putPolicyObj.detectMime || null;
 
   this.mimeLimit = putPolicyObj.mimeLimit || null;
+
+  this.deleteAfterDays = putPolicyObj.deleteAfterDays || null;
+
 }
 
 PutPolicy2.prototype.token = function(mac) {
@@ -284,7 +287,7 @@ PutPolicy2.prototype.token = function(mac) {
 
 PutPolicy2.prototype.getFlags = function() {
   var flags = {};
-  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit','fsizeMin', 'detectMime', 'mimeLimit'];
+  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit','fsizeMin', 'detectMime', 'mimeLimit', 'deleteAfterDays'];
 
   for (var i = attrs.length - 1; i >= 0; i--) {
     if (this[attrs[i]] !== null) {
