@@ -33,14 +33,14 @@ function PutRet(hash, key) {
 
 // onret: callback function instead of ret
 function putReadable (uptoken, key, rs, extra, onret) {
-  if(!extra) {
+  if (!extra) {
     extra = new PutExtra();
   }
   if (!extra.mimeType) {
     extra.mimeType = 'application/octet-stream';
   }
 
-  if(!key) {
+  if (!key) {
     key = exports.UNDEFINED_KEY;
   }
 
@@ -58,7 +58,7 @@ function put(uptoken, key, body, extra, onret) {
   rs.push(body);
   rs.push(null);
 
-  if(!extra) {
+  if (!extra) {
     extra = new PutExtra();
   }
   if (extra.checkCrc == 1) {
@@ -79,12 +79,12 @@ function getMultipart(uptoken, key, rs, extra) {
   var form = formstream();
 
   form.field('token', uptoken);
-  if(key != exports.UNDEFINED_KEY) {
+  if (key != exports.UNDEFINED_KEY) {
     form.field('key', key);
   }
   form.stream('file', rs, key, extra.mimeType);
 
-  if(extra.crc32) {
+  if (extra.crc32) {
     form.field('crc32', extra.crc32);
   }
 
@@ -99,7 +99,7 @@ function putFile(uptoken, key, loadFile, extra, onret) {
 
   var rs = fs.createReadStream(loadFile);
 
-  if(!extra) {
+  if (!extra) {
     extra = new PutExtra();
   }
   if (extra.checkCrc == 1) {
@@ -108,7 +108,7 @@ function putFile(uptoken, key, loadFile, extra, onret) {
   } else if (extra.checkCrc == 2 && extra.crc32) {
     extra.crc32 = '' + extra.crc32
   }
-  if(!extra.mimeType) {
+  if (!extra.mimeType) {
     extra.mimeType = mime.lookup(loadFile);
   }
 

@@ -51,10 +51,10 @@ Client.prototype.move = function(bucketSrc, keySrc, bucketDest, keyDest, onret) 
 }
 
 Client.prototype.forceMove = function(bucketSrc, keySrc, bucketDest, keyDest, force, onret) {
-  
+
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+force;  
+  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+force;
 
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
@@ -70,11 +70,11 @@ Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) 
 }
 
 Client.prototype.forceCopy = function(bucketSrc, keySrc, bucketDest, keyDest, force, onret) {
-  
+
     var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
     var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
     var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+force;
-    
+
     var digest = util.generateAccessToken(uri, null);
     rpc.postWithoutForm(uri, digest, onret);
 }
@@ -117,7 +117,7 @@ function EntryPathPair(src, dest) {
 }
 
 EntryPathPair.prototype.toStr = function(op, force) {
-  if(typeof(force)=='undefined'){
+  if (typeof(force)=='undefined'){
 
     return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '&';
 
@@ -151,7 +151,7 @@ Client.prototype.batchMove = function(entries, onret) {
 }
 
 Client.prototype.forceBatchMove = function(entries, force, onret) {
-  
+
   fileHandleForce('move', entries, force, onret);
 
 }
@@ -161,9 +161,9 @@ Client.prototype.batchCopy = function(entries, onret) {
 }
 
 Client.prototype.forceBatchCopy = function(entries, force, onret) {
-  
+
   fileHandleForce('copy', entries, force, onret);
-  
+
 }
 
 
