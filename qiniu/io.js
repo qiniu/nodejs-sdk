@@ -47,7 +47,7 @@ function putReadable (uptoken, key, rs, extra, onret) {
   rs.on("error", function (err) {
       onret({code: -1, error: err.toString()}, {});
   });
-  
+
   var form = getMultipart(uptoken, key, rs, extra);
 
   return rpc.postMultipart(conf.UP_HOST, form, onret);
@@ -64,6 +64,8 @@ function put(uptoken, key, body, extra, onret) {
   if (extra.checkCrc == 1) {
     var bodyCrc32 = getCrc32(body);
     extra.crc32 = '' + parseInt(bodyCrc32, 16);
+  } else if (extra.checkCrc == 2 && extra.crc32) {
+    extra.crc32 = '' + extra.crc32
   }
   return putReadable(uptoken, key, rs, extra, onret)
 }
@@ -82,6 +84,10 @@ function getMultipart(uptoken, key, rs, extra) {
   }
   form.stream('file', rs, key, extra.mimeType);
 
+  if(extra.crc32) {
+    form.field('crc32', extra.crc32);
+  }
+
   for (var k in extra.params) {
     form.field(k, extra.params[k]);
   }
@@ -99,6 +105,8 @@ function putFile(uptoken, key, loadFile, extra, onret) {
   if (extra.checkCrc == 1) {
     var fileCrc32 = getCrc32(fs.readFileSync(loadFile));
     extra.crc32 = '' + parseInt(fileCrc32, 16);
+  } else if (extra.checkCrc == 2 && extra.crc32) {
+    extra.crc32 = '' + extra.crc32
   }
   if(!extra.mimeType) {
     extra.mimeType = mime.lookup(loadFile);
