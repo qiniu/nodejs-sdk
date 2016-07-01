@@ -223,7 +223,7 @@ PutPolicy.prototype.token = function(mac) {
 
 PutPolicy.prototype.getFlags = function() {
   var flags = {};
-  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit','fsizeMin', 'detectMime', 'mimeLimit', 'deleteAfterDays'];
+  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit', 'detectMime', 'mimeLimit'];
 
   for (var i = attrs.length - 1; i >= 0; i--) {
     if (this[attrs[i]] !== null) {
@@ -274,9 +274,32 @@ function PutPolicy2(putPolicyObj) {
 
 }
 
-PutPolicy2.prototype.token = PutPolicy.prototype.token
+PutPolicy2.prototype.token = function(mac) {
+  if (mac == null) {
+    mac = new Mac(conf.ACCESS_KEY, conf.SECRET_KEY);
+  }
+  var flags = this.getFlags();
+  var encodedFlags = util.urlsafeBase64Encode(JSON.stringify(flags));
+  var encoded = util.hmacSha1(encodedFlags, mac.secretKey);
+  var encodedSign = util.base64ToUrlSafe(encoded);
+  var uploadToken = mac.accessKey + ':' + encodedSign + ':' + encodedFlags;
+  return uploadToken;
+}
 
-PutPolicy2.prototype.getFlags = PutPolicy.prototype.getFlags
+PutPolicy2.prototype.getFlags = function() {
+  var flags = {};
+  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit','fsizeMin', 'detectMime', 'mimeLimit', 'deleteAfterDays'];
+
+  for (var i = attrs.length - 1; i >= 0; i--) {
+    if (this[attrs[i]] !== null) {
+      flags[attrs[i]] = this[attrs[i]];
+    }
+  }
+
+  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
+
+  return flags;
+}
 
 function GetPolicy(expires) {
   this.expires = expires || 3600;
