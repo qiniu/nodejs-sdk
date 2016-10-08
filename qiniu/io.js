@@ -7,7 +7,7 @@ var url = require('url');
 var mime = require('mime');
 var Readable = require('stream').Readable;
 var formstream = require('formstream');
-var var urllib = require('urllib');
+var urllib = require('urllib');
 
 exports.UNDEFINED_KEY = '?'
 exports.PutExtra = PutExtra;
