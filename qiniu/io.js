@@ -106,7 +106,6 @@ function putReadable(uptoken, key, rs, extra, onret) {
       return rpc.postMultipart(conf.UP_HOST, form, onret);
     }
   }else{
-    console.log("指定空间上传域名");
     //指定空间上传域名，在conf.js中设置UP_HOST
     if (!extra) {
       extra = new PutExtra();
