@@ -40,8 +40,8 @@ function putReadable(uptoken, key, rs, extra, onret) {
     var ak = uptoken.toString().split(":")[0];
     var tokenPolicy = uptoken.toString().split(":")[2];
     var tokenPolicyStr = new Buffer(tokenPolicy, 'base64').toString();
-    var  json_tokenPolicyStr = JSON.parse(tokenPolicyStr);
-    var bucket = josn_tokenPolicyStr.scope;
+    var  json_tokenPolicyStr = JSON.parse(tokenPolicyStr);//josn_tokenPolicyStr
+    var  bucket = json_tokenPolicyStr.scope;
     // 判断过期时间
     if( new Date().getTime() > conf.DEADLINE){
       urllib.request('http://uc.qbox.me/v1/query', {
@@ -51,7 +51,7 @@ function putReadable(uptoken, key, rs, extra, onret) {
         },
         data: {
           'ak':ak,
-          'bucket':backet
+          'bucket':bucket
         }
       },function (err, data, res) {
         var str = data.toString();
