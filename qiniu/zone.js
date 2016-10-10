@@ -15,7 +15,6 @@ exports.up_host = function (uptoken, conf){
 
     // bucket 相同，上传域名仍在过期时间内
     if((new Date().getTime() < conf.EXPIRE) && bucket == conf.BUCKET){
-        console.log('bucket 相同，expire 在过期时间内');
         return;
     }
     
