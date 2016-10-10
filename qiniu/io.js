@@ -7,6 +7,8 @@ var url = require('url');
 var mime = require('mime');
 var Readable = require('stream').Readable;
 var formstream = require('formstream');
+var urllib = require('urllib');
+var zone = require('./zone');
 
 exports.UNDEFINED_KEY = '?'
 exports.PutExtra = PutExtra;
@@ -49,9 +51,12 @@ function putReadable (uptoken, key, rs, extra, onret) {
   });
 
   var form = getMultipart(uptoken, key, rs, extra);
+  // 设置上传域名
+  zone.up_host(uptoken, conf);
 
   return rpc.postMultipart(conf.UP_HOST, form, onret);
 }
+
 
 function put(uptoken, key, body, extra, onret) {
   var rs = new Readable();

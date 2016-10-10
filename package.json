@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "6.1.11",
+  "version": "6.1.12",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {
@@ -58,7 +58,8 @@
     "mime": "1.2.9",
     "formstream": "0.0.7",
     "crc32": "0.2.2",
-    "urllib": "0.5.1"
+    "urllib": "0.5.1",
+    "sync-request":"3.0.1"
   },
   "devDependencies": {
     "should": "1.2.2",
