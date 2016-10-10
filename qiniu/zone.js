@@ -39,7 +39,7 @@ exports.up_host = function (uptoken, conf){
             conf.UP_HOST = json_str.https.up[0];
         }
 
-        conf.DEADLINE = 2 + new Date().getTime(); 
+        conf.EXPIRE = 86400 + new Date().getTime(); 
 
     }else{
         var err = new Error('Server responded with status code ' + res.statusCode + ':\n' + res.body.toString());
