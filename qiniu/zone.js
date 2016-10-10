@@ -18,8 +18,6 @@ exports.up_host = function (uptoken){
         if(res.statusCode == 200){
             var json_str = JSON.parse(res.body.toString());
 
-            console.log(json_str);
-
             //判断设置使用的协议, 默认使用http
             if(conf.SCHEME == 'http'){
                 conf.UP_HOST = json_str.http.up[1];
