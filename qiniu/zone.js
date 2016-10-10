@@ -3,6 +3,14 @@ var request = require('sync-request');
 //conf 为全局变量
 exports.up_host = function (uptoken, conf){
 
+    var version = process.versions;
+    var num = version.node.split(".")[0];
+
+    // node 版本号低于 1.0.0, 使用默认域名上传，可以在conf中改下上传域名
+    if(num < 1 ){
+        conf.AUTOZONE = false;
+    }
+
     if(!conf.AUTOZONE){
         return;
     }
