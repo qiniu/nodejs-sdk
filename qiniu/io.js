@@ -52,7 +52,7 @@ function putReadable (uptoken, key, rs, extra, onret) {
 
   var form = getMultipart(uptoken, key, rs, extra);
   // 设置上传域名
-  zone.up_host(uptoken);
+  zone.up_host(uptoken, conf);
 
   return rpc.postMultipart(conf.UP_HOST, form, onret);
 }
