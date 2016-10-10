@@ -1,39 +1,52 @@
-var conf = require('./conf');
 var request = require('sync-request');
 
-exports.up_host = function (uptoken){
-    if((new Date().getTime() > conf.DEADLINE) && conf.AUTOZONE){
-        var ak = uptoken.toString().split(":")[0];
-        var tokenPolicy = uptoken.toString().split(":")[2];
-        var tokenPolicyStr = new Buffer(tokenPolicy, 'base64').toString();
-        var json_tokenPolicyStr = JSON.parse(tokenPolicyStr);
-        var bucket = json_tokenPolicyStr.scope;
+//conf 为全局变量
+exports.up_host = function (uptoken, conf){
 
-        var res = request('GET', 'http://uc.qbox.me/v1/query?ak=' + ak + '&bucket=' + bucket, {
-          'headers': {
-            'Content-Type': 'application/json'
-          }
-        });
+    if(!conf.AUTOZONE){
+        return;
+    }
 
-        if(res.statusCode == 200){
-            var json_str = JSON.parse(res.body.toString());
+    var ak = uptoken.toString().split(":")[0];
+    var tokenPolicy = uptoken.toString().split(":")[2];
+    var tokenPolicyStr = new Buffer(tokenPolicy, 'base64').toString();
+    var json_tokenPolicyStr = JSON.parse(tokenPolicyStr);
+    var bucket = json_tokenPolicyStr.scope;
 
-            //判断设置使用的协议, 默认使用http
-            if(conf.SCHEME == 'http'){
-                conf.UP_HOST = json_str.http.up[1];
-            }else{
-                conf.UP_HOST = json_str.https.up[0];
-            }
+    // bucket 相同，上传域名仍在过期时间内
+    if((new Date().getTime() < conf.EXPIRE) && bucket == conf.BUCKET){
+        console.log('bucket 相同，expire 在过期时间内');
+        return;
+    }
+    
+    //记录bucket名
+    conf.BUCKET = bucket;
 
-            conf.DEADLINE = json_str.ttl + new Date().getTime(); 
+    var res = request('GET', 'http://uc.qbox.me/v1/query?ak=' + ak + '&bucket=' + bucket, {
+      'headers': {
+        'Content-Type': 'application/json'
+      }
+    });
 
+    if(res.statusCode == 200){
+        
+        var json_str = JSON.parse(res.body.toString());
+
+        //判断设置使用的协议, 默认使用http
+        if(conf.SCHEME == 'http'){
+            conf.UP_HOST = json_str.http.up[1];
         }else{
-            var err = new Error('Server responded with status code ' + res.statusCode + ':\n' + res.body.toString());
-            err.statusCode = res.statusCode;
-            err.headers = res.headers;
-            err.body = res.body;
-            throw err;
+            conf.UP_HOST = json_str.https.up[0];
         }
+
+        conf.DEADLINE = 2 + new Date().getTime(); 
+
+    }else{
+        var err = new Error('Server responded with status code ' + res.statusCode + ':\n' + res.body.toString());
+        err.statusCode = res.statusCode;
+        err.headers = res.headers;
+        err.body = res.body;
+        throw err;
     }
 
 }
