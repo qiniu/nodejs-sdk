@@ -20,4 +20,4 @@ exports.UC_HOST  = 'http://uc.qbox.me';
 exports.UP_HTTPS_HOST = 'https://up-z1.qbox.me'; 
 exports.SCHEME = 'http'; // 上传使用的协议 
 exports.AUTOZONE = true; // 自动获取不同机房空间的上传域名 
-exports.DEADLINE = 0; // 获取空间域名对应的缓存时间
+exports.DEADLINE = 0; // 获取不同机房空间上传域名的缓存时间
