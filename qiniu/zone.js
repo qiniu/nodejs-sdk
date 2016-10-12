@@ -19,7 +19,9 @@ exports.up_host = function (uptoken, conf){
     var tokenPolicy = uptoken.toString().split(":")[2];
     var tokenPolicyStr = new Buffer(tokenPolicy, 'base64').toString();
     var json_tokenPolicyStr = JSON.parse(tokenPolicyStr);
-    var bucket = json_tokenPolicyStr.scope;
+
+    var scope = json_tokenPolicyStr.scope;
+    var bucket = scope.toString().split(":")[0];
 
     // bucket 相同，上传域名仍在过期时间内
     if((new Date().getTime() < conf.EXPIRE) && bucket == conf.BUCKET){
