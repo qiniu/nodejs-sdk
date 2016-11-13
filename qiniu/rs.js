@@ -79,6 +79,15 @@ Client.prototype.forceCopy = function(bucketSrc, keySrc, bucketDest, keyDest, fo
     rpc.postWithoutForm(uri, digest, onret);
 }
 
+Client.prototype.changeMime = function(bucket, key, mime, onret) {
+
+  var encodedEntryURISrc = getEncodedEntryUri(bucket, key);
+  var encode_mime = util.urlsafeBase64Encode(mime);
+
+  var uri = conf.RS_HOST + '/chgm/' + encodedEntryURISrc + '/mime/' + encode_mime;
+  var digest = util.generateAccessToken(uri, null);
+  rpc.postWithoutForm(uri, digest, onret);
+}
 
 Client.prototype.fetch = function(url, bucket, key, onret) {
   var bucketUri = getEncodedEntryUri(bucket, key);
