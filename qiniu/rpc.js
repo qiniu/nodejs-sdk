@@ -34,13 +34,13 @@ function post(uri, form, headers, onresp) {
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
 
+
   var data = {
     headers: headers,
     method: 'POST',
     dataType: 'json',
     timeout: conf.RPC_TIMEOUT,
   };
-
   if (Buffer.isBuffer(form) || typeof form === 'string') {
     data.content = form;
   } else if (form) {
@@ -59,4 +59,3 @@ function post(uri, form, headers, onresp) {
 
   return req;
 }
-

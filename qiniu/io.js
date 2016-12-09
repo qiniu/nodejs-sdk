@@ -50,11 +50,14 @@ function putReadable (uptoken, key, rs, extra, onret) {
       onret({code: -1, error: err.toString()}, {});
   });
 
-  var form = getMultipart(uptoken, key, rs, extra);
-  // 设置上传域名
-  zone.up_host(uptoken, conf);
 
-  return rpc.postMultipart(conf.UP_HOST, form, onret);
+  // 设置上传域名
+  // zone.up_host(uptoken, conf);
+  zone.up_host_async(uptoken, conf, function() {
+      var form = getMultipart(uptoken, key, rs, extra);
+      return rpc.postMultipart(conf.UP_HOST, form, onret);
+  });
+
 }
 
 
