@@ -74,7 +74,7 @@ exports.prefetch =  function(prefetchData){
         'Content-Type': 'application/json',
         'Authorization': accessToken,
     };
-    var refreshJson = prefetchData;
+    
     req('/v2/tune/prefetch', headers, prefetchData); 
 }
 
@@ -90,8 +90,8 @@ exports.refresh = function(refreshData){
         'Content-Type': 'application/json',
         'Authorization': accessToken,
     };
-    var refreshJson = refreshDate;
-    req('/v2/tune/refresh', headers, refreshDate); 
+
+    req('/v2/tune/refresh', headers, refreshData); 
 }
 
 
@@ -122,13 +122,16 @@ exports.getAntiLeechAccessUrlBasedOnTimestamp = function(urlString, encryptKey, 
     var urlStr = url.parse(urlString);
     var pathname = urlStr.pathname;
 
+
     //获取linux时间戳（当前时间+有效时间）的16进制
     var dateNow = parseInt(Date.now()/1000);
     var timestampNow =  dateNow + durationInSeconds;
+
+
     var expireHex = timestampNow.toString(16);
-
-
     var signedStr = encryptKey + pathname + expireHex;
+
+
     var md5 = crypto.createHash('md5');
     var toSignStr = md5.update(signedStr).digest('hex');
 
@@ -139,3 +142,4 @@ exports.getAntiLeechAccessUrlBasedOnTimestamp = function(urlString, encryptKey, 
         return urlString + '?sign=' + toSignStr + '&t=' + expireHex;
     }
 }
+
