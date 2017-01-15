@@ -66,8 +66,9 @@ exports.getBandwidthData = function(startDate, endDate, granularity, domain){
 
 // 预取文件链接
 // @link http://developer.qiniu.com/article/fusion/api/prefetch.html
-// 预取urls  prefetchData =  {urls:['http://obbid7qc6.qnssl.com/023']} 
-exports.prefetch =  function(prefetchData){
+// 预取urls  prefetchUrls = ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
+exports.prefetchUrls = function(prefetchUrls){
+    var obj = {urls:prefetchUrls};
     var url = '/v2/tune/prefetch\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -75,15 +76,15 @@ exports.prefetch =  function(prefetchData){
         'Authorization': accessToken,
     };
     
-    req('/v2/tune/prefetch', headers, prefetchData); 
+    req('/v2/tune/prefetch', headers, obj);
 }
 
 
 // 刷新链接
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
-// 刷新urls  refreshDate =  {urls:['http://obbid7qc6.qnssl.com/023']} 
-// 刷新dirs  refreshDate = {dirs:['http://obbid7qc6.qnssl.com/023/']}
-exports.refresh = function(refreshData){
+// 刷新urls  refreshUrls =  ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
+exports.refreshUrls = function(refreshUrls){
+    var obj = {urls:refreshUrls};
     var url = '/v2/tune/refresh\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -91,7 +92,23 @@ exports.refresh = function(refreshData){
         'Authorization': accessToken,
     };
 
-    req('/v2/tune/refresh', headers, refreshData); 
+    req('/v2/tune/refresh', headers, obj);
+}
+
+
+// 刷新目录
+// @link http://developer.qiniu.com/article/fusion/api/refresh.html
+// 刷新dirs  refreshDirs =  ['http://obbid7qc6.qnssl.com/wo/','http://obbid7qc6.qnssl.com/']
+exports.refreshDirs = function(refreshDirs){
+    var obj = {dirs:refreshDirs};
+    var url = '/v2/tune/refresh\n';
+    var accessToken = util.generateAccessToken(url, '');
+    var headers = {
+        'Content-Type': 'application/json',
+        'Authorization': accessToken,
+    };
+
+    req('/v2/tune/refresh', headers, obj);
 }
 
 
