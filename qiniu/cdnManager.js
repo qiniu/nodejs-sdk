@@ -97,7 +97,7 @@ exports.refresh = function(refreshData){
 
 // post 请求
 function req(pathname, header, datas){
-      urllib.request("http://fusion.qiniuapi.com" + pahtname, {
+      urllib.request("http://fusion.qiniuapi.com" + pathname, {
       method: 'POST',
       headers: header,
       data:datas
