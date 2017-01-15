@@ -96,7 +96,7 @@ exports.refresh = function(refreshData){
 
 
 // post 请求
-function req(pahtname, header, datas){
+function req(pathname, header, datas){
       urllib.request("http://fusion.qiniuapi.com" + pahtname, {
       method: 'POST',
       headers: header,
@@ -117,7 +117,7 @@ function req(pahtname, header, datas){
 // encryptKey 时间戳秘钥
 // durationInSeconds 设置有效期，单位秒
 // return 最终的带时间戳防盗链的url
-exports.getAntiLeechAccessUrlBasedOnTimestamp = function(urlString, encryptKey, durationInSeconds){
+exports.createTimestampAntiLeechUrl = function(urlString, encryptKey, durationInSeconds){
     // 获取pathname
     var urlStr = url.parse(urlString);
     var pathname = urlStr.pathname;
