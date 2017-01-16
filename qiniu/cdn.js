@@ -6,8 +6,7 @@ var request = require('request');
 
 // 获取域名日志下载链接
 // @link http://developer.qiniu.com/article/fusion/api/log.html
-// domains 域名列表，以英文分号 ; 分割
-
+// domains 域名列表 domains = ['obbid7qc6.qnssl.com','7xkh68.com1.z0.glb.clouddn.com']
 exports.getCdnLogList = function (domains, logDate){
     var url = '/v2/tune/log/list\n';
     var accessToken = util.generateAccessToken(url, '');
@@ -17,7 +16,7 @@ exports.getCdnLogList = function (domains, logDate){
     };
     data = {
         'day': logDate,
-        'domains': domains
+        'domains': domains.join(';')
     }
 
     req('/v2/tune/log/list', headers, data); 
@@ -68,7 +67,7 @@ exports.getBandwidthData = function(startDate, endDate, granularity, domain){
 // @link http://developer.qiniu.com/article/fusion/api/prefetch.html
 // 预取urls  prefetchUrls = ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
 exports.prefetchUrls = function(prefetchUrls){
-    var obj = {urls:prefetchUrls};
+    var postBody = {urls:prefetchUrls};
     var url = '/v2/tune/prefetch\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -76,15 +75,15 @@ exports.prefetchUrls = function(prefetchUrls){
         'Authorization': accessToken,
     };
     
-    req('/v2/tune/prefetch', headers, obj);
+    req('/v2/tune/prefetch', headers, postBody);
 }
 
 
 // 刷新链接
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
 // 刷新urls  refreshUrls =  ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
-exports.refreshUrls = function(refreshUrls){
-    var obj = {urls:refreshUrls};
+exports.refreshUrls = function(urls){
+    var postBody = {urls:urls};
     var url = '/v2/tune/refresh\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -92,15 +91,15 @@ exports.refreshUrls = function(refreshUrls){
         'Authorization': accessToken,
     };
 
-    req('/v2/tune/refresh', headers, obj);
+    req('/v2/tune/refresh', headers, postBody);
 }
 
 
 // 刷新目录
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
 // 刷新dirs  refreshDirs =  ['http://obbid7qc6.qnssl.com/wo/','http://obbid7qc6.qnssl.com/']
-exports.refreshDirs = function(refreshDirs){
-    var obj = {dirs:refreshDirs};
+exports.refreshDirs = function(dirs){
+    var postBody = {dirs:dirs};
     var url = '/v2/tune/refresh\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -108,7 +107,7 @@ exports.refreshDirs = function(refreshDirs){
         'Authorization': accessToken,
     };
 
-    req('/v2/tune/refresh', headers, obj);
+    req('/v2/tune/refresh', headers, postBody);
 }
 
 
