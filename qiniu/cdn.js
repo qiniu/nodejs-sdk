@@ -7,6 +7,7 @@ var request = require('request');
 // 获取域名日志下载链接
 // @link http://developer.qiniu.com/article/fusion/api/log.html
 // domains 域名列表 domains = ['obbid7qc6.qnssl.com','7xkh68.com1.z0.glb.clouddn.com']
+// logDate 日期，例如 2016-07-01
 exports.getCdnLogList = function (domains, logDate){
     var url = '/v2/tune/log/list\n';
     var accessToken = util.generateAccessToken(url, '');
@@ -25,7 +26,11 @@ exports.getCdnLogList = function (domains, logDate){
 
 // 获取域名访问流量数据
 // @link http://developer.qiniu.com/article/fusion/api/traffic-bandwidth.html#batch-flux
-exports.getFluxData = function(startDate, endDate, granularity, domain){
+// startDate 开始日期，例如：2016-07-01
+// endDate 结束日期，例如：2016-07-03
+// granularity 粒度，取值：5min／hour／day
+// domains   域名 domain = ['obbid7qc6.qnssl.com','obbid7qc6.qnssl.com'];
+exports.getFluxData = function(startDate, endDate, granularity, domains){
     var url = '/v2/tune/flux\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -36,7 +41,7 @@ exports.getFluxData = function(startDate, endDate, granularity, domain){
         'startDate': startDate,
         'endDate': endDate,
         'granularity': granularity,
-        'domains': domain
+        'domains': domains.join(';')
     }
 
     req('/v2/tune/flux', headers, data); 
@@ -45,7 +50,11 @@ exports.getFluxData = function(startDate, endDate, granularity, domain){
 
 // 获取域名访问带宽数据
 // @link http://developer.qiniu.com/article/fusion/api/traffic-bandwidth.html
-exports.getBandwidthData = function(startDate, endDate, granularity, domain){
+// startDate 开始日期，例如：2016-07-01
+// endDate   结束日期，例如：2016-07-03
+// granularity 粒度，取值：5min／hour／day
+// domains   域名 domain = ['obbid7qc6.qnssl.com','obbid7qc6.qnssl.com']
+exports.getBandwidthData = function(startDate, endDate, granularity, domains){
     var url = '/v2/tune/bandwidth\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -56,7 +65,7 @@ exports.getBandwidthData = function(startDate, endDate, granularity, domain){
         'startDate': startDate,
         'endDate': endDate,
         'granularity': granularity,
-        'domains': domain
+        'domains': domains.join(';')
     }
 
     req('/v2/tune/bandwidth', headers, data); 
@@ -65,9 +74,9 @@ exports.getBandwidthData = function(startDate, endDate, granularity, domain){
 
 // 预取文件链接
 // @link http://developer.qiniu.com/article/fusion/api/prefetch.html
-// 预取urls  prefetchUrls = ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
-exports.prefetchUrls = function(prefetchUrls){
-    var postBody = {urls:prefetchUrls};
+// 预取urls  urls = ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
+exports.prefetchUrls = function(urls){
+    var postBody = {urls:urls};
     var url = '/v2/tune/prefetch\n';
     var accessToken = util.generateAccessToken(url, '');
     var headers = {
@@ -96,6 +105,7 @@ exports.refreshUrls = function(urls){
 
 
 // 刷新目录
+// 刷新目录列表，每次最多不可以超过10个目录, 刷新目录需要额外开通权限，可以联系七牛技术支持处理
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
 // 刷新dirs  refreshDirs =  ['http://obbid7qc6.qnssl.com/wo/','http://obbid7qc6.qnssl.com/']
 exports.refreshDirs = function(dirs){
@@ -108,6 +118,16 @@ exports.refreshDirs = function(dirs){
     };
 
     req('/v2/tune/refresh', headers, postBody);
+}
+
+
+exports.refreshUrlsAndDirs = function(urls, dirs){
+    if(urls != null){
+        this.refreshUrls(urls);
+    }
+    if(dirs != null){
+        this.refreshDirs(dirs);
+    }
 }
 
 
@@ -126,7 +146,6 @@ function req(pathname, header, datas){
  });
 }
 
-
 // 构建标准的基于时间戳的防盗链
 // url 链接 格式为：http://user:pass@host.com:8080/2?v=xx
 // encryptKey 时间戳秘钥
@@ -137,15 +156,12 @@ exports.createTimestampAntiLeechUrl = function(urlString, encryptKey, durationIn
     var urlStr = url.parse(urlString);
     var pathname = urlStr.pathname;
 
-
     //获取linux时间戳（当前时间+有效时间）的16进制
     var dateNow = parseInt(Date.now()/1000);
     var timestampNow =  dateNow + durationInSeconds;
 
-
     var expireHex = timestampNow.toString(16);
     var signedStr = encryptKey + pathname + expireHex;
-
 
     var md5 = crypto.createHash('md5');
     var toSignStr = md5.update(signedStr).digest('hex');
@@ -157,4 +173,3 @@ exports.createTimestampAntiLeechUrl = function(urlString, encryptKey, durationIn
         return urlString + '?sign=' + toSignStr + '&t=' + expireHex;
     }
 }
-
