@@ -114,17 +114,16 @@ exports.refreshDirs = function(refreshDirs){
 
 // post 请求
 function req(pathname, header, datas){
-      urllib.request("http://fusion.qiniuapi.com" + pathname, {
-      method: 'POST',
-      headers: header,
-      data:datas
+    urllib.request("http://fusion.qiniuapi.com" + pathname, {
+    method: 'POST',
+    headers: header,
+    data:datas
 },function (err, data, res) {
-      if (err) {
-        throw err; // you need to handle error 
-      }
+    if (err) {
+       throw err; // you need to handle error 
+    }
         console.log(res.statusCode);
         console.log(data.toString())
-
  });
 }
 
