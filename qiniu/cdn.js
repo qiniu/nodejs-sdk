@@ -150,13 +150,17 @@ function req(pathname, header, datas){
 // 构建标准的基于时间戳的防盗链
 // host 自定义域名，例如 http://img.abc.com
 // fileName 待访问的原始文件名，必须是utf8编码，不需要进行urlencode
-// query 业务自身的查询参数，必须是utf8编码，不需要进行urlencode, 例如 attname=qiniu&x=34
+// query 业务自身的查询参数，必须是utf8编码，不需要进行urlencode, 例如 {aa:"23", attname:"11111111111111"}s
 // encryptKey 时间戳防盗链的签名密钥，从七牛后台获取
 // deadline 链接的有效期时间戳，是以秒为单位的Unix时间戳
 // return  signedUrl 最终的带时间戳防盗链的url
 exports.createTimestampAntiLeechUrl = function(host, fileName, query, encryptKey, deadline){
-    if(query !=null && query.length > 0){
-        urlToSign = host + '/' + urlencode(fileName) + '?' + urlencode(query);
+    if(query != null){
+        var arr = [];
+        Object.getOwnPropertyNames(query).forEach(function(val, idx, array) {
+            arr.push(val + "=" + urlencode(query[val]));
+        });
+        urlToSign = host + '/' + urlencode(fileName) + '?' + arr.join('&');
     }else{
         urlToSign = host + '/' + urlencode(fileName);
     }
@@ -174,7 +178,7 @@ exports.createTimestampAntiLeechUrl = function(host, fileName, query, encryptKey
     var md5 = crypto.createHash('md5');
     var toSignStr = md5.update(signedStr).digest('hex');
 
-    if(query !=null && query.length > 0){
+    if(query !=null){
         return urlToSign + '&sign=' + toSignStr + '&t=' + expireHex;
     }else{
         return urlToSign + '?sign=' + toSignStr + '&t=' + expireHex;
