@@ -3,6 +3,7 @@ var crypto = require('crypto');
 var urllib = require('urllib');
 var util = require('./util');
 var request = require('request');
+var urlencode = require('urlencode');
 
 // 获取域名日志下载链接
 // @link http://developer.qiniu.com/article/fusion/api/log.html
@@ -147,18 +148,25 @@ function req(pathname, header, datas){
 }
 
 // 构建标准的基于时间戳的防盗链
-// url 链接 格式为：http://user:pass@host.com:8080/2?v=xx
-// encryptKey 时间戳秘钥
-// durationInSeconds 设置有效期，单位秒
-// return 最终的带时间戳防盗链的url
-exports.createTimestampAntiLeechUrl = function(urlString, encryptKey, durationInSeconds){
-    // 获取pathname
-    var urlStr = url.parse(urlString);
-    var pathname = urlStr.pathname;
+// host 自定义域名，例如 http://img.abc.com
+// fileName 待访问的原始文件名，必须是utf8编码，不需要进行urlencode
+// query 业务自身的查询参数，必须是utf8编码，不需要进行urlencode, 例如 attname=qiniu&x=34
+// encryptKey 时间戳防盗链的签名密钥，从七牛后台获取
+// deadline 链接的有效期时间戳，是以秒为单位的Unix时间戳
+// return  signedUrl 最终的带时间戳防盗链的url
+exports.createTimestampAntiLeechUrl = function(host, fileName, query, encryptKey, deadline){
+    if(query !=null && query.length > 0){
+        urlToSign = host + '/' + urlencode(fileName) + '?' + urlencode(query);
+    }else{
+        urlToSign = host + '/' + urlencode(fileName);
+    }
 
-    //获取linux时间戳（当前时间+有效时间）的16进制
+    var urlObj = url.parse(urlToSign);
+    pathname = urlObj.pathname;
+
+   //获取linux时间戳（当前时间+有效时间）的16进制
     var dateNow = parseInt(Date.now()/1000);
-    var timestampNow =  dateNow + durationInSeconds;
+    var timestampNow =  dateNow + deadline;
 
     var expireHex = timestampNow.toString(16);
     var signedStr = encryptKey + pathname + expireHex;
@@ -166,10 +174,9 @@ exports.createTimestampAntiLeechUrl = function(urlString, encryptKey, durationIn
     var md5 = crypto.createHash('md5');
     var toSignStr = md5.update(signedStr).digest('hex');
 
-    //判断查询参数
-    if(urlStr.search){
-        return urlString + '&sign=' + toSignStr + '&t=' + expireHex;
+    if(query !=null && query.length > 0){
+        return urlToSign + '&sign=' + toSignStr + '&t=' + expireHex;
     }else{
-        return urlString + '?sign=' + toSignStr + '&t=' + expireHex;
+        return urlToSign + '?sign=' + toSignStr + '&t=' + expireHex;
     }
 }
