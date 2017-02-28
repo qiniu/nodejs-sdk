@@ -92,7 +92,7 @@ Client.prototype.changeMime = function(bucket, key, mime, onret) {
 Client.prototype.fetch = function(url, bucket, key, onret) {
   var bucketUri = getEncodedEntryUri(bucket, key);
   var fetchUrl = util.urlsafeBase64Encode(url);
-  var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
+  var uri = conf.IO_HOST + '/fetch/' + fetchUrl + '/to/' + bucketUri;
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
