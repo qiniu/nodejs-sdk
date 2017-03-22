@@ -26,6 +26,16 @@ client.stat(bucket, key,function(err, ret){
     }
 });
 
+//bucket 空间名
+//key 文件名
+//自定义时间
+client.deleteAfterDays(bucket, key, days, function(err, ret) {
+    if (!err) {
+        console.log(ret);
+    } else {
+        console.log(err);
+    }
+});
 
 // var client = new qiniu.rs.Client();
 // client.move('public','145637992222','logs','145637992222', 1, function(err, ret){
@@ -74,5 +84,17 @@ client.stat(bucket, key,function(err, ret){
 //      }
 //  });
 
+
+
+// days = 1;
+// //删除资源
+// client.deleteAfterDays(bucket, key, days, function(err, ret) {
+//     if (!err) {
+//         console.log(ok);
+//     } else {
+//         console.log(err);
+//     }
+// });
+//
 
 
