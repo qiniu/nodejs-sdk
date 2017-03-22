@@ -86,15 +86,5 @@ client.deleteAfterDays(bucket, key, days, function(err, ret) {
 
 
 
-// days = 1;
-// //删除资源
-// client.deleteAfterDays(bucket, key, days, function(err, ret) {
-//     if (!err) {
-//         console.log(ok);
-//     } else {
-//         console.log(err);
-//     }
-// });
-//
 
 
