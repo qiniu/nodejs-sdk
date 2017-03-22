@@ -86,6 +86,15 @@ describe('test start step2:', function() {
         });
       });
 
+      describe('rs.Client#deleteAfterDays()', function () {
+        it('delete logo5.png after 1 day', function (done) {
+          client.deleteAfterDays(TEST_BUCKET, logo5, 1, function (err, ret) {
+            should.not.exist(err);
+            done();
+          });
+        });
+      });
+
       describe('rs.Client#move()', function() {
         it('move logo.png to logo5.png', function(done) {
           client.move(TEST_BUCKET, logo, TEST_BUCKET, logo5, function(err, ret) {

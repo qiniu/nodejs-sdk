@@ -42,6 +42,13 @@ Client.prototype.remove = function(bucket, key, onret) {
   rpc.postWithoutForm(uri, digest, onret);
 }
 
+Client.prototype.deleteAfterDays = function(bucket, key, days, onret) {
+  var encodedEntryUri = getEncodedEntryUri(bucket, key);
+  var uri = conf.RS_HOST + '/deleteAfterDays/' + encodedEntryUri + "/" + days;
+  var digest = util.generateAccessToken(uri, null);
+  rpc.postWithoutForm(uri, digest, onret);
+}
+
 Client.prototype.move = function(bucketSrc, keySrc, bucketDest, keyDest, onret) {
   var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
   var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
