@@ -18,6 +18,7 @@ exports.API_HOST = 'http://api.qiniu.com';
 exports.RPC_TIMEOUT = 3600000; // default rpc timeout: one hour
 exports.UC_HOST  = 'http://uc.qbox.me'; 
 exports.UP_HTTPS_HOST = 'https://up-z1.qbox.me';
+exports.FS_HOST = 'http://fusion.qiniuapi.com'
 exports.SCHEME = 'http'; // 上传使用的协议 
 exports.AUTOZONE = true; // 自动获取不同机房空间的上传域名
 exports.BUCKET = null ; // 上传空间
