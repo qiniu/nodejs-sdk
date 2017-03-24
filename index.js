@@ -7,6 +7,7 @@ module.exports = {
   },
   io: require(libpath + '/io.js'),
   rs: require(libpath + '/rs.js'),
+  fs: require(libpath + '/fs.js'),
   rsf: require(libpath + '/rsf.js'),
   fop: require(libpath + '/fop.js'),
   conf: require(libpath + '/conf.js'),
