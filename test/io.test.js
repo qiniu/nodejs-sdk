@@ -3,21 +3,25 @@ var should = require('should');
 var path = require('path');
 var fs = require('fs');
 
-qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
-qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
+// qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
+// qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
 
-var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
-var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
+qiniu.conf.ACCESS_KEY = 'DWQOcImtTCrnPp1ogwgAHBdIK1mIFrnmtnXb-66-';
+qiniu.conf.SECRET_KEY = 'cJFhYuaq7Vo35e1XDFUG8Rm8C2VjkpmXO0aGkJGM';
+
+// var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
+var TEST_BUCKET = 'nodejstest';
+// var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
 
 var imageFile = path.join(__dirname, 'logo.png');
 
-before(function(done) {
-  if(!process.env.QINIU_ACCESS_KEY) {
-    console.log('should run command `source test-env.sh` first\n');
-    process.exit(0);
-  }
-  done();
-});
+// before(function(done) {
+//   if(!process.env.QINIU_ACCESS_KEY) {
+//     console.log('should run command `source test-env.sh` first\n');
+//     process.exit(0);
+//   }
+//   done();
+// });
 
 describe('test start step1:', function() {
 
