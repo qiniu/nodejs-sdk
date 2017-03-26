@@ -4,6 +4,7 @@ var path = require('path');
 var crypto = require('crypto');
 var conf = require('./conf');
 
+
 exports.isQiniuCallback = isQiniuCallback;
 
 // ------------------------------------------------------------------------------------------
@@ -43,6 +44,33 @@ exports.generateAccessToken = function(uri, body) {
   var safeDigest = exports.base64ToUrlSafe(digest);
   return 'QBox ' + conf.ACCESS_KEY + ':' + safeDigest;
 }
+
+exports.getAntiLeechAccessUrlBasedOnTimestamp = function (host, protocol, pathname, query, encryptKey, durationInseconds) {
+    var pathname = encodeURI(pathname, 'UTF-8');
+    var time = (parseInt(Date.now() /1000) + durationInseconds).toString(16);
+    var sign = encryptKey + pathname + time;
+
+    var signstr = crypto.createHash('md5').update(sign).digest('hex');
+    
+    if(query != undefined) {
+      return protocol + '//' + host  + pathname + '?' + query + '&sign=' + signstr + "&t=" + time;
+    } else {
+      return 'http://' + host  + pathname + '?sign=' + signstr + "&t=" + time;
+    }
+}
+
+exports.getTimestampWithUrl = function (URL, encryptKey, durationInseconds ) {
+    var urlObj = url.parse(URL);
+    var host = urlObj.host;
+    var protocol = urlObj.protocol;
+    console.log(protocol);
+    var pathname = urlObj.pathname;
+    console.log(pathname);
+    var query = urlObj.query;
+    console.log(query);
+    return exports.getAntiLeechAccessUrlBasedOnTimestamp(host, protocol, pathname, query, encryptKey, durationInseconds);
+}
+
 
 function isQiniuCallback(path, body, callbackAuth) {
   var auth = exports.generateAccessToken(path, body);
