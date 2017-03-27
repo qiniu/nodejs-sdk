@@ -13,17 +13,20 @@ function CdnManager(cdnManager) {
 }
 
 CdnManager.prototype.refreshUrls = function (urls, onret) {
+    var _urls = urls.split(",");
     var body = {
-        'urls' : urls
+        'urls' : _urls
     }
     var uri = conf.FS_HOST + '/v2/tune/refresh';
     var digest = util.generateAccessToken(uri, querystring.stringify(body));
+    console.log('token' + digest);
     rpc.postWithForm(uri, querystring.stringify(body), digest, onret);
 }
 
-CdnManager.prototype.refreshDirs = function (urls, onret) {
+CdnManager.prototype.refreshDirs = function (dirs, onret) {
+    var _dirs = dirs.split(",");
     var body = {
-        'dirs' : urls
+        'dirs' : _dirs
     }
     var uri = conf.FS_HOST + '/v2/tune/refresh';
     var digest = util.generateAccessToken(uri, querystring.stringify(body));
@@ -31,9 +34,11 @@ CdnManager.prototype.refreshDirs = function (urls, onret) {
 }
 
 CdnManager.prototype.refreshUrlsAndDirs = function (urls, dirs, onret) {
+    var _urls = urls.split(",");
+    var _dirs = dirs.split(",");
     var body = {
-        'urls' : undefined,
-        'dirs' : dirs
+        'urls' : _urls,
+        'dirs' : _dirs
     };
     var uri = conf.FS_HOST + '/v2/tune/refresh';
     var digest = util.generateAccessToken(uri, querystring.stringify(body));
@@ -41,8 +46,9 @@ CdnManager.prototype.refreshUrlsAndDirs = function (urls, dirs, onret) {
 }
 
 CdnManager.prototype.prefetch = function (urls, onret) {
+    var _urls = urls.split(",");
     var body = {
-        'urls' : urls
+        'urls' : _urls
     }
     var uri = conf.FS_HOST + '/v2/tune/prefetch';
     var digest = util.generateAccessToken(uri, querystring.stringify(body));

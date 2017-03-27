@@ -5,6 +5,7 @@ var conf = require('./conf');
 exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
+exports.postWithJson = postWithJson;
 
 function postMultipart(uri, form, onret) {
   return post(uri, form, form.headers(), onret);
@@ -18,6 +19,16 @@ function postWithForm(uri, form, token, onret) {
     headers['Authorization'] = token;
   }
   return post(uri, form, headers, onret);
+}
+
+function postWithJson(uri, form, token, onret) {
+    var headers = {
+        'Content-Type': 'application/json'
+    };
+    if (token) {
+        headers['Authorization'] = token;
+    }
+    return post(uri, form, headers, onret);
 }
 
 function postWithoutForm(uri, token, onret) {
