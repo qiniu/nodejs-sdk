@@ -5,7 +5,6 @@ var conf = require('./conf');
 exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
-exports.postWithJson = postWithJson;
 
 function postMultipart(uri, form, onret) {
   return post(uri, form, form.headers(), onret);
