@@ -3,8 +3,8 @@
  */
 var qiniu = require('../');
 
-var url = 'http://pictures.gugaobai.top/qupload/Luffy.jpg?imageslim';
-var key = 'dfa827aa79a9ab995fabfb9b68b80b98c689e58b';
+var url = '<url1>';
+var key = 'key';
 var time = 3600;
 
 var uri = qiniu.util.getTimestampWithUrl( url, key, time);

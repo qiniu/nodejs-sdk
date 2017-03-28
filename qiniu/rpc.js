@@ -21,16 +21,6 @@ function postWithForm(uri, form, token, onret) {
   return post(uri, form, headers, onret);
 }
 
-function postWithJson(uri, form, token, onret) {
-    var headers = {
-        'Content-Type': 'application/json'
-    };
-    if (token) {
-        headers['Authorization'] = token;
-    }
-    return post(uri, form, headers, onret);
-}
-
 function postWithoutForm(uri, token, onret) {
   var headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
