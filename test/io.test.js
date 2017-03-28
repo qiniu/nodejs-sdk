@@ -6,6 +6,7 @@ var fs = require('fs');
 qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
 qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
 
+var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
 var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
 
 var imageFile = path.join(__dirname, 'logo.png');
