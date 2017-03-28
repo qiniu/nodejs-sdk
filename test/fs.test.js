@@ -5,40 +5,83 @@ var path = require('path');
 qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
 qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
 
-var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
-var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
-
-var imageFile = path.join(__dirname, 'logo.png');
-
-var logo  = Math.random() + 'logo.png';
-var logo1 = Math.random() + 'logo1.png';
-var logo2 = Math.random() + 'logo2.png';
-var logo3 = Math.random() + 'logo3.png';
-var logo4 = Math.random() + 'logo4.png';
-var logo5 = Math.random() + 'logo5.png';
-var logo6 = Math.random() + 'logo6.png';
-var logo7 = Math.random() + 'logo7.png';
+var Urls = "<urls1>";
+var Dirs = "<dirs1>";
+var StartDate = "date";
+var EndDate =  "date";
+var Granularity = "day";
+var Domains = "<Domains1>";
+var Day =  "date";
 
 
 
 describe('test start step3:', function() {
-    describe('fs.test.js', function() {
-        var cdnManager = new qiniu.rs.CdnManager();
+    describe('fs.test.js', function () {
+        var cdnManager = new qiniu.fs.CdnManager();
 
-        before(function(done) {
-            var putPolicy = new qiniu.rs.PutPolicy(
-                TEST_BUCKET
-            );
-            var uptoken = putPolicy.token();
-
-            qiniu.io.putFile(uptoken, logo, imageFile, null, function(err, ret) {
-                should.not.exist(err);
-            });
-
-            qiniu.io.putFile(uptoken, logo2, imageFile, null, function(err, ret) {
-                should.not.exist(err);
-                done();
-            });
+        describe('fs.CdnManager#refreshUrls()', function () {
+           it('',function (done) {
+               cdnManager.refreshUrls(Urls, function (err, ret) {
+                   should.not.exist(err);
+                   done();
+               })
+           })
         });
+
+        describe('fs.CdnManager#refreshDirs()', function () {
+            it('',function (done) {
+                cdnManager.refreshDirs(Dirs, function (err, ret) {
+                    should.not.exist(err);
+                    done();
+                })
+            })
+        });
+
+        describe('fs.CdnManager#refreshUrlsAndDirs()', function () {
+            it('',function (done) {
+                cdnManager.refreshUrlsAndDirs(Urls, Dirs, function (err, ret) {
+                    should.not.exist(err);
+                    done();
+                })
+            })
+        });
+
+        describe('fs.CdnManager#prefetch()', function () {
+            it('',function (done) {
+                cdnManager.prefetch(Urls, function (err, ret) {
+                    should.not.exist(err);
+                    done();
+                })
+            })
+        });
+
+        describe('fs.CdnManager#bandwidth()', function () {
+            it('',function (done) {
+                cdnManager.bandwidth(StartDate, EndDate, Granularity, Domains, function (err, ret) {
+                    should.not.exist(err);
+                    done();
+                })
+            })
+        });
+
+        describe('fs.CdnManager#flux()', function () {
+            it('',function (done) {
+                cdnManager.flux(StartDate, EndDate, Granularity, Domains, function (err, ret) {
+                    should.not.exist(err);
+                    done();
+                })
+            })
+        });
+
+        describe('fs.CdnManager#logList()', function () {
+            it('',function (done) {
+                cdnManager.logList(Day, Domains, function (err, ret) {
+                    should.not.exist(err);
+                    done();
+                })
+            })
+        });
+    });
 });
-});
+
+
