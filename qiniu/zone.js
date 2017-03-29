@@ -44,10 +44,11 @@ exports.up_host = function (uptoken, conf){
         //判断设置使用的协议, 默认使用http
         if(conf.SCHEME == 'http'){
             conf.UP_HOST = json_str.http.up[1];
+            conf.IO_HOST = json_str.http.io[0];
         }else{
             conf.UP_HOST = json_str.https.up[0];
+            conf.IO_HOST = json_str.https.io[0];
         }
-
         conf.EXPIRE = 86400 + new Date().getTime(); 
 
     }else{
