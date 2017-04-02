@@ -64,10 +64,12 @@ function pfop(bucket, key, fops, opts, onret) {
   if (opts.notifyURL) {
     param.notifyURL = opts.notifyURL;
   } else {
-    param.notifyURL = 'www.test.com';
+    param.notifyURL = undefined;
   }
   if (opts.force) {
-    param.force = 1;
+    param.force = opts.force;
+  } else {
+    param.force = 0;
   }
   if (opts.pipeline) {
     param.pipeline = opts.pipeline;
