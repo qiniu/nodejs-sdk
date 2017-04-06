@@ -88,7 +88,7 @@ describe('test start step2:', function() {
 
       describe('rs.Client#deleteAfterDays()', function () {
         it('delete logo5.png after 1 day', function (done) {
-          client.deleteAfterDays(TEST_BUCKET, logo5, 1, function (err, ret) {
+          client.deleteAfterDays(TEST_BUCKET, logo, 1, function (err, ret) {
             should.not.exist(err);
             done();
           });
