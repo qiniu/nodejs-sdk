@@ -2,11 +2,11 @@ var qiniu = require('../');
 var should = require('should');
 var path = require('path');
 
-qiniu.conf.ACCESS_KEY = "QWYn5TFQsLLU1pL5MFEmX3s5DmHdUThav9WyOWOm";
-qiniu.conf.SECRET_KEY = "Bxckh6FA-Fbs9Yt3i3cbKVK22UPBmAOHJcL95pGz";
+qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
+qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
 
-var TEST_BUCKET = "nodesdk";
-var TEST_DOMAIN = "nodesdk.qiniudn.com";
+var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
+var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
 var imageFile = path.join(__dirname, 'logo.png');
 
 var logo  = Math.random() + 'logo.png';
@@ -45,7 +45,6 @@ describe('test start step2:', function() {
           should.not.exist(err);
           done();
         });
-
 
       });
 
@@ -89,7 +88,7 @@ describe('test start step2:', function() {
 
       describe('rs.Client#deleteAfterDays()', function () {
         it('delete logo5.png after 1 day', function (done) {
-          client.deleteAfterDays(TEST_BUCKET, logo, 1, function (err, ret) {
+          client.deleteAfterDays(TEST_BUCKET, logo5, 1, function (err, ret) {
             should.not.exist(err);
             done();
           });
