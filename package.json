@@ -59,7 +59,7 @@
     "formstream": "0.0.7",
     "crc32": "0.2.2",
     "urllib": "0.5.1",
-    "sync-request":"3.0.1"
+    "then-request":"2.2.0"
   },
   "devDependencies": {
     "should": "1.2.2",
