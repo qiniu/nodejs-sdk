@@ -12,5 +12,6 @@ module.exports = {
   conf: require(libpath + '/conf.js'),
   rpc: require(libpath + '/rpc.js'),
   util: require(libpath + '/util.js'),
-  zone: require(libpath + '/zone.js')
+  zone: require(libpath + '/zone.js'),
+  up: require(libpath + '/up.js')
 };
