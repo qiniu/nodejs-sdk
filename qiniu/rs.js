@@ -1,7 +1,6 @@
 var url = require('url');
 var crypto = require('crypto');
 var formstream = require('formstream');
-var querystring = require('querystring');
 var rpc = require('./rpc');
 var conf = require('./conf');
 var util = require('./util');
@@ -38,6 +37,13 @@ Client.prototype.remove = function(bucket, key, onret) {
    * */
   var encodedEntryUri = getEncodedEntryUri(bucket, key);
   var uri = conf.RS_HOST + '/delete/' + encodedEntryUri;
+  var digest = util.generateAccessToken(uri, null);
+  rpc.postWithoutForm(uri, digest, onret);
+}
+
+Client.prototype.deleteAfterDays = function(bucket, key, days, onret) {
+  var encodedEntryUri = getEncodedEntryUri(bucket, key);
+  var uri = conf.RS_HOST + '/deleteAfterDays/' + encodedEntryUri + "/" + days;
   var digest = util.generateAccessToken(uri, null);
   rpc.postWithoutForm(uri, digest, onret);
 }
@@ -339,5 +345,5 @@ GetPolicy.prototype.makeRequest = function(baseUrl, mac) {
 // query like '-thumbnail', '?imageMogr2/thumbnail/960x' and so on
 function makeBaseUrl(domain, key, query) {
   key = new Buffer(key);
-  return (/^https?:\/\//.test(domain) ? domain : 'http://' + domain) + '/' + querystring.escape(key) + (query || '');
+  return (/^https?:\/\//.test(domain) ? domain : 'http://' + domain) + '/' + encodeURI(key) + (query || '');
 }
