@@ -95,6 +95,13 @@ Client.prototype.changeMime = function(bucket, key, mime, onret) {
   rpc.postWithoutForm(uri, digest, onret);
 }
 
+Client.prototype.changeType = function(bucket, key, fileType, onret) {
+    var encodedEntry = getEncodedEntryUri(bucket, key);
+    var uri = conf.RS_HOST + '/chtype/' + encodedEntry + '/type/' + fileType;
+    var digest = util.generateAccessToken(uri, null);
+    rpc.postWithoutForm(uri, digest, onret);
+}
+
 Client.prototype.fetch = function(url, bucket, key, onret) {
   var bucketUri = getEncodedEntryUri(bucket, key);
   var fetchUrl = util.urlsafeBase64Encode(url);
@@ -286,6 +293,7 @@ function PutPolicy2(putPolicyObj) {
   this.mimeLimit = putPolicyObj.mimeLimit || null;
 
   this.deleteAfterDays = putPolicyObj.deleteAfterDays || null;
+  this.fileType = putPolicyObj.fileType || null;
 
 }
 
@@ -303,7 +311,7 @@ PutPolicy2.prototype.token = function(mac) {
 
 PutPolicy2.prototype.getFlags = function() {
   var flags = {};
-  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit','fsizeMin', 'detectMime', 'mimeLimit', 'deleteAfterDays'];
+  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit','fsizeMin', 'detectMime', 'mimeLimit', 'deleteAfterDays', 'fileType'];
 
   for (var i = attrs.length - 1; i >= 0; i--) {
     if (this[attrs[i]] !== null) {
