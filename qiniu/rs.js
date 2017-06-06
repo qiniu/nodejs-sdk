@@ -98,7 +98,7 @@ Client.prototype.changeMime = function(bucket, key, mime, onret) {
 Client.prototype.changeType = function(bucket, key, fileType, onret) {
     var encodedEntry = getEncodedEntryUri(bucket, key);
     var uri = conf.RS_HOST + '/chtype/' + encodedEntry + '/type/' + fileType;
-    var digest = util.generateAccessToken(uri, nil);
+    var digest = util.generateAccessToken(uri, null);
     rpc.postWithoutForm(uri, digest, onret);
 }
 
