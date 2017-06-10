@@ -5,7 +5,8 @@ var rpc = require('./rpc');
 var conf = require('./conf');
 var util = require('./util');
 var Mac = require('./auth/digest').Mac;
-
+var zone = require('./zone');
+var conf = require('./conf');
 
 exports.Client = Client;
 exports.Entry = Entry;
@@ -98,9 +99,15 @@ Client.prototype.changeMime = function(bucket, key, mime, onret) {
 Client.prototype.fetch = function(url, bucket, key, onret) {
   var bucketUri = getEncodedEntryUri(bucket, key);
   var fetchUrl = util.urlsafeBase64Encode(url);
-  var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
+
+    zone.fetch_host(bucket, conf, function (err) {
+        if(err) {
+            throw err;
+        }
+        var uri =  conf.IO_HOST + '/fetch/' + fetchUrl + '/to/' + bucketUri;
+        var digest = util.generateAccessToken(uri, null);
+        rpc.postWithoutForm(uri, digest, onret);
+    });
 }
 
 function Entry(hash, fsize, putTime, mimeType, endUser) {
