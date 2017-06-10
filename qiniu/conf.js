@@ -22,3 +22,4 @@ exports.SCHEME = 'http'; // 上传使用的协议
 exports.AUTOZONE = true; // 自动获取不同机房空间的上传域名
 exports.BUCKET = null ; // 上传空间
 exports.EXPIRE = 0;
+exports.IO_HOST = 'http://iovip.qbox.me';

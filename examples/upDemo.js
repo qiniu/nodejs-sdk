@@ -1,12 +1,20 @@
-var qiniu = require('qiniu');
+var qiniu = require('../');
 
 // 初始化ak,sk
-qiniu.conf.ACCESS_KEY = 'ACCESS_KEY';
-qiniu.conf.SECRET_KEY = 'SECRET_KEY';
+qiniu.conf.ACCESS_KEY = 'FMVCRs2-LO1ivRNi4l7mEZE6ZDvPv-519D12kZCO';
+qiniu.conf.SECRET_KEY = 'InOXBls8alaPiRcFn002XsoXKFw1iFJZxcoOvAeY';
 
 //上传策略 http://developer.qiniu.com/article/developer/security/put-policy.html
 // bucket:key 空间名:文件名
-var putPolicy = new qiniu.rs.PutPolicy2(new policy('bucket:key'));
+var policy = {
+  scope : 'uploadtest'
+};
+
+var key = null;
+
+var filePath = '../gopher.png';
+
+var putPolicy = new qiniu.rs.PutPolicy2(policy);
 
 var token = putPolicy.token();
 
@@ -25,4 +33,6 @@ qiniu.io.putFile(token,key,filePath ,null,function(err, ret) {
       // http://developer.qiniu.com/docs/v6/api/reference/codes.html
     }
   });
+
+
 
