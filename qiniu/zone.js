@@ -1,7 +1,7 @@
-var request = require('sync-request');
+var request = require('then-request');
 
 //conf 为全局变量
-exports.up_host = function (uptoken, conf){
+exports.up_host = function (uptoken, conf, cb){
 
     var version = process.versions;
     var num = version.node.split(".")[0];
@@ -12,7 +12,7 @@ exports.up_host = function (uptoken, conf){
     }
 
     if(!conf.AUTOZONE){
-        return;
+        return cb(null);
     }
 
     var ak = uptoken.toString().split(":")[0];
@@ -25,37 +25,43 @@ exports.up_host = function (uptoken, conf){
 
     // bucket 相同，上传域名仍在过期时间内
     if((new Date().getTime() < conf.EXPIRE) && bucket == conf.BUCKET){
-        return;
+      return cb(null);
     }
-    
+
     //记录bucket名
     conf.BUCKET = bucket;
 
-    var res = request('GET', 'http://uc.qbox.me/v1/query?ak=' + ak + '&bucket=' + bucket, {
+    request('GET', 'http://uc.qbox.me/v1/query?ak=' + ak + '&bucket=' + bucket, {
       'headers': {
         'Content-Type': 'application/json'
       }
-    });
+    }, function(error, res){
+      if (error) {
+        return cb(error);
+      }
 
-    if(res.statusCode == 200){
-        
+      if(res.statusCode == 200){
+
         var json_str = JSON.parse(res.body.toString());
 
         //判断设置使用的协议, 默认使用http
         if(conf.SCHEME == 'http'){
-            conf.UP_HOST = json_str.http.up[1];
+          conf.UP_HOST = json_str.http.up[1];
         }else{
-            conf.UP_HOST = json_str.https.up[0];
+          conf.UP_HOST = json_str.https.up[0];
         }
 
-        conf.EXPIRE = 86400 + new Date().getTime(); 
+        conf.EXPIRE = 86400 + new Date().getTime();
 
-    }else{
+        cb(null);
+
+      }else{
         var err = new Error('Server responded with status code ' + res.statusCode + ':\n' + res.body.toString());
         err.statusCode = res.statusCode;
         err.headers = res.headers;
         err.body = res.body;
-        throw err;
-    }
 
-}
+        cb(err);
+      }
+    });
+};
