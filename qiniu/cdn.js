@@ -1,9 +1,9 @@
-var url = require('url');
-var crypto = require('crypto');
-var urllib = require('urllib');
-var util = require('./util');
-var request = require('request');
-var urlencode = require('urlencode');
+const url = require('url');
+const crypto = require('crypto');
+const urllib = require('urllib');
+const util = require('./util');
+const request = require('request');
+const urlencode = require('urlencode');
 
 // 获取域名日志下载链接
 // @link http://developer.qiniu.com/article/fusion/api/log.html

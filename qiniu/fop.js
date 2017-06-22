@@ -1,80 +1,56 @@
-var util = require('./util');
-var rpc = require('./rpc');
-var conf = require('./conf');
+const util = require('./util');
+const rpc = require('./rpc');
+const conf = require('./conf');
+const querystring = require('querystring');
 
-var querystring = require('querystring');
-
-exports.ImageView = ImageView;
-exports.ImageInfo = ImageInfo;
-exports.Exif = Exif;
 exports.pfop = pfop;
+exports.prefop = prefop;
 
-function ImageView(mode, width, height, quality, format) {
-  this.mode = mode || 1;
-  this.width = width || 0;
-  this.height = height || 0;
-  this.quality = quality || 0;
-  this.format = format || null;
-}
+// 发送持久化数据处理请求
+// @param bucket - 空间名称
+// @param key  - 文件名称
+// @param fops - 处理指令集合
+// @param pipeline - 处理队列名称
+// @param options - 可选参数
+//                  notifyURL 回调业务服务器，通知处理结果
+//                  force     结果是否强制覆盖已有的同名文件
+// @param callbackFunc(err, respBody, respInfo) - 回调函数
+function pfop(bucket, key, fops, pipeline, options, callbackFunc) {
+  options = options || {};
 
-ImageView.prototype.makeRequest = function(url) {
-  url += '?imageView2/' + this.mode;
-
-  if (this.width > 0) {
-    url += '/w/' + this.width;
-  }
-
-  if (this.height > 0) {
-    url += '/h/' + this.height;
-  }
-
-  if (this.quality > 0) {
-    url += '/q/' + this.quality;
-  }
-
-  if (this.format) {
-    url += '/format/' + this.format;
-  }
-
-  return url;
-}
-
-function ImageInfo() {}
-
-ImageInfo.prototype.makeRequest = function(url) {
-  return url + '?imageInfo'
-}
-
-function Exif() {}
-
-Exif.prototype.makeRequest = function(url) {
-  return url + '?exif'
-}
-
-
-function pfop(bucket, key, fops, opts, onret) {
-
-  opts = opts || {};
-
-  param = {
+  //必须参数
+  var reqParams = {
     bucket: bucket,
     key: key,
-    fops: fops
+    pipeline: pipeline,
+    fops: fops.join(";"),
   };
-  if (opts.notifyURL) {
-    param.notifyURL = opts.notifyURL;
-  } else {
-    param.notifyURL = 'www.test.com';
-  }
-  if (opts.force) {
-    param.force = 1;
-  }
-  if (opts.pipeline) {
-    param.pipeline = opts.pipeline;
+
+  //notifyURL
+  if (options.notifyURL) {
+    reqParams.notifyURL = options.notifyURL;
   }
 
-  var uri = conf.API_HOST + '/pfop/';
-  var body = querystring.stringify(param);
-  var auth = util.generateAccessToken(uri, body);
-  rpc.postWithForm(uri, body, auth, onret);
+  //force
+  if (options.force) {
+    reqParams.force = 1;
+  }
+
+  var requestURI = conf.API_HOST + '/pfop/';
+  var reqBody = querystring.stringify(reqParams);
+  var auth = util.generateAccessToken(requestURI, reqBody);
+  rpc.postWithForm(requestURI, reqBody, auth, callbackFunc);
+}
+
+// 查询持久化数据处理进度
+// @param persistentId
+// @callbackFunc(err, respBody, respInfo) - 回调函数
+function prefop(persistentId, callbackFunc) {
+  var requestURI = conf.API_HOST + "/status/get/prefop";
+  var reqParams = {
+    id: persistentId
+  };
+  var reqBody = querystring.stringify(reqParams);
+  var auth = util.generateAccessToken(requestURI, reqBody);
+  rpc.postWithForm(requestURI, reqBody, auth, callbackFunc);
 }

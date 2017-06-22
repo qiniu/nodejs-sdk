@@ -10,14 +10,14 @@ function postMultipart(uri, form, onret) {
   return post(uri, form, form.headers(), onret);
 }
 
-function postWithForm(uri, form, token, onret) {
+function postWithForm(uri, form, token, callbackFunc) {
   var headers = {
     'Content-Type': 'application/x-www-form-urlencoded'
   };
   if (token) {
     headers['Authorization'] = token;
   }
-  return post(uri, form, headers, onret);
+  return post(uri, form, headers, callbackFunc);
 }
 
 function postWithoutForm(uri, token, onret) {
@@ -30,7 +30,7 @@ function postWithoutForm(uri, token, onret) {
   return post(uri, null, headers, onret);
 }
 
-function post(uri, form, headers, onresp) {
+function post(uri, form, headers, callbackFunc) {
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
 
@@ -49,14 +49,16 @@ function post(uri, form, headers, onresp) {
     data.headers['Content-Length'] = 0;
   };
 
-  var req = urllib.request(uri, data, function(err, result, res) {
-    var rerr = null;
-    if (err || Math.floor(res.statusCode/100) !== 2) {
-      rerr = {code: res&&res.statusCode||-1, error: err||result&&result.error||''};
+  var req = urllib.request(uri, data, function(err, respBody, respInfo) {
+    var respErr = null;
+    if (err || Math.floor(respInfo.statusCode / 100) !== 2) {
+      respErr = {
+        code: respInfo && respInfo.statusCode || -1,
+        error: err || respBody && respBody.error || ''
+      };
     }
-    onresp(rerr, result, res);
+    callbackFunc(respErr, respBody, respInfo);
   });
 
   return req;
 }
-
