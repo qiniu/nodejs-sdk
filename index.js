@@ -1,16 +1,16 @@
-
-var libpath = process.env.QINIU_COV ? './lib-cov' : './qiniu';
+var libPath = process.env.QINIU_COV ? './lib-cov' : './qiniu';
 
 module.exports = {
   auth: {
-    digest: require(libpath + '/auth' + '/digest.js')
+    digest: require(libPath + '/auth' + '/digest.js')
   },
-  io: require(libpath + '/io.js'),
-  rs: require(libpath + '/rs.js'),
-  rsf: require(libpath + '/rsf.js'),
-  fop: require(libpath + '/fop.js'),
-  conf: require(libpath + '/conf.js'),
-  rpc: require(libpath + '/rpc.js'),
-  util: require(libpath + '/util.js'),
-  zone: require(libpath + '/zone.js')
+  cdn: require(libPath + "/cdn.js"),
+  io: require(libPath + '/io.js'),
+  rs: require(libPath + '/rs.js'),
+  rsf: require(libPath + '/rsf.js'),
+  fop: require(libPath + '/fop.js'),
+  conf: require(libPath + '/conf.js'),
+  rpc: require(libPath + '/rpc.js'),
+  util: require(libPath + '/util.js'),
+  zone: require(libPath + '/zone.js')
 };
