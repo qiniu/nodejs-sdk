@@ -18,6 +18,7 @@ const BLOCK_SIZE = 4 * 1024 * 1024; //4MB, never change
 exports.FormMimeUrl = "application/x-www-form-urlencoded";
 exports.FormMimeJson = "application/json";
 exports.FormMimeRaw = "application/octet-stream";
+exports.RS_HOST = "http://rs.qiniu.com";
 
 exports.Config = function Config(options) {
   options = options || {};

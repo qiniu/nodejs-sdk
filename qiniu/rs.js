@@ -54,8 +54,8 @@ BucketManager.prototype.stat = function(bucket, key, callbackFunc) {
 
 function statReq(mac, config, bucket, key, callbackFunc) {
   var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var encodedEntryURI = util.encodedEntry(bucket, key);
-  var requestURI = scheme + config.zone.rsHost + '/stat/' + encodedEntryURI;
+  var statOp = exports.statOp(bucket, key);
+  var requestURI = scheme + config.zone.rsHost + statOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -102,11 +102,8 @@ BucketManager.prototype.changeMime = function(bucket, key, newMime,
 
 function changeMimeReq(mac, config, bucket, key, newMime, callbackFunc) {
   var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var encodedEntryURI = util.encodedEntry(bucket, key);
-  var encodedMime = util.urlsafeBase64Encode(newMime);
-
-  var requestURI = scheme + config.zone.rsHost + '/chgm/' + encodedEntryURI +
-    '/mime/' + encodedMime;
+  var changeMimeOp = exports.changeMimeOp(bucket, key, newMime);
+  var requestURI = scheme + config.zone.rsHost + changeMimeOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -157,16 +154,9 @@ BucketManager.prototype.move = function(srcBucket, srcKey, destBucket, destKey,
 
 function moveReq(mac, config, srcBucket, srcKey, destBucket, destKey,
   options, callbackFunc) {
-  options = options || {};
   var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
-  var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
-  var requestURI = scheme + config.zone.rsHost + '/move/' +
-    encodedEntryURISrc + '/' + encodedEntryURIDest;
-  //check force
-  if (options.force) {
-    requestURI += "/force/true";
-  }
+  var moveOp = exports.moveOp(srcBucket, srcKey, destBucket, destKey, options);
+  var requestURI = scheme + config.zone.rsHost + moveOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -219,14 +209,8 @@ function copyReq(mac, config, srcBucket, srcKey, destBucket, destKey,
   options, callbackFunc) {
   options = options || {};
   var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
-  var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
-  var requestURI = scheme + config.zone.rsHost + '/copy/' +
-    encodedEntryURISrc + '/' + encodedEntryURIDest;
-  //check force
-  if (options.force) {
-    requestURI += "/force/true";
-  }
+  var copyOp = exports.copyOp(srcBucket, srcKey, destBucket, destKey, options);
+  var requestURI = scheme + config.zone.rsHost + copyOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -270,8 +254,8 @@ BucketManager.prototype.delete = function(bucket, key, callbackFunc) {
 
 function deleteReq(mac, config, bucket, key, callbackFunc) {
   var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var encodedEntryURI = util.encodedEntry(bucket, key);
-  var requestURI = scheme + config.zone.rsHost + '/delete/' + encodedEntryURI;
+  var deleteOp = exports.deleteOp(bucket, key);
+  var requestURI = scheme + config.zone.rsHost + deleteOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -319,9 +303,8 @@ BucketManager.prototype.deleteAfterDays = function(bucket, key, days,
 
 function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
   var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var encodedEntryURI = util.encodedEntry(bucket, key);
-  var requestURI = scheme + config.zone.rsHost + '/deleteAfterDays/' +
-    encodedEntryURI + "/" + days;
+  var deleteAfterDaysOp = exports.deleteAfterDaysOp(bucket, key, days);
+  var requestURI = scheme + config.zone.rsHost + deleteAfterDaysOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -461,9 +444,8 @@ BucketManager.prototype.changeType = function(bucket, key, newType,
 
 function changeTypeReq(mac, config, bucket, key, newType, callbackFunc) {
   var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var encodedEntryURI = util.encodedEntry(bucket, key);
-  var requestURI = scheme + config.zone.rsHost + '/chtype/' + encodedEntryURI +
-    '/type/' + newType;
+  var changeTypeOp = exports.changeTypeOp(bucket, key, newType);
+  var requestURI = scheme + config.zone.rsHost + changeTypeOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -578,4 +560,62 @@ function listPrefixReq(mac, config, bucket, options, callbackFunc) {
 
   var auth = util.generateAccessToken(mac, requestURI, null);
   rpc.postWithForm(requestURI, null, auth, callbackFunc);
+}
+
+// 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
+BucketManager.prototype.batch = function(operations, callbackFunc) {
+  var requestURI = conf.RS_HOST + "/batch";
+  var reqParams = {
+    op: operations,
+  };
+  var reqBody = querystring.stringify(reqParams);
+  var digest = util.generateAccessToken(this.mac, requestURI, reqBody);
+  rpc.postWithForm(requestURI, reqBody, digest, callbackFunc);
+}
+
+// 批量操作支持的指令构造器
+exports.statOp = function(bucket, key) {
+  return "/stat/" + util.encodedEntry(bucket, key);
+}
+
+exports.deleteOp = function(bucket, key) {
+  return "/delete/" + util.encodedEntry(bucket, key);
+}
+
+exports.deleteAfterDaysOp = function(bucket, key, days) {
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  return '/deleteAfterDays/' + encodedEntryURI + "/" + days;
+}
+
+exports.changeMimeOp = function(bucket, key, newMime) {
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var encodedMime = util.urlsafeBase64Encode(newMime);
+  return '/chgm/' + encodedEntryURI + '/mime/' + encodedMime;
+}
+
+exports.changeTypeOp = function(bucket, key, newType) {
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  return '/chtype/' + encodedEntryURI + '/type/' + newType;
+}
+
+exports.moveOp = function(srcBucket, srcKey, destBucket, destKey, options) {
+  options = options || {};
+  var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
+  var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
+  var op = "/move/" + encodedEntryURISrc + "/" + encodedEntryURIDest;
+  if (options.force) {
+    op += "/force/true";
+  }
+  return op;
+}
+
+exports.copyOp = function(srcBucket, srcKey, destBucket, destKey, options) {
+  options = options || {};
+  var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
+  var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
+  var op = "/copy/" + encodedEntryURISrc + "/" + encodedEntryURIDest;
+  if (options.force) {
+    op += "/force/true";
+  }
+  return op;
 }
