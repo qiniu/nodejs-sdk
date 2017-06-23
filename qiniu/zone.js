@@ -16,7 +16,7 @@ exports.Zone_z0 = new conf.Zone([
   'api.qiniu.com');
 
 //huabei
-exports.Zone_z1 = conf.Zone([
+exports.Zone_z1 = new conf.Zone([
     'up-z1.qiniup.com',
   ], [
     'upload-z1.qiniup.com',
@@ -25,7 +25,7 @@ exports.Zone_z1 = conf.Zone([
   'api-z1.qiniu.com');
 
 //huanan
-exports.Zone_z2 = conf.Zone([
+exports.Zone_z2 = new conf.Zone([
     'up-z2.qiniup.com',
     'up-gz.qiniup.com',
     'up-fs.qiniup.com'
@@ -39,7 +39,7 @@ exports.Zone_z2 = conf.Zone([
 
 
 //beimei
-exports.Zone_na0 = conf.Zone([
+exports.Zone_na0 = new conf.Zone([
     'up-na0.qiniup.com',
   ], [
     'upload-na0.qiniup.com',
