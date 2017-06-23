@@ -12,6 +12,10 @@ exports.isTimestampExpired = function(timestamp) {
   return timestamp > parseInt(Date.now() / 1000);
 }
 
+exports.encodedEntry = function(bucket, key) {
+  return exports.urlsafeBase64Encode(bucket + (key ? ':' + key : ''));
+}
+
 exports.urlsafeBase64Encode = function(jsonFlags) {
   var encoded = new Buffer(jsonFlags).toString('base64');
   return exports.base64ToUrlSafe(encoded);

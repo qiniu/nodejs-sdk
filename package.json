@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "6.1.14",
+  "version": "7.1.0",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {
@@ -33,24 +33,19 @@
     "web-service"
   ],
   "author": "sdk@qiniu.com",
-  "contributors": [
-    {
-      "name": "Xu Shiwei",
-      "email": "xushiweizh@gmail.com"
-    },
-    {
-      "name": "why404",
-      "email": "awhy.xu@gmail.com"
-    },
-    {
-      "name": "ikbear",
-      "email": "sunikbear@gmail.com"
-    },
-    {
-      "name": "lintianzhi",
-      "email": "lintianzhi1992@gmail.com"
-    }
-  ],
+  "contributors": [{
+    "name": "Xu Shiwei",
+    "email": "xushiweizh@gmail.com"
+  }, {
+    "name": "why404",
+    "email": "awhy.xu@gmail.com"
+  }, {
+    "name": "ikbear",
+    "email": "sunikbear@gmail.com"
+  }, {
+    "name": "lintianzhi",
+    "email": "lintianzhi1992@gmail.com"
+  }],
   "engines": [
     "node >= 0.4.7"
   ],
@@ -59,7 +54,7 @@
     "formstream": "0.0.7",
     "crc32": "0.2.2",
     "urllib": "0.5.1",
-    "then-request":"2.2.0"
+    "then-request": "2.2.0"
   },
   "devDependencies": {
     "should": "1.2.2",

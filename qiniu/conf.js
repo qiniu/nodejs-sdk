@@ -39,11 +39,13 @@ exports.Config = function Config(options) {
   this.zoneExpire = options.zoneExpire || -1;
 }
 
-exports.Zone = function(srcUpHosts, cdnUpHosts, ioHost, rsHost, apiHost) {
+exports.Zone = function(srcUpHosts, cdnUpHosts, ioHost, rsHost, rsfHost,
+  apiHost) {
   this.srcUpHosts = srcUpHosts || {};
   this.cdnUpHosts = cdnUpHosts || {};
   this.ioHost = ioHost || "";
   this.rsHost = rsHost || "rs.qiniu.com";
+  this.rsfHost = rsfHost || "rsf.qiniu.com";
   this.apiHost = apiHost || "api.qiniu.com";
   var dotIndex = this.ioHost.indexOf(".");
   if (dotIndex != -1) {
@@ -53,20 +55,24 @@ exports.Zone = function(srcUpHosts, cdnUpHosts, ioHost, rsHost, apiHost) {
       var zoneTag = ioTag.substring(zoneSepIndex + 1);
       switch (zoneTag) {
         case "z1":
-          this.apiHost = "api-z1.qiniu.com";
           this.rsHost = "rs-z1.qiniu.com";
+          this.rsfHost = "rsf-z1.qiniu.com";
+          this.apiHost = "api-z1.qiniu.com";
           break;
         case "z2":
-          this.apiHost = "api-z2.qiniu.com";
           this.rsHost = "rs-z2.qiniu.com";
+          this.rsfHost = "rsf-z2.qiniu.com";
+          this.apiHost = "api-z2.qiniu.com";
           break;
         case "na0":
-          this.apiHost = "api-na0.qiniu.com";
           this.rsHost = "rs-na0.qiniu.com";
+          this.rsfHost = "rsf-na0.qiniu.com";
+          this.apiHost = "api-na0.qiniu.com";
           break;
         default:
-          this.apiHost = "api.qiniu.com";
           this.rsHost = "rs.qiniu.com";
+          this.rsfHost = "rsf.qiniu.com";
+          this.apiHost = "api.qiniu.com";
           break;
       }
     }

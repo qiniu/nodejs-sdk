@@ -1,357 +1,581 @@
-var url = require('url');
-var crypto = require('crypto');
-var formstream = require('formstream');
-var rpc = require('./rpc');
-var conf = require('./conf');
-var util = require('./util');
-var Mac = require('./auth/digest').Mac;
+const url = require('url');
+const crypto = require('crypto');
+const formstream = require('formstream');
+const rpc = require('./rpc');
+const conf = require('./conf');
+const digest = require('./auth/digest');
+const util = require('./util');
+const zone = require('./zone');
+const querystring = require('querystring');
 
+exports.BucketManager = BucketManager;
 
-exports.Client = Client;
-exports.Entry = Entry;
-exports.EntryPath = EntryPath;
-exports.EntryPathPair = EntryPathPair;
-exports.BatchItemRet = BatchItemRet;
-exports.BatchStatItemRet = BatchStatItemRet;
-
-exports.PutPolicy = PutPolicy;
-exports.PutPolicy2 = PutPolicy2;
-exports.GetPolicy = GetPolicy;
-exports.makeBaseUrl = makeBaseUrl;
-
-function Client(client) {
-  this.client = client || null;
+function BucketManager(mac, config) {
+  this.mac = mac || new digest.Mac();
+  this.config = config || new conf.Config();
 }
 
-Client.prototype.stat = function(bucket, key, onret) {
-  var encodedEntryUri = getEncodedEntryUri(bucket, key);
-  var uri = conf.RS_HOST + '/stat/' + encodedEntryUri;
-  var digest = util.generateAccessToken(uri, null);
-
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.remove = function(bucket, key, onret) {
-  /*
-   * func (this Client) Delete(bucket, key string) (err error)
-   * */
-  var encodedEntryUri = getEncodedEntryUri(bucket, key);
-  var uri = conf.RS_HOST + '/delete/' + encodedEntryUri;
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.deleteAfterDays = function(bucket, key, days, onret) {
-  var encodedEntryUri = getEncodedEntryUri(bucket, key);
-  var uri = conf.RS_HOST + '/deleteAfterDays/' + encodedEntryUri + "/" + days;
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.move = function(bucketSrc, keySrc, bucketDest, keyDest, onret) {
-  var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
-  var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.forceMove = function(bucketSrc, keySrc, bucketDest, keyDest, force, onret) {
-
-  var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
-  var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+force;
-
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.copy = function(bucketSrc, keySrc, bucketDest, keyDest, onret) {
-  var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
-  var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-  var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
-
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.forceCopy = function(bucketSrc, keySrc, bucketDest, keyDest, force, onret) {
-
-    var encodedEntryURISrc = getEncodedEntryUri(bucketSrc, keySrc);
-    var encodedEntryURIDest = getEncodedEntryUri(bucketDest, keyDest);
-    var uri = conf.RS_HOST + '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest +'/force/'+force;
-
-    var digest = util.generateAccessToken(uri, null);
-    rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.changeMime = function(bucket, key, mime, onret) {
-
-  var encodedEntryURISrc = getEncodedEntryUri(bucket, key);
-  var encode_mime = util.urlsafeBase64Encode(mime);
-
-  var uri = conf.RS_HOST + '/chgm/' + encodedEntryURISrc + '/mime/' + encode_mime;
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.changeType = function(bucket, key, fileType, onret) {
-    var encodedEntry = getEncodedEntryUri(bucket, key);
-    var uri = conf.RS_HOST + '/chtype/' + encodedEntry + '/type/' + fileType;
-    var digest = util.generateAccessToken(uri, null);
-    rpc.postWithoutForm(uri, digest, onret);
-}
-
-Client.prototype.fetch = function(url, bucket, key, onret) {
-  var bucketUri = getEncodedEntryUri(bucket, key);
-  var fetchUrl = util.urlsafeBase64Encode(url);
-  var uri = 'http://iovip.qbox.me/fetch/' + fetchUrl + '/to/' + bucketUri;
-  var digest = util.generateAccessToken(uri, null);
-  rpc.postWithoutForm(uri, digest, onret);
-}
-
-function Entry(hash, fsize, putTime, mimeType, endUser) {
-  this.hash = hash || null;
-  this.fsize = fsize || null;
-  this.putTime = putTime || null;
-  this.mimeType = mimeType || null;
-  this.endUser = endUser || null;
-}
-
-// ----- batch  -------
-
-function EntryPath(bucket, key) {
-  this.bucket = bucket || null;
-  this.key = key || null;
-}
-
-EntryPath.prototype.encode = function() {
-  return getEncodedEntryUri(this.bucket, this.key);
-}
-
-EntryPath.prototype.toStr = function(op) {
-  return 'op=/' + op + '/' + getEncodedEntryUri(this.bucket, this.key) + '&';
-}
-
-function EntryPathPair(src, dest) {
-  this.src = src || null;
-  this.dest = dest || null;
-}
-
-EntryPathPair.prototype.toStr = function(op, force) {
-  if (typeof(force)=='undefined'){
-
-    return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '&';
-
-  }else{
-
-    return 'op=/' + op + '/' + this.src.encode() + '/' + this.dest.encode() + '/force/' + force + '&';
-  }
-}
-
-function BatchItemRet(error, code) {
-  this.error = error || null;
-  this.code = code || null;
-}
-
-function BatchStatItemRet(data, error, code) {
-  this.data = data;
-  this.error = error;
-  this.code = code;
-}
-
-Client.prototype.batchStat = function(entries, onret) {
-  fileHandle('stat', entries, onret);
-}
-
-Client.prototype.batchDelete = function(entries, onret) {
-  fileHandle('delete', entries, onret);
-}
-
-Client.prototype.batchMove = function(entries, onret) {
-  fileHandle('move', entries, onret);
-}
-
-Client.prototype.forceBatchMove = function(entries, force, onret) {
-
-  fileHandleForce('move', entries, force, onret);
-
-}
-
-Client.prototype.batchCopy = function(entries, onret) {
-  fileHandle('copy', entries, onret);
-}
-
-Client.prototype.forceBatchCopy = function(entries, force, onret) {
-
-  fileHandleForce('copy', entries, force, onret);
-
-}
-
-
-function fileHandle(op, entries, onret) {
-  var body = '';
-  for (var i in entries) {
-    body += entries[i].toStr(op);
-  }
-
-  var uri = conf.RS_HOST + '/batch';
-  var digest = util.generateAccessToken(uri, body);
-  rpc.postWithForm(uri, body, digest, onret);
-}
-
-function fileHandleForce(op, entries, force, onret) {
-  var body = '';
-  for (var i in entries) {
-    body += entries[i].toStr(op, force);
-  }
-
-  console.log(body);
-  var uri = conf.RS_HOST + '/batch';
-  var digest = util.generateAccessToken(uri, body);
-  rpc.postWithForm(uri, body, digest, onret);
-}
-
-function getEncodedEntryUri(bucket, key) {
-  return util.urlsafeBase64Encode(bucket + (key ? ':' + key : ''));
-}
-
-// ----- token --------
-// @gist PutPolicy
-function PutPolicy(scope, callbackUrl, callbackBody, returnUrl, returnBody, endUser, expires, persistentOps, persistentNotifyUrl) {
-  this.scope = scope || null;
-  this.callbackUrl = callbackUrl || null;
-  this.callbackBody = callbackBody || null;
-  this.returnUrl = returnUrl || null;
-  this.returnBody = returnBody || null;
-  this.endUser = endUser || null;
-  this.expires = expires || 3600;
-  this.persistentOps = persistentOps || null;
-  this.persistentNotifyUrl = persistentNotifyUrl || null;
-}
-// @endgist
-
-PutPolicy.prototype.token = function(mac) {
-  if (mac == null) {
-    mac = new Mac(conf.ACCESS_KEY, conf.SECRET_KEY);
-  }
-  var flags = this.getFlags();
-  var encodedFlags = util.urlsafeBase64Encode(JSON.stringify(flags));
-  var encoded = util.hmacSha1(encodedFlags, mac.secretKey);
-  var encodedSign = util.base64ToUrlSafe(encoded);
-  var uploadToken = mac.accessKey + ':' + encodedSign + ':' + encodedFlags;
-  return uploadToken;
-}
-
-PutPolicy.prototype.getFlags = function() {
-  var flags = {};
-  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit', 'detectMime', 'mimeLimit'];
-
-  for (var i = attrs.length - 1; i >= 0; i--) {
-    if (this[attrs[i]] !== null) {
-      flags[attrs[i]] = this[attrs[i]];
+// 获取资源信息
+// @link https://developer.qiniu.com/kodo/api/1308/stat
+// @param bucket 空间名称
+// @param key    文件名称
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.stat = function(bucket, key, callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
     }
   }
 
-  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
-
-  return flags;
-}
-
-function PutPolicy2(putPolicyObj) {
-
-  if (typeof putPolicyObj !== 'object') {
-    return false;
-  }
-
-  this.scope = putPolicyObj.scope || null;
-  this.expires = putPolicyObj.expires || 3600;
-  this.insertOnly = putPolicyObj.insertOnly || null;
-
-  this.saveKey = putPolicyObj.saveKey || null;
-  this.endUser = putPolicyObj.endUser || null;
-
-  this.returnUrl = putPolicyObj.returnUrl || null;
-  this.returnBody = putPolicyObj.returnBody || null;
-
-  this.callbackUrl = putPolicyObj.callbackUrl || null;
-  this.callbackHost = putPolicyObj.callbackHost || null;
-  this.callbackBody = putPolicyObj.callbackBody || null;
-  this.callbackBodyType = putPolicyObj.callbackBodyType || null;
-  this.callbackFetchKey = putPolicyObj.callbackFetchKey || null;
-
-  this.persistentOps = putPolicyObj.persistentOps || null;
-  this.persistentNotifyUrl = putPolicyObj.persistentNotifyUrl || null;
-  this.persistentPipeline = putPolicyObj.persistentPipeline || null;
-
-  this.fsizeLimit = putPolicyObj.fsizeLimit || null;
-
-  this.fsizeMin = putPolicyObj.fsizeMin || null;
-
-  this.detectMime = putPolicyObj.detectMime || null;
-
-  this.mimeLimit = putPolicyObj.mimeLimit || null;
-
-  this.deleteAfterDays = putPolicyObj.deleteAfterDays || null;
-  this.fileType = putPolicyObj.fileType || null;
-
-}
-
-PutPolicy2.prototype.token = function(mac) {
-  if (mac == null) {
-    mac = new Mac(conf.ACCESS_KEY, conf.SECRET_KEY);
-  }
-  var flags = this.getFlags();
-  var encodedFlags = util.urlsafeBase64Encode(JSON.stringify(flags));
-  var encoded = util.hmacSha1(encodedFlags, mac.secretKey);
-  var encodedSign = util.base64ToUrlSafe(encoded);
-  var uploadToken = mac.accessKey + ':' + encodedSign + ':' + encodedFlags;
-  return uploadToken;
-}
-
-PutPolicy2.prototype.getFlags = function() {
-  var flags = {};
-  var attrs = ['scope', 'insertOnly', 'saveKey', 'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost', 'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps', 'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit','fsizeMin', 'detectMime', 'mimeLimit', 'deleteAfterDays', 'fileType'];
-
-  for (var i = attrs.length - 1; i >= 0; i--) {
-    if (this[attrs[i]] !== null) {
-      flags[attrs[i]] = this[attrs[i]];
-    }
-  }
-
-  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
-
-  return flags;
-}
-
-function GetPolicy(expires) {
-  this.expires = expires || 3600;
-}
-
-GetPolicy.prototype.makeRequest = function(baseUrl, mac) {
-  if (!mac) {
-    mac = new Mac(conf.ACCESS_KEY, conf.SECRET_KEY);
-  }
-
-  var deadline = this.expires + Math.floor(Date.now() / 1000);
-
-  if (baseUrl.indexOf('?') >= 0) {
-    baseUrl += '&e=';
+  if (useCache) {
+    statReq(this.mac, this.config, bucket, key, callbackFunc);
   } else {
-    baseUrl += '?e=';
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      statReq(that.mac, that.config, bucket, key, callbackFunc);
+    });
   }
-  baseUrl += deadline;
-
-  var signature = util.hmacSha1(baseUrl, mac.secretKey);
-  var encodedSign = util.base64ToUrlSafe(signature);
-  var downloadToken = mac.accessKey + ':' + encodedSign;
-
-  return baseUrl + '&token=' + downloadToken;
 }
 
-// domain maybe 'http://hello.qiniu.com', 'https://hello.qiniu.com' and 'hello.qiniu.com'
-// query like '-thumbnail', '?imageMogr2/thumbnail/960x' and so on
-function makeBaseUrl(domain, key, query) {
-  key = new Buffer(key);
-  return (/^https?:\/\//.test(domain) ? domain : 'http://' + domain) + '/' + encodeURI(key) + (query || '');
+function statReq(mac, config, bucket, key, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var requestURI = scheme + config.zone.rsHost + '/stat/' + encodedEntryURI;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//  修改文件的类型
+// @link https://developer.qiniu.com/kodo/api/1252/chgm
+// @param bucket  空间名称
+// @param key     文件名称
+// @param newMime 新文件类型
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.changeMime = function(bucket, key, newMime,
+  callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    changeMimeReq(this.mac, this.config, bucket, key, newMime, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      changeMimeReq(that.mac, that.config, bucket, key, newMime,
+        callbackFunc);
+    });
+  }
+}
+
+function changeMimeReq(mac, config, bucket, key, newMime, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var encodedMime = util.urlsafeBase64Encode(newMime);
+
+  var requestURI = scheme + config.zone.rsHost + '/chgm/' + encodedEntryURI +
+    '/mime/' + encodedMime;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
+// @link https://developer.qiniu.com/kodo/api/1257/delete
+// @param srcBucket  源空间名称
+// @param srcKey     源文件名称
+// @param destBucket 目标空间名称
+// @param destKey    目标文件名称
+// @param options    可选参数
+//                   force 强制覆盖
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.move = function(srcBucket, srcKey, destBucket, destKey,
+  options, callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    moveReq(this.mac, this.config, srcBucket, srcKey, destBucket, destKey,
+      options, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, srcBucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      moveReq(that.mac, that.config, srcBucket, srcKey, destBucket,
+        destKey, options, callbackFunc);
+    });
+  }
+}
+
+function moveReq(mac, config, srcBucket, srcKey, destBucket, destKey,
+  options, callbackFunc) {
+  options = options || {};
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
+  var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
+  var requestURI = scheme + config.zone.rsHost + '/move/' +
+    encodedEntryURISrc + '/' + encodedEntryURIDest;
+  //check force
+  if (options.force) {
+    requestURI += "/force/true";
+  }
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 复制一个文件
+// @link https://developer.qiniu.com/kodo/api/1254/copy
+// @param srcBucket  源空间名称
+// @param srcKey     源文件名称
+// @param destBucket 目标空间名称
+// @param destKey    目标文件名称
+// @param options    可选参数
+//                   force 强制覆盖
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.copy = function(srcBucket, srcKey, destBucket, destKey,
+  options, callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    copyReq(this.mac, this.config, srcBucket, srcKey, destBucket, destKey,
+      options, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, srcBucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      copyReq(that.mac, that.config, srcBucket, srcKey, destBucket,
+        destKey, options, callbackFunc);
+    });
+  }
+}
+
+function copyReq(mac, config, srcBucket, srcKey, destBucket, destKey,
+  options, callbackFunc) {
+  options = options || {};
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
+  var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
+  var requestURI = scheme + config.zone.rsHost + '/copy/' +
+    encodedEntryURISrc + '/' + encodedEntryURIDest;
+  //check force
+  if (options.force) {
+    requestURI += "/force/true";
+  }
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 删除资源
+// @link https://developer.qiniu.com/kodo/api/1257/delete
+// @param bucket 空间名称
+// @param key    文件名称
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.delete = function(bucket, key, callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    deleteReq(this.mac, this.config, bucket, key, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      deleteReq(that.mac, that.config, bucket, key, callbackFunc);
+    });
+  }
+}
+
+function deleteReq(mac, config, bucket, key, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var requestURI = scheme + config.zone.rsHost + '/delete/' + encodedEntryURI;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+
+// 更新文件的生命周期
+// @link https://developer.qiniu.com/kodo/api/1732/update-file-lifecycle
+// @param bucket 空间名称
+// @param key    文件名称
+// @param days   有效期天数
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.deleteAfterDays = function(bucket, key, days,
+  callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    deleteAfterDaysReq(this.mac, this.config, bucket, key, days, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      deleteAfterDaysReq(that.mac, that.config, bucket, key, days,
+        callbackFunc);
+    });
+  }
+}
+
+function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var requestURI = scheme + config.zone.rsHost + '/deleteAfterDays/' +
+    encodedEntryURI + "/" + days;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 抓取资源
+// @link https://developer.qiniu.com/kodo/api/1263/fetch
+// @param resUrl 资源链接
+// @param bucket 空间名称
+// @param key    文件名称
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.fetch = function(resUrl, bucket, key, callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    fetchReq(this.mac, this.config, resUrl, bucket, key, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      fetchReq(that.mac, that.config, resUrl, bucket, key, callbackFunc);
+    });
+  }
+}
+
+function fetchReq(mac, config, resUrl, bucket, key, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var encodedResURL = util.urlsafeBase64Encode(resUrl);
+  var requestURI = scheme + config.zone.ioHost + '/fetch/' + encodedResURL +
+    '/to/' + encodedEntryURI;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 更新镜像副本
+// @link https://developer.qiniu.com/kodo/api/1293/prefetch
+// @param bucket 空间名称
+// @param key    文件名称
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.prefetch = function(bucket, key, callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    prefetchReq(this.mac, this.config, bucket, key, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      prefetchReq(that.mac, that.config, bucket, key, callbackFunc);
+    });
+  }
+}
+
+function prefetchReq(mac, config, bucket, key, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var requestURI = scheme + config.zone.ioHost + '/prefetch/' + encodedEntryURI;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 修改文件的存储类型
+// @link https://developer.qiniu.com/kodo/api/3710/modify-the-file-type
+// @param bucket  空间名称
+// @param key     文件名称
+// @param newType 新文件存储类型
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.changeType = function(bucket, key, newType,
+  callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    changeTypeReq(this.mac, this.config, bucket, key, newType, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      changeTypeReq(that.mac, that.config, bucket, key, newType,
+        callbackFunc);
+    });
+  }
+}
+
+function changeTypeReq(mac, config, bucket, key, newType, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var requestURI = scheme + config.zone.rsHost + '/chtype/' + encodedEntryURI +
+    '/type/' + newType;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+
+// 设置空间镜像源
+// @link https://developer.qiniu.com/kodo/api/1370/mirror
+// @param bucket 空间名称
+// @param srcSiteUrl 镜像源地址
+// @param srcHost 镜像Host
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+const PU_HOST = "http://pu.qbox.me:10200";
+BucketManager.prototype.image = function(bucket, srcSiteUrl, srcHost,
+  callbackFunc) {
+  var encodedSrcSite = util.urlsafeBase64Encode(srcSiteUrl);
+  var requestURI = PU_HOST + "/image/" + bucket + "/from/" + encodedSrcSite;
+  if (srcHost) {
+    var encodedHost = util.urlsafeBase64Encode(srcHost);
+    requestURI += "/host/" + encodedHost;
+  }
+  var digest = util.generateAccessToken(this.mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 取消设置空间镜像源
+// @link https://developer.qiniu.com/kodo/api/1370/mirror
+// @param bucket 空间名称
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.unimage = function(bucket, callbackFunc) {
+  var requestURI = PU_HOST + "/unimage/" + bucket;
+  var digest = util.generateAccessToken(this.mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// 获取指定前缀的文件列表
+// @link https://developer.qiniu.com/kodo/api/1284/list
+//
+// @param bucket 空间名称
+// @param options 列举操作的可选参数
+//                prefix    列举的文件前缀
+//                marker    上一次列举返回的位置标记，作为本次列举的起点信息
+//                limit     每次返回的最大列举文件数量
+//                delimiter 指定目录分隔符
+// @param callbackFunc(err, respBody, respInfo) - 回调函数
+BucketManager.prototype.listPrefix = function(bucket, options, callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    listPrefixReq(this.mac, this.config, bucket, options, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      listPrefixReq(that.mac, that.config, bucket, options, callbackFunc);
+    });
+  }
+}
+
+function listPrefixReq(mac, config, bucket, options, callbackFunc) {
+  options = options || {};
+  //必须参数
+  var reqParams = {
+    bucket: bucket,
+  };
+
+  if (options.prefix) {
+    reqParams.prefix = options.prefix;
+  } else {
+    reqParams.prefix = "";
+  }
+
+  console.log(typeof(options.limit));
+  if (options.limit >= 1 && options.limit <= 1000) {
+    reqParams.limit = options.limit;
+  } else {
+    reqParams.limit = 1000;
+  }
+
+  if (options.marker) {
+    reqParams.marker = options.marker;
+  } else {
+    reqParams.marker = "";
+  }
+
+  if (options.delimiter) {
+    reqParams.delimiter = options.delimiter;
+  } else {
+    reqParams.delimiter = "";
+  }
+
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var reqSpec = querystring.stringify(reqParams);
+  var requestURI = scheme + config.zone.rsfHost + '/list?' + reqSpec;
+
+  var auth = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithForm(requestURI, null, auth, callbackFunc);
 }
