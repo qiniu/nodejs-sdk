@@ -8,6 +8,9 @@ exports.isQiniuCallback = isQiniuCallback;
 
 // ------------------------------------------------------------------------------------------
 // func encode
+exports.isTimestampExpired = function(timestamp) {
+  return timestamp > parseInt(Date.now() / 1000);
+}
 
 exports.urlsafeBase64Encode = function(jsonFlags) {
   var encoded = new Buffer(jsonFlags).toString('base64');
@@ -21,7 +24,7 @@ exports.base64ToUrlSafe = function(v) {
 exports.hmacSha1 = function(encodedFlags, secretKey) {
   /*
    *return value already encoded with base64
-  * */
+   * */
   var hmac = crypto.createHmac('sha1', secretKey);
   hmac.update(encodedFlags);
   return hmac.digest('base64');
@@ -30,7 +33,7 @@ exports.hmacSha1 = function(encodedFlags, secretKey) {
 // ------------------------------------------------------------------------------------------
 // func generateAccessToken
 
-exports.generateAccessToken = function(uri, body) {
+exports.generateAccessToken = function(mac, uri, body) {
   var u = url.parse(uri);
   var path = u.path;
   var access = path + '\n';
@@ -39,12 +42,12 @@ exports.generateAccessToken = function(uri, body) {
     access += body;
   }
 
-  var digest = exports.hmacSha1(access, conf.SECRET_KEY);
+  var digest = exports.hmacSha1(access, mac.secretKey);
   var safeDigest = exports.base64ToUrlSafe(digest);
-  return 'QBox ' + conf.ACCESS_KEY + ':' + safeDigest;
+  return 'QBox ' + mac.accessKey + ':' + safeDigest;
 }
 
-function isQiniuCallback(path, body, callbackAuth) {
-  var auth = exports.generateAccessToken(path, body);
+function isQiniuCallback(mac, path, body, callbackAuth) {
+  var auth = exports.generateAccessToken(mac, path, body);
   return auth === callbackAuth;
 }

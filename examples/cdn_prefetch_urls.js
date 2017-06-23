@@ -1,18 +1,18 @@
 const qiniu = require("../index.js");
 const proc = require("process");
 
-//初始化ak,sk
-qiniu.conf.ACCESS_KEY = proc.env.QINIU_ACCESS_KEY;
-qiniu.conf.SECRET_KEY = proc.env.QINIU_SECRET_KEY;
 
 //URL 列表
 var urlsToPrefetch = [
   'http://if-pbl.qiniudn.com/nodejs.png',
   'http://if-pbl.qiniudn.com/qiniu.jpg'
 ];
-
+var accessKey = proc.env.QINIU_ACCESS_KEY;
+var secretKey = proc.env.QINIU_SECRET_KEY;
+var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+var cdnManager = new qiniu.cdn.CdnManager(mac);
 //预取链接
-qiniu.cdn.prefetchUrls(urlsToPrefetch, function(err, respBody, respInfo) {
+cdnManager.prefetchUrls(urlsToPrefetch, function(err, respBody, respInfo) {
   if (err) {
     throw err;
   }

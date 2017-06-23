@@ -1,8 +1,12 @@
 const qiniu = require("../index.js");
 
-var persistentId = 'z0.594b66f745a2650c99aa9e57';
+//var persistentId = 'z0.594b66f745a2650c99aa9e57';
+var persistentId = 'na0.58df4eee92129336c2075195';
+var config = new qiniu.conf.Config();
+config.useHttpsDomain = true;
+var operManager = new qiniu.fop.OperationManager(null, config);
 //持久化数据处理返回的是任务的persistentId，可以根据这个id查询处理状态
-qiniu.fop.prefop(persistentId, function(err, respBody, respInfo) {
+operManager.prefop(persistentId, function(err, respBody, respInfo) {
   if (err) {
     console.log(err);
     throw err;

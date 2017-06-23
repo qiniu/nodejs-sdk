@@ -9,7 +9,8 @@ var query = {
   'location': 'shanghai'
 };
 var deadline = parseInt(Date.now() / 1000) + 3600;
-var finalUrl = qiniu.cdn.createTimestampAntiLeechUrl(domain, fileName, query,
+var cdnManager = new qiniu.cdn.CdnManager(null);
+var finalUrl = cdnManager.createTimestampAntiLeechUrl(domain, fileName, query,
   encryptKey,
   deadline);
 console.log(finalUrl);

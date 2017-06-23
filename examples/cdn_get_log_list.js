@@ -1,10 +1,6 @@
 const qiniu = require("../index.js");
 const proc = require("process");
 
-//初始化ak,sk
-qiniu.conf.ACCESS_KEY = proc.env.QINIU_ACCESS_KEY;
-qiniu.conf.SECRET_KEY = proc.env.QINIU_SECRET_KEY;
-
 //域名列表
 var domains = [
   'if-pbl.qiniudn.com',
@@ -13,9 +9,13 @@ var domains = [
 
 //指定日期
 var logDay = '2017-06-20';
+var accessKey = proc.env.QINIU_ACCESS_KEY;
+var secretKey = proc.env.QINIU_SECRET_KEY;
+var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
 
+var cdnManager = new qiniu.cdn.CdnManager(mac);
 //获取域名日志
-qiniu.cdn.getCdnLogList(domains, logDay, function(err, respBody, respInfo) {
+cdnManager.getCdnLogList(domains, logDay, function(err, respBody, respInfo) {
   if (err) {
     throw err;
   }

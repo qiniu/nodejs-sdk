@@ -1,12 +1,16 @@
 const qiniu = require("../index.js");
 const proc = require("process");
 
-//初始化ak,sk
-qiniu.conf.ACCESS_KEY = proc.env.QINIU_ACCESS_KEY;
-qiniu.conf.SECRET_KEY = proc.env.QINIU_SECRET_KEY;
+var accessKey = proc.env.QINIU_ACCESS_KEY;
+var secretKey = proc.env.QINIU_SECRET_KEY;
+var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+var config = new qiniu.conf.Config();
+//config.useHttpsDomain = true;
+config.zone = qiniu.zone.Zone_z1;
+var operManager = new qiniu.fop.OperationManager(mac, config);
 
 //处理指令集合
-var saveBucket = 'if-pbl';
+var saveBucket = 'if-bc';
 var fops = [
   'avthumb/mp4/s/480x320/vb/150k|saveas/' + qiniu.util.urlsafeBase64Encode(
     saveBucket + ":qiniu_480x320.mp4"),
@@ -14,7 +18,7 @@ var fops = [
     ":qiniu_frame1.jpg")
 ];
 var pipeline = 'jemy';
-var srcBucket = 'if-pbl';
+var srcBucket = 'if-bc';
 var srcKey = 'qiniu.mp4';
 
 var options = {
@@ -23,11 +27,10 @@ var options = {
 };
 
 //持久化数据处理返回的是任务的persistentId，可以根据这个id查询处理状态
-qiniu.fop.pfop(srcBucket, srcKey, fops, pipeline, options, function(err,
+operManager.pfop(srcBucket, srcKey, fops, pipeline, options, function(err,
   respBody,
   respInfo) {
   if (err) {
-    console.log(err);
     throw err;
   }
 

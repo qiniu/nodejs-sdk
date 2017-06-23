@@ -2,8 +2,15 @@ const url = require('url');
 const crypto = require('crypto');
 const urllib = require('urllib');
 const util = require('./util');
+const digest = require('./auth/digest.js');
 const request = require('request');
 const urlencode = require('urlencode');
+
+exports.CdnManager = CdnManager;
+
+function CdnManager(mac) {
+  this.mac = mac || new digest.Mac();
+}
 
 // 获取域名日志下载链接
 // @link http://developer.qiniu.com/article/fusion/api/log.html
@@ -11,9 +18,9 @@ const urlencode = require('urlencode');
 // @param domains 域名列表 domains = ['obbid7qc6.qnssl.com','7xkh68.com1.z0.glb.clouddn.com']
 // @param logDay  日期，例如 2016-07-01
 // @param callbackFunc(err, respBody, respInfo)
-exports.getCdnLogList = function(domains, logDay, callbackFunc) {
+CdnManager.prototype.getCdnLogList = function(domains, logDay, callbackFunc) {
   var url = '/v2/tune/log/list\n';
-  var accessToken = util.generateAccessToken(url, '');
+  var accessToken = util.generateAccessToken(this.mac, url, '');
   var headers = {
     'Content-Type': 'application/json',
     'Authorization': accessToken,
@@ -35,10 +42,11 @@ exports.getCdnLogList = function(domains, logDay, callbackFunc) {
 // @param granularity 粒度，取值：5min／hour／day
 // @param domains     域名列表 domain = ['obbid7qc6.qnssl.com','obbid7qc6.qnssl.com'];
 // @param callbackFunc(err, respBody, respInfo)
-exports.getFluxData = function(startDate, endDate, granularity, domains,
+CdnManager.prototype.getFluxData = function(startDate, endDate, granularity,
+  domains,
   callbackFunc) {
   var url = '/v2/tune/flux\n';
-  var accessToken = util.generateAccessToken(url, '');
+  var accessToken = util.generateAccessToken(this.mac, url, '');
   var headers = {
     'Content-Type': 'application/json',
     'Authorization': accessToken,
@@ -61,10 +69,11 @@ exports.getFluxData = function(startDate, endDate, granularity, domains,
 // @param granularity 粒度，取值：5min／hour／day
 // @param domains   域名列表 domain = ['obbid7qc6.qnssl.com','obbid7qc6.qnssl.com']
 // @param callbackFunc(err, respBody, respInfo)
-exports.getBandwidthData = function(startDate, endDate, granularity, domains,
+CdnManager.prototype.getBandwidthData = function(startDate, endDate,
+  granularity, domains,
   callbackFunc) {
   var url = '/v2/tune/bandwidth\n';
-  var accessToken = util.generateAccessToken(url, '');
+  var accessToken = util.generateAccessToken(this.mac, url, '');
   var headers = {
     'Content-Type': 'application/json',
     'Authorization': accessToken,
@@ -85,12 +94,12 @@ exports.getBandwidthData = function(startDate, endDate, granularity, domains,
 //
 // @param 预取urls  urls = ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
 // @param callbackFunc(err, respBody, respInfo)
-exports.prefetchUrls = function(urls, callbackFunc) {
+CdnManager.prototype.prefetchUrls = function(urls, callbackFunc) {
   var postBody = {
     urls: urls
   };
   var url = '/v2/tune/prefetch\n';
-  var accessToken = util.generateAccessToken(url, '');
+  var accessToken = util.generateAccessToken(this.mac, url, '');
   var headers = {
     'Content-Type': 'application/json',
     'Authorization': accessToken,
@@ -103,7 +112,7 @@ exports.prefetchUrls = function(urls, callbackFunc) {
 // 刷新链接
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
 // 刷新urls  refreshUrls =  ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
-exports.refreshUrls = function(urls, callbackFunc) {
+CdnManager.prototype.refreshUrls = function(urls, callbackFunc) {
   exports.refreshUrlsAndDirs(urls, null, callbackFunc);
 }
 
@@ -112,18 +121,18 @@ exports.refreshUrls = function(urls, callbackFunc) {
 // 刷新目录列表，每次最多不可以超过10个目录, 刷新目录需要额外开通权限，可以联系七牛技术支持处理
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
 // 刷新dirs  refreshDirs =  ['http://obbid7qc6.qnssl.com/wo/','http://obbid7qc6.qnssl.com/']
-exports.refreshDirs = function(dirs, callbackFunc) {
+CdnManager.prototype.refreshDirs = function(dirs, callbackFunc) {
   exports.refreshUrlsAndDirs(null, dirs, callbackFunc);
 }
 
 
-exports.refreshUrlsAndDirs = function(urls, dirs, callbackFunc) {
+CdnManager.prototype.refreshUrlsAndDirs = function(urls, dirs, callbackFunc) {
   var postBody = {
     urls: urls,
     dirs: dirs,
   };
   var url = '/v2/tune/refresh\n';
-  var accessToken = util.generateAccessToken(url, '');
+  var accessToken = util.generateAccessToken(this.mac, url, '');
   var headers = {
     'Content-Type': 'application/json',
     'Authorization': accessToken,
@@ -150,8 +159,8 @@ function req(reqPath, header, reqBody, callbackFunc) {
 // @param  encryptKey 时间戳防盗链的签名密钥，从七牛后台获取
 // @param  deadline   链接的有效期时间戳，是以秒为单位的Unix时间戳
 // @return signedUrl  最终的带时间戳防盗链的url
-exports.createTimestampAntiLeechUrl = function(domain, fileName, query,
-  encryptKey, deadline) {
+CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
+  query, encryptKey, deadline) {
   if (query != null) {
     var arr = [];
     Object.getOwnPropertyNames(query).forEach(function(val, idx, array) {
