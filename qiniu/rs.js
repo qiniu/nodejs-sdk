@@ -9,6 +9,7 @@ const zone = require('./zone');
 const querystring = require('querystring');
 
 exports.BucketManager = BucketManager;
+exports.PutPolicy = PutPolicy;
 
 function BucketManager(mac, config) {
   this.mac = mac || new digest.Mac();
@@ -649,4 +650,112 @@ BucketManager.prototype.privateDownloadUrl = function(domain, fileName,
 // @return 公开下载链接
 BucketManager.prototype.publicDownloadUrl = function(domain, fileName) {
   return domain + "/" + encodeURI(fileName);
+}
+
+// 上传策略
+
+function PutPolicy2(options) {
+
+  if (typeof options !== 'object') {
+    return false;
+  }
+
+  this.scope = options.scope || null;
+  this.expires = options.expires || 3600;
+  this.insertOnly = options.insertOnly || null;
+
+  this.saveKey = options.saveKey || null;
+  this.endUser = options.endUser || null;
+
+  this.returnUrl = options.returnUrl || null;
+  this.returnBody = options.returnBody || null;
+
+  this.callbackUrl = options.callbackUrl || null;
+  this.callbackHost = options.callbackHost || null;
+  this.callbackBody = options.callbackBody || null;
+  this.callbackBodyType = options.callbackBodyType || null;
+  this.callbackFetchKey = options.callbackFetchKey || null;
+
+  this.persistentOps = options.persistentOps || null;
+  this.persistentNotifyUrl = options.persistentNotifyUrl || null;
+  this.persistentPipeline = options.persistentPipeline || null;
+
+  this.fsizeLimit = options.fsizeLimit || null;
+
+  this.fsizeMin = options.fsizeMin || null;
+
+  this.detectMime = options.detectMime || null;
+
+  this.mimeLimit = options.mimeLimit || null;
+
+  this.deleteAfterDays = options.deleteAfterDays || null;
+  this.fileType = options.fileType || null;
+
+}
+
+// 上传策略
+function PutPolicy(options) {
+  if (typeof options !== 'object') {
+    throw new Error('invalid putpolicy options');
+  }
+
+  this.scope = options.scope || null;
+  this.isPrefixalScope = options.isPrefixalScope || null;
+  this.expires = options.expires || 3600;
+  this.insertOnly = options.insertOnly || null;
+
+  this.saveKey = options.saveKey || null;
+  this.endUser = options.endUser || null;
+
+  this.returnUrl = options.returnUrl || null;
+  this.returnBody = options.returnBody || null;
+
+  this.callbackUrl = options.callbackUrl || null;
+  this.callbackHost = options.callbackHost || null;
+  this.callbackBody = options.callbackBody || null;
+  this.callbackBodyType = options.callbackBodyType || null;
+  this.callbackFetchKey = options.callbackFetchKey || null;
+
+  this.persistentOps = options.persistentOps || null;
+  this.persistentNotifyUrl = options.persistentNotifyUrl || null;
+  this.persistentPipeline = options.persistentPipeline || null;
+
+  this.fsizeLimit = options.fsizeLimit || null;
+  this.fsizeMin = options.fsizeMin || null;
+  this.mimeLimit = options.mimeLimit || null;
+
+  this.detectMime = options.detectMime || null;
+  this.deleteAfterDays = options.deleteAfterDays || null;
+  this.fileType = options.fileType || null;
+}
+
+PutPolicy.prototype.getFlags = function() {
+  var flags = {};
+  var attrs = ['scope', 'isPrefixalScope', 'insertOnly', 'saveKey', 'endUser',
+    'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost',
+    'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps',
+    'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit', 'fsizeMin',
+    'detectMime', 'mimeLimit', 'deleteAfterDays', 'fileType'
+  ];
+
+  for (var i = attrs.length - 1; i >= 0; i--) {
+    if (this[attrs[i]] !== null) {
+      flags[attrs[i]] = this[attrs[i]];
+    }
+  }
+
+  flags['deadline'] = this.expires + Math.floor(Date.now() / 1000);
+
+  return flags;
+}
+
+
+PutPolicy.prototype.uploadToken = function(mac) {
+  mac = mac || new digest.Mac();
+  var flags = this.getFlags();
+  var encodedFlags = util.urlsafeBase64Encode(JSON.stringify(flags));
+  var encoded = util.hmacSha1(encodedFlags, mac.secretKey);
+  var encodedSign = util.base64ToUrlSafe(encoded);
+  var uploadToken = mac.accessKey + ':' + encodedSign + ':' + encodedFlags;
+  return uploadToken;
 }
