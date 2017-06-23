@@ -619,3 +619,34 @@ exports.copyOp = function(srcBucket, srcKey, destBucket, destKey, options) {
   }
   return op;
 }
+
+// 空间资源下载
+
+// 获取私有空间的下载链接
+// @param domain 空间绑定的域名，比如以http或https开头
+// @param fileName 原始文件名
+// @param deadline 文件有效期时间戳（单位秒）
+// @return 私有下载链接
+BucketManager.prototype.privateDownloadUrl = function(domain, fileName,
+  deadline) {
+  var baseUrl = this.publicDownloadUrl(domain, fileName);
+  if (baseUrl.indexOf('?') >= 0) {
+    baseUrl += '&e=';
+  } else {
+    baseUrl += '?e=';
+  }
+  baseUrl += deadline;
+
+  var signature = util.hmacSha1(baseUrl, this.mac.secretKey);
+  var encodedSign = util.base64ToUrlSafe(signature);
+  var downloadToken = this.mac.accessKey + ':' + encodedSign;
+  return baseUrl + '&token=' + downloadToken;
+}
+
+// 获取公开空间的下载链接
+// @param domain 空间绑定的域名，比如以http或https开头
+// @param fileName 原始文件名
+// @return 公开下载链接
+BucketManager.prototype.publicDownloadUrl = function(domain, fileName) {
+  return domain + "/" + encodeURI(fileName);
+}
