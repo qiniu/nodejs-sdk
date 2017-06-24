@@ -24,5 +24,8 @@ operManager.prefop(persistentId, function(err, respBody, respInfo) {
       console.log(item.hash);
       console.log(item.key);
     });
+  } else {
+    console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 });

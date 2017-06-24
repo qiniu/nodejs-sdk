@@ -19,14 +19,19 @@ var copyOperations = [
   qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu4.mp4'),
 ];
 
-// bucketManager.batch(copyOperations, function(err, respBody, respInfo) {
-//   if (err) {
-//     console.log(err);
-//     //throw err;
-//   } else {
-//     console.log(respBody);
-//   }
-// });
+bucketManager.batch(copyOperations, function(err, respBody, respInfo) {
+  if (err) {
+    console.log(err);
+    //throw err;
+  } else {
+    if (respInfo.statusCode == 200) {
+      console.log(respBody);
+    } else {
+      console.log(respInfo.statusCode);
+      console.log(respBody);
+    }
+  }
+});
 
 var statOperations = [
   qiniu.rs.statOp(srcBucket, 'qiniu1.mp4'),
@@ -40,6 +45,11 @@ bucketManager.batch(statOperations, function(err, respBody, respInfo) {
     console.log(err);
     //throw err;
   } else {
-    console.log(respBody);
+    if (respInfo.statusCode == 200) {
+      console.log(respBody);
+    } else {
+      console.log(respInfo.statusCode);
+      console.log(respBody);
+    }
   }
 });

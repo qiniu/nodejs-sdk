@@ -17,9 +17,14 @@ bucketManager.fetch(resUrl, bucket, key, function(err, respBody, respInfo) {
     console.log(err);
     //throw err;
   } else {
-    console.log(respBody.key);
-    console.log(respBody.hash);
-    console.log(respBody.fsize);
-    console.log(respBody.mimeType);
+    if (respInfo.statusCode == 200) {
+      console.log(respBody.key);
+      console.log(respBody.hash);
+      console.log(respBody.fsize);
+      console.log(respBody.mimeType);
+    } else {
+      console.log(respInfo.statusCode);
+      console.log(respBody);
+    }
   }
 });

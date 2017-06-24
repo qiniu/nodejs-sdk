@@ -43,5 +43,8 @@ bucketManager.listPrefix(bucket, options, function(err, respBody, respInfo) {
       // console.log(item.endUser);
       // console.log(item.type);
     });
+  } else {
+    console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 });

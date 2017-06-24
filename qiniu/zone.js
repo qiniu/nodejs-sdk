@@ -69,34 +69,34 @@ exports.getZoneInfo = function(accessKey, bucket, callbackFunc) {
     }
 
     var zoneData = JSON.parse(respData);
-    var srcHosts = [];
-    var cdnHosts = [];
+    var srcUpHosts = [];
+    var cdnUpHosts = [];
     var zoneExpire = 0;
 
     try {
       zoneExpire = zoneData.ttl;
       //read src hosts
       zoneData.up.src.main.forEach(function(host) {
-        srcHosts.push(host);
+        srcUpHosts.push(host);
       });
       if (zoneData.up.src.backup) {
         zoneData.up.src.backup.forEach(function(host) {
-          srcHosts.push(host);
+          srcUpHosts.push(host);
         });
       }
 
       //read acc hosts
       zoneData.up.acc.main.forEach(function(host) {
-        cdnHosts.push(host);
+        cdnUpHosts.push(host);
       });
       if (zoneData.up.acc.backup) {
         zoneData.up.acc.backup.forEach(function(host) {
-          cdnHosts.push(host);
+          cdnUpHosts.push(host);
         });
       }
 
       var ioHost = zoneData.io.src.main[0];
-      var zoneInfo = new conf.Zone(srcHosts, cdnHosts, ioHost)
+      var zoneInfo = new conf.Zone(srcUpHosts, cdnUpHosts, ioHost)
       callbackFunc(null, zoneInfo, zoneExpire);
     } catch (e) {
       callbackFunc(e, null, null);

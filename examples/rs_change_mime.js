@@ -19,5 +19,6 @@ bucketManager.changeMime(bucket, key, newMime, function(err, respBody, respInfo)
   } else {
     //200 is success
     console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 });

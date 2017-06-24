@@ -16,6 +16,25 @@ exports.encodedEntry = function(bucket, key) {
   return exports.urlsafeBase64Encode(bucket + (key ? ':' + key : ''));
 }
 
+exports.getAKFromUptoken = function(uploadToken) {
+  var sepIndex = uploadToken.indexOf(":");
+  return uploadToken.substring(0, sepIndex);
+}
+
+exports.getBucketFromUptoken = function(uploadToken) {
+  var sepIndex = uploadToken.lastIndexOf(":");
+  var encodedPutPolicy = uploadToken.substring(sepIndex + 1);
+  var putPolicy = exports.urlSafeBase64Decode(encodedPutPolicy);
+  var putPolicyObj = JSON.parse(putPolicy);
+  var scope = putPolicyObj.scope;
+  var scopeSepIndex = scope.indexOf(":");
+  if (scopeSepIndex == -1) {
+    return scope;
+  } else {
+    return scope.substring(0, scopeSepIndex);
+  }
+}
+
 exports.urlsafeBase64Encode = function(jsonFlags) {
   var encoded = new Buffer(jsonFlags).toString('base64');
   return exports.base64ToUrlSafe(encoded);
@@ -23,6 +42,17 @@ exports.urlsafeBase64Encode = function(jsonFlags) {
 
 exports.base64ToUrlSafe = function(v) {
   return v.replace(/\//g, '_').replace(/\+/g, '-');
+}
+
+exports.urlSafeToBase64 = function(v) {
+  return v.replace(/\_/g, '/').replace(/\-/g, '+');
+}
+
+/**
+ * UrlSafe Base64 Decode
+ */
+exports.urlSafeBase64Decode = function(fromStr) {
+  return new Buffer(exports.urlSafeToBase64(fromStr), 'base64').toString();
 }
 
 exports.hmacSha1 = function(encodedFlags, secretKey) {

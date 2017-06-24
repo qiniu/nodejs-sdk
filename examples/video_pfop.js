@@ -36,5 +36,8 @@ operManager.pfop(srcBucket, srcKey, fops, pipeline, options, function(err,
 
   if (respInfo.statusCode == 200) {
     console.log(respBody.persistentId);
+  } else {
+    console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 });

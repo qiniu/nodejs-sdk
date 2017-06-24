@@ -19,6 +19,7 @@ exports.FormMimeUrl = "application/x-www-form-urlencoded";
 exports.FormMimeJson = "application/json";
 exports.FormMimeRaw = "application/octet-stream";
 exports.RS_HOST = "http://rs.qiniu.com";
+exports.RPC_TIMEOUT = 5000;
 
 exports.Config = function Config(options) {
   options = options || {};

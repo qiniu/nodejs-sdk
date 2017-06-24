@@ -16,6 +16,7 @@ bucketManager.prefetch(bucket, key, function(err, respBody, respInfo) {
     console.log(err);
     //throw err;
   } else {
+    //200 is success
     console.log(respInfo.statusCode);
   }
 });

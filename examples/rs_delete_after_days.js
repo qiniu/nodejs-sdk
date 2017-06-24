@@ -19,5 +19,6 @@ bucketManager.deleteAfterDays(bucket, key, days, function(err, respBody,
     //throw err;
   } else {
     console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 });

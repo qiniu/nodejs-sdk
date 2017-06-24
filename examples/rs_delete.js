@@ -17,5 +17,6 @@ bucketManager.delete(bucket, key, function(err, respBody, respInfo) {
     //throw err;
   } else {
     console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 });

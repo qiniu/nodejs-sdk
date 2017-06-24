@@ -19,5 +19,6 @@ bucketManager.changeType(bucket, key, newType, function(err, respBody, respInfo)
   } else {
     //200 is success
     console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 });

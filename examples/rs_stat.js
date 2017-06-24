@@ -9,18 +9,23 @@ var config = new qiniu.conf.Config();
 config.zone = qiniu.zone.Zone_z0;
 var bucketManager = new qiniu.rs.BucketManager(mac, config);
 var bucket = "if-pbl";
-var key = "qiniu.mp4";
+var key = "qiniux.mp4";
 
 bucketManager.stat(bucket, key, function(err, respBody, respInfo) {
   if (err) {
     console.log(err);
     //throw err;
   } else {
-    console.log(respBody.hash);
-    console.log(respBody.fsize);
-    console.log(respBody.mimeType);
-    console.log(respBody.putTime);
-    console.log(respBody.type);
+    if (respInfo.statusCode == 200) {
+      console.log(respBody.hash);
+      console.log(respBody.fsize);
+      console.log(respBody.mimeType);
+      console.log(respBody.putTime);
+      console.log(respBody.type);
+    } else {
+      console.log(respInfo.statusCode);
+      console.log(respBody.error);
+    }
   }
 
 });

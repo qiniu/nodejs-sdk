@@ -24,6 +24,7 @@ bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options, function(
   } else {
     //200 is success
     console.log(respInfo.statusCode);
+    console.log(respBody);
   }
 
 });
