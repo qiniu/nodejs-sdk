@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const urllib = require('urllib');
 const util = require('./util');
 const digest = require('./auth/digest.js');
-const request = require('request');
 const urlencode = require('urlencode');
 
 exports.CdnManager = CdnManager;

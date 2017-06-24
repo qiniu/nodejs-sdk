@@ -9,8 +9,6 @@ const Readable = require('stream').Readable;
 const formstream = require('formstream');
 const zone = require('../zone');
 const digest = require('../auth/digest');
-const Promise = require('bluebird');
-const retry = require('bluebird-retry');
 
 exports.FormUploader = FormUploader;
 exports.PutExtra = PutExtra;
