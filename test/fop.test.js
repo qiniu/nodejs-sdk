@@ -1,4 +1,4 @@
-  const qiniu = require("../");
+  const qiniu = require("../index.js");
   const should = require('should');
   const proc = require("process");
 
