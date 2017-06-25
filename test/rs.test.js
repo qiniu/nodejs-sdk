@@ -1,248 +1,108 @@
-var qiniu = require('../');
-var should = require('should');
-var path = require('path');
+const should = require('should');
+const assert = require('assert');
+const qiniu = require("../index.js");
+const proc = require("process");
 
-qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
-qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
+before(function(done) {
+  if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY || !
+    process.env.QINIU_TEST_BUCKET || !process.env.QINIU_TEST_DOMAIN) {
+    console.log('should run command `source test-env.sh` first\n');
+    process.exit(0);
+  }
+  done();
+});
 
-var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
-var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
-var imageFile = path.join(__dirname, 'logo.png');
-
-var logo  = Math.random() + 'logo.png';
-var logo1 = Math.random() + 'logo1.png';
-var logo2 = Math.random() + 'logo2.png';
-var logo3 = Math.random() + 'logo3.png';
-var logo4 = Math.random() + 'logo4.png';
-var logo5 = Math.random() + 'logo5.png';
-var logo6 = Math.random() + 'logo6.png';
-var logo7 = Math.random() + 'logo7.png';
-
-
-
-describe('test start step2:', function() {
-
-  describe('rs.test.js', function() {
-
-    var client = new qiniu.rs.Client();
-
-    var EntryPath = qiniu.rs.EntryPath;
-    var EntryPathPair = qiniu.rs.EntryPathPair;
-
-    describe('single file handle', function() {
-
-      before(function(done) {
-        var putPolicy = new qiniu.rs.PutPolicy(
-          TEST_BUCKET
-        );
-        var uptoken = putPolicy.token();
-
-        qiniu.io.putFile(uptoken, logo, imageFile, null, function(err, ret) {
-          should.not.exist(err);
-        });
-
-        qiniu.io.putFile(uptoken, logo2, imageFile, null, function(err, ret) {
-          should.not.exist(err);
-          done();
-        });
-
-      });
-
-      describe('rs.Client#stat()', function() {
-        it('get the stat of a file', function(done) {
-          client.stat(TEST_BUCKET, logo, function(err, ret) {
-            should.not.exist(err);
-            ret.should.have.keys('hash', 'fsize', 'putTime', 'mimeType');
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#copy()', function() {
-        it('copy logo.png to logo5.png', function(done) {
-          client.copy(TEST_BUCKET, logo, TEST_BUCKET, logo5, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#forceCopy()', function() {
-        it('copy logo.png to logo3.png', function(done) {
-          client.forceCopy(TEST_BUCKET, logo, TEST_BUCKET, logo1, 1, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-
-      describe('rs.Client#remove()', function() {
-        it('remove logo5.png', function(done) {
-          client.remove(TEST_BUCKET, logo5, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#deleteAfterDays()', function () {
-        it('delete logo5.png after 1 day', function (done) {
-          client.deleteAfterDays(TEST_BUCKET, logo, 1, function (err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#move()', function() {
-        it('move logo.png to logo5.png', function(done) {
-          client.move(TEST_BUCKET, logo, TEST_BUCKET, logo5, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#forceMove()', function() {
-        it('move logo5.png to logo.png', function(done) {
-          client.forceMove(TEST_BUCKET, logo5, TEST_BUCKET, logo, 1, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-    });
-
-    describe('batch file handle', function() {
-
-      after(function(done) {
-        var entries = [new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo2)];
-
-        client.batchDelete(entries, function(err, ret) {
-          should.not.exist(err);
-          done();
-        });
-      });
-
-      describe('rs.Client#batchStat()', function() {
-        it('get the stat of logo.png and logo2.png', function(done) {
-          var entries = [
-            new EntryPath(TEST_BUCKET, logo),
-            new EntryPath(TEST_BUCKET, logo2)];
-
-            client.batchStat(entries, function(err, ret) {
-              should.not.exist(err);
-              ret.length.should.equal(2);
-              for (var i in ret) {
-                ret[i].code.should.equal(200);
-                ret[i].data.should.have.keys('fsize', 'hash', 'mimeType', 'putTime');
-              }
-              done();
-            });
-        });
-
-        it('should return code 298 when partial ok', function(done) {
-
-          var entries = [
-            new EntryPath(TEST_BUCKET, logo),
-            new EntryPath(TEST_BUCKET, 'not exist file')];
-
-            client.batchStat(entries, function(err, ret) {
-              should.not.exist(err); // 298
-              ret.length.should.equal(2);
-
-              for (var i in ret) {
-                if (ret[i].code !== 200) {
-                  ret[i].code.should.equal(612);
-                  ret[i].data.should.have.keys('error');
-                }
-              }
-
-              done();
-            });
-        });
-
-      });
-
-      describe('rs.Client#batchCopy', function() {
-        var entries = [];
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo6)));
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo2), new EntryPath(TEST_BUCKET, logo7)));
-
-        it('copy from logo, logo2 to logo6, logo7', function(done) {
-          client.batchCopy(entries, function(err, ret) {
-            should.not.exist(err);
-            ret.should.eql([ { code: 200 }, { code: 200 } ]);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#forceBatchCopy', function() {
-        var entries = [];
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo1)));
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo2), new EntryPath(TEST_BUCKET, logo3)));
-
-        it('copy from logo, logo2 to logo1, logo3', function(done) {
-          client.forceBatchCopy(entries, 1, function(err, ret) {
-            should.not.exist(err);
-            ret.should.eql([ { code: 200 }, { code: 200 } ]);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#batchDelete', function() {
-        var entries = [new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo2)];
-
-        it('delete logo.png, logo2.png', function(done) {
-          client.batchDelete(entries, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#batchMove', function() {
-        var entries = [];
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo1), new EntryPath(TEST_BUCKET, logo)));
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo3), new EntryPath(TEST_BUCKET, logo2)));
-
-        it('move from logo1.png, logo3.png to logo.png, logo2.png', function(done) {
-          client.batchMove(entries, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-      describe('rs.Client#forceBatchMove', function() {
-        var entries = [];
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo), new EntryPath(TEST_BUCKET, logo1)));
-        entries.push(new EntryPathPair(new EntryPath(TEST_BUCKET, logo2), new EntryPath(TEST_BUCKET, logo3)));
-
-        it('move from logo.png, logo2.png to logo1.png, logo3.png', function(done) {
-          client.forceBatchMove(entries, 1, function(err, ret) {
-            should.not.exist(err);
-            done();
-          });
-        });
-      });
-
-    });
-
-    describe('rs.isQiniuCallBack', function() {
-
-      it('test isQiniuCallback true', function(done) {
-        var auth = 'QBox QWYn5TFQsLLU1pL5MFEmX3s5DmHdUThav9WyOWOm:4GcOC2_eiw97QBNsHiwLzSqxelI=';
-        var path = '/callback';
-        var content = 'key=43850.6579994258936495&hash=FllOJrhvzorEKnyMwE-o7pfciiha';
-        var ok = qiniu.util.isQiniuCallback(path, content, auth);
-        ok.should.be.ok;
+describe('test start bucket manager', function() {
+  var accessKey = proc.env.QINIU_ACCESS_KEY;
+  var secretKey = proc.env.QINIU_SECRET_KEY;
+  var srcBucket = proc.env.QINIU_TEST_BUCKET;
+  var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+  var config = new qiniu.conf.Config();
+  //config.useHttpsDomain = true;
+  config.zone = qiniu.zone.Zone_z0;
+  var bucketManager = new qiniu.rs.BucketManager(mac, config);
+  //test stat
+  describe('test stat', function() {
+    it('test stat', function(done) {
+      var bucket = srcBucket;
+      var key = 'qiniu.mp4';
+      bucketManager.stat(bucket, key, function(err, respBody,
+        respInfo) {
+        //console.log(respBody);
+        should.not.exist(err);
+        respBody.should.have.keys('hash', 'fsize', 'mimeType',
+          'putTime', 'type');
         done();
       });
     });
+  });
 
+  //test copy and move and delete
+  describe('test copy', function() {
+    it('test copy', function(done) {
+      var destBucket = srcBucket;
+      var srcKey = 'qiniu.mp4';
+      var destKey = 'qiniu_copy.mp4';
+      var options = {
+        force: true,
+      }
+      bucketManager.copy(srcBucket, srcKey, destBucket, destKey,
+        options,
+        function(err, respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(err);
+          assert.equal(respInfo.statusCode, 200);
+          done();
+
+          //test move
+          describe('test move', function() {
+            var moveDestKey = 'qiniu_move.mp4';
+            it('test move', function(done1) {
+              bucketManager.move(destBucket, destKey,
+                destBucket, moveDestKey, options,
+                function(err1, ret1, info1) {
+                  should.not.exist(err1);
+                  assert.equal(info1.statusCode, 200);
+                  done1();
+
+                  //test delete
+                  describe('test delete', function() {
+                    it('test delete', function(
+                      done2) {
+                      bucketManager.delete(
+                        destBucket,
+                        moveDestKey,
+                        function(err2, ret2,
+                          info2) {
+                          should.not.exist(
+                            err2);
+                          assert.equal(info2.statusCode,
+                            200);
+                          done2();
+                        });
+                    });
+                  });
+                });
+            });
+          });
+        });
+    });
+  });
+
+  describe('test fetch', function() {
+    it('test fetch', function(done) {
+      var resUrl = 'http://devtools.qiniu.com/qiniu.png';
+      var bucket = srcBucket;
+      var key = "qiniu.png";
+
+      bucketManager.fetch(resUrl, bucket, key, function(err,
+        respBody,
+        respInfo) {
+        should.not.exist(err);
+        respBody.should.have.keys('hash', 'fsize', 'mimeType',
+          'key');
+        done();
+      });
+    });
   });
 });
