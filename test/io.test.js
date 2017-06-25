@@ -1,166 +1,154 @@
-var qiniu = require('../');
-var should = require('should');
-var path = require('path');
-var fs = require('fs');
-
-qiniu.conf.ACCESS_KEY = process.env.QINIU_ACCESS_KEY;
-qiniu.conf.SECRET_KEY = process.env.QINIU_SECRET_KEY;
-
-var TEST_BUCKET = process.env.QINIU_TEST_BUCKET;
-var TEST_DOMAIN = process.env.QINIU_TEST_DOMAIN;
-
-var imageFile = path.join(__dirname, 'logo.png');
+const path = require('path');
+const should = require('should');
+const assert = require('assert');
+const qiniu = require("../index.js");
+const proc = require("process");
+const fs = require("fs");
 
 before(function(done) {
-  if(!process.env.QINIU_ACCESS_KEY) {
+  if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY || !
+    process.env.QINIU_TEST_BUCKET || !process.env.QINIU_TEST_DOMAIN) {
     console.log('should run command `source test-env.sh` first\n');
     process.exit(0);
   }
   done();
 });
 
-describe('test start step1:', function() {
 
-  var keys = [];
+//file to upload
+var imageFile = path.join(__dirname, 'logo.png');
+
+describe('test form io', function() {
+  var accessKey = proc.env.QINIU_ACCESS_KEY;
+  var secretKey = proc.env.QINIU_SECRET_KEY;
+  var bucket = proc.env.QINIU_TEST_BUCKET;
+  var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+  var config = new qiniu.conf.Config();
+  //config.useHttpsDomain = true;
+  config.zone = qiniu.zone.Zone_z0;
+  var bucketManager = new qiniu.rs.BucketManager(mac, config);
+
+  //delete all the files uploaded
+  var keysToDelete = [];
 
   after(function(done) {
-    var entries = [];
-    for (var i in keys) {
-      entries.push(new qiniu.rs.EntryPath(TEST_BUCKET, keys[i]));
-    }
+    var deleteOps = [];
+    keysToDelete.forEach(function(key) {
+      deleteOps.push(qiniu.rs.deleteOp(bucket, key));
+    });
 
-    var client = new qiniu.rs.Client();
-    client.batchDelete(entries, function(err, ret) {
-      should.not.exist(err);
-      should.exist(ret);
-      ret.length.should.equal(entries.length);
-      ret.forEach(function (result) {
-        result.should.eql({code: 200});
+    bucketManager.batch(deleteOps, function(respErr, respBody, respInfo) {
+      //console.log(respBody);
+      respBody.forEach(function(ret) {
+        ret.should.eql({
+          code: 200
+        });
       });
       done();
     });
   });
 
-  describe('io.js', function() {
-    describe('upload#', function() {
-      var uptoken = null;
-      beforeEach(function(done) {
-        var putPolicy = new qiniu.rs.PutPolicy(
-          TEST_BUCKET
-        );
-	      uptoken = putPolicy.token();
-        done();
-      });
+  var options = {
+    scope: bucket,
+  }
+  var putPolicy = new qiniu.rs.PutPolicy(options);
+  var uploadToken = putPolicy.uploadToken(mac);
+  var config = new qiniu.conf.Config();
+  config.zone = qiniu.zone.Zone_z0;
+  var formUploader = new qiniu.form_io.FormUploader(config);
+  var putExtra = new qiniu.form_io.PutExtra();
 
-      describe('io.putReadable()', function() {
-        it('test upload from readableStrem', function(done) {
-          var key = 'filename' + Math.random(1000);
-          var rs = fs.createReadStream(imageFile);
-          qiniu.io.putReadable(uptoken, key, rs, null, function(err, ret) {
-            should.not.exist(err);
-            ret.should.have.keys('hash', 'key');
-            ret.key.should.equal(key);
-            ret.hash.should.be.a('string');
-            keys.push(ret.key);
-            done();
-          });
+  describe('test form io#putStreamWithoutKey', function() {
+    it('test form io#putStreamWithoutKey', function(done) {
+      var key = null;
+      var rs = fs.createReadStream(imageFile);
+      formUploader.putStream(uploadToken, key, rs, putExtra,
+        function(respErr,
+          respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(respErr);
+          respBody.should.have.keys('key', 'hash');
+          keysToDelete.push(respBody.key);
+          done();
         });
-      });
-
-      describe('io.put()', function() {
-        it('test upload from memory', function(done) {
-          var key = 'filename' + Math.random(1000);
-          qiniu.io.put(uptoken, key, 'content', null, function(err, ret) {
-            should.not.exist(err);
-            ret.should.have.keys('hash', 'key');
-            ret.key.should.equal(key);
-            ret.hash.should.be.a('string');
-            keys.push(ret.key);
-            done();
-          });
-        });
-      });
-
-      describe('io.putWithoutKey()', function() {
-        it('test upload from memory without key', function(done) {
-          var content = 'content' + Math.random(1000);
-          qiniu.io.putWithoutKey(uptoken, content, null, function(err, ret) {
-            should.not.exist(err);
-            ret.should.have.keys('hash', 'key');
-            ret.key.should.equal(ret.hash);
-            keys.push(ret.key);
-            done();
-          });
-        });
-      });
-
-      describe('io.putFile()', function() {
-        it('test upload from a file', function(done) {
-          var key = Math.random() + 'logo.png';
-          qiniu.io.putFile(uptoken, key, imageFile, null, function(err, ret) {
-            should.not.exist(err);
-            ret.should.have.keys('key', 'hash');
-            ret.key.should.equal(key);
-            keys.push(ret.key);
-            done();
-          });
-        });
-
-        it('test upload from a file with checkCrc32=1', function(done) {
-          var extra = new qiniu.io.PutExtra();
-          extra.checkCrc = 1;
-          var key = Math.random() + 'logo_crc32.png';
-          qiniu.io.putFile(uptoken, key, imageFile, extra, function(err, ret) {
-            should.not.exist(err);
-            ret.should.have.keys('key', 'hash');
-            ret.key.should.equal(key);
-            keys.push(ret.key);
-            done();
-          });
-        });
-      });
-
-//      describe('io.putFileWithoutKey()', function() {
-//        it('test upload from a file without key', function(done) {
-//          qiniu.io.putFileWithoutKey(uptoken, imageFile, null, function(ret) {
-//            ret.code.should.equal(200);
-//            ret.data.should.have.keys('key', 'hash');
-//            ret.data.key.should.equal(ret.data.hash);
-//            keys.push(ret.data.key);
-//            done();
-//          });
-//        });
-//      });
     });
   });
 
-  describe('rsf.js', function() {
-    describe('file handle', function() {
-      describe('rsf.listPrefix()', function() {
-        it('list all file in test bucket', function(done) {
-          qiniu.rsf.listPrefix(TEST_BUCKET, null, null, null, null, function(err, ret) {
-            should.not.exist(err);
-//            ret.data.items.length.should.equal(keys.length);
-            for (var i in ret.items) {
-              ret.items[i].should.have.keys('key', 'putTime', 'hash', 'fsize', 'mimeType');
-//              keys.indexOf(ret.items[i].key).should.above(-1);
-            }
-            done();
-          });
+  describe('test form io#putStream', function() {
+    it('test form io#putStream', function(done) {
+      var key = 'io_putStream_test' + Math.random(1000);
+      var rs = fs.createReadStream(imageFile);
+      formUploader.putStream(uploadToken, key, rs, putExtra,
+        function(respErr,
+          respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(respErr);
+          respBody.should.have.keys('key', 'hash');
+          keysToDelete.push(respBody.key);
+          done();
         });
-      });
     });
   });
 
-  describe('pfop', function() {
-    it('do pfop', function(done) {
-// @gist pfop
-// pfop
-      qiniu.fop.pfop(TEST_BUCKET, keys[0], 'avinfo', {notifyURL: 'www.test.com'}, function(err, ret) {
-        ret.should.have.keys('persistentId');
-        done();
-      });
-// @endgist
-    })
+  describe('test form io#put', function() {
+    it('test form io#put', function(done) {
+      var key = 'io_put_test' + Math.random(1000);
+      formUploader.put(uploadToken, key, "hello world", putExtra,
+        function(respErr,
+          respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(respErr);
+          respBody.should.have.keys('key', 'hash');
+          keysToDelete.push(respBody.key);
+          done();
+        });
+    });
+  });
+
+  describe('test form io#putWithoutKey', function() {
+    it('test form io#putWithoutKey', function(done) {
+      var key = null;
+      formUploader.put(uploadToken, key, "hello world", putExtra,
+        function(respErr,
+          respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(respErr);
+          respBody.should.have.keys('key', 'hash');
+          keysToDelete.push(respBody.key);
+          done();
+        });
+    });
+  });
+
+  describe('test form io#putFile', function() {
+    it('test form io#putFile', function(done) {
+      var key = 'io_putFile_test' + Math.random(1000);
+      formUploader.put(uploadToken, key, imageFile, putExtra,
+        function(
+          respErr,
+          respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(respErr);
+          respBody.should.have.keys('key', 'hash');
+          keysToDelete.push(respBody.key);
+          done();
+        });
+    });
+  });
+
+  describe('test form io#putFileWithoutKey', function() {
+    it('test form io#putFileWithoutKey', function(done) {
+      var key = null;
+      formUploader.put(uploadToken, key, imageFile, putExtra,
+        function(
+          respErr,
+          respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(respErr);
+          respBody.should.have.keys('key', 'hash');
+          keysToDelete.push(respBody.key);
+          done();
+        });
+    });
   });
 });

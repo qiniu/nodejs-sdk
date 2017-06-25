@@ -6,31 +6,31 @@ exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
 
-function postMultipart(uri, form, onret) {
-  return post(uri, form, form.headers(), onret);
+function postMultipart(requestURI, requestForm, callbackFunc) {
+  return post(requestURI, requestForm, requestForm.headers(), callbackFunc);
 }
 
-function postWithForm(uri, form, token, onret) {
+function postWithForm(requestURI, requestForm, token, callbackFunc) {
   var headers = {
     'Content-Type': 'application/x-www-form-urlencoded'
   };
   if (token) {
     headers['Authorization'] = token;
   }
-  return post(uri, form, headers, onret);
+  return post(requestURI, requestForm, headers, callbackFunc);
 }
 
-function postWithoutForm(uri, token, onret) {
+function postWithoutForm(requestURI, token, callbackFunc) {
   var headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
   };
   if (token) {
     headers['Authorization'] = token;
   }
-  return post(uri, null, headers, onret);
+  return post(requestURI, null, headers, callbackFunc);
 }
 
-function post(uri, form, headers, onresp) {
+function post(requestURI, requestForm, headers, callbackFunc) {
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
 
@@ -41,22 +41,18 @@ function post(uri, form, headers, onresp) {
     timeout: conf.RPC_TIMEOUT,
   };
 
-  if (Buffer.isBuffer(form) || typeof form === 'string') {
-    data.content = form;
-  } else if (form) {
-    data.stream = form;
+  if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
+    data.content = requestForm;
+  } else if (requestForm) {
+    data.stream = requestForm;
   } else {
     data.headers['Content-Length'] = 0;
   };
 
-  var req = urllib.request(uri, data, function(err, result, res) {
-    var rerr = null;
-    if (err || Math.floor(res.statusCode/100) !== 2) {
-      rerr = {code: res&&res.statusCode||-1, error: err||result&&result.error||''};
-    }
-    onresp(rerr, result, res);
+  var req = urllib.request(requestURI, data, function(respErr, respBody,
+    respInfo) {
+    callbackFunc(respErr, respBody, respInfo);
   });
 
   return req;
 }
-
