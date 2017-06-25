@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const pkg = require('../package.json');
 
 exports.ACCESS_KEY = '<PLEASE APPLY YOUR ACCESS KEY>';
 exports.SECRET_KEY = '<DONT SEND YOUR SECRET KEY TO ANYONE>';
 
-var pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../', 'package.json')));
 var defaultUserAgent = function() {
   return 'QiniuNodejs/' + pkg.version + ' (' + os.type() + '; ' + os.platform() +
     '; ' + os.arch() + '; )';
