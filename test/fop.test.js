@@ -1,7 +1,9 @@
-var fop = require('../').fop;
+const fop = require('../').fop;
+const should = require('should');
 
 before(function(done) {
-  if (!process.env.QINIU_ACCESS_KEY) {
+  if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY || !
+    process.env.QINIU_TEST_BUCKET || !process.env.QINIU_TEST_DOMAIN) {
     console.log('should run command `source test-env.sh` first\n');
     process.exit(0);
   }
@@ -9,14 +11,16 @@ before(function(done) {
 });
 
 describe('test start fop', function() {
-  it('test video fop', function() {
-
+  it('test video fop', function(done) {
     const qiniu = require("../index.js");
     const proc = require("process");
 
     var accessKey = proc.env.QINIU_ACCESS_KEY;
     var secretKey = proc.env.QINIU_SECRET_KEY;
     var srcBucket = proc.env.QINIU_TEST_BUCKET;
+
+    console.log(srcBucket);
+
     var pipeline = 'sdktest';
     var srcKey = 'qiniu.mp4';
 
@@ -43,11 +47,10 @@ describe('test start fop', function() {
 
     //持久化数据处理返回的是任务的persistentId，可以根据这个id查询处理状态
     operManager.pfop(srcBucket, srcKey, fops, pipeline, options,
-      function(err,
-        respBody,
-        respInfo) {
+      function(err, respBody, respInfo) {
+        console.log(respBody);
         should.not.exist(err);
-        ret.should.have.keys('persistentId');
+        respBody.should.have.keys('persistentId');
         done();
       });
   });
