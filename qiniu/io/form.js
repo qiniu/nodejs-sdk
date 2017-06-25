@@ -31,7 +31,7 @@ function PutExtra(fname, params, mimeType, crc32, checkCrc) {
   this.checkCrc = checkCrc || 0;
 }
 
-FormUploader.prototype.putReadable = function(uploadToken, key, rsStream,
+FormUploader.prototype.putStream = function(uploadToken, key, rsStream,
   putExtra, callbackFunc) {
   putExtra = putExtra || new PutExtra();
   if (!putExtra.mimeType) {
@@ -128,7 +128,7 @@ FormUploader.prototype.put = function(uploadToken, key, body, putExtra,
   } else if (putExtra.checkCrc == 2 && putExtra.crc32) {
     putExtra.crc32 = '' + putExtra.crc32
   }
-  return this.putReadable(uploadToken, key, rsStream, putExtra, callbackFunc)
+  return this.putStream(uploadToken, key, rsStream, putExtra, callbackFunc)
 }
 
 FormUploader.prototype.putWithoutKey = function(uploadToken, body, putExtra,
@@ -143,7 +143,6 @@ function createMultipartForm(uploadToken, key, rsStream, putExtra) {
     postForm.field('key', key);
   }
   postForm.stream('file', rsStream, putExtra.fname, putExtra.mimeType);
-
   if (putExtra.crc32) {
     postForm.field('crc32', putExtra.crc32);
   }
@@ -185,7 +184,7 @@ FormUploader.prototype.putFile = function(uploadToken, key, localFile, putExtra,
     putExtra.fname = path.basename(localFile);
   }
 
-  return this.putReadable(uploadToken, key, rsStream, putExtra, callbackFunc);
+  return this.putStream(uploadToken, key, rsStream, putExtra, callbackFunc);
 }
 
 FormUploader.prototype.putFileWithoutKey = function(uploadToken, localFile,
