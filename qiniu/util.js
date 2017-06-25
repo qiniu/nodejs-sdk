@@ -53,7 +53,7 @@ exports.urlSafeBase64Decode = function(fromStr) {
   return new Buffer(exports.urlSafeToBase64(fromStr), 'base64').toString();
 }
 
-// Hmac-sha1 Crypt 
+// Hmac-sha1 Crypt
 exports.hmacSha1 = function(encodedFlags, secretKey) {
   /*
    *return value already encoded with base64
@@ -73,7 +73,7 @@ exports.generateAccessToken = function(mac, requestURI, reqBody) {
   var path = u.path;
   var access = path + '\n';
 
-  if (body) {
+  if (reqBody) {
     access += reqBody;
   }
 
