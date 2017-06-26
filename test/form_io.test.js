@@ -68,7 +68,9 @@ describe('test form io', function() {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          keysToDelete.push(respBody.key);
+          if (!keysToDelete.includes(respBody.key)) {
+            keysToDelete.push(respBody.key);
+          }
           done();
         });
     });
@@ -84,7 +86,9 @@ describe('test form io', function() {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          keysToDelete.push(respBody.key);
+          if (!keysToDelete.includes(respBody.key)) {
+            keysToDelete.push(respBody.key);
+          }
           done();
         });
     });
@@ -99,7 +103,9 @@ describe('test form io', function() {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          keysToDelete.push(respBody.key);
+          if (!keysToDelete.includes(respBody.key)) {
+            keysToDelete.push(respBody.key);
+          }
           done();
         });
     });
@@ -107,14 +113,16 @@ describe('test form io', function() {
 
   describe('test form io#putWithoutKey', function() {
     it('test form io#putWithoutKey', function(done) {
-      var key = null;
-      formUploader.put(uploadToken, key, "hello world", putExtra,
+      formUploader.putWithoutKey(uploadToken, "hello world",
+        putExtra,
         function(respErr,
           respBody, respInfo) {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          keysToDelete.push(respBody.key);
+          if (!keysToDelete.includes(respBody.key)) {
+            keysToDelete.push(respBody.key);
+          }
           done();
         });
     });
@@ -123,14 +131,16 @@ describe('test form io', function() {
   describe('test form io#putFile', function() {
     it('test form io#putFile', function(done) {
       var key = 'io_putFile_test' + Math.random(1000);
-      formUploader.put(uploadToken, key, imageFile, putExtra,
+      formUploader.putFile(uploadToken, key, imageFile, putExtra,
         function(
           respErr,
           respBody, respInfo) {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          keysToDelete.push(respBody.key);
+          if (!keysToDelete.includes(respBody.key)) {
+            keysToDelete.push(respBody.key);
+          }
           done();
         });
     });
@@ -138,15 +148,17 @@ describe('test form io', function() {
 
   describe('test form io#putFileWithoutKey', function() {
     it('test form io#putFileWithoutKey', function(done) {
-      var key = null;
-      formUploader.put(uploadToken, key, imageFile, putExtra,
+      formUploader.putFileWithoutKey(uploadToken, imageFile,
+        putExtra,
         function(
           respErr,
           respBody, respInfo) {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          keysToDelete.push(respBody.key);
+          if (!keysToDelete.includes(respBody.key)) {
+            keysToDelete.push(respBody.key);
+          }
           done();
         });
     });

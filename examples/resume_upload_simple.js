@@ -12,29 +12,19 @@ var putPolicy = new qiniu.rs.PutPolicy(options);
 
 var uploadToken = putPolicy.uploadToken(mac);
 var config = new qiniu.conf.Config();
-var localFile = "/Users/jemy/Documents/github.png";
-//config.zone = qiniu.zone.Zone_z0;
-var formUploader = new qiniu.form_io.FormUploader(config);
-var putExtra = new qiniu.form_io.PutExtra();
-
-
-//bytes
-formUploader.put(uploadToken, null, "hello", null, function(respErr,
-  respBody, respInfo) {
-  if (respErr) {
-    throw respErr;
-  }
-
-  if (respInfo.statusCode == 200) {
-    console.log(respBody);
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+var localFile = "/Users/jemy/Documents/qiniu.mp4";
+config.zone = qiniu.zone.Zone_z0;
+config.useCdnDomain = true;
+var resumeUploader = new qiniu.resume_io.ResumeUploader(config);
+var putExtra = new qiniu.resume_io.PutExtra();
+putExtra.params = {
+  "x:name": "",
+  "x:age": 27,
+}
+putExtra.fname = 'testfile.mp4';
 
 //file
-formUploader.putFile(uploadToken, null, localFile, putExtra, function(respErr,
+resumeUploader.putFile(uploadToken, null, localFile, putExtra, function(respErr,
   respBody, respInfo) {
   if (respErr) {
     throw respErr;
