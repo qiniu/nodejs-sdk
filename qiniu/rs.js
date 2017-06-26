@@ -536,7 +536,6 @@ function listPrefixReq(mac, config, bucket, options, callbackFunc) {
     reqParams.prefix = "";
   }
 
-  console.log(typeof(options.limit));
   if (options.limit >= 1 && options.limit <= 1000) {
     reqParams.limit = options.limit;
   } else {
@@ -650,50 +649,11 @@ BucketManager.prototype.privateDownloadUrl = function(domain, fileName,
 // @return 公开下载链接
 BucketManager.prototype.publicDownloadUrl = function(domain, fileName) {
   return domain + "/" + encodeURI(fileName);
-}
-
-// 上传策略
-
-function PutPolicy2(options) {
-
-  if (typeof options !== 'object') {
-    return false;
-  }
-
-  this.scope = options.scope || null;
-  this.expires = options.expires || 3600;
-  this.insertOnly = options.insertOnly || null;
-
-  this.saveKey = options.saveKey || null;
-  this.endUser = options.endUser || null;
-
-  this.returnUrl = options.returnUrl || null;
-  this.returnBody = options.returnBody || null;
-
-  this.callbackUrl = options.callbackUrl || null;
-  this.callbackHost = options.callbackHost || null;
-  this.callbackBody = options.callbackBody || null;
-  this.callbackBodyType = options.callbackBodyType || null;
-  this.callbackFetchKey = options.callbackFetchKey || null;
-
-  this.persistentOps = options.persistentOps || null;
-  this.persistentNotifyUrl = options.persistentNotifyUrl || null;
-  this.persistentPipeline = options.persistentPipeline || null;
-
-  this.fsizeLimit = options.fsizeLimit || null;
-
-  this.fsizeMin = options.fsizeMin || null;
-
-  this.detectMime = options.detectMime || null;
-
-  this.mimeLimit = options.mimeLimit || null;
-
-  this.deleteAfterDays = options.deleteAfterDays || null;
-  this.fileType = options.fileType || null;
 
 }
 
 // 上传策略
+// @link https://developer.qiniu.com/kodo/manual/1206/put-policy
 function PutPolicy(options) {
   if (typeof options !== 'object') {
     throw new Error('invalid putpolicy options');
