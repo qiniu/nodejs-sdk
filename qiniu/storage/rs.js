@@ -1,12 +1,12 @@
 const url = require('url');
 const crypto = require('crypto');
 const formstream = require('formstream');
-const rpc = require('./rpc');
-const conf = require('./conf');
-const digest = require('./auth/digest');
-const util = require('./util');
-const zone = require('./zone');
 const querystring = require('querystring');
+const rpc = require('../rpc');
+const conf = require('../conf');
+const digest = require('../auth/digest');
+const util = require('../util');
+const zone = require('../zone');
 
 exports.BucketManager = BucketManager;
 exports.PutPolicy = PutPolicy;
