@@ -129,7 +129,6 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
         //check ctx expired or not
         var blkputRet = blkputRets[index];
         var expiredAt = blkputRet.expired_at;
-        console.log(expiredAt);
         //make sure the ctx at least has one day expiration
         expiredAt += 3600 * 24;
         if (util.isTimestampExpired(expiredAt)) {
