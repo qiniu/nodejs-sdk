@@ -54,6 +54,7 @@
     "formstream": "1.1.0",
     "crc32": "0.2.2",
     "urllib": "2.22.0",
+    "agentkeepalive": "3.3.0",
     "urlencode": "1.1.0"
   },
   "devDependencies": {
