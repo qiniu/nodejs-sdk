@@ -6,6 +6,7 @@ module.exports = {
   },
   cdn: require(libPath + "/cdn.js"),
   form_io: require(libPath + '/io/form.js'),
+  resume_io: require(libPath + '/io/resume.js'),
   rs: require(libPath + '/rs.js'),
   fop: require(libPath + '/fop.js'),
   conf: require(libPath + '/conf.js'),

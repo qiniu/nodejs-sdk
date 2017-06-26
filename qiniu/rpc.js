@@ -2,6 +2,7 @@ var urllib = require('urllib');
 var util = require('./util');
 var conf = require('./conf');
 
+exports.post = post;
 exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
@@ -33,6 +34,8 @@ function postWithoutForm(requestURI, token, callbackFunc) {
 function post(requestURI, requestForm, headers, callbackFunc) {
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
+  headers['Accept-Encoding'] = 'gzip';
+  headers['Connection'] = 'keep-alive';
 
   var data = {
     headers: headers,
@@ -42,6 +45,7 @@ function post(requestURI, requestForm, headers, callbackFunc) {
   };
 
   if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
+    headers['Content-Type'] = 'application/octet-stream';
     data.content = requestForm;
   } else if (requestForm) {
     data.stream = requestForm;

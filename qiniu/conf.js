@@ -12,14 +12,14 @@ var defaultUserAgent = function() {
 }
 
 exports.USER_AGENT = defaultUserAgent();
-const BLOCK_SIZE = 4 * 1024 * 1024; //4MB, never change
+exports.BLOCK_SIZE = 4 * 1024 * 1024; //4MB, never change
 
 //define api form mime type
 exports.FormMimeUrl = "application/x-www-form-urlencoded";
 exports.FormMimeJson = "application/json";
 exports.FormMimeRaw = "application/octet-stream";
 exports.RS_HOST = "http://rs.qiniu.com";
-exports.RPC_TIMEOUT = 30000; //30s
+exports.RPC_TIMEOUT = 60000; //60s
 
 exports.Config = function Config(options) {
   options = options || {};
@@ -28,7 +28,7 @@ exports.Config = function Config(options) {
   //response timeout, in seconds
   this.responseTimeout = options.responseTimeout || 30;
   //put threshold, in bytes
-  this.putThreshold = options.putThreshold || BLOCK_SIZE;
+  this.putThreshold = options.putThreshold || exports.BLOCK_SIZE;
   //use http or https protocol
   this.useHttpsDomain = options.useHttpsDomain || false;
   //use cdn accerlated domains
