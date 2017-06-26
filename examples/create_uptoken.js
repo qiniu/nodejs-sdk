@@ -43,6 +43,7 @@ var options = {
   scope: bucket,
   callbackUrl: 'http://api.example.com/qiniu/upload/callback',
   callbackBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}',
+  callbackBodyType: 'application/json'
 }
 var putPolicy = new qiniu.rs.PutPolicy(options);
 console.log(putPolicy.uploadToken(mac));

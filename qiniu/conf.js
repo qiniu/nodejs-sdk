@@ -23,18 +23,10 @@ exports.RPC_TIMEOUT = 60000; //60s
 
 exports.Config = function Config(options) {
   options = options || {};
-  //connect timeout, in seconds
-  this.connectTimeout = options.connectTimeout || 30;
-  //response timeout, in seconds
-  this.responseTimeout = options.responseTimeout || 30;
-  //put threshold, in bytes
-  this.putThreshold = options.putThreshold || exports.BLOCK_SIZE;
   //use http or https protocol
   this.useHttpsDomain = options.useHttpsDomain || false;
   //use cdn accerlated domains
   this.useCdnDomain = options.useCdnDomain || true;
-  //max retry times for chunk upload
-  this.maxRetryTimes = options.maxRetryTimes || 3;
   //zone of the bucket
   //z0 huadong, z1 huabei, z2 huanan, na0 beimei
   this.zone = options.zone || null;
