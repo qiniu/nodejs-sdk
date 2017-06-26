@@ -24,31 +24,17 @@ bucketManager.batch(copyOperations, function(err, respBody, respInfo) {
     console.log(err);
     //throw err;
   } else {
-    if (respInfo.statusCode == 200) {
-      console.log(respBody);
+    // 200 is success, 298 is part success
+    if (parseInt(respInfo.statusCode / 100) == 2) {
+      respBody.forEach(function(item) {
+        if (item.code == 200) {
+          console.log(item.code + "\tsuccess");
+        } else {
+          console.log(item.code + "\t" + item.data.error);
+        }
+      });
     } else {
-      console.log(respInfo.statusCode);
-      console.log(respBody);
-    }
-  }
-});
-
-var statOperations = [
-  qiniu.rs.statOp(srcBucket, 'qiniu1.mp4'),
-  qiniu.rs.statOp(srcBucket, 'qiniu2.mp4'),
-  qiniu.rs.statOp(srcBucket, 'qiniu3.mp4'),
-  qiniu.rs.statOp(srcBucket, 'qiniu4.mp4'),
-];
-
-bucketManager.batch(statOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    if (respInfo.statusCode == 200) {
-      console.log(respBody);
-    } else {
-      console.log(respInfo.statusCode);
+      console.log(respInfo.deleteusCode);
       console.log(respBody);
     }
   }
