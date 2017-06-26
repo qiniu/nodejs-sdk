@@ -18,7 +18,7 @@ before(function(done) {
 //file to upload
 var imageFile = path.join(__dirname, 'logo.png');
 
-describe('test resume io', function() {
+describe('test resume up', function() {
   var accessKey = proc.env.QINIU_ACCESS_KEY;
   var secretKey = proc.env.QINIU_SECRET_KEY;
   var bucket = proc.env.QINIU_TEST_BUCKET;
@@ -55,11 +55,11 @@ describe('test resume io', function() {
   var uploadToken = putPolicy.uploadToken(mac);
   var config = new qiniu.conf.Config();
   config.zone = qiniu.zone.Zone_z0;
-  var resumeUploader = new qiniu.resume_io.ResumeUploader(config);
-  var putExtra = new qiniu.form_io.PutExtra();
+  var resumeUploader = new qiniu.resume_up.ResumeUploader(config);
+  var putExtra = new qiniu.resume_up.PutExtra();
 
-  describe('test resume io#putFileWithoutKey', function() {
-    it('test resume io#putFileWithoutKey', function(done) {
+  describe('test resume up#putFileWithoutKey', function() {
+    it('test resume up#putFileWithoutKey', function(done) {
       resumeUploader.putFileWithoutKey(uploadToken, imageFile,
         putExtra,
         function(
@@ -74,9 +74,9 @@ describe('test resume io', function() {
     });
   });
 
-  describe('test resume io#putFile', function() {
-    it('test resume io#putFile', function(done) {
-      var key = 'io_putFile_test' + Math.random(1000);
+  describe('test resume up#putFile', function() {
+    it('test resume up#putFile', function(done) {
+      var key = 'storage_putFile_test' + Math.random(1000);
       resumeUploader.putFile(uploadToken, key, imageFile, putExtra,
         function(
           respErr,

@@ -19,7 +19,7 @@ before(function(done) {
 var testFilePath1 = path.join(__dirname, 'logo.png');
 var testFilePath2 = path.join(__dirname, 'github.png');
 
-describe('test form io', function() {
+describe('test form up', function() {
   var accessKey = proc.env.QINIU_ACCESS_KEY;
   var secretKey = proc.env.QINIU_SECRET_KEY;
   var bucket = proc.env.QINIU_TEST_BUCKET;
@@ -56,11 +56,11 @@ describe('test form io', function() {
   var uploadToken = putPolicy.uploadToken(mac);
   var config = new qiniu.conf.Config();
   config.zone = qiniu.zone.Zone_z0;
-  var formUploader = new qiniu.form_io.FormUploader(config);
-  var putExtra = new qiniu.form_io.PutExtra();
+  var formUploader = new qiniu.form_up.FormUploader(config);
+  var putExtra = new qiniu.form_up.PutExtra();
 
-  describe('test form io#putStreamWithoutKey', function() {
-    it('test form io#putStreamWithoutKey', function(done) {
+  describe('test form up#putStreamWithoutKey', function() {
+    it('test form up#putStreamWithoutKey', function(done) {
       var key = null;
       var rs = fs.createReadStream(testFilePath1);
       formUploader.putStream(uploadToken, key, rs, putExtra,
@@ -75,9 +75,9 @@ describe('test form io', function() {
     });
   });
 
-  describe('test form io#putStream', function() {
-    it('test form io#putStream', function(done) {
-      var key = 'io_putStream_test' + Math.random(1000);
+  describe('test form up#putStream', function() {
+    it('test form up#putStream', function(done) {
+      var key = 'storage_putStream_test' + Math.random(1000);
       var rs = fs.createReadStream(testFilePath1);
       formUploader.putStream(uploadToken, key, rs, putExtra,
         function(respErr,
@@ -91,9 +91,9 @@ describe('test form io', function() {
     });
   });
 
-  describe('test form io#put', function() {
-    it('test form io#put', function(done) {
-      var key = 'io_put_test' + Math.random(1000);
+  describe('test form up#put', function() {
+    it('test form up#put', function(done) {
+      var key = 'storage_put_test' + Math.random(1000);
       formUploader.put(uploadToken, key, "hello world", putExtra,
         function(respErr,
           respBody, respInfo) {
@@ -106,8 +106,8 @@ describe('test form io', function() {
     });
   });
 
-  describe('test form io#putWithoutKey', function() {
-    it('test form io#putWithoutKey', function(done) {
+  describe('test form up#putWithoutKey', function() {
+    it('test form up#putWithoutKey', function(done) {
       formUploader.putWithoutKey(uploadToken, "hello world",
         putExtra,
         function(respErr,
@@ -121,9 +121,9 @@ describe('test form io', function() {
     });
   });
 
-  describe('test form io#putFile', function() {
-    it('test form io#putFile', function(done) {
-      var key = 'io_putFile_test' + Math.random(1000);
+  describe('test form up#putFile', function() {
+    it('test form up#putFile', function(done) {
+      var key = 'storage_putFile_test' + Math.random(1000);
       formUploader.putFile(uploadToken, key, testFilePath2,
         putExtra,
         function(
@@ -138,8 +138,8 @@ describe('test form io', function() {
     });
   });
 
-  describe('test form io#putFileWithoutKey', function() {
-    it('test form io#putFileWithoutKey', function(done) {
+  describe('test form up#putFileWithoutKey', function() {
+    it('test form up#putFileWithoutKey', function(done) {
       formUploader.putFileWithoutKey(uploadToken, testFilePath2,
         putExtra,
         function(

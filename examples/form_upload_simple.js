@@ -14,8 +14,8 @@ var uploadToken = putPolicy.uploadToken(mac);
 var config = new qiniu.conf.Config();
 var localFile = "/Users/jemy/Documents/qiniu.mp4";
 //config.zone = qiniu.zone.Zone_z0;
-var formUploader = new qiniu.form_io.FormUploader(config);
-var putExtra = new qiniu.form_io.PutExtra();
+var formUploader = new qiniu.form_up.FormUploader(config);
+var putExtra = new qiniu.form_up.PutExtra();
 
 //bytes
 formUploader.put(uploadToken, null, "hello", null, function(respErr,

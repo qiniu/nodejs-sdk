@@ -1,5 +1,13 @@
 ## CHANGE LOG
 
+### v7.0.0
+
+- 重构文件表单上传和分片上传代码
+- 重构CDN操作相关的代码
+- 重构资源管理相关的代码
+- 重构数据处理相关的代码
+- 重构上传策略的相关代码
+
 ### v6.1.14
 
 2017-01-16
@@ -42,10 +50,10 @@
 
 2015-12-03
 
-- Make secure base url 
-- policy add fsizeMin 
-- 修正 getEncodedEntryUri(bucket, key) 
-- 文档修正 
+- Make secure base url
+- policy add fsizeMin
+- 修正 getEncodedEntryUri(bucket, key)
+- 文档修正
 
 ### v6.1.8
 

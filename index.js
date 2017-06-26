@@ -5,8 +5,8 @@ module.exports = {
     digest: require(libPath + '/auth' + '/digest.js')
   },
   cdn: require(libPath + "/cdn.js"),
-  form_io: require(libPath + '/io/form.js'),
-  resume_io: require(libPath + '/io/resume.js'),
+  form_up: require(libPath + '/storage/form.js'),
+  resume_up: require(libPath + '/storage/resume.js'),
   rs: require(libPath + '/rs.js'),
   fop: require(libPath + '/fop.js'),
   conf: require(libPath + '/conf.js'),
