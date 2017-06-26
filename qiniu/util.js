@@ -4,7 +4,7 @@ var conf = require('./conf');
 
 // Check Timestamp Expired or not
 exports.isTimestampExpired = function(timestamp) {
-  return timestamp > parseInt(Date.now() / 1000);
+  return timestamp < parseInt(Date.now() / 1000);
 }
 
 // Encoded Entry
