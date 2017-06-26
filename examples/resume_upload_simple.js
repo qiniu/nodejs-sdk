@@ -22,6 +22,7 @@ putExtra.params = {
   "x:age": 27,
 }
 putExtra.fname = 'testfile.mp4';
+putExtra.resumeRecordFile = 'progress.log';
 
 //file
 resumeUploader.putFile(uploadToken, null, localFile, putExtra, function(respErr,

@@ -14,27 +14,17 @@ function ResumeUploader(config) {
 }
 
 // 上传可选参数
-// @params fname   请求体中的文件的名称
-// @params params  额外参数设置，参数名称必须以x:开头
-// @param mimeType 指定文件的mimeType
+// @params fname                      请求体中的文件的名称
+// @params params                     额外参数设置，参数名称必须以x:开头
+// @param mimeType                    指定文件的mimeType
+// @param resumeRecordFile            断点续传的已上传的部分信息记录文件
 // @param progressCallback(BlkputRet) 上传进度回调
-// @param ctxList  断点续传的已上传的文件ctx列表，
-//                 在上传的过程中可以在progressCallback中写入本地文件
-function PutExtra(fname, params, mimeType, blkputRets, progressCallback) {
+function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback) {
   this.fname = fname || '';
   this.params = params || {};
   this.mimeType = mimeType || null;
-  this.blkputRets = blkputRets || [];
+  this.resumeRecordFile = resumeRecordFile || null;
   this.progressCallback = progressCallback || null;
-}
-
-function BlkputRet(options) {
-  this.ctx = options.ctx || null;
-  this.checksum = options.checksum || null;
-  this.crc32 = options.crc32 || null;
-  this.offset = options.offset || null;
-  this.host = options.host || null;
-  this.expired_at = options.expired_at || null;
 }
 
 ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
@@ -128,23 +118,28 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   var readLen = 0;
   var readBuffers = [];
   var finishedCtxList = [];
+  var finishedBlkPutRets = [];
+  //read resumeRecordFile
+  if (putExtra.resumeRecordFile) {
+    try {
+      var resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
+      var blkputRets = JSON.parse(resumeRecords);
 
-  //check putExtra.blkputRets
-  if (putExtra.blkputRets) {
-    for (var index = 0; index < putExtra.blkputRets.length; index++) {
-      //check ctx expired or not
-      var blkputRet = putExtra.blkputRets[index];
-      var expiredAt = blkputRet.expired_at;
-      //make sure the ctx at least has one day expiration
-      expiredAt += 3600 * 24;
-      if (util.isTimestampExpired(expiredAt)) {
-        //discard these ctxs
-        break;
+      for (var index = 0; index < blkputRets.length; index++) {
+        //check ctx expired or not
+        var blkputRet = blkputRets[index];
+        var expiredAt = blkputRet.expired_at;
+        //make sure the ctx at least has one day expiration
+        expiredAt += 3600 * 24;
+        if (util.isTimestampExpired(expiredAt)) {
+          //discard these ctxs
+          break;
+        }
+
+        finishedBlock += 1;
+        finishedCtxList.push(blkputRet.ctx);
       }
-
-      finishedBlock += 1;
-      finishedCtxList.push(blkputRet.ctx);
-    }
+    } catch (e) {}
   }
 
   //check when to mkblk
@@ -170,8 +165,16 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
             rsStream.resume();
             var blkputRet = respBody;
             finishedCtxList.push(blkputRet.ctx);
+            finishedBlkPutRets.push(blkputRet);
             if (putExtra.progressCallback) {
               putExtra.progressCallback(blkputRet);
+            }
+            if (putExtra.resumeRecordFile) {
+              var contents = JSON.stringify(finishedBlkPutRets);
+              console.log("write resume record " + putExtra.resumeRecordFile)
+              fs.writeFileSync(putExtra.resumeRecordFile, contents, {
+                encoding: 'utf-8'
+              });
             }
           }
         });
@@ -226,7 +229,15 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     'Content-Type': 'application/octet-stream'
   }
   var postBody = ctxList.join(",");
-  rpc.post(requestURI, postBody, headers, callbackFunc);
+  rpc.post(requestURI, postBody, headers, function(err, ret, info) {
+    if (info.statusCode == 200 || info.statusCode == 701 ||
+      info.statusCode == 401) {
+      if (putExtra.resumeRecordFile) {
+        fs.unlinkSync(putExtra.resumeRecordFile);
+      }
+    }
+    callbackFunc(err, ret, info);
+  });
 }
 
 ResumeUploader.prototype.putFile = function(uploadToken, key, localFile,
