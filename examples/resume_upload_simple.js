@@ -14,6 +14,7 @@ var uploadToken = putPolicy.uploadToken(mac);
 var config = new qiniu.conf.Config();
 var localFile = "/Users/jemy/Documents/qiniu.mp4";
 config.zone = qiniu.zone.Zone_z0;
+config.useCdnDomain = true;
 var resumeUploader = new qiniu.resume_io.ResumeUploader(config);
 var putExtra = new qiniu.resume_io.PutExtra();
 putExtra.params = {

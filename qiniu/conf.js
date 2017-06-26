@@ -32,7 +32,7 @@ exports.Config = function Config(options) {
   //use http or https protocol
   this.useHttpsDomain = options.useHttpsDomain || false;
   //use cdn accerlated domains
-  this.useCdnDomain = options.useCdnDomain || false;
+  this.useCdnDomain = options.useCdnDomain || true;
   //max retry times for chunk upload
   this.maxRetryTimes = options.maxRetryTimes || 3;
   //zone of the bucket

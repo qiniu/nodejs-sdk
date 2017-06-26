@@ -32,7 +32,7 @@ function postWithoutForm(requestURI, token, callbackFunc) {
 }
 
 function post(requestURI, requestForm, headers, callbackFunc) {
-  var start = parseInt(Date.now() / 1000);
+  //var start = parseInt(Date.now() / 1000);
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
   headers['Accept-Encoding'] = 'gzip';
@@ -43,6 +43,7 @@ function post(requestURI, requestForm, headers, callbackFunc) {
     method: 'POST',
     dataType: 'json',
     timeout: conf.RPC_TIMEOUT,
+    //  timing: true,
   };
 
   if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
@@ -55,8 +56,15 @@ function post(requestURI, requestForm, headers, callbackFunc) {
 
   var req = urllib.request(requestURI, data, function(respErr, respBody,
     respInfo) {
-    var end = parseInt(Date.now() / 1000);
-    console.log((end - start) + " seconds");
+    //var end = parseInt(Date.now() / 1000);
+    // console.log((end - start) + " seconds");
+    // console.log("queuing:\t" + respInfo.timing.queuing);
+    // console.log("dnslookup:\t" + respInfo.timing.dnslookup);
+    // console.log("connected:\t" + respInfo.timing.connected);
+    // console.log("requestSent:\t" + respInfo.timing.requestSent);
+    // console.log("waiting:\t" + respInfo.timing.waiting);
+    // console.log("contentDownload:\t" + respInfo.timing.contentDownload);
+
     callbackFunc(respErr, respBody, respInfo);
   });
 
