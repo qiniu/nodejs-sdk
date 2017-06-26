@@ -119,7 +119,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   // block upload
 
   var fileSize = rsStreamLen;
-  console.log("file size:" + fileSize);
+  //console.log("file size:" + fileSize);
   var blockCnt = fileSize / conf.BLOCK_SIZE
   var totalBlockNum = (fileSize % conf.BLOCK_SIZE == 0) ? blockCnt : (blockCnt +
     1);
@@ -153,7 +153,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     readBuffers.push(chunk);
 
     if (readLen % conf.BLOCK_SIZE == 0 || readLen == fileSize) {
-      console.log(readLen);
+      //console.log(readLen);
       var readData = Buffer.concat(readBuffers);
       readBuffers = []; //reset read buffer
       curBlock += 1; //set current block
@@ -181,14 +181,14 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
 
   //check when to mkfile
   rsStream.on('end', function() {
-    console.log("end");
+    //console.log("end");
     mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
       putExtra, callbackFunc);
   });
 }
 
 function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
-  console.log("mkblk");
+  //console.log("mkblk");
   var requestURI = upDomain + "/mkblk/" + blkData.length;
   var auth = 'UpToken ' + uploadToken;
   var headers = {
@@ -200,8 +200,11 @@ function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
 
 function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
   callbackFunc) {
-  console.log("mkfile");
+  //console.log("mkfile");
   var requestURI = upDomain + "/mkfile/" + fileSize;
+  if (key) {
+    requestURI += "/key/" + util.urlsafeBase64Encode(key);
+  }
   if (putExtra.mimeType) {
     requestURI += "/mimeType/" + util.urlsafeBase64Encode(putExtra.mimeType);
   }

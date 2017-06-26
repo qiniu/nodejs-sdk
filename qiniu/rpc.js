@@ -35,7 +35,6 @@ function post(requestURI, requestForm, headers, callbackFunc) {
   //var start = parseInt(Date.now() / 1000);
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
-  headers['Accept-Encoding'] = 'gzip';
   headers['Connection'] = 'keep-alive';
 
   var data = {
@@ -43,6 +42,7 @@ function post(requestURI, requestForm, headers, callbackFunc) {
     method: 'POST',
     dataType: 'json',
     timeout: conf.RPC_TIMEOUT,
+    gzip: true,
     //  timing: true,
   };
 
