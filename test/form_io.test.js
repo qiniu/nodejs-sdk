@@ -16,7 +16,8 @@ before(function(done) {
 
 
 //file to upload
-var imageFile = path.join(__dirname, 'logo.png');
+var testFilePath1 = path.join(__dirname, 'logo.png');
+var testFilePath2 = path.join(__dirname, 'github.png');
 
 describe('test form io', function() {
   var accessKey = proc.env.QINIU_ACCESS_KEY;
@@ -61,16 +62,14 @@ describe('test form io', function() {
   describe('test form io#putStreamWithoutKey', function() {
     it('test form io#putStreamWithoutKey', function(done) {
       var key = null;
-      var rs = fs.createReadStream(imageFile);
+      var rs = fs.createReadStream(testFilePath1);
       formUploader.putStream(uploadToken, key, rs, putExtra,
         function(respErr,
           respBody, respInfo) {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          if (!keysToDelete.includes(respBody.key)) {
-            keysToDelete.push(respBody.key);
-          }
+          keysToDelete.push(respBody.key);
           done();
         });
     });
@@ -79,16 +78,14 @@ describe('test form io', function() {
   describe('test form io#putStream', function() {
     it('test form io#putStream', function(done) {
       var key = 'io_putStream_test' + Math.random(1000);
-      var rs = fs.createReadStream(imageFile);
+      var rs = fs.createReadStream(testFilePath1);
       formUploader.putStream(uploadToken, key, rs, putExtra,
         function(respErr,
           respBody, respInfo) {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          if (!keysToDelete.includes(respBody.key)) {
-            keysToDelete.push(respBody.key);
-          }
+          keysToDelete.push(respBody.key);
           done();
         });
     });
@@ -103,9 +100,7 @@ describe('test form io', function() {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          if (!keysToDelete.includes(respBody.key)) {
-            keysToDelete.push(respBody.key);
-          }
+          keysToDelete.push(respBody.key);
           done();
         });
     });
@@ -120,9 +115,7 @@ describe('test form io', function() {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          if (!keysToDelete.includes(respBody.key)) {
-            keysToDelete.push(respBody.key);
-          }
+          keysToDelete.push(respBody.key);
           done();
         });
     });
@@ -131,24 +124,7 @@ describe('test form io', function() {
   describe('test form io#putFile', function() {
     it('test form io#putFile', function(done) {
       var key = 'io_putFile_test' + Math.random(1000);
-      formUploader.putFile(uploadToken, key, imageFile, putExtra,
-        function(
-          respErr,
-          respBody, respInfo) {
-          //console.log(respBody);
-          should.not.exist(respErr);
-          respBody.should.have.keys('key', 'hash');
-          if (!keysToDelete.includes(respBody.key)) {
-            keysToDelete.push(respBody.key);
-          }
-          done();
-        });
-    });
-  });
-
-  describe('test form io#putFileWithoutKey', function() {
-    it('test form io#putFileWithoutKey', function(done) {
-      formUploader.putFileWithoutKey(uploadToken, imageFile,
+      formUploader.putFile(uploadToken, key, testFilePath2,
         putExtra,
         function(
           respErr,
@@ -156,9 +132,23 @@ describe('test form io', function() {
           //console.log(respBody);
           should.not.exist(respErr);
           respBody.should.have.keys('key', 'hash');
-          if (!keysToDelete.includes(respBody.key)) {
-            keysToDelete.push(respBody.key);
-          }
+          keysToDelete.push(respBody.key);
+          done();
+        });
+    });
+  });
+
+  describe('test form io#putFileWithoutKey', function() {
+    it('test form io#putFileWithoutKey', function(done) {
+      formUploader.putFileWithoutKey(uploadToken, testFilePath2,
+        putExtra,
+        function(
+          respErr,
+          respBody, respInfo) {
+          //console.log(respBody);
+          should.not.exist(respErr);
+          respBody.should.have.keys('key', 'hash');
+          keysToDelete.push(respBody.key);
           done();
         });
     });
