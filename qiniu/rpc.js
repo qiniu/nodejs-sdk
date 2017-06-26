@@ -32,6 +32,7 @@ function postWithoutForm(requestURI, token, callbackFunc) {
 }
 
 function post(requestURI, requestForm, headers, callbackFunc) {
+  var start = parseInt(Date.now() / 1000);
   headers = headers || {};
   headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
   headers['Accept-Encoding'] = 'gzip';
@@ -45,7 +46,6 @@ function post(requestURI, requestForm, headers, callbackFunc) {
   };
 
   if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
-    headers['Content-Type'] = 'application/octet-stream';
     data.content = requestForm;
   } else if (requestForm) {
     data.stream = requestForm;
@@ -55,6 +55,8 @@ function post(requestURI, requestForm, headers, callbackFunc) {
 
   var req = urllib.request(requestURI, data, function(respErr, respBody,
     respInfo) {
+    var end = parseInt(Date.now() / 1000);
+    console.log((end - start) + " seconds");
     callbackFunc(respErr, respBody, respInfo);
   });
 

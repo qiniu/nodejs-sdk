@@ -16,6 +16,10 @@ var localFile = "/Users/jemy/Documents/qiniu.mp4";
 config.zone = qiniu.zone.Zone_z0;
 var resumeUploader = new qiniu.resume_io.ResumeUploader(config);
 var putExtra = new qiniu.resume_io.PutExtra();
+putExtra.params = {
+  "x:name": "",
+  "x:age": 27,
+}
 
 //file
 resumeUploader.putFile(uploadToken, null, localFile, putExtra, function(respErr,

@@ -192,7 +192,8 @@ function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
   var requestURI = upDomain + "/mkblk/" + blkData.length;
   var auth = 'UpToken ' + uploadToken;
   var headers = {
-    Authorization: auth,
+    'Authorization': auth,
+    'Content-Type': 'application/octet-stream'
   }
   rpc.post(requestURI, blkData, headers, callbackFunc);
 }
@@ -210,7 +211,7 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
   if (putExtra.params) {
     //putExtra params
     for (var k in putExtra.params) {
-      if (k.startsWith("x:")) {
+      if (k.startsWith("x:") && putExtra.params[k]) {
         requestURI += "/" + k + "/" + util.urlsafeBase64Encode(putExtra.params[
           k].toString());
       }
@@ -218,7 +219,8 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
   }
   var auth = 'UpToken ' + uploadToken;
   var headers = {
-    Authorization: auth,
+    'Authorization': auth,
+    'Content-Type': 'application/octet-stream'
   }
   var postBody = ctxList.join(",");
   rpc.post(requestURI, postBody, headers, callbackFunc);

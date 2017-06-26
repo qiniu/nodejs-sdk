@@ -12,11 +12,10 @@ var putPolicy = new qiniu.rs.PutPolicy(options);
 
 var uploadToken = putPolicy.uploadToken(mac);
 var config = new qiniu.conf.Config();
-var localFile = "/Users/jemy/Documents/github.png";
+var localFile = "/Users/jemy/Documents/qiniu.mp4";
 //config.zone = qiniu.zone.Zone_z0;
 var formUploader = new qiniu.form_io.FormUploader(config);
 var putExtra = new qiniu.form_io.PutExtra();
-
 
 //bytes
 formUploader.put(uploadToken, null, "hello", null, function(respErr,
