@@ -99,7 +99,7 @@ export declare namespace cdn {
          * @param deadline 链接的有效期时间戳，是以秒为单位的Unix时间戳
          * @return signedUrl  最终的带时间戳防盗链的url
          */
-        createTimestampAntiLeechUrl(domain, fileName, query, encryptKey, deadline): string;
+        createTimestampAntiLeechUrl(domain: string, fileName: string, query: any, encryptKey: string, deadline: number): string;
     }
 }
 
