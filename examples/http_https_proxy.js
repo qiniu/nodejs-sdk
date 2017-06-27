@@ -32,7 +32,7 @@ var proxyAgent = tunnel.httpOverHttp({
   }
 });
 
-//qiniu.conf.RPC_HTTP_AGENT = proxyAgent;
+qiniu.conf.RPC_HTTP_AGENT = proxyAgent;
 
 //qiniu.conf.RPC_HTTPS_AGENT = proxyAgent;
 //以代理方式上传
