@@ -14,7 +14,7 @@ var putPolicy = new qiniu.rs.PutPolicy(options);
 var uploadToken = putPolicy.uploadToken(mac);
 var config = new qiniu.conf.Config();
 //config.zone = qiniu.zone.Zone_z0;
-config.useHttpsDomain = true;
+//config.useHttpsDomain = true;
 var formUploader = new qiniu.form_up.FormUploader(config);
 var putExtra = new qiniu.form_up.PutExtra();
 
