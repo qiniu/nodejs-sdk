@@ -1,14 +1,14 @@
 language: node_js
 node_js:
-- "4"
-- "6"
-- "8"
+- '4'
+- '6'
+- '8'
 before_script:
 - export is_travis=true
 deploy:
   provider: npm
-  email: "sdk@qiniu.com"
+  email: sdk@qiniu.com
   api_key:
-    secure: O46FsywFgTyqwdf2tN5AXIJe3gnCjSHZT8tPfxl1TGY+p3iu0clixN8+nBvAqdnQvKu3Z4hmNhOd3zLdDbSsZoEWu6AhS+ySJWkkvM0rdIt9+wcVNWDyKd6WcW3bm1kq5KsLi1xM9VPfto5M/qYQRMg1RoCGDdxaAra4a6SH2Bs=
+    secure: GbKSsROWx6J33WK23cT08eizlkRqpbnCEv3bh4I9R8K5HuUzk08TkNj/LxxuWOEG3hrthivnb5gxshE5UxJ8+nGkS1N2lgZX1i8qT6dGrHb3xda7QB1Szm5+305fCpIa/0jsFqud/8l0GNsNyLezeoaihaNAb9Et5tz6JYVfQxU=
   on:
     tags: true
