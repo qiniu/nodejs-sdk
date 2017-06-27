@@ -21,6 +21,10 @@ exports.FormMimeRaw = "application/octet-stream";
 exports.RS_HOST = "http://rs.qiniu.com";
 exports.RPC_TIMEOUT = 60000; //60s
 
+//proxy
+exports.RPC_HTTP_AGENT = null;
+exports.RPC_HTTPS_AGENT = null;
+
 exports.Config = function Config(options) {
   options = options || {};
   //use http or https protocol

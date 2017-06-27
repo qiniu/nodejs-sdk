@@ -46,6 +46,14 @@ function post(requestURI, requestForm, headers, callbackFunc) {
     //  timing: true,
   };
 
+  if (conf.RPC_HTTP_AGENT) {
+    data['agent'] = conf.RPC_HTTP_AGENT;
+  }
+
+  if (conf.RPC_HTTPS_AGENT) {
+    data['httpsAgent'] = conf.RPC_HTTPS_AGENT;
+  }
+
   if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
     data.content = requestForm;
   } else if (requestForm) {
