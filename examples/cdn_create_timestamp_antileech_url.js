@@ -1,4 +1,4 @@
-const qiniu = require("../index.js");
+const qiniu = require("qiniu");
 
 var domain = 'http://sg.xiaohongshu.com';
 var fileName = 'github.png';

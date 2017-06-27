@@ -1,4 +1,4 @@
-const qiniu = require("../index.js");
+const qiniu = require("qiniu");
 const proc = require("process");
 
 //URL 列表
@@ -41,7 +41,7 @@ cdnManager.refreshUrls(urlsToRefresh, function(err, respBody, respInfo) {
 });
 
 //刷新目录，刷新目录需要联系七牛技术支持开通权限
-qiniu.cdn.refreshDirs(dirsToRefresh, function(err, respBody, respInfo) {
+cdnManager.refreshDirs(dirsToRefresh, function(err, respBody, respInfo) {
   if (err) {
     throw err;
   }
@@ -62,7 +62,7 @@ qiniu.cdn.refreshDirs(dirsToRefresh, function(err, respBody, respInfo) {
 });
 
 //一起刷新
-qiniu.cdn.refreshUrlsAndDirs(urlsToRefresh, dirsToRefresh, function(err,
+cdnManager.refreshUrlsAndDirs(urlsToRefresh, dirsToRefresh, function(err,
   respBody, respInfo) {
   if (err) {
     throw err;

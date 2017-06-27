@@ -1,4 +1,4 @@
-const qiniu = require("../index.js");
+const qiniu = require("qiniu");
 const proc = require("process");
 
 var accessKey = proc.env.QINIU_ACCESS_KEY;
@@ -13,7 +13,9 @@ var destBucket = srcBucket;
 
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
 var copyOperations = [
-  qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu1.mp4'),
+  qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu1.mp4', {
+    force: true
+  }),
   qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu2.mp4'),
   qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu3.mp4'),
   qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu4.mp4'),

@@ -112,7 +112,7 @@ CdnManager.prototype.prefetchUrls = function(urls, callbackFunc) {
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
 // 刷新urls  refreshUrls =  ['http://obbid7qc6.qnssl.com/023','http://obbid7qc6.qnssl.com/025']
 CdnManager.prototype.refreshUrls = function(urls, callbackFunc) {
-  exports.refreshUrlsAndDirs(urls, null, callbackFunc);
+  this.refreshUrlsAndDirs(urls, null, callbackFunc);
 }
 
 
@@ -121,7 +121,7 @@ CdnManager.prototype.refreshUrls = function(urls, callbackFunc) {
 // @link http://developer.qiniu.com/article/fusion/api/refresh.html
 // 刷新dirs  refreshDirs =  ['http://obbid7qc6.qnssl.com/wo/','http://obbid7qc6.qnssl.com/']
 CdnManager.prototype.refreshDirs = function(dirs, callbackFunc) {
-  exports.refreshUrlsAndDirs(null, dirs, callbackFunc);
+  this.refreshUrlsAndDirs(null, dirs, callbackFunc);
 }
 
 

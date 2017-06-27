@@ -1,4 +1,4 @@
-const qiniu = require("../index.js");
+const qiniu = require("qiniu");
 
 //var persistentId = 'z0.594b66f745a2650c99aa9e57';
 var persistentId = 'na0.58df4eee92129336c2075195';
