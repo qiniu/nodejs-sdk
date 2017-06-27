@@ -199,12 +199,12 @@ var uploadToken=putPolicy.uploadToken(mac);
 <a id="param-uptoken"></a>
 #### 带自定义参数的凭证
 
-七牛支持客户端上传文件的时候定义一些自定义参数，这些参数可以在`returnBody`和`callbackBody`里面和七牛内置支持的魔法变量（即系统变量）通过相同的方式来引用。这些自定义的参数名称必须以`x:`开头。例如客户端上传的时候指定了自定义的参数`x:user`和`x:age`分别是`string`和`int`类型。那么可以通过下面的方式引用：
+七牛支持客户端上传文件的时候定义一些自定义参数，这些参数可以在`returnBody`和`callbackBody`里面和七牛内置支持的魔法变量（即系统变量）通过相同的方式来引用。这些自定义的参数名称必须以`x:`开头。例如客户端上传的时候指定了自定义的参数`x:name`和`x:age`分别是`string`和`int`类型。那么可以通过下面的方式引用：
 
 ```
 var options = {
   //其他上传策略参数...
-  returnBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}'
+  returnBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)","age":$(x:age)}'
 }
 ```
 
@@ -213,7 +213,7 @@ var options = {
 ```
 var options = {
   //其他上传策略参数...
-  callbackBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}',
+  callbackBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)","age":$(x:age)}',
 }
 ```
 
