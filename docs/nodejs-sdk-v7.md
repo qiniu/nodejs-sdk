@@ -14,7 +14,7 @@ Node.js SDK 属于七牛服务端SDK之一，主要有如下功能：
 <a id="opensource"></a>
 # 开源
 
-- [Node.js SDK 项目地址](https://github.com/qiniu)
+- [Node.js SDK 项目地址](https://github.com/qiniu/nodejs-sdk)
 - [Node.js SDK 发布地址](https://github.com/qiniu/nodejs-sdk/releases)
 - [Node.js SDK 历史文档](/kodo/sdk/nodejs-sdk-6)
 
@@ -176,10 +176,8 @@ var uploadToken=putPolicy.uploadToken(mac);
 七牛支持在文件上传到七牛之后，立即对其进行多种指令的数据处理，这个只需要在生成的上传凭证中指定相关的处理参数即可。
 
 ```
-var saveMp4Entry = qiniu.util.urlsafeBase64Encode(bucket +
-  ":avthumb_test_target.mp4");
-var saveJpgEntry = qiniu.util.urlsafeBase64Encode(bucket +
-  ":vframe_test_target.jpg");
+var saveMp4Entry = qiniu.util.urlsafeBase64Encode(bucket + ":avthumb_test_target.mp4");
+var saveJpgEntry = qiniu.util.urlsafeBase64Encode(bucket + ":vframe_test_target.jpg");
 //数据处理指令，支持多个指令
 var avthumbMp4Fop = "avthumb/mp4|saveas/" + saveMp4Entry;
 var vframeJpgFop = "vframe/jpg/offset/1|saveas/" + saveJpgEntry;
@@ -201,7 +199,7 @@ var uploadToken=putPolicy.uploadToken(mac);
 <a id="param-uptoken"></a>
 #### 带自定义参数的凭证
 
-七牛支持客户端上传文件的时候定义一些自定义参数，这些参数可以在`returnBody`和`callbackBody`里面和七牛内置支持的魔法变量（即系统变量）通过相同的方式来引用。这些自定义的参数名称必须以`x:`开头。例如客户端上传的时候指定了自定义的参数`x:user`和`x:age`分别是`String`和`int`类型。那么可以通过下面的方式引用：
+七牛支持客户端上传文件的时候定义一些自定义参数，这些参数可以在`returnBody`和`callbackBody`里面和七牛内置支持的魔法变量（即系统变量）通过相同的方式来引用。这些自定义的参数名称必须以`x:`开头。例如客户端上传的时候指定了自定义的参数`x:user`和`x:age`分别是`string`和`int`类型。那么可以通过下面的方式引用：
 
 ```
 var options = {
@@ -259,9 +257,7 @@ config.zone = qiniu.zone.Zone_z0;
 最简单的就是上传本地文件，直接指定文件的完整路径即可上传。
 
 ```
-var config = new qiniu.conf.Config();
 var localFile = "/Users/jemy/Documents/qiniu.mp4";
-config.zone = qiniu.zone.Zone_z0;
 var formUploader = new qiniu.form_up.FormUploader(config);
 var putExtra = new qiniu.form_up.PutExtra();
 var key='test.mp4';
@@ -286,8 +282,6 @@ formUploader.putFile(uploadToken, key, localFile, putExtra, function(respErr,
 可以支持将内存中的字节数组上传到空间中。
 
 ```
-var config = new qiniu.conf.Config();
-config.zone = qiniu.zone.Zone_z0;
 var formUploader = new qiniu.form_up.FormUploader(config);
 var putExtra = new qiniu.form_up.PutExtra();
 var key='test.txt';
@@ -311,8 +305,6 @@ formUploader.put(uploadToken, key, "hello world", putExtra, function(respErr,
 这里演示的是`ReadableStream`对象的上传。
 
 ```
-var config = new qiniu.conf.Config();
-config.zone = qiniu.zone.Zone_z0;
 var formUploader = new qiniu.form_up.FormUploader(config);
 var putExtra = new qiniu.form_up.PutExtra();
 var readableStream = xxx; // 可读的流
@@ -335,10 +327,7 @@ formUploader.putStream(uploadToken, key, readableStream, putExtra, function(resp
 #### 文件分片上传（断点续传）
 
 ```
-var config = new qiniu.conf.Config();
 var localFile = "/Users/jemy/Documents/qiniu.mp4";
-config.zone = qiniu.zone.Zone_z0;
-config.useCdnDomain = true;
 var resumeUploader = new qiniu.resume_up.ResumeUploader(config);
 var putExtra = new qiniu.resume_up.PutExtra();
 // 扩展参数
@@ -369,7 +358,7 @@ resumeUploader.putFile(uploadToken, key, localFile, putExtra, function(respErr,
 
 <a id="upload-result-parse"></a>
 ### 解析自定义回复内容
-有些情况下，七牛返回给上传端的内容不是默认的`hash`和`key`形式，这种情况下，可能出现在自定义`returnBody`或者自定义了`callbackBody`的情况下，前者一般是服务端直传的场景，而后者则是接受上传回调的场景，这两种场景之下，都涉及到需要将自定义的回复内容解析为`Java`的类对象，一般建议在交互过程中，都采用`JSON`的方式，这样处理起来方法比较一致，而且`JSON`的方法最通用，在 Node.js 里面处理JSON的回复相当地方面，基本上了解回复结构就可以处理，这里不再赘述。
+有些情况下，七牛返回给上传端的内容不是默认的`hash`和`key`形式，这种情况下，可能出现在自定义`returnBody`或者自定义了`callbackBody`的情况下，前者一般是服务端直传的场景，而后者则是接受上传回调的场景，这两种场景之下，都涉及到需要将自定义的回复进行内容解析，一般建议在交互过程中，都采用`JSON`的方式，这样处理起来方法比较一致，而且`JSON`的方法最通用，在 Node.js 里面处理JSON的回复相当地方便，基本上了解回复结构就可以处理，这里不再赘述。
 
 <a id="upload-callback-verify"></a>
 ### 业务服务器验证七牛回调
@@ -436,7 +425,8 @@ var privateDownloadUrl = bucketManager.privateDownloadUrl(privateBucketDomain, k
 资源管理包括的主要功能有：
 
 - <a href="#rs-stat">获取文件信息</a>
-- <a href="#rs-chgm">修改文件类型</a>
+- <a href="#rs-chgm">修改文件MimeType</a>
+- <a href="#rs-chtype">修改文件存储类型</a>
 - <a href="#rs-move">移动或重命名文件</a>
 - <a href="#rs-copy">复制文件副本</a>
 - <a href="#rs-delete">删除空间中的文件</a>
@@ -490,7 +480,7 @@ bucketManager.stat(bucket, key, function(err, respBody, respInfo) {
 ```
 
 <a id="rs-chgm"></a>
-## 修改文件类型
+## 修改文件MimeType
 
 ```
 var bucket = 'if-pbl';
@@ -498,6 +488,27 @@ var key = 'qiniu.mp4';
 var newMime = 'video/x-mp4';
 
 bucketManager.changeMime(bucket, key, newMime, function(err, respBody, respInfo) {
+  if (err) {
+    console.log(err);
+    //throw err;
+  } else {
+    //200 is success
+    console.log(respInfo.statusCode);
+    console.log(respBody);
+  }
+});
+```
+
+<a id="rs-chtype"></a>
+## 修改文件存储类型
+
+```
+var bucket = 'if-pbl';
+var key = 'qiniu.mp4';
+//newType=0表示普通存储，newType为1表示低频存储
+var newType = 0;
+
+bucketManager.changeType(bucket, key, newType, function(err, respBody, respInfo) {
   if (err) {
     console.log(err);
     //throw err;
@@ -622,7 +633,7 @@ var bucket = 'if-pbl';
 //                delimiter 指定目录分隔符
 var options = {
   limit: 10,
-  prefix: 'calculus',
+  prefix: 'images/',
 };
 
 bucketManager.listPrefix(bucket, options, function(err, respBody, respInfo) {
@@ -1319,8 +1330,8 @@ console.log(finalUrl);
 <a id="faq"></a>
 # 常见问题
 
-- QiniuExeption 保留了请求响应的信息，失败情况下会抛出此异常，可以提交给我们排查问题。
-- API 的使用，demo 可以参考[单元测试](https://github.com/qiniu/java-sdk/blob/master/src/test)。
+- Node.js SDK的callback保留了请求的错误信息，回复信息和头部信息，遇到问题时，可以都打印出来提交给我们排查问题。
+- API 的使用，可以参考我们为大家精心准备的[使用实例](https://github.com/qiniu/nodejs-sdk/tree/master/examples)。
 
 <a id="related-resources"></a>
 # 相关资源
