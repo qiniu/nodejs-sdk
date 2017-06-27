@@ -38,22 +38,22 @@ $ npm install qiniu
 <a id="io-put"></a>
 # 文件上传
 - <a href="#upload-flow">上传流程</a>
-- <a href="#upload-token">客户端上传凭证<a/>
- 	 - <a href="#simple-uptoken">简单上传凭证<a/>
- 	 - <a href="#overwrite-uptoken">覆盖上传凭证<a/>
- 	 - <a href="#returnbody-uptoken">自定义上传回复凭证<a/>
- 	 - <a href="#callback-uptoken">带回调业务服务器的凭证<a/>
- 	 - <a href="#pfop-uptoken">带数据处理的凭证<a/>
- 	 - <a href="#param-uptoken">带自定义参数的凭证<a/>
- 	 - <a href="#general-uptoken">综合上传凭证<a/>
-- <a href="#server-upload">服务器直传<a/>
- 	- <a href="#upload-config">构建配置类<a/>
- 	- <a href="#form-upload-file">文件上传（表单方式）<a/>
- 	- <a href="#form-upload-bytes">字节数组上传（表单方式）<a/>
- 	- <a href="#form-upload-stream">数据流上传（表单方式）<a/>
- 	- <a href="#resume-upload-file">文件分片上传（断点续传）<a/>
- 	- <a href="#upload-result-parse">解析自定义回复内容</a>
- 	- <a href="#upload-callback-verify">业务服务器验证七牛回调</a>
+- <a href="#upload-token">客户端上传凭证</a>
+     - <a href="#simple-uptoken">简单上传凭证</a>
+     - <a href="#overwrite-uptoken">覆盖上传凭证</a>
+     - <a href="#returnbody-uptoken">自定义上传回复凭证</a>
+     - <a href="#callback-uptoken">带回调业务服务器的凭证</a>
+     - <a href="#pfop-uptoken">带数据处理的凭证</a>
+     - <a href="#param-uptoken">带自定义参数的凭证</a>
+     - <a href="#general-uptoken">综合上传凭证</a>
+- <a href="#server-upload">服务器直传</a>
+  - <a href="#upload-config">构建配置类</a>
+  - <a href="#form-upload-file">文件上传（表单方式）</a>
+  - <a href="#form-upload-bytes">字节数组上传（表单方式）</a>
+  - <a href="#form-upload-stream">数据流上传（表单方式）</a>
+  - <a href="#resume-upload-file">文件分片上传（断点续传）</a>
+  - <a href="#upload-result-parse">解析自定义回复内容</a>
+  - <a href="#upload-callback-verify">业务服务器验证七牛回调</a>
 
 <a id="upload-flow"></a>
 ### 上传流程
@@ -435,13 +435,13 @@ var privateDownloadUrl = bucketManager.privateDownloadUrl(privateBucketDomain, k
 - <a href="#rs-fetch">抓取网络资源到空间</a>
 - <a href="#rs-prefetch">更新镜像存储空间中文件内容</a>
 - <a href="#rs-batch">资源管理批量操作</a>
-    - <a href="#rs-batch-stat">批量获取文件信息<a/>
-  	- <a href="#rs-batch-chgm">批量修改文件类型<a/>
-  	- <a href="#rs-batch-delete">批量删除文件<a/>
-    - <a href="#rs-batch-copy">批量复制文件<a/>
-  	- <a href="#rs-batch-move">批量移动或重命名文件<a/>
+    - <a href="#rs-batch-stat">批量获取文件信息</a>
+    - <a href="#rs-batch-chgm">批量修改文件类型</a>
+    - <a href="#rs-batch-delete">批量删除文件</a>
+    - <a href="#rs-batch-copy">批量复制文件</a>
+    - <a href="#rs-batch-move">批量移动或重命名文件</a>
     - <a href="#rs-batch-deleteAfterDays">批量更新文件的有效期</a>
-  	- <a href="#rs-batch-type">批量更新文件存储类型<a/>
+    - <a href="#rs-batch-type">批量更新文件存储类型</a>
 
 资源管理相关的操作首先要构建`BucketManager`对象：
 
