@@ -702,7 +702,7 @@ export declare namespace rs {
         deleteAfterDays?: number;
         fileType?: number;
     }
-    class PutPolicy implements PutPolicyOptions {
+    class PutPolicy {
         constructor(options?: PutPolicyOptions);
 
         getFlags(): any;
