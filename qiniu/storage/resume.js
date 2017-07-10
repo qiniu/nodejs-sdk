@@ -166,6 +166,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
             var blkputRet = respBody;
             finishedCtxList.push(blkputRet.ctx);
             finishedBlkPutRets.push(blkputRet);
+            blkputRet.progress = readLen / fileSize;
             if (putExtra.progressCallback) {
               putExtra.progressCallback(blkputRet);
             }
