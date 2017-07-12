@@ -22,8 +22,10 @@ putExtra.params = {
   "x:age": 27,
 }
 putExtra.fname = 'testfile.mp4';
-// 这个上传进度记录文件的名字需要和上传的文件相关联，不可以多个文件共享一个记录文件
 putExtra.resumeRecordFile = 'progress.log';
+putExtra.progressCallback = function(uploadBytes, totalBytes) {
+  console.log("progress:" + uploadBytes + "(" + totalBytes + ")");
+}
 
 //file
 resumeUploader.putFile(uploadToken, null, localFile, putExtra, function(respErr,

@@ -53,11 +53,11 @@ exports.Zone_na0 = new conf.Zone([
 
 
 exports.getZoneInfo = function(accessKey, bucket, callbackFunc) {
-  var apiAddr = util.format('http://uc.qbox.me/v2/query?ak=%s&bucket=%s',
+  var apiAddr = util.format('https://uc.qbox.me/v2/query?ak=%s&bucket=%s',
     accessKey, bucket);
   urllib.request(apiAddr, function(respErr, respData, respInfo) {
     if (respErr) {
-      callback(respErr, null, null);
+      callbackFunc(respErr, null, null);
       return;
     }
 

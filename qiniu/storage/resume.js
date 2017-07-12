@@ -18,7 +18,7 @@ function ResumeUploader(config) {
 // @params params                     额外参数设置，参数名称必须以x:开头
 // @param mimeType                    指定文件的mimeType
 // @param resumeRecordFile            断点续传的已上传的部分信息记录文件
-// @param progressCallback(BlkputRet) 上传进度回调
+// @param progressCallback(uploadBytes, totalBytes) 上传进度回调
 function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback) {
   this.fname = fname || '';
   this.params = params || {};
@@ -167,7 +167,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
             finishedCtxList.push(blkputRet.ctx);
             finishedBlkPutRets.push(blkputRet);
             if (putExtra.progressCallback) {
-              putExtra.progressCallback(blkputRet);
+              putExtra.progressCallback(readLen, fileSize);
             }
             if (putExtra.resumeRecordFile) {
               var contents = JSON.stringify(finishedBlkPutRets);
