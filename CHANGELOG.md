@@ -1,5 +1,9 @@
 ## CHANGE LOG
 
+### v7.0.5
+- 修复zone获取失败时callbackFunc不存在的问题
+- 增加分片上传的时候的progressCallback
+
 ### v7.0.4
 - 增加http&https代理功能
 
