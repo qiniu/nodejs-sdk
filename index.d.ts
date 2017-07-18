@@ -194,7 +194,7 @@ export declare namespace form_up {
          * @param putExtra 额外选项
          * @param callback
          */
-        putFile(uploadToken: string, key: string | null, localFile: string, putExtra: PutExtra | null, callback: callback);
+        putFile(uploadToken: string, key: string | null, localFile: string, putExtra: PutExtra | null, callback: callback): void;
 
         /**
          *
@@ -203,7 +203,7 @@ export declare namespace form_up {
          * @param putExtra
          * @param callback
          */
-        putFileWithoutKey(uploadToken: string, localFile: string, putExtra: PutExtra | null, callback: callback);
+        putFileWithoutKey(uploadToken: string, localFile: string, putExtra: PutExtra | null, callback: callback): void;
     }
 
     class PutExtra {
@@ -483,7 +483,7 @@ export declare namespace rs {
          * @param newMime 新文件类型
          * @param callback
          */
-        changeMime(bucket: string, key: string, newMime: string, callback: callback);
+        changeMime(bucket: string, key: string, newMime: string, callback: callback): void;
 
         /**
          * 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
