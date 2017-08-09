@@ -153,7 +153,7 @@ function req(reqPath, header, reqBody, callbackFunc) {
 // 构建标准的基于时间戳的防盗链
 // @param  domain     自定义域名，例如 http://img.abc.com
 // @param  fileName   待访问的原始文件名，必须是utf8编码，不需要进行urlencode
-// @param  query      业务自身的查询参数，必须是utf8编码，不需要进行urlencode,
+// @param  query      业务自身的查询参数，必须是utf8编码，需要进行urlencode,
 //                    例如 {aa:"23", attname:"11111111111111"}
 // @param  encryptKey 时间戳防盗链的签名密钥，从七牛后台获取
 // @param  deadline   链接的有效期时间戳，是以秒为单位的Unix时间戳
@@ -165,9 +165,9 @@ CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
     Object.getOwnPropertyNames(query).forEach(function(val, idx, array) {
       arr.push(val + "=" + urlencode(query[val]));
     });
-    urlToSign = domain + '/' + urlencode(fileName) + '?' + arr.join('&');
+    urlToSign = domain + '/' + fileName + '?' + arr.join('&');
   } else {
-    urlToSign = domain + '/' + urlencode(fileName);
+    urlToSign = domain + '/' + fileName;
   }
 
   var urlObj = url.parse(urlToSign);
