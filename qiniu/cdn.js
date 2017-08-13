@@ -163,11 +163,12 @@ CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
   if (query != null) {
     var arr = [];
     Object.getOwnPropertyNames(query).forEach(function(val, idx, array) {
-      arr.push(val + "=" + urlencode(query[val]));
+      arr.push(val + "=" + encodeURIComponent(query[val]));
     });
-    urlToSign = domain + '/' + urlencode(fileName) + '?' + arr.join('&');
+    urlToSign = domain + '/' + encodeURI(fileName) + '?' + arr.join(
+      '&');
   } else {
-    urlToSign = domain + '/' + urlencode(fileName);
+    urlToSign = domain + '/' + encodeURI(fileName);
   }
 
   var urlObj = url.parse(urlToSign);
