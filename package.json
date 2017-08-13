@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "7.0.5",
+  "version": "7.0.6",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {
@@ -40,11 +40,11 @@
     "name": "why404",
     "email": "awhy.xu@gmail.com"
   }, {
-    "name": "ikbear",
-    "email": "sunikbear@gmail.com"
+    "name": "guhao",
+    "email": "guhao@qiniu.com"
   }, {
-    "name": "lintianzhi",
-    "email": "lintianzhi1992@gmail.com"
+    "name": "jinxinxin",
+    "email": "jinxinxin@qiniu.com"
   }],
   "engines": [
     "node >= 0.4.7"
