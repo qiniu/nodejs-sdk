@@ -1,5 +1,9 @@
 ## CHANGE LOG
 
+### v7.0.6
+- 修复时间戳防盗链算法中对文件名的urlencode不兼容问题
+- 发布index.d.ts文件
+
 ### v7.0.5
 - 修复zone获取失败时callbackFunc不存在的问题
 - 增加分片上传的时候的progressCallback
