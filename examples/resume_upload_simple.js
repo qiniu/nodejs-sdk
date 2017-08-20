@@ -1,7 +1,7 @@
-const qiniu = require("qiniu");
+const qiniu = require("../index.js");
 const proc = require("process");
 
-var bucket = 'if-pbl';
+var bucket = proc.env.QINIU_TEST_BUCKET;
 var accessKey = proc.env.QINIU_ACCESS_KEY;
 var secretKey = proc.env.QINIU_SECRET_KEY;
 var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);

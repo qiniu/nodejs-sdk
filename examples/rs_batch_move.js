@@ -7,7 +7,7 @@ var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
 var config = new qiniu.conf.Config();
 var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
-var srcBucket = 'if-pbl';
+var srcBucket = proc.env.QINIU_TEST_BUCKET;
 var destBucket = srcBucket;
 
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送

@@ -9,7 +9,7 @@ var config = new qiniu.conf.Config();
 config.zone = qiniu.zone.Zone_z0;
 var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
-var bucket = 'if-pbl';
+var bucket = proc.env.QINIU_TEST_BUCKET;
 // @param options 列举操作的可选参数
 //                prefix    列举的文件前缀
 //                marker    上一次列举返回的位置标记，作为本次列举的起点信息

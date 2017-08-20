@@ -9,7 +9,7 @@ var config = new qiniu.conf.Config();
 //config.zone = qiniu.zone.Zone_z1;
 var bucketManager = new qiniu.rs.BucketManager(mac, config);
 var resUrl = 'http://devtools.qiniu.com/qiniu.png';
-var bucket = "if-bc";
+var bucket = proc.env.QINIU_TEST_BUCKET;
 var key = "qiniu.png";
 
 bucketManager.fetch(resUrl, bucket, key, function(err, respBody, respInfo) {

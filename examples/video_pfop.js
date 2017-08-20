@@ -10,7 +10,7 @@ config.zone = qiniu.zone.Zone_z1;
 var operManager = new qiniu.fop.OperationManager(mac, config);
 
 //处理指令集合
-var saveBucket = 'if-bc';
+var saveBucket = proc.env.QINIU_TEST_BUCKET;
 var fops = [
   'avthumb/mp4/s/480x320/vb/150k|saveas/' + qiniu.util.urlsafeBase64Encode(
     saveBucket + ":qiniu_480x320.mp4"),

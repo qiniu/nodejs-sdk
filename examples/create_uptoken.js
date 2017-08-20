@@ -5,7 +5,7 @@ var accessKey = proc.env.QINIU_ACCESS_KEY;
 var secretKey = proc.env.QINIU_SECRET_KEY;
 var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
 
-var bucket = 'if-pbl';
+var bucket = proc.env.QINIU_TEST_BUCKET;
 
 //简单上传凭证
 var options = {

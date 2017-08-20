@@ -8,7 +8,7 @@ var config = new qiniu.conf.Config();
 //config.useHttpsDomain = true;
 config.zone = qiniu.zone.Zone_z0;
 var bucketManager = new qiniu.rs.BucketManager(mac, config);
-var bucket = "if-pbl";
+var bucket = proc.env.QINIU_TEST_BUCKET;
 var key = "qiniux.mp4";
 
 bucketManager.stat(bucket, key, function(err, respBody, respInfo) {
