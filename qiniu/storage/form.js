@@ -28,7 +28,7 @@ function PutExtra(fname, params, mimeType, crc32, checkCrc) {
   this.params = params || {};
   this.mimeType = mimeType || null;
   this.crc32 = crc32 || null;
-  this.checkCrc = checkCrc || 0;
+  this.checkCrc = checkCrc || 1;
 }
 
 FormUploader.prototype.putStream = function(uploadToken, key, rsStream,
@@ -39,7 +39,7 @@ FormUploader.prototype.putStream = function(uploadToken, key, rsStream,
   }
 
   if (!putExtra.fname) {
-    putExtra.fname = key ? key : '?';
+    putExtra.fname = key ? key : 'fname';
   }
 
   rsStream.on("error", function(err) {
@@ -121,13 +121,6 @@ FormUploader.prototype.put = function(uploadToken, key, body, putExtra,
   rsStream.push(null);
 
   putExtra = putExtra || new PutExtra();
-
-  if (putExtra.checkCrc == 1) {
-    var bodyCrc32 = getCrc32(body);
-    putExtra.crc32 = '' + parsStreameInt(bodyCrc32, 16);
-  } else if (putExtra.checkCrc == 2 && putExtra.crc32) {
-    putExtra.crc32 = '' + putExtra.crc32
-  }
   return this.putStream(uploadToken, key, rsStream, putExtra, callbackFunc)
 }
 
@@ -168,13 +161,6 @@ FormUploader.prototype.putFile = function(uploadToken, key, localFile, putExtra,
   callbackFunc) {
   putExtra = putExtra || new PutExtra();
   var rsStream = fs.createReadStream(localFile);
-
-  if (putExtra.checkCrc == 1) {
-    var fileCrc32 = getCrc32(fs.readFileSync(localFile));
-    putExtra.crc32 = '' + parsStreameInt(fileCrc32, 16);
-  } else if (putExtra.checkCrc == 2 && putExtra.crc32) {
-    putExtra.crc32 = '' + putExtra.crc32
-  }
 
   if (!putExtra.mimeType) {
     putExtra.mimeType = mime.lookup(localFile);
