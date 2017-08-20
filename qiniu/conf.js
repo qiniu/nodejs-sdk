@@ -19,7 +19,7 @@ exports.FormMimeUrl = "application/x-www-form-urlencoded";
 exports.FormMimeJson = "application/json";
 exports.FormMimeRaw = "application/octet-stream";
 exports.RS_HOST = "http://rs.qiniu.com";
-exports.RPC_TIMEOUT = 60000; //60s
+exports.RPC_TIMEOUT = 120000; //120s
 
 //proxy
 exports.RPC_HTTP_AGENT = null;

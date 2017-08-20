@@ -31,7 +31,7 @@ function PutExtra(fname, params, mimeType, crc32, checkCrc) {
   this.checkCrc = checkCrc || 1;
 }
 
-FormUploader.prototype.putStream = function(uploadToken, key, rsStream,
+FormUploader.prototype.putStream = function(uploadToken, key, fsStream,
   putExtra, callbackFunc) {
   putExtra = putExtra || new PutExtra();
   if (!putExtra.mimeType) {
@@ -42,7 +42,7 @@ FormUploader.prototype.putStream = function(uploadToken, key, rsStream,
     putExtra.fname = key ? key : 'fname';
   }
 
-  rsStream.on("error", function(err) {
+  fsStream.on("error", function(err) {
     //callbackFunc
     callbackFunc(err, null, null);
     return;
@@ -63,8 +63,10 @@ FormUploader.prototype.putStream = function(uploadToken, key, rsStream,
   var accessKey = util.getAKFromUptoken(uploadToken);
   var bucket = util.getBucketFromUptoken(uploadToken);
   if (useCache) {
-    var postForm = createMultipartForm(uploadToken, key, rsStream, putExtra);
-    putReq(this.config, postForm, callbackFunc);
+    createMultipartForm(uploadToken, key, fsStream, putExtra, function(
+      postForm) {
+      putReq(this.config, postForm, callbackFunc);
+    });
   } else {
     zone.getZoneInfo(accessKey, bucket, function(err, cZoneInfo,
       cZoneExpire) {
@@ -78,9 +80,12 @@ FormUploader.prototype.putStream = function(uploadToken, key, rsStream,
       that.config.zoneExpire = cZoneExpire;
 
       //req
-      var postForm = createMultipartForm(uploadToken, key, rsStream,
-        putExtra);
-      putReq(that.config, postForm, callbackFunc);
+      createMultipartForm(uploadToken, key, fsStream,
+        putExtra,
+        function(postForm) {
+          console.log("uploading");
+          putReq(that.config, postForm, callbackFunc);
+        });
     });
   }
 }
@@ -116,12 +121,12 @@ function putReq(config, postForm, callbackFunc) {
 //
 FormUploader.prototype.put = function(uploadToken, key, body, putExtra,
   callbackFunc) {
-  var rsStream = new Readable();
-  rsStream.push(body);
-  rsStream.push(null);
+  var fsStream = new Readable();
+  fsStream.push(body);
+  fsStream.push(null);
 
   putExtra = putExtra || new PutExtra();
-  return this.putStream(uploadToken, key, rsStream, putExtra, callbackFunc)
+  return this.putStream(uploadToken, key, fsStream, putExtra, callbackFunc)
 }
 
 FormUploader.prototype.putWithoutKey = function(uploadToken, body, putExtra,
@@ -129,15 +134,11 @@ FormUploader.prototype.putWithoutKey = function(uploadToken, body, putExtra,
   return this.put(uploadToken, null, body, putExtra, callbackFunc);
 }
 
-function createMultipartForm(uploadToken, key, rsStream, putExtra) {
+function createMultipartForm(uploadToken, key, fsStream, putExtra, callbackFunc) {
   var postForm = formstream();
   postForm.field('token', uploadToken);
   if (key) {
     postForm.field('key', key);
-  }
-  postForm.stream('file', rsStream, putExtra.fname, putExtra.mimeType);
-  if (putExtra.crc32) {
-    postForm.field('crc32', putExtra.crc32);
   }
 
   //putExtra params
@@ -147,7 +148,22 @@ function createMultipartForm(uploadToken, key, rsStream, putExtra) {
     }
   }
 
-  return postForm;
+  var fileBody = [];
+  fsStream.on('data', function(data) {
+    fileBody.push(data);
+  });
+
+  fsStream.on('end', function() {
+    fileBody = Buffer.concat(fileBody);
+    var bodyCrc32 = parseInt("0x" + getCrc32(fileBody));
+    postForm.field('crc32', bodyCrc32);
+
+    var newFsStream = new Readable();
+    newFsStream.push(fileBody);
+    newFsStream.push(null);
+    postForm.stream('file', newFsStream, putExtra.fname, putExtra.mimeType);
+    callbackFunc(postForm);
+  });
 }
 
 
@@ -160,7 +176,7 @@ function createMultipartForm(uploadToken, key, rsStream, putExtra) {
 FormUploader.prototype.putFile = function(uploadToken, key, localFile, putExtra,
   callbackFunc) {
   putExtra = putExtra || new PutExtra();
-  var rsStream = fs.createReadStream(localFile);
+  var fsStream = fs.createReadStream(localFile);
 
   if (!putExtra.mimeType) {
     putExtra.mimeType = mime.lookup(localFile);
@@ -170,7 +186,7 @@ FormUploader.prototype.putFile = function(uploadToken, key, localFile, putExtra,
     putExtra.fname = path.basename(localFile);
   }
 
-  return this.putStream(uploadToken, key, rsStream, putExtra, callbackFunc);
+  return this.putStream(uploadToken, key, fsStream, putExtra, callbackFunc);
 }
 
 FormUploader.prototype.putFileWithoutKey = function(uploadToken, localFile,

@@ -18,19 +18,19 @@ var formUploader = new qiniu.form_up.FormUploader(config);
 var putExtra = new qiniu.form_up.PutExtra();
 
 //bytes
-// formUploader.put(uploadToken, null, "hello", null, function(respErr,
-//   respBody, respInfo) {
-//   if (respErr) {
-//     throw respErr;
-//   }
-//
-//   if (respInfo.statusCode == 200) {
-//     console.log(respBody);
-//   } else {
-//     console.log(respInfo.statusCode);
-//     console.log(respBody);
-//   }
-// });
+formUploader.put(uploadToken, null, "hello", null, function(respErr,
+  respBody, respInfo) {
+  if (respErr) {
+    throw respErr;
+  }
+
+  if (respInfo.statusCode == 200) {
+    console.log(respBody);
+  } else {
+    console.log(respInfo.statusCode);
+    console.log(respBody);
+  }
+});
 
 //file
 formUploader.putFile(uploadToken, null, localFile, putExtra, function(respErr,
