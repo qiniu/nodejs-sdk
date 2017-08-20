@@ -5,6 +5,7 @@ const rpc = require('../rpc');
 const path = require('path');
 const mime = require('mime');
 const fs = require('fs');
+const getCrc32 = require('crc32');
 
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
@@ -157,12 +158,12 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
         mkblkReq(upDomain, uploadToken, readData, function(respErr,
           respBody,
           respInfo) {
-          if (respInfo.statusCode != 200) {
+          var bodyCrc32 = parseInt("0x" + getCrc32(readData));
+          if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
             callbackFunc(respErr, respBody, respInfo);
             return;
           } else {
             finishedBlock += 1;
-            rsStream.resume();
             var blkputRet = respBody;
             finishedCtxList.push(blkputRet.ctx);
             finishedBlkPutRets.push(blkputRet);
@@ -176,6 +177,8 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
                 encoding: 'utf-8'
               });
             }
+
+            rsStream.resume();
           }
         });
       }
