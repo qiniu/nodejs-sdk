@@ -65,7 +65,7 @@ FormUploader.prototype.putStream = function(uploadToken, key, fsStream,
   if (useCache) {
     createMultipartForm(uploadToken, key, fsStream, putExtra, function(
       postForm) {
-      putReq(this.config, postForm, callbackFunc);
+      putReq(that.config, postForm, callbackFunc);
     });
   } else {
     zone.getZoneInfo(accessKey, bucket, function(err, cZoneInfo,
