@@ -135,33 +135,30 @@ FormUploader.prototype.putWithoutKey = function(uploadToken, body, putExtra,
 }
 
 function createMultipartForm(uploadToken, key, fsStream, putExtra, callbackFunc) {
-    var postForm = formstream();
-    postForm.field('token', uploadToken);
-    if (key) {
-        postForm.field('key', key);
-    }
-    postForm.stream('file', fsStream, putExtra.fname, putExtra.mimeType);
-    if (putExtra.crc32) {
-        postForm.field('crc32', putExtra.crc32);
-    }
+  var postForm = formstream();
+  postForm.field('token', uploadToken);
+  if (key) {
+    postForm.field('key', key);
+  }
+  postForm.stream('file', fsStream, putExtra.fname, putExtra.mimeType);
 
-    //putExtra params
-    for (var k in putExtra.params) {
-        if (k.startsWith("x:")) {
-            postForm.field(k, putExtra.params[k].toString());
-        }
+  //putExtra params
+  for (var k in putExtra.params) {
+    if (k.startsWith("x:")) {
+      postForm.field(k, putExtra.params[k].toString());
     }
-      var fileBody = [];
-      fsStream.on('data', function(data) {
-        fileBody.push(data);
-      });
+  }
+  var fileBody = [];
+  fsStream.on('data', function(data) {
+    fileBody.push(data);
+  });
 
-      fsStream.on('end', function() {
-        fileBody = Buffer.concat(fileBody);
-        var bodyCrc32 = parseInt("0x" + getCrc32(fileBody));
-        postForm.field('crc32', bodyCrc32);
-    });
-    callbackFunc(postForm);
+  fsStream.on('end', function() {
+    fileBody = Buffer.concat(fileBody);
+    var bodyCrc32 = parseInt("0x" + getCrc32(fileBody));
+    postForm.field('crc32', bodyCrc32);
+  });
+  callbackFunc(postForm);
 }
 
 
