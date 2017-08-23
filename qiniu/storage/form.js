@@ -83,7 +83,6 @@ FormUploader.prototype.putStream = function(uploadToken, key, fsStream,
       createMultipartForm(uploadToken, key, fsStream,
         putExtra,
         function(postForm) {
-          console.log("uploading");
           putReq(that.config, postForm, callbackFunc);
         });
     });

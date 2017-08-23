@@ -1,5 +1,9 @@
 ## CHANGE LOG
 
+### v7.0.7
+- 给form upload添加默认的crc32校验以避免网络层面的字节反转导致上传内容不正确
+- 修复resume upload在上传小文件的时候出现的上传失败情况
+
 ### v7.0.6
 - 修复时间戳防盗链算法中对文件名的urlencode不兼容问题
 - 发布index.d.ts文件
