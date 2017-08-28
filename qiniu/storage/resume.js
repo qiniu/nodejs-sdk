@@ -143,6 +143,8 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     } catch (e) {}
   }
 
+  var isEnd = rsStream._readableState.ended;
+  
   //check when to mkblk
   rsStream.on('data', function(chunk) {
     readLen += chunk.length;
@@ -179,6 +181,9 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
             }
 
             rsStream.resume();
+            if (isEnd) {
+                mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
+            }
           }
         });
       }
@@ -188,8 +193,10 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   //check when to mkfile
   rsStream.on('end', function() {
     //console.log("end");
-    mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
+    if (!isEnd) {
+      mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
       putExtra, callbackFunc);
+    }
   });
 }
 
