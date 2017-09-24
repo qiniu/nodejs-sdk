@@ -85,28 +85,11 @@ function pfopReq(mac, config, reqParams, callbackFunc) {
 // @param persistentId
 // @callbackFunc(err, respBody, respInfo) - 回调函数
 OperationManager.prototype.prefop = function(persistentId, callbackFunc) {
-  var apiHost = "http://api.qiniu.com";
-  var zoneIndex = persistentId.indexOf(".");
-  if (zoneIndex == -1) {
-    callbackFunc("invalid persistentId", null, null);
-    return;
+  var apiHost = "api.qiniu.com";
+  if(this.config.zone) {
+    apiHost=this.config.zone.apiHost;
   }
-  var zoneTag = persistentId.substring(0, zoneIndex);
-  switch (zoneTag) {
-    case "z1":
-      apiHost = "api-z1.qiniu.com";
-      break;
-    case "z2":
-      apiHost = "api-z2.qiniu.com";
-      break;
-    case "na0":
-      apiHost = "api-na0.qiniu.com";
-      break;
-    default:
-      apiHost = "api.qiniu.com";
-      break;
-  }
-
+  
   var scheme = this.config.useHttpsDomain ? "https://" : "http://";
   var requestURI = scheme + apiHost + "/status/get/prefop";
   var reqParams = {
