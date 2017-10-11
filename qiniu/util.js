@@ -63,10 +63,10 @@ exports.hmacSha1 = function(encodedFlags, secretKey) {
   return hmac.digest('base64');
 }
 
-// 创建AccessToken凭证
+// 创建 AccessToken 凭证
 // @param mac         AK&SK对象
-// @param requestURI 回调的URL中的requestURI
-// @param reqBody    请求Body，仅当请求的ContentType为
+// @param requestURI 请求URL
+// @param reqBody    请求Body，仅当请求的 ContentType 为
 //                   application/x-www-form-urlencoded时才需要传入该参数
 exports.generateAccessToken = function(mac, requestURI, reqBody) {
   var u = url.parse(requestURI);
@@ -80,6 +80,50 @@ exports.generateAccessToken = function(mac, requestURI, reqBody) {
   var digest = exports.hmacSha1(access, mac.secretKey);
   var safeDigest = exports.base64ToUrlSafe(digest);
   return 'QBox ' + mac.accessKey + ':' + safeDigest;
+}
+
+// 创建 AccessToken 凭证
+// @param mac            AK&SK对象
+// @param requestURI     请求URL
+// @param reqMethod      请求方法，例如 GET，POST
+// @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
+// @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者 
+//                       application/x-www-form-urlencoded 时才需要传入该参数
+exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContentType, reqBody) {
+  var u = url.parse(requestURI);
+  var path = u.path;
+  var query = u.query;
+  var host = u.host;
+  var port = u.port;
+
+  var access = reqMethod.toUpperCase() + ' ' + path;
+  if (query) {
+    access += '?' + query;
+  }
+  // add host
+  access += '\nHost: ' + host;
+  // add port
+  if (port) {
+    access += ':' + port;
+  }
+
+  // add content type
+  if (reqContentType && (reqContentType=="application/json" || reqContentType=="application/x-www-form-urlencoded")) {
+    access += '\nContent-Type: ' + reqContentType;
+  }
+
+  access += '\n\n';
+
+  // add reqbody
+  if (reqBody) {
+    access += reqBody;
+  }
+
+  console.log(access);
+
+  var digest = exports.hmacSha1(access, mac.secretKey);
+  var safeDigest = exports.base64ToUrlSafe(digest);
+  return 'Qiniu ' + mac.accessKey + ':' + safeDigest;
 }
 
 // 校验七牛上传回调的Authorization

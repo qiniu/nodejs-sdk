@@ -331,10 +331,21 @@ export declare namespace util {
     /**
      * 创建AccessToken凭证
      * @param mac AK&SK对象
-     * @param requestURI 回调的URL中的requestURI 请求Body，仅当请求的ContentType为application/x-www-form-urlencoded时才需要传入该参数
-     * @param reqBody
+     * @param requestURI 请求URL
+     * @param reqBody  请求Body，仅当请求的ContentType为application/x-www-form-urlencoded 时才需要传入该参数
      */
     function generateAccessToken(mac: auth.digest.Mac, requestURI: string, reqBody?: string): string;
+
+
+    /**
+     * 创建AccessToken凭证
+     * @param mac            AK&SK对象
+     * @param requestURI     请求URL
+     * @param reqMethod      请求方法，例如 GET，POST 
+     * @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
+     * @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者 application/x-www-form-urlencoded 时才需要传入该参数
+     */
+    function generateAccessTokenV2(mac: auth.digest.Mac, requestURI: string, reqMethod: string, reqContentType: string, reqBody?: string) 
 
     /**
      * 校验七牛上传回调的Authorization
