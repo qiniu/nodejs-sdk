@@ -181,7 +181,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
             }
 
             rsStream.resume();
-            if (isEnd) {
+            if (isEnd  || finishedCtxList.length === Math.floor(totalBlockNum)) {
                 mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
             }
           }
@@ -191,13 +191,13 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   });
 
   //check when to mkfile
-  rsStream.on('end', function() {
-    //console.log("end");
-    if (!isEnd) {
-      setTimeout(() => {mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
-          putExtra, callbackFunc)}, 1000);
-    }
-  });
+  // rsStream.on('end', function() {
+  //   //console.log("end");
+  //   if (!isEnd) {
+  //     console.log("end");
+  //     mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
+  //         putExtra, callbackFunc)}
+  //   });
 }
 
 function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
