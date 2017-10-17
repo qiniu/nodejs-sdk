@@ -194,8 +194,8 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   rsStream.on('end', function() {
     //console.log("end");
     if (!isEnd) {
-      mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
-      putExtra, callbackFunc);
+      setTimeout(() => {mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
+          putExtra, callbackFunc)}, 1000);
     }
   });
 }
