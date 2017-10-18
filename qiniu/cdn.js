@@ -165,10 +165,10 @@ CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
     Object.getOwnPropertyNames(query).forEach(function(val, idx, array) {
       arr.push(val + "=" + encodeURIComponent(query[val]));
     });
-    urlToSign = domain + '/' + encodeURI(fileName) + '?' + arr.join(
+    urlToSign = domain + '/' + url_encode(fileName) + '?' + arr.join(
       '&');
   } else {
-    urlToSign = domain + '/' + encodeURI(fileName);
+    urlToSign = domain + '/' + url_encode(fileName);
   }
 
   var urlObj = url.parse(urlToSign);
@@ -185,4 +185,10 @@ CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
   } else {
     return urlToSign + '?sign=' + toSignStr + '&t=' + expireHex;
   }
+}
+
+function url_encode(url){
+    url = encodeURI(url);
+    url = url.replace(/\'/g, "%27");
+    return url;
 }
