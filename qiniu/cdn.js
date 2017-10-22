@@ -161,12 +161,7 @@ function req(reqPath, header, reqBody, callbackFunc) {
 CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
   query, encryptKey, deadline) {
   if (query != null) {
-    var arr = [];
-    Object.getOwnPropertyNames(query).forEach(function(val, idx, array) {
-      arr.push(val + "=" + encodeURIComponent(query[val]));
-    });
-    urlToSign = domain + '/' + url_encode(fileName) + '?' + arr.join(
-      '&');
+    urlToSign = domain + '/' + url_encode(fileName) + '?' + query;
   } else {
     urlToSign = domain + '/' + url_encode(fileName);
   }
