@@ -345,7 +345,7 @@ export declare namespace util {
      * @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
      * @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者 application/x-www-form-urlencoded 时才需要传入该参数
      */
-    function generateAccessTokenV2(mac: auth.digest.Mac, requestURI: string, reqMethod: string, reqContentType: string, reqBody?: string) 
+    function generateAccessTokenV2(mac: auth.digest.Mac, requestURI: string, reqMethod: string, reqContentType: string, reqBody?: string): string;
 
     /**
      * 校验七牛上传回调的Authorization
