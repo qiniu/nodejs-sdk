@@ -144,7 +144,8 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   }
 
   var isEnd = rsStream._readableState.ended;
-  
+  var isSent = false;
+
   //check when to mkblk
   rsStream.on('data', function(chunk) {
     readLen += chunk.length;
@@ -182,7 +183,8 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
 
             rsStream.resume();
             if (isEnd  || finishedCtxList.length === Math.floor(totalBlockNum)) {
-                mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
+              mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
+              isSent = true;
             }
           }
         });
@@ -190,14 +192,12 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     }
   });
 
-  //check when to mkfile
-  // rsStream.on('end', function() {
-  //   //console.log("end");
-  //   if (!isEnd) {
-  //     console.log("end");
-  //     mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key,
-  //         putExtra, callbackFunc)}
-  //   });
+  rsStream.on('end', function () {
+    // 0B file won't trigger 'data' event
+    if (!isSent && rsStreamLen === 0) {
+      mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc)
+    }
+  })
 }
 
 function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
