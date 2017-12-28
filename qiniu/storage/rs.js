@@ -2,6 +2,7 @@ const url = require('url');
 const crypto = require('crypto');
 const formstream = require('formstream');
 const querystring = require('querystring');
+const encodeUrl = require('encodeurl');
 const rpc = require('../rpc');
 const conf = require('../conf');
 const digest = require('../auth/digest');
@@ -648,7 +649,7 @@ BucketManager.prototype.privateDownloadUrl = function(domain, fileName,
 // @param fileName 原始文件名
 // @return 公开下载链接
 BucketManager.prototype.publicDownloadUrl = function(domain, fileName) {
-  return domain + "/" + encodeURI(fileName);
+  return domain + '/' + encodeUrl(fileName);
 
 }
 
