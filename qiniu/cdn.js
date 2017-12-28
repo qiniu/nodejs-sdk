@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const urllib = require('urllib');
 const util = require('./util');
 const digest = require('./auth/digest.js');
-const urlencode = require('urlencode');
+const encodeUrl = require('encodeurl');
 
 exports.CdnManager = CdnManager;
 
@@ -161,9 +161,9 @@ function req(reqPath, header, reqBody, callbackFunc) {
 CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
   query, encryptKey, deadline) {
   if (query != null) {
-    urlToSign = domain + '/' + url_encode(fileName) + '?' + query;
+    urlToSign = domain + '/' + encodeUrl(fileName) + '?' + query;
   } else {
-    urlToSign = domain + '/' + url_encode(fileName);
+    urlToSign = domain + '/' + encodeUrl(fileName);
   }
 
   var urlObj = url.parse(urlToSign);
@@ -180,10 +180,4 @@ CdnManager.prototype.createTimestampAntiLeechUrl = function(domain, fileName,
   } else {
     return urlToSign + '?sign=' + toSignStr + '&t=' + expireHex;
   }
-}
-
-function url_encode(url){
-    url = encodeURI(url);
-    url = url.replace(/\'/g, "%27");
-    return url;
 }

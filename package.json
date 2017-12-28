@@ -47,16 +47,16 @@
     "email": "jinxinxin@qiniu.com"
   }],
   "engines": [
-    "node >= 0.4.7"
+    "node >= 4"
   ],
   "dependencies": {
-    "mime": "1.3.6",
-    "formstream": "1.1.0",
-    "crc32": "0.2.2",
-    "urllib": "2.22.0",
     "agentkeepalive": "3.3.0",
+    "crc32": "0.2.2",
+    "encodeurl": "^1.0.1",
+    "formstream": "1.1.0",
+    "mime": "1.3.6",
     "tunnel-agent": "0.6.0",
-    "urlencode": "1.1.0"
+    "urllib": "2.22.0"
   },
   "devDependencies": {
     "@types/node": "^8.0.3",
