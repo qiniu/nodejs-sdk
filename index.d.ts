@@ -341,7 +341,7 @@ export declare namespace util {
      * 创建AccessToken凭证
      * @param mac            AK&SK对象
      * @param requestURI     请求URL
-     * @param reqMethod      请求方法，例如 GET，POST 
+     * @param reqMethod      请求方法，例如 GET，POST
      * @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
      * @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者 application/x-www-form-urlencoded 时才需要传入该参数
      */
@@ -435,7 +435,7 @@ export declare namespace fop {
          * @param options
          * @param callback
          */
-        pfop(bucket: string, key: string, fops: string, pipeline: string, options: PfopOptions | null, callback: callback): void;
+        pfop(bucket: string, key: string, fops: string[], pipeline: string, options: PfopOptions | null, callback: callback): void;
 
         /**
          * 查询持久化数据处理进度
