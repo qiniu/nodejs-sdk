@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>七牛云 - JavaScript SDK</title>
+  <link rel="stylesheet" href="http://cdn.static.runoob.com/libs/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" href="./style/index.css">
+</head>
+
+<body>
+  <nav class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="#">七牛云存储 - JavaScript SDK</a>
+      </div>
+      <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-6">
+        <ul class="nav navbar-nav">
+          <li class="active">
+            <a href="#">上传示例</a>
+          </li>
+          <li>
+            <a href="http://developer.qiniu.com/code/v6/sdk/javascript.html">SDK 文档</a>
+          </li>
+          <li>
+            <a href="/performance">上传速度检测</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <div class="mainContainer">
+    <div class="row" style="margin-top: 20px;">
+      <ul class="tip col-md-12 text-mute">
+        <li>
+          <small>
+            JavaScript SDK 基于 Plupload 开发，可以通过 Html5 或 Flash 等模式上传文件至七牛云存储。
+          </small>
+        </li>
+        <li>
+          <small>临时上传的空间不定时清空，请勿保存重要文件。</small>
+        </li>
+        <li>
+          <small>Html5模式大于4M文件采用分块上传。</small>
+        </li>
+        <li>
+          <small>上传图片可查看处理效果。</small>
+        </li>
+        <li>
+          <small>本示例限制最大上传文件100M。</small>
+        </li>
+      </ul>
+    </div>
+    <form method="post" enctype="multipart/form-data" id="form" action="upload">
+      <div class="box">
+        <button class="select-button">选择文件</button>
+        <a class="file-input" id="select"></a>
+      </div>
+      <div class="box2">
+        <button class="select-button">选择文件</button>
+        <input class="file-input" type="file" id="select2" />
+      </div>
+    </form>
+    <div class="nav-box" style="margin-top:30px">
+      <ul id="myTab" class="nav nav-tabs">
+        <li class="active">
+          <a href="#h5" name="h5" data-toggle="tab">
+            七牛h5模式 - example
+          </a>
+        </li>
+        <li>
+          <a href="#expand" name="expand" data-toggle="tab">插件模式 - example</a>
+        </li>
+        <li>
+          <a href="#directForm" name="directForm" data-toggle="tab">form表单直传模式</a>
+        </li>
+      </ul>
+      <div id="process" class="tab-content">
+        <div class="tab-pane fade in active" id="h5">
+          <table class="table table-striped table-hover text-left" style="margin-top:30px">
+            <thead>
+              <tr>
+                <th class="col-md-4">Filename</th>
+                <th class="col-md-2">Size</th>
+                <th class="col-md-6">Detail</th>
+              </tr>
+            </thead>
+            <tbody id="fsUploadProgress">
+
+            </tbody>
+          </table>
+        </div>
+        <div class="tab-pane fade" id="expand">
+          <table class="table table-striped table-hover text-left" style="margin-top:30px">
+            <thead>
+              <tr>
+                <th class="col-md-4">Filename</th>
+                <th class="col-md-2">Size</th>
+                <th class="col-md-6">Detail</th>
+              </tr>
+            </thead>
+            <tbody id="fsUploadProgress2">
+
+            </tbody>
+          </table>
+        </div>
+        <div class="tab-pane fade" id="directForm">
+          <form id="uploadForm" class="picForm" method="post" action="" enctype="multipart/form-data" target="ifram">
+            <button style="color:#fff;background-color:#00b7ee;position:relative;top:30px;font-weight:100;height:30px;font-size:14px;width:80px;">选择文件</button>
+            <input style="width:80px;height:30px;opacity:0;cursor:pointer" type="file" name="file" id="select3" />
+            <input name="token" style="display:none">
+            <input name="key" style="display:none" />
+            <input name="url" style="display:none" />
+          </form>
+          <table class="table table-striped table-hover text-left" style="margin-top:30px">
+            <thead>
+              <tr>
+                <th class="col-md-4">Filename</th>
+                <th class="col-md-2">Size</th>
+                <th class="col-md-6">Detail</th>
+              </tr>
+            </thead>
+            <tbody id="fsUploadProgress3">
+
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+<style>
+</style>
+<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.js"></script>
+<script type="text/javascript" src="./js/moxie.js"></script>
+<script type="text/javascript" src='./js/plupload.dev.js'></script>
+<script type="text/javascript" src='/dist/qiniu.min.js'></script>
+<script type="text/javascript" src='./widget.js'></script>
+<script type="text/javascript" src='./common/common.js'></script>
+<script type="text/javascript" src='./component/ui.js'></script>
+<script src="http://cdn.static.runoob.com/libs/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script type="text/javascript" src='./dealWithOthers.js'></script>
+<script type="text/javascript" src='./dealWithForm.js'></script>
+<script type="text/javascript" src='./dealWithSDK.js'></script>
+<script type="text/javascript" src='./test.js'></script>
+
+</html>
