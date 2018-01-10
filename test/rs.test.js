@@ -128,9 +128,11 @@ describe('test start bucket manager', function() {
 
       bucketManager.changeHeaders(bucket, key, {
         'Content-Type': 'text/plain',
-        'Cache-Control': 'public, max-age=31566000',
+        'Last-Modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
+        'x-qn-test-custom-header': '0',
       },
         function (err, respBody, respInfo) {
+          console.log(respInfo);
           should.not.exist(err);
           assert.equal(respInfo.statusCode, 200);
           done();
