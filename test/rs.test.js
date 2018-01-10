@@ -105,4 +105,37 @@ describe('test start bucket manager', function() {
       });
     });
   });
+
+  describe('test changeMime', function() {
+    it('test changeMime', function(done) {
+      var key = "test_file";
+      var bucket = srcBucket;
+
+      bucketManager.changeMime(bucket, key, "text/html",
+        function (err, respBody, respInfo) {
+          should.not.exist(err);
+          assert.equal(respInfo.statusCode, 200);
+          done();
+        }
+      );
+    });
+  });
+
+  describe('test changeHeaders', function() {
+    it('test changeHeaders', function(done) {
+      var key = "test_file";
+      var bucket = srcBucket;
+
+      bucketManager.changeHeaders(bucket, key, {
+        'Content-Type': 'text/plain',
+        'x-qn-meta-!Cache-Control': 'public, max-age=31566000',
+      },
+        function (err, respBody, respInfo) {
+          should.not.exist(err);
+          assert.equal(respInfo.statusCode, 200);
+          done();
+        }
+      );
+    });
+  });
 });
