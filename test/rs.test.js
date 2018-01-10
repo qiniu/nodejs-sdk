@@ -128,7 +128,7 @@ describe('test start bucket manager', function() {
 
       bucketManager.changeHeaders(bucket, key, {
         'Content-Type': 'text/plain',
-        'x-qn-meta-!Cache-Control': 'public, max-age=31566000',
+        'Cache-Control': 'public, max-age=31566000',
       },
         function (err, respBody, respInfo) {
           should.not.exist(err);

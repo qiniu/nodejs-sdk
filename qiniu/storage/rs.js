@@ -646,11 +646,10 @@ exports.changeMimeOp = function(bucket, key, newMime) {
 exports.changeHeadersOp = function(bucket, key, headers) {
   var encodedEntryURI = util.encodedEntry(bucket, key);
   var prefix = 'x-qn-meta-!';
-  var prefixReg = /^x\-qn\-meta\-\!/;
   var path = '/chgm/' + encodedEntryURI;
   for (var headerKey in headers) {
     var encodedValue = util.urlsafeBase64Encode(headers[headerKey]);
-    var prefixedHeaderKey = headerKey.match(prefixReg) ? headerKey : prefix + headerKey;
+    var prefixedHeaderKey = prefix + headerKey;
     path += "/" + prefixedHeaderKey + "/" + encodedValue;
   }
 
