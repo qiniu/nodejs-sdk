@@ -1,6 +1,6 @@
 function dealWithOthers(token, putExtra, config) {
   controlTabDisplay("others");
-  var uploadUrl = getUploadUrl({config:config,putExtra:putExtra});
+  var uploadUrl = qiniu.getUploadUrl(config);
   var ctx = "";
   var board = {};
   var chunk_size;
@@ -100,14 +100,12 @@ function dealWithOthers(token, putExtra, config) {
         // TODO: although only the html5 runtime will enter this statement
         // but need uniform way to make convertion between string and json
         localFileInfo = JSON.parse(localFileInfo);
-        var now = new Date().getTime();
         var before = localFileInfo.time || 0;
-        var aDay = 24 * 60 * 60 * 1000; //  milliseconds of one day
         // if the last upload time is within one day
         //      will upload continuously follow the last breakpoint
         // else
         //      will reupload entire file
-        if (now - before < aDay) {
+        if (!qiniu.checkExpire(before)) {
           if (localFileInfo.percent !== 100) {
             if (file.size === localFileInfo.total) {
               // TODO: if file.name and file.size is the same
@@ -115,10 +113,7 @@ function dealWithOthers(token, putExtra, config) {
               file.percent = localFileInfo.percent;
               file.loaded = localFileInfo.offset;
               ctx = localFileInfo.ctx;
-              console.log(99009);
               // set speed info
-              speedCalInfo.isResumeUpload = true;
-              speedCalInfo.resumeFilesize = localFileInfo.offset;
             }
             // set block size
             if (localFileInfo.offset + blockSize > file.size) {
@@ -137,7 +132,6 @@ function dealWithOthers(token, putExtra, config) {
         // remove file info when last upload time is over one day
         localStorage.removeItem("qiniu_" + file.name);
       }
-      speedCalInfo.startTime = new Date().getTime();
       var multipart_params_obj = {};
       //计算已上传的chunk数量
       var index = Math.floor(file.loaded / chunk_size);
@@ -174,10 +168,15 @@ function dealWithOthers(token, putExtra, config) {
       });
     };
     //判断是否采取分片上传
-    if (file.size < chunk_size) {
+    if ((uploader.runtime === 'html5' || uploader.runtime === 'flash') && chunk_size){
+      if (file.size < chunk_size) {
+        directUpload();
+      } else {
+        resumeUpload();
+      }
+    }else{
+      console.log("directUpload because file.size < chunk_size || is_android_weixin_or_qq()")
       directUpload();
-    } else {
-      resumeUpload();
     }
   });
 
@@ -204,7 +203,7 @@ function dealWithOthers(token, putExtra, config) {
         percent: file.percent,
         total: info.total,
         offset: info.offset,
-        time: new Date().getTime()
+        time: new Date().getTime()/1000
       })
     );
   });
@@ -229,6 +228,7 @@ function dealWithOthers(token, putExtra, config) {
   uploader.bind("FileUploaded", function(uploader, file) {
     if (ctx) {
       //调用sdk的url构建函数
+      var id = file.id;
       var requestURI = qiniu.createFileUrl(uploadUrl, file, key, putExtra);
       var xhr = createAjax();
       xhr.open("POST", requestURI);
@@ -239,29 +239,17 @@ function dealWithOthers(token, putExtra, config) {
       xhr.onreadystatechange = function() {
         if (xhr.readyState == 4) {
           if (xhr.status === 200) {
-            console.log(eval("(" + this.responseText + ")"));
+            uploadFinish(this.responseText,board[id])
           } else {
-            console.log(eval("(" + this.responseText + ")"));
+            console.log(JSON.parse(this.responseText));
           }
         }
       };
     }
   });
-  uploader.bind("FileUploaded", function(up, file, info) {
-    var id = file.id;
-    board[id].querySelector("#total").classList.add("hide");
-    board[id].querySelector(".control-container").innerHTML =
-      "<p><strong>Hash：</strong>" +
-      JSON.parse(info.response).hash +
-      "</p>" +
-      "<p><strong>Bucket：</strong>" +
-      JSON.parse(info.response).bucket +
-      "</p>";
-  });
 
   function setChunkProgress(file, board, chunk_size, count) {
     var index = Math.ceil(file.loaded / chunk_size);
-    console.log("index:"+index)
     var leftSize = file.loaded - chunk_size * (index - 1);
     if (index == count) {
       chunk_size = file.size - chunk_size * (index - 1);
@@ -269,9 +257,20 @@ function dealWithOthers(token, putExtra, config) {
     var dom = board
       .querySelectorAll(".fragment-group li")
       [index - 1].querySelector("#bar-child");
-    console.log(width)
     dom.style.width = Math.floor(leftSize / chunk_size * width.childWidth - 2) + "px";
-    console.log(dom.style.width)
+  }
+
+  function uploadFinish(res,board){
+    var data = JSON.parse(res)
+    console.log(data);
+    board.querySelector("#total").classList.add("hide");
+    board.querySelector(".control-container").innerHTML =
+      "<p><strong>Hash：</strong>" +
+      data.hash +
+      "</p>" +
+      "<p><strong>Bucket：</strong>" +
+      data.bucket +
+      "</p>";
   }
 }
 

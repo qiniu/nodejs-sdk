@@ -1,8 +1,8 @@
 import { URLSafeBase64Encode } from "./base64.js";
-export function checkExpire(info) {
-  let expireAt = info.expire_at;
+import { Zone } from './config.js'
+export function checkExpire(expireAt) {
   expireAt += 3600 * 24;
-  if (expireAt < new Date().getTime()) {
+  if (expireAt < new Date().getTime()/1000) {
     return true;
   }
   return false;
@@ -65,7 +65,6 @@ export function initProgress(file) {
     }
     //了解下map和forEach区别
   }
-  console.log(progress);
   return progress;
 }
 
@@ -89,9 +88,7 @@ export function checkLocalFileInfo(file) {
   let totalSize;
   let localFileInfo =
     JSON.parse(localStorage.getItem("qiniu_" + file.name)) || [];
-  console.log(localFileInfo)
   let successStatus = localStorage.getItem("qiniu_file_" + file.name)
-  console.log(typeof(successStatus))
   if (localFileInfo.length) {
     for (let i = 0; i < localFileInfo.length; i++) {
       if (localFileInfo[i]) {
@@ -151,6 +148,10 @@ export function createFileUrl(uploadUrl, file, key, putExtra) {
   if (putExtra.mimeType) {
     requestURI += "/mimeType/" + URLSafeBase64Encode(putExtra.mimeType);
   }
+  if (!putExtra.fname) {
+    putExtra.fname = key ? key : file.name;
+  }
+  requestURI += "/fname/" + URLSafeBase64Encode(putExtra.fname)
   if (putExtra.params) {
     //putExtra params
     for (var k in putExtra.params) {
@@ -171,6 +172,32 @@ export var createAjax = () => {
   }
   return xmlhttp;
 };
+
+export function getUploadUrl(config) {
+  let upHosts = {};
+  switch (config.zone) {
+    case "Zone_z0":
+      upHosts = Zone.Zone_z0;
+      break;
+    case "Zone_z1":
+      upHosts = Zone.Zone_z1;
+      break;
+    case "Zone_z2":
+      upHosts = Zone.Zone_z2;
+      break;
+    case "Zone_na0":
+      upHosts = Zone.Zone_na0;
+      break;
+    default:
+      upHosts = Zone.Zone_z0;
+  }
+  let scheme = config.useHttpsDomain ? "https://" : "http://";
+  let uploadUrl = config.useCdnDomain
+    ? scheme + upHosts["cdnUphost"]
+    : scheme + upHosts["srcUphost"];
+  console.log("uploadUrl:"+uploadUrl);
+  return uploadUrl;
+}
 
 function PutExtra(fname, params, mimeType, crc32, checkCrc) {
   this.fname = fname || "";

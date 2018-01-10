@@ -1,4 +1,4 @@
-import { PutExtra, Config, Zone } from "./config.js";
+import { PutExtra, Config} from "./config.js";
 import {
   initProgress,
   initProgressIndex,
@@ -8,6 +8,7 @@ import {
   createFileUrl,
   setLocalItem,
   checkLocalFileInfo,
+  getUploadUrl,
   updateProgress
 } from "./support-method.js";
 
@@ -26,7 +27,7 @@ export class UploadManager {
     this.uptoken = this.option.token;
     this.putExtra = this.option.putExtra || new PutExtra();
     if (!this.putExtra.fname) {
-      this.putExtra.fname = this.file.name;
+      this.putExtra.fname = this.key ? this.key : this.file.name;
     }
     if (this.putExtra.mimeType) {
       if (file.type != this.putExtra.mimeType) {
@@ -36,7 +37,7 @@ export class UploadManager {
         });
       }
     }
-    this.uploadUrl = this.getUploadUrl();
+    this.uploadUrl = getUploadUrl(this.config);
     if (this.file.size > this.config.BLOCK_SIZE) {
       //分片上传名字
       this.resumeUpload();
@@ -65,7 +66,7 @@ export class UploadManager {
     let promises = arrayBlob.map(function(blob, index) {
       let info = localFileInfo[index];
       if (info) {
-        if (!checkExpire(info)) {
+        if (!checkExpire(info.expire_at)) {
           //本地存储的进度放到progress里
           initProgressIndex(info, index, that.progress);
           return Promise.resolve(info);
@@ -207,32 +208,6 @@ export class UploadManager {
         });
     });
   }
-  //z改为url
-  getUploadUrl() {
-    let upHosts = {};
-    switch (this.config.zone) {
-      case "Zone_z0":
-        upHosts = Zone.Zone_z0;
-        break;
-      case "Zone_z1":
-        upHosts = Zone.Zone_z1;
-        break;
-      case "Zone_z2":
-        upHosts = Zone.Zone_z2;
-        break;
-      case "Zone_na0":
-        upHosts = Zone.Zone_na0;
-        break;
-      default:
-        upHosts = Zone.Zone_z0;
-    }
-    let scheme = this.config.useHttpsDomain ? "https://" : "http://";
-    let uploadUrl = this.config.useCdnDomain
-      ? scheme + upHosts["cdnUphost"]
-      : scheme + upHosts["srcUphost"];
-    console.log(uploadUrl);
-    return uploadUrl;
-  }
 
   directUpload() {
     let that = this;
@@ -244,6 +219,7 @@ export class UploadManager {
     formData.append("file", that.file);
     formData.append("token", that.uptoken);
     formData.append("key", that.key);
+    formData.append("fname",that.putExtra.fname)
     // multipart_params["token"] = uptoken;
     // multipart_params["key"] = key;
     // multipart_params["file"] = data;

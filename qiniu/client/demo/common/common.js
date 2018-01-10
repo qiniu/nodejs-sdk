@@ -36,8 +36,3 @@ function controlTabDisplay(type) {
   }
 }
 
-function getUploadUrl(option) {
-  var uploadManager = new qiniu.UploadManager(option);
-  var uploadUrl = uploadManager.getUploadUrl();
-  return uploadUrl;
-}

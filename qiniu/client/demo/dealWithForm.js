@@ -1,11 +1,11 @@
 //实现form直传无刷新并解决跨域问题
 function dealWithForm(token, putExtra, config) {
   controlTabDisplay("form");
-  var uploadUrl = getUploadUrl({config:config,putExtra:putExtra});
+  var uploadUrl = qiniu.getUploadUrl(config);
 
   document.getElementsByName("token")[0].value = token;
   //把action地址指向我们的 node sdk 后端服务,通过后端来实现跨域访问
-  document.querySelector("#uploadForm").action = "api/take";
+  document.querySelector("#uploadForm").action = "/api/take";
   document.getElementsByName("url")[0].value = uploadUrl;
   //当选择文件后执行的操作
   document.getElementById("select3").onchange = function() {

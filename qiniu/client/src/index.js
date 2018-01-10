@@ -1,5 +1,5 @@
 import { Config, Zone, Zones, PutExtra } from "./config.js";
-import { createFileUrl } from "./support-method.js";
+import { createFileUrl,checkExpire, getUploadUrl } from "./support-method.js";
 import { UploadManager } from "./upload.js";
 
 //putextra.fname
@@ -79,4 +79,4 @@ function upload(file, key, uptoken, putExtra, config) {
     return datasource.stop.bind(datasource);
   });
 }
-export { upload, Config, PutExtra, UploadManager,Zones, createFileUrl };
+export { upload, Config, PutExtra, UploadManager,Zones, createFileUrl, checkExpire, getUploadUrl };
