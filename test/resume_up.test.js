@@ -57,6 +57,7 @@ describe('test resume up', function() {
   config.zone = qiniu.zone.Zone_z0;
   var resumeUploader = new qiniu.resume_up.ResumeUploader(config);
   var putExtra = new qiniu.resume_up.PutExtra();
+  putExtra.params.sliceSize = 1024 * 10;
 
   describe('test resume up#putFileWithoutKey', function() {
     it('test resume up#putFileWithoutKey', function(done) {
