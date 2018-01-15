@@ -18,6 +18,7 @@ function ResumeUploader(config) {
 // @params fname                      请求体中的文件的名称
 // @params params                     额外参数设置，参数名称必须以x:开头
 // @param mimeType                    指定文件的mimeType
+// @param sliceSize                   指定文件的上传分片大小(默认4MB)
 // @param resumeRecordFile            断点续传的已上传的部分信息记录文件
 // @param progressCallback(uploadBytes, totalBytes) 上传进度回调
 function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback) {
@@ -110,12 +111,16 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   // block upload
 
   var fileSize = rsStreamLen;
+  var sliceSize = putExtra.params.sliceSize || conf.BLOCK_SIZE;
   //console.log("file size:" + fileSize);
-  var blockCnt = fileSize / conf.BLOCK_SIZE
+  var blockCnt = Math.round(fileSize / conf.BLOCK_SIZE);
   var totalBlockNum = (fileSize % conf.BLOCK_SIZE == 0) ? blockCnt : (blockCnt +
     1);
   var finishedBlock = 0;
+  var curCtx = null;
+  var curSliceOffset = 0;
   var curBlock = 0;
+  var curBlockSize = conf.BLOCK_SIZE;
   var readLen = 0;
   var readBuffers = [];
   var finishedCtxList = [];
@@ -151,28 +156,37 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     readLen += chunk.length;
     readBuffers.push(chunk);
 
-    if (readLen % conf.BLOCK_SIZE == 0 || readLen == fileSize) {
-      //console.log(readLen);
+    if (readLen % sliceSize == 0 || readLen == fileSize) {
       var readData = Buffer.concat(readBuffers);
       readBuffers = []; //reset read buffer
-      curBlock += 1; //set current block
+
+      if (curCtx === null) {
+        curBlock += 1;
+        if (curBlock === blockCnt + 1) {
+          curBlockSize = fileSize % conf.BLOCK_SIZE;
+        }
+      }
+
       if (curBlock > finishedBlock) {
         rsStream.pause();
-        mkblkReq(upDomain, uploadToken, readData, function(respErr,
+        blkReq(upDomain, uploadToken, curCtx, readData, curSliceOffset, curBlockSize, function(respErr,
           respBody,
           respInfo) {
           var bodyCrc32 = parseInt("0x" + getCrc32(readData));
           if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
             callbackFunc(respErr, respBody, respInfo);
             return;
-          } else {
-            finishedBlock += 1;
-            var blkputRet = respBody;
-            finishedCtxList.push(blkputRet.ctx);
-            finishedBlkPutRets.push(blkputRet);
-            if (putExtra.progressCallback) {
-              putExtra.progressCallback(readLen, fileSize);
-            }
+          }
+          if (putExtra.progressCallback) {
+            putExtra.progressCallback(readLen, fileSize);
+          }
+          finishedBlkPutRets.push(respBody);
+          curCtx = respBody.ctx;
+          curSliceOffset = respBody.offset;
+          rsStream.resume();
+
+          // block upload finished
+          if (curSliceOffset === curBlockSize) {
             if (putExtra.resumeRecordFile) {
               var contents = JSON.stringify(finishedBlkPutRets);
               console.log("write resume record " + putExtra.resumeRecordFile)
@@ -180,8 +194,12 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
                 encoding: 'utf-8'
               });
             }
+            curCtx = null;
+            curSliceOffset = 0;
+            finishedBlock += 1;
+            var blkputRet = respBody;
+            finishedCtxList.push(blkputRet.ctx);
 
-            rsStream.resume();
             if (isEnd  || finishedCtxList.length === Math.floor(totalBlockNum)) {
               mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
               isSent = true;
@@ -200,15 +218,31 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   })
 }
 
-function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
+function blkReq(upDomain, uploadToken, ctx, bufferData, offset, blockSize, callbackFunc) {
   //console.log("mkblk");
-  var requestURI = upDomain + "/mkblk/" + blkData.length;
+  var requestURI;
+
+  if (offset === 0) {
+    requestURI = upDomain + "/mkblk/" + blockSize;
+  } else {
+    requestURI = upDomain + "/bput/" + ctx + "/" + offset;
+  }
   var auth = 'UpToken ' + uploadToken;
   var headers = {
     'Authorization': auth,
     'Content-Type': 'application/octet-stream'
   }
-  rpc.post(requestURI, blkData, headers, callbackFunc);
+  rpc.post(requestURI, bufferData, headers, callbackFunc);
+}
+
+function putsliceReq(upDomain, uploadToken, sliceData, chunkOffset, callbackFunc) {
+  var requestURI = upDomain + "/bput/" + chunkOffset;
+  var auth = 'UpToken ' + uploadToken;
+  var headers = {
+    'Authorization': auth,
+    'Content-Type': 'application/octet-stream'
+  }
+  rpc.post(requestURI, sliceData, headers, callbackFunc);
 }
 
 function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
@@ -253,7 +287,7 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
 ResumeUploader.prototype.putFile = function(uploadToken, key, localFile,
   putExtra, callbackFunc) {
   putExtra = putExtra || new PutExtra();
-  var rsStream = fs.createReadStream(localFile);
+  var rsStream = fs.createReadStream(localFile, { highWaterMark: putExtra.params.sliceSize || conf.BLOCK_SIZE });
   var rsStreamLen = fs.statSync(localFile).size;
   if (!putExtra.mimeType) {
     putExtra.mimeType = mime.lookup(localFile);
