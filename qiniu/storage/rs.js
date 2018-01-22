@@ -110,6 +110,55 @@ function changeMimeReq(mac, config, bucket, key, newMime, callbackFunc) {
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
+
+// 修改文件返回的Headers内容
+// @link TODO
+// @param bucket  空间名称
+// @param key     文件名称
+// @param headers 需要修改的headers
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.changeHeaders = function(bucket, key, headers,
+  callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    changeHeadersReq(this.mac, this.config, bucket, key, headers, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      changeHeadersReq(that.mac, that.config, bucket, key, headers,
+        callbackFunc);
+    });
+  }
+}
+
+function changeHeadersReq(mac, config, bucket, key, headers, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var changeHeadersOp = exports.changeHeadersOp(bucket, key, headers);
+  var requestURI = scheme + config.zone.rsHost + changeHeadersOp;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
 // 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
 // @link https://developer.qiniu.com/kodo/api/1257/delete
 // @param srcBucket  源空间名称
@@ -592,6 +641,19 @@ exports.changeMimeOp = function(bucket, key, newMime) {
   var encodedEntryURI = util.encodedEntry(bucket, key);
   var encodedMime = util.urlsafeBase64Encode(newMime);
   return '/chgm/' + encodedEntryURI + '/mime/' + encodedMime;
+}
+
+exports.changeHeadersOp = function(bucket, key, headers) {
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  var prefix = 'x-qn-meta-!';
+  var path = '/chgm/' + encodedEntryURI;
+  for (var headerKey in headers) {
+    var encodedValue = util.urlsafeBase64Encode(headers[headerKey]);
+    var prefixedHeaderKey = prefix + headerKey;
+    path += "/" + prefixedHeaderKey + "/" + encodedValue;
+  }
+
+  return path;
 }
 
 exports.changeTypeOp = function(bucket, key, newType) {

@@ -499,6 +499,30 @@ bucketManager.changeMime(bucket, key, newMime, function(err, respBody, respInfo)
 });
 ```
 
+<a id="rs-chgm-h"></a>
+## 修改文件Headers
+
+```
+var bucket = 'if-pbl';
+var key = 'qiniu.mp4';
+var headers = {
+  'Content-Type': 'application/octet-stream',
+  'Last-Modified': 'Web, 21 Oct 2015 07:00:00 GMT',
+  'x-custom-header-xx': 'value',
+};
+
+bucketManager.changeHeaders(bucket, key, headers, function(err, respBody, respInfo) {
+  if (err) {
+    console.log(err);
+    //throw err;
+  } else {
+    //200 is success
+    console.log(respInfo.statusCode);
+    console.log(respBody);
+  }
+});
+```
+
 <a id="rs-chtype"></a>
 ## 修改文件存储类型
 

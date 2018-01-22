@@ -497,6 +497,17 @@ export declare namespace rs {
         changeMime(bucket: string, key: string, newMime: string, callback: callback): void;
 
         /**
+         * 修改文件的Headers
+         * @see TODO
+         *
+         * @param bucket 空间名称
+         * @param key 文件名称
+         * @param headers Headers对象
+         * @param callback
+         */
+        changeHeaders(bucket: string, key: string, headers: { [k: string]: string }, callback: callback): void;
+
+        /**
          * 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
          * @see https://developer.qiniu.com/kodo/api/1288/move
          *
@@ -657,6 +668,14 @@ export declare namespace rs {
      * @param newMime
      */
     function changeMimeOp(bucket: string, key: string, newMime: string): string;
+
+    /**
+     *
+     * @param bucket
+     * @param key
+     * @param headers
+     */
+    function changeHeadersOp(bucket: string, key: string, headers: { [k: string]: string }): string;
 
     /**
      *
