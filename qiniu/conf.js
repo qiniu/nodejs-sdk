@@ -67,6 +67,11 @@ exports.Zone = function(srcUpHosts, cdnUpHosts, ioHost, rsHost, rsfHost,
           this.rsfHost = "rsf-na0.qiniu.com";
           this.apiHost = "api-na0.qiniu.com";
           break;
+        case "as0":
+          this.rsHost = "rs-as0.qiniu.com";
+          this.rsfHost = "rsf-as0.qiniu.com";
+          this.apiHost = "api-as0.qiniu.com";
+          break;  
         default:
           this.rsHost = "rs.qiniu.com";
           this.rsfHost = "rsf.qiniu.com";

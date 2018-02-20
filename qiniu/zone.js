@@ -52,6 +52,16 @@ exports.Zone_na0 = new conf.Zone([
   'api-na0.qiniu.com')
 
 
+exports.Zone_as0 = new conf.Zone([
+  'up-as0.qiniup.com',
+], [
+  'upload-as0.qiniup.com',
+], 'iovip-as0.qbox.me',
+'rs-as0.qiniu.com',
+'rsf-as0.qiniu.com',
+'api-as0.qiniu.com')
+
+
 exports.getZoneInfo = function(accessKey, bucket, callbackFunc) {
   var apiAddr = util.format('https://uc.qbox.me/v2/query?ak=%s&bucket=%s',
     accessKey, bucket);
