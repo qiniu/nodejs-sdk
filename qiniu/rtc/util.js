@@ -1,4 +1,4 @@
-var crypto = require('crypto');
+var crypto = require('crypto')
 
 exports.base64ToUrlSafe = function(v) {
     return v.replace(/\//g, '_').replace(/\+/g, '-');
