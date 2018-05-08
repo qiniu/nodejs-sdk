@@ -5,50 +5,6 @@ const headers = {
     'Content-Type': 'application/json',
 };
 
-exports.createApp = function(app, credentials ,fn) {
-    var options = {
-        host: host,
-        port: 80,
-        path: '/v3/apps',
-        method: 'POST',
-        headers: headers
-    };
-    post(credentials, options, app, fn)
-}
-
-exports.getApp = function (appId, credentials, fn) {
-    var options = {
-        host: host,
-        port: 80,
-        path: '/v3/apps/' + appId,
-        method: 'GET',
-        headers: headers
-    };
-    get(credentials, options, fn)
-}
-
-exports.deleteApp = function (appId, credentials, fn) {
-    var options = {
-        host: host,
-        port: 80,
-        path: '/v3/apps/' + appId,
-        method: 'DELETE',
-        headers: headers
-    };
-    get(credentials, options, fn)
-}
-
-exports.updateApp = function (appId, app, credentials, fn) {
-    var options = {
-        host: host,
-        port: 80,
-        path: '/v3/apps/' + appId,
-        method: 'POST',
-        headers: headers
-    };
-    post(credentials, options, app, fn)
-}
-
 function get(credentials, options, fn){
     options.headers['Authorization'] = credentials.generateAccessToken(options, null);
 
@@ -124,3 +80,49 @@ function post(credentials, options, data, fn) {
 
     req.end();
 };
+
+
+exports.createApp = function(app, credentials ,fn) {
+    var options = {
+        host: host,
+        port: 80,
+        path: '/v3/apps',
+        method: 'POST',
+        headers: headers
+    };
+    post(credentials, options, app, fn)
+}
+
+exports.getApp = function (appId, credentials, fn) {
+    var options = {
+        host: host,
+        port: 80,
+        path: '/v3/apps/' + appId,
+        method: 'GET',
+        headers: headers
+    };
+    get(credentials, options, fn)
+}
+
+exports.deleteApp = function (appId, credentials, fn) {
+    var options = {
+        host: host,
+        port: 80,
+        path: '/v3/apps/' + appId,
+        method: 'DELETE',
+        headers: headers
+    };
+    get(credentials, options, fn)
+}
+
+exports.updateApp = function (appId, app, credentials, fn) {
+    var options = {
+        host: host,
+        port: 80,
+        path: '/v3/apps/' + appId,
+        method: 'POST',
+        headers: headers
+    };
+    post(credentials, options, app, fn)
+}
+

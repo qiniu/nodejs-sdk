@@ -13,7 +13,7 @@ module.exports = {
   rpc: require(libPath + '/rpc.js'),
   util: require(libPath + '/util.js'),
   zone: require(libPath + '/zone.js'),
-  app: require(libPath + '/rtc/app.js'),
-  room: require(libPath + '/rtc/room.js'),
-  credentials: require(libPath + '/rtc/credentials.js')
+  app: require(libPath + "/rtc/app.js"),
+  room: require(libPath + "/rtc/room.js"),
+  Credentials: require(libPath + "/rtc/credentials.js")
 };

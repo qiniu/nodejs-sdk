@@ -1,51 +1,9 @@
 var http = require('http')
-var c
 
 const host = 'rtc.qiniuapi.com'
 const headers = {
     'Content-Type': 'application/json',
 };
-
-exports.listUser = function(appId, roomName, credentials ,fn) {
-    var options = {
-        host: host,
-        port: 80,
-        path: '/v3/apps/' + appId + '/rooms/' + roomName + '/users',
-        method: 'GET',
-        headers: headers
-    };
-    get(credentials, options, fn)
-}
-
-exports.kickUser = function (appId, roomName, userId, credentials, fn) {
-    var options = {
-        host: host,
-        port: 80,
-        path: '/v3/apps/' + appId + '/rooms/' + roomName + '/users/' + userId,
-        method: 'DELETE',
-        headers: headers
-    };
-    get(credentials, options, fn)
-}
-
-exports.listActiveRoom = function (appId, roomNamePrefix, offset, limit, credentials, fn) {
-    var options = {
-        host: host,
-        port: 80,
-        path: '/v3/apps/' + appId + "/rooms?prefix=" + roomNamePrefix + "&offset=" + offset + "&limit=" + limit ,
-        method: 'GET',
-        headers: headers
-    };
-    get(credentials, options, fn)
-}
-
-exports.roomToken = function (roomAccess, credentials) {
-    if (!roomAccess.expireAt) {
-        roomAccess.expireAt = Math.floor(Date.now() / 1000) + 3600;
-    }
-    return credentials.signJson(roomAccess);
-
-}
 
 function get(credentials, options, fn){
     options.headers['Authorization'] = credentials.generateAccessToken(options, null);
@@ -119,3 +77,46 @@ function post(credentials, options, data, fn) {
 
     req.end();
 };
+
+
+exports.listUser = function(appId, roomName, credentials ,fn) {
+    var options = {
+        host: host,
+        port: 80,
+        path: '/v3/apps/' + appId + '/rooms/' + roomName + '/users',
+        method: 'GET',
+        headers: headers
+    };
+    get(credentials, options, fn)
+}
+
+exports.kickUser = function (appId, roomName, userId, credentials, fn) {
+    var options = {
+        host: host,
+        port: 80,
+        path: '/v3/apps/' + appId + '/rooms/' + roomName + '/users/' + userId,
+        method: 'DELETE',
+        headers: headers
+    };
+    get(credentials, options, fn)
+}
+
+exports.listActiveRoom = function (appId, roomNamePrefix, offset, limit, credentials, fn) {
+    var options = {
+        host: host,
+        port: 80,
+        path: '/v3/apps/' + appId + "/rooms?prefix=" + roomNamePrefix + "&offset=" + offset + "&limit=" + limit ,
+        method: 'GET',
+        headers: headers
+    };
+    get(credentials, options, fn)
+}
+
+exports.roomToken = function (roomAccess, credentials) {
+    if (!roomAccess.expireAt) {
+        roomAccess.expireAt = Math.floor(Date.now() / 1000) + 3600;
+    }
+    return credentials.signJson(roomAccess);
+
+}
+
