@@ -4,7 +4,7 @@ module.exports = {
   auth: {
     digest: require(libPath + '/auth' + '/digest.js')
   },
-  cdn: require(libPath + "/cdn.js"),
+  cdn: require(libPath + '/cdn.js'),
   form_up: require(libPath + '/storage/form.js'),
   resume_up: require(libPath + '/storage/resume.js'),
   rs: require(libPath + '/storage/rs.js'),
@@ -12,5 +12,8 @@ module.exports = {
   conf: require(libPath + '/conf.js'),
   rpc: require(libPath + '/rpc.js'),
   util: require(libPath + '/util.js'),
-  zone: require(libPath + '/zone.js')
-};
+  zone: require(libPath + '/zone.js'),
+  app: require(libPath + '/rtc/app.js'),
+  room: require(libPath + '/rtc/room.js'),
+  Credentials: require(libPath + '/rtc/credentials.js')
+}
