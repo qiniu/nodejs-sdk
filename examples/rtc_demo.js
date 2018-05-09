@@ -78,7 +78,7 @@ qiniu.room.kickUser('appId', 'roomName', 'userId', credentials, function (err, r
 })
 
 // type of(offset limit) =  Num  such as 5 10
-qiniu.room.listActiveRoom('appId', 'prefix', 'offset', 'limit', credentials, function (err, res) {
+qiniu.room.listActiveRooms('appId', 'prefix', 'offset', 'limit', credentials, function (err, res) {
   if (err) {
     console.log(err)
   } else {
@@ -95,4 +95,4 @@ var roomAccess = {
   'permission': 'admin'
 }
 
-console.log(qiniu.room.roomToken(roomAccess, credentials))
+console.log(qiniu.room.getRoomToken(roomAccess, credentials))

@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "7.1.4",
+  "version": "7.1.5",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {

@@ -101,7 +101,7 @@ exports.kickUser = function (appId, roomName, userId, credentials, fn) {
     get(credentials, options, fn)
 }
 
-exports.listActiveRoom = function (appId, roomNamePrefix, offset, limit, credentials, fn) {
+exports.listActiveRooms = function (appId, roomNamePrefix, offset, limit, credentials, fn) {
     var options = {
         host: host,
         port: 80,
@@ -112,7 +112,7 @@ exports.listActiveRoom = function (appId, roomNamePrefix, offset, limit, credent
     get(credentials, options, fn)
 }
 
-exports.roomToken = function (roomAccess, credentials) {
+exports.getRoomToken = function (roomAccess, credentials) {
     if (!roomAccess.expireAt) {
         roomAccess.expireAt = Math.floor(Date.now() / 1000) + 3600;
     }
