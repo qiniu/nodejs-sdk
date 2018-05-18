@@ -12,8 +12,8 @@ exports.Zone_z0 = new conf.Zone([
     'upload-nb.qiniup.com',
     'upload-xs.qiniup.com',
   ], 'iovip.qbox.me',
-  'rs.qiniu.com',
-  'rsf.qiniu.com',
+  'rs.qbox.me',
+  'rsf.qbox.me',
   'api.qiniu.com');
 
 //huabei
@@ -22,8 +22,8 @@ exports.Zone_z1 = new conf.Zone([
   ], [
     'upload-z1.qiniup.com',
   ], 'iovip-z1.qbox.me',
-  'rs-z1.qiniu.com',
-  'rsf-z1.qiniu.com',
+  'rs-z1.qbox.me',
+  'rsf-z1.qbox.me',
   'api-z1.qiniu.com');
 
 //huanan
@@ -36,8 +36,8 @@ exports.Zone_z2 = new conf.Zone([
     'upload-gz.qiniup.com',
     'upload-fs.qiniup.com',
   ], 'iovip-z2.qbox.me',
-  'rs-z2.qiniu.com',
-  'rsf-z2.qiniu.com',
+  'rs-z2.qbox.me',
+  'rsf-z2.qbox.me',
   'api-z2.qiniu.com');
 
 
@@ -47,8 +47,8 @@ exports.Zone_na0 = new conf.Zone([
   ], [
     'upload-na0.qiniup.com',
   ], 'iovip-na0.qbox.me',
-  'rs-na0.qiniu.com',
-  'rsf-na0.qiniu.com',
+  'rs-na0.qbox.me',
+  'rsf-na0.qbox.me',
   'api-na0.qiniu.com')
 
 
@@ -57,8 +57,8 @@ exports.Zone_as0 = new conf.Zone([
 ], [
   'upload-as0.qiniup.com',
 ], 'iovip-as0.qbox.me',
-'rs-as0.qiniu.com',
-'rsf-as0.qiniu.com',
+'rs-as0.qbox.me',
+'rsf-as0.qbox.me',
 'api-as0.qiniu.com')
 
 

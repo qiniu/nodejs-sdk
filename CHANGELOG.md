@@ -1,5 +1,8 @@
 ## CHANGE LOG
 
+## v7.1.6
+- 修复rs和rsf的https默认域名
+
 ## v7.1.5
 - 增加连麦功能
 
