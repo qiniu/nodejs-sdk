@@ -1,5 +1,8 @@
 ## CHANGE LOG
 
+## v7.7.7
+- 修复form上传在升级mime库后的错误
+
 ## v7.1.6
 - 修复rs和rsf的https默认域名
 - 升级修复mime库的安全风险
