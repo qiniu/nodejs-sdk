@@ -256,7 +256,7 @@ ResumeUploader.prototype.putFile = function(uploadToken, key, localFile,
   var rsStream = fs.createReadStream(localFile);
   var rsStreamLen = fs.statSync(localFile).size;
   if (!putExtra.mimeType) {
-    putExtra.mimeType = mime.lookup(localFile);
+    putExtra.mimeType = mime.getType(localFile);
   }
 
   if (!putExtra.fname) {
