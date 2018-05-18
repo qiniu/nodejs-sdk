@@ -173,7 +173,7 @@ FormUploader.prototype.putFile = function(uploadToken, key, localFile, putExtra,
   var fsStream = fs.createReadStream(localFile);
 
   if (!putExtra.mimeType) {
-    putExtra.mimeType = mime.lookup(localFile);
+    putExtra.mimeType = mime.getType(localFile);
   }
 
   if (!putExtra.fname) {
