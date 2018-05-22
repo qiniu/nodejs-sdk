@@ -661,6 +661,11 @@ exports.changeTypeOp = function(bucket, key, newType) {
   return '/chtype/' + encodedEntryURI + '/type/' + newType;
 }
 
+exports.changeStatusOp = function(bucket, key, newStatus) {
+  var encodedEntryURI = util.encodedEntry(bucket, key);
+  return '/chstatus/' + encodedEntryURI + '/status/' + newStatus;
+}
+
 exports.moveOp = function(srcBucket, srcKey, destBucket, destKey, options) {
   options = options || {};
   var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
