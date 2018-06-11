@@ -128,7 +128,7 @@ export declare namespace conf {
         /**
          * @default null
          */
-        zone?: 'huadong' | 'huabei' | 'huanan' | 'beimei';
+        zone?: Zone,
 
         /**
          * @default -1
