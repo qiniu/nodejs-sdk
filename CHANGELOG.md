@@ -1,5 +1,8 @@
 ## CHANGE LOG
 
+## v7.1.8
+- 修复 index.d.ts 文件中zone的设置
+
 ## v7.7.7
 - 修复form上传在升级mime库后的错误
 
