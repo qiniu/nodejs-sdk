@@ -119,6 +119,8 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   var finishedBlock = 0;
   var curBlock = 0;
   var readLen = 0;
+  var bufferLen = 0;
+  var remainedData = new Buffer(0);
   var readBuffers = [];
   var finishedCtxList = [];
   var finishedBlkPutRets = [];
@@ -151,19 +153,26 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
   //check when to mkblk
   rsStream.on('data', function(chunk) {
     readLen += chunk.length;
+    bufferLen += chunk.length;
     readBuffers.push(chunk);
 
-    if (readLen % conf.BLOCK_SIZE == 0 || readLen == fileSize) {
-      //console.log(readLen);
-      var readData = Buffer.concat(readBuffers);
-      readBuffers = []; //reset read buffer
+    if (bufferLen >= conf.BLOCK_SIZE || readLen == fileSize) {
+      var readBuffersData = Buffer.concat(readBuffers);
+      var blockSize = conf.BLOCK_SIZE - remainedData.length;
+    
+      var postData = Buffer.concat([remainedData, readBuffersData.slice(0,blockSize)]);
+      remainedData = new Buffer(readBuffersData.slice(blockSize,bufferLen));
+      bufferLen =  bufferLen - conf.BLOCK_SIZE;
+      //reset buffer  
+      readBuffers = [];
+
       curBlock += 1; //set current block
       if (curBlock > finishedBlock) {
         rsStream.pause();
-        mkblkReq(upDomain, uploadToken, readData, function(respErr,
+        mkblkReq(upDomain, uploadToken, postData, function(respErr,
           respBody,
           respInfo) {
-          var bodyCrc32 = parseInt("0x" + getCrc32(readData));
+          var bodyCrc32 = parseInt("0x" + getCrc32(postData));
           if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
             callbackFunc(respErr, respBody, respInfo);
             rsStream.close();
@@ -258,7 +267,9 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
 ResumeUploader.prototype.putFile = function(uploadToken, key, localFile,
   putExtra, callbackFunc) {
   putExtra = putExtra || new PutExtra();
-  var rsStream = fs.createReadStream(localFile);
+  var rsStream = fs.createReadStream(localFile,{
+    highWaterMark: conf.BLOCK_SIZE,
+  });
   var rsStreamLen = fs.statSync(localFile).size;
   if (!putExtra.mimeType) {
     putExtra.mimeType = mime.getType(localFile);
