@@ -1,5 +1,8 @@
 ## CHANGE LOG
 
+## v7.1.9
+- 修复新版node下resume up方式文件内容被缓存而导致的上传失败
+
 ## v7.1.8
 - 修复 index.d.ts 文件中zone的设置
 

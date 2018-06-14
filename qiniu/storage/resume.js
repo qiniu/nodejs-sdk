@@ -42,6 +42,7 @@ ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
   rsStream.on("error", function(err) {
     //callbackFunc
     callbackFunc(err, null, null);
+    rsStream.close();
     return;
   });
 
@@ -67,6 +68,7 @@ ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
       cZoneExpire) {
       if (err) {
         callbackFunc(err, null, null);
+        rsStream.close();
         return;
       }
 
@@ -164,6 +166,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
           var bodyCrc32 = parseInt("0x" + getCrc32(readData));
           if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
             callbackFunc(respErr, respBody, respInfo);
+            rsStream.close();
             return;
           } else {
             finishedBlock += 1;
@@ -197,7 +200,9 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     if (!isSent && rsStreamLen === 0) {
       mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc)
     }
-  })
+
+    rsStream.close();
+  });
 }
 
 function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
