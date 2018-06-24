@@ -13,7 +13,7 @@ var mac = new qiniu.auth.digest.Mac(qiniu.conf.ACCESS_KEY, qiniu.conf.SECRET_KEY
 var json = {
 
   "data":{
-        "uri": "http:///Videos/2016-09/39/9d019f7acab742ddbc5f4db02b6f72cb.mp4"
+        "uri": "http://test.qiniu.com/Videos/2016-09/39/9d019f7acab742ddbc5f4db02b6f72cb.mp4"
   },
   "params": {
         "async": false,
