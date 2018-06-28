@@ -1,5 +1,8 @@
 ## CHANGE LOG
 
+## v7.2.1
+- 修复rtc获取回复存在的问题
+
 ## v7.2.0
 - 修复node的stream读取的chunk大小比较随意的问题
 
