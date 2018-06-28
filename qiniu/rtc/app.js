@@ -18,7 +18,7 @@ function get(credentials, options, fn){
         });
 
         res.on('end', function() {
-            //var resultObject = JSON.parse(responseString);
+            var resultObject = JSON.parse(responseString);
 
             if (res.statusCode != 200) {
                 var result = {
@@ -27,11 +27,7 @@ function get(credentials, options, fn){
                 }
                 fn(result, null);
             } else {
-                result = {
-                    code: res.statusCode,
-                    message: res.statusMessage
-                }
-                fn(null, result);
+                fn(null, resultObject);
             }
         });
     });
