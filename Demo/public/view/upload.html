@@ -15,6 +15,14 @@
         // $.get('http://127.0.0.1:11010/get/uptoken',function(data){
         //   alert(data);
         // });
+        var file = $("#upFile")[0].files[0];
+        //alert(filePath);
+        if(file==''&&file==undefined){
+          return;
+        }else if(file.size>5242880){
+          alert('文件过大');
+          return;
+        }
         $.ajax({
           url:'http://127.0.0.1:11010/get/uptoken',
           type:'GET',
@@ -22,27 +30,33 @@
           success:function(data) {
               //alert('token');
               token = data;
-              alert(token);
+              //alert(token);
               //uploadBytoken(token);
-              var observable = qiniu.upload('/Users/jemy/Desktop/11月工作日报','20181108-02',token,null,null);
+              var observable = qiniu.upload(file,"test-node"+new Date().getTime(),token,null,null);
               var subscription = observable.subscribe(next,error,complete);
             }
           });
         //var token = http://127.0.0.1:11010/get/uptoken
         function next(res){
           //alert(res.total.percent);
+          $("#connectUrl").html("<span>上传进度："+res.total.percent+"+%</span>");
         }
         function error(err){
-          alert(err);
+          alert(err.message);
+        $("#connectUrl").html("<span>发生错误："+err.message+"</span>");
         }
         function complete(res){
-          alert(res.key);
-          alert('complete');
+
+          //alert("上传完成"+res.key);
+          $("#connectUrl").html("<span>上传完成，</span><a href='http://img.blog.ijemy.com/"+res.key+"'>点击访问</>");
+          //alert('complete');
         }
 }
     </script>
   </head>
   <body>
-    <input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'>
+    <input type="file" name='upFile' id="upFile"></input><span style="color:red">不超过5M</span></br>
+    <input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'></br>
+    <span id="connectUrl" ></span>
   </body>
 </html>

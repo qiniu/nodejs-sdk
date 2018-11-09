@@ -75,8 +75,11 @@ app.listen('11010', function() {
 function getToken() {
   var mac = new qiniu.auth.digest.Mac(qiniu.conf.ACCESS_KEY,qiniu.conf.SECRET_KEY);
   var options = {
-    scope: 'blog-image',
+    scope: 'blog-image:test-node',
     deadline:120,
+    insertOnly:1,
+    fileSize:5242880,
+    isPrefixalScope:1,
   };
   var putPolicy = new qiniu.rs.PutPolicy(options);
   var uploadToken=putPolicy.uploadToken(mac);
