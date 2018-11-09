@@ -3,8 +3,8 @@ const path = require('path');
 const os = require('os');
 const pkg = require('../package.json');
 
-exports.ACCESS_KEY = '<PLEASE APPLY YOUR ACCESS KEY>';
-exports.SECRET_KEY = '<DONT SEND YOUR SECRET KEY TO ANYONE>';
+exports.ACCESS_KEY = 'MP_Ebql_lSsUrDr7WrXn_5vKocQDLvTPCNEFeVm';
+exports.SECRET_KEY = 'YZlfOKeuQVA0h7yuCJrkdcYlbcGYwEP7A8YVG9-P';
 
 var defaultUserAgent = function() {
   return 'QiniuNodejs/' + pkg.version + ' (' + os.type() + '; ' + os.platform() +
@@ -71,7 +71,7 @@ exports.Zone = function(srcUpHosts, cdnUpHosts, ioHost, rsHost, rsfHost,
           this.rsHost = "rs-as0.qiniu.com";
           this.rsfHost = "rsf-as0.qiniu.com";
           this.apiHost = "api-as0.qiniu.com";
-          break;  
+          break;
         default:
           this.rsHost = "rs.qiniu.com";
           this.rsfHost = "rsf.qiniu.com";

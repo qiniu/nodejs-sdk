@@ -7,6 +7,7 @@
     "test": "test"
   },
   "scripts": {
+    "start": "node ./server.js",
     "test": "make test",
     "blanket": {
       "pattern": "qiniu/qiniu",
@@ -57,7 +58,9 @@
   "dependencies": {
     "agentkeepalive": "3.3.0",
     "crc32": "0.2.2",
+    "ejs": "^2.6.1",
     "encodeurl": "^1.0.1",
+    "express": "^4.16.4",
     "formstream": "1.1.0",
     "mime": "2.3.1",
     "tunnel-agent": "0.6.0",

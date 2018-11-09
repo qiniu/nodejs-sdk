@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>上传测试</title>
+    <script src="https://unpkg.com/qiniu-js@2.5.2/dist/qiniu.min.js" charset="utf-8"></script>
+
+    <!-- <script src="http://cdn.iorange.vip/2e4db4c1c6a60dc91aaef447a80945d7.js" charset="utf-8"></script> -->
+    <script src="../../js/jquery.min.js" charset="utf-8"></script>
+
+    <script type="text/javascript">
+      function uploadFile(){
+        //alert('start');
+        var token = '';
+        // $.get('http://127.0.0.1:11010/get/uptoken',function(data){
+        //   alert(data);
+        // });
+        $.ajax({
+          url:'http://127.0.0.1:11010/get/uptoken',
+          type:'GET',
+          async:true,
+          success:function(data) {
+              //alert('token');
+              token = data;
+              alert(token);
+              //uploadBytoken(token);
+              var observable = qiniu.upload('/Users/jemy/Desktop/11月工作日报','20181108-02',token,null,null);
+              var subscription = observable.subscribe(next,error,complete);
+            }
+          });
+        //var token = http://127.0.0.1:11010/get/uptoken
+        function next(res){
+          //alert(res.total.percent);
+        }
+        function error(err){
+          alert(err);
+        }
+        function complete(res){
+          alert(res.key);
+          alert('complete');
+        }
+}
+    </script>
+  </head>
+  <body>
+    <input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'>
+  </body>
+</html>
