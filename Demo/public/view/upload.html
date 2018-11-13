@@ -1,62 +1,74 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
-  <head>
-    <meta charset="utf-8">
-    <title>上传测试</title>
-    <script src="https://unpkg.com/qiniu-js@2.5.2/dist/qiniu.min.js" charset="utf-8"></script>
 
-    <!-- <script src="http://cdn.iorange.vip/2e4db4c1c6a60dc91aaef447a80945d7.js" charset="utf-8"></script> -->
-    <script src="../../js/jquery.min.js" charset="utf-8"></script>
+<head>
+  <meta charset="utf-8">
+  <title>上传测试</title>
+  <script src="https://unpkg.com/qiniu-js@2.5.2/dist/qiniu.min.js" charset="utf-8">
+  </script>
 
-    <script type="text/javascript">
-      function uploadFile(){
-        //alert('start');
-        var token = '';
-        // $.get('http://127.0.0.1:11010/get/uptoken',function(data){
-        //   alert(data);
-        // });
-        var file = $("#upFile")[0].files[0];
-        //alert(filePath);
-        if(file==''&&file==undefined){
-          return;
-        }else if(file.size>5242880){
-          alert('文件过大');
-          return;
-        }
-        $.ajax({
-          url:'http://127.0.0.1:11010/get/uptoken',
-          type:'GET',
-          async:true,
-          success:function(data) {
-              //alert('token');
-              token = data;
-              //alert(token);
-              //uploadBytoken(token);
-              var observable = qiniu.upload(file,"test-node"+new Date().getTime(),token,null,null);
-              var subscription = observable.subscribe(next,error,complete);
-            }
-          });
-        //var token = http://127.0.0.1:11010/get/uptoken
-        function next(res){
-          //alert(res.total.percent);
-          $("#connectUrl").html("<span>上传进度："+res.total.percent+"+%</span>");
-        }
-        function error(err){
-          alert(err.message);
-        $("#connectUrl").html("<span>发生错误："+err.message+"</span>");
-        }
-        function complete(res){
+  <!-- <script src="http://cdn.iorange.vip/2e4db4c1c6a60dc91aaef447a80945d7.js"
+  charset="utf-8"></script> -->
+  <script src="../../js/jquery.min.js" charset="utf-8"></script>
 
-          //alert("上传完成"+res.key);
-          $("#connectUrl").html("<span>上传完成，</span><a href='http://img.blog.ijemy.com/"+res.key+"'>点击访问</>");
-          //alert('complete');
+  <script type="text/javascript">
+    function uploadFile() {
+      //alert('start');
+      var token = '';
+      // $.get('http://127.0.0.1:11010/get/uptoken',function(data){
+      //   alert(data);
+      // });
+      var file = $("#upFile")[0].files[0];
+      //alert(filePath);
+      if (file == '' && file == undefined) {
+        return;
+      } else if (file.size > 5242880) {
+        alert('文件过大');
+        return;
+      }
+      $.ajax({
+        url: 'http://127.0.0.1:11010/get/uptoken',
+        type: 'GET',
+        async: true,
+        success: function(data) {
+          //alert('token');
+          token = data;
+          var fileName = $("#fileName").val();
+
+          var observable = qiniu.upload(file, "test-node_"+fileName+"_"+new Date().getTime()
+          , token, null, null);
+          var subscription = observable.subscribe(next, error, complete);
         }
-}
-    </script>
-  </head>
-  <body>
-    <input type="file" name='upFile' id="upFile"></input><span style="color:red">不超过5M</span></br>
-    <input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'></br>
-    <span id="connectUrl" ></span>
-  </body>
+      });
+      //var token = http://127.0.0.1:11010/get/uptoken
+      function next(res) {
+        //alert(res.total.percent);
+        $("#connectUrl").html("<span>上传进度：" + res.total.percent + "+%</span>");
+      }
+
+      function error(err) {
+        alert(err.message);
+        $("#connectUrl").html("<span>发生错误：" + err.message + "</span>");
+      }
+
+      function complete(res) {
+
+        //alert("上传完成"+res.key);
+        $("#connectUrl").html("<span>上传完成，</span><a href='http://img.blog."+
+        "ijemy.com/" + res.key + "'>点击访问</a>&nbsp&nbsp&nbsp链接&nbsp http://img"
+        +".blog.ijemy.com/" + res.key);
+        //alert('complete');
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <p>请输入文件名 <input type="text"  style="width:120px" id="fileName"></input></p>
+  <p><input type="file" name='upFile' id="upFile"></input><span style="color:red">不
+    超过5M</span></br><p>
+  <p><input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'></br>
+  <span id="connectUrl"></span><P>
+</body>
+
 </html>

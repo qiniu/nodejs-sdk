@@ -9,16 +9,18 @@ app.use(express.static(__dirname + '/Demo/public'));
 app.engine('html', require('ejs').renderFile);
 app.set('views', __dirname + '/Demo/public/view');
 //获取token
-app.get('/get/uptoken',function(req,res){
+app.get('/get/uptoken', function(req, res) {
   var token = getToken();
   res.send(token);
+  res.end();
 });
 //打开上传页面
-app.get('/get/upload',function (req,res) {
+app.get('/get/upload', function(req, res) {
   console.log('request at');
   res.render('upload.html', {
 
   });
+  res.end();
 });
 
 
@@ -73,16 +75,16 @@ app.listen('11010', function() {
 // console.log('server at 11010');
 //
 function getToken() {
-  var mac = new qiniu.auth.digest.Mac(qiniu.conf.ACCESS_KEY,qiniu.conf.SECRET_KEY);
+  var mac = new qiniu.auth.digest.Mac(qiniu.conf.ACCESS_KEY, qiniu.conf.SECRET_KEY);
   var options = {
     scope: 'blog-image:test-node',
-    deadline:120,
-    insertOnly:1,
-    fileSize:5242880,
-    isPrefixalScope:1,
+    deadline: 120,
+    insertOnly: 1,
+    fileSize: 5242880,
+    isPrefixalScope: 1,
   };
   var putPolicy = new qiniu.rs.PutPolicy(options);
-  var uploadToken=putPolicy.uploadToken(mac);
+  var uploadToken = putPolicy.uploadToken(mac);
   return uploadToken;
   console.log(uploadToken);
 }
