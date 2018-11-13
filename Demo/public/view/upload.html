@@ -35,8 +35,7 @@
           token = data;
           var fileName = $("#fileName").val();
 
-          var observable = qiniu.upload(file, "test-node_"+fileName+"_"+new Date().getTime()
-          , token, null, null);
+          var observable = qiniu.upload(file, "test-node_" + fileName + "_" + new Date().getTime(), token, null, null);
           var subscription = observable.subscribe(next, error, complete);
         }
       });
@@ -54,9 +53,9 @@
       function complete(res) {
 
         //alert("上传完成"+res.key);
-        $("#connectUrl").html("<span>上传完成，</span><a href='http://img.blog."+
-        "ijemy.com/" + res.key + "'>点击访问</a>&nbsp&nbsp&nbsp链接&nbsp http://img"
-        +".blog.ijemy.com/" + res.key);
+        $("#connectUrl").html("<span>上传完成，</span><a href='http://img.blog." +
+          "ijemy.com/" + res.key + "'>点击访问</a>&nbsp&nbsp&nbsp链接&nbsp http://img" +
+          ".blog.ijemy.com/" + res.key);
         //alert('complete');
       }
     }
@@ -64,11 +63,13 @@
 </head>
 
 <body>
-  <p>请输入文件名 <input type="text"  style="width:120px" id="fileName"></input></p>
+  <p>请输入文件名 <input type="text" style="width:120px" id="fileName"></input></p>
   <p><input type="file" name='upFile' id="upFile"></input><span style="color:red">不
-    超过5M</span></br><p>
-  <p><input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'></br>
-  <span id="connectUrl"></span><P>
+      超过5M</span></br>
+    <p>
+      <p><input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'></br>
+        <span id="connectUrl"></span>
+        <P>
 </body>
 
 </html>
