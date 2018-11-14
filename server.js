@@ -80,7 +80,6 @@ function getToken() {
     scope: 'blog-image:test-node',
     deadline: 120,
     insertOnly: 1,
-    fileSize: 5242880,
     isPrefixalScope: 1,
   };
   var putPolicy = new qiniu.rs.PutPolicy(options);
