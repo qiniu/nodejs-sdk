@@ -27,19 +27,20 @@
         return;
       }
       $.ajax({
-        url: 'http://127.0.0.1:11010/get/uptoken',
+        url: '/get/uptoken',
         type: 'GET',
         async: true,
         success: function(data) {
           //alert('token');
           token = data;
+          //var token = "krGrwk5tp-bxURfU3gNrHe5NLG9MhN1oG647Jo7H:oZCEdgcgMgE0RZXC9uwqyaDsV_o=:eyJzY29wZSI6ImNtLXNoZXF1LXZpZGVvIiwiZGVhZGxpbmUiOjE1NDI2Mjc4MTR9";
           var fileName = $("#fileName").val();
 
           var observable = qiniu.upload(file, "test-node_" + fileName + "_" + new Date().getTime(), token, null, null);
           var subscription = observable.subscribe(next, error, complete);
         }
       });
-      //var token = http://127.0.0.1:11010/get/uptoken
+
       function next(res) {
         //alert(res.total.percent);
         $("#connectUrl").html("<span>上传进度：" + res.total.percent + "+%</span>");

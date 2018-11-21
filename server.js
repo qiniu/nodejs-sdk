@@ -36,6 +36,8 @@ app.listen('11010', function() {
   );
 });
 
+console.log('kaishi');
+
 
 
 // http.createServer(function (req,res){
