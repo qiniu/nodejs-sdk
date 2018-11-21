@@ -22,9 +22,6 @@
       //alert(filePath);
       if (file == '' && file == undefined) {
         return;
-      } else if (file.size > 5242880) {
-        alert('文件过大');
-        return;
       }
       $.ajax({
         url: '/get/uptoken',
@@ -65,8 +62,7 @@
 
 <body>
   <p>请输入文件名 <input type="text" style="width:120px" id="fileName"></input></p>
-  <p><input type="file" name='upFile' id="upFile"></input><span style="color:red">不
-      超过5M</span></br>
+  <p><input type="file" name='upFile' id="upFile"></input></br>
     <p>
       <p><input type="button" name="开始上传" value="开始上传" onclick='uploadFile()'></br>
         <span id="connectUrl"></span>

@@ -63,6 +63,7 @@
     "express": "^4.16.4",
     "formstream": "1.1.0",
     "mime": "2.3.1",
+    "string_decoder": "^1.1.1",
     "tunnel-agent": "0.6.0",
     "urllib": "2.22.0"
   },
