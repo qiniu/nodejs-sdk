@@ -4,45 +4,37 @@
 <head>
   <title>回调测试</title>
   <style>
-    * { margin: 20; padding: 20; box-sizing: border-box; }
-    </style>
+  </style>
   <script src="../../js/jquery.min.js" charset="utf-8"></script>
   <script>
+    var pingServer;
     function socketC(){
-      $.ajax({
-        url: '/get/qncback',
-        type: 'GET',
-        async: false,
-        success: function(data) {
-          var fileName = $("#textCallBack").html("<span>"+data+"</span>");
-        }
-      });
+       pingServer=setInterval(sendPost,2000);
+    }
 
-      var waitUnit = new Date().getTime()+2000;
-      while(waitUnit>new Date().getTime()){
-
-      }
-      socketC();
-  }
-
+    function stopServer(){
+      clearInterval(pingServer);
+    }
     function sendPost(){
       $.ajax({
         url: '/get/qncback',
-        type: 'GET',
-        async: false,
-        data: '{"hello":"hehe","name":"zhangwei"}',
+        type: 'POST',
+        async: true,
         success: function(data) {
-          var fileName = $("#textCallBack").html("<span>"+data+"</span>");
+          var textCallBack =   $("#textCallBack").html();
+          if(data!=''){
+            $("#textCallBack").append("<span>"+data+"</span></br>");
+          }
         }
       });
     }
     </script>
 </head>
 
-<body>
-  <input type="button" value="发送" onclick="sendPost()"></input>
-  <label id="textCallBack"></label></br>
-  <input type="button" value="建立长链接" onclick="socketC()"></input>
+<body onload="socketC()">
+  <input type="button" value="建立长链接" onclick="socketC()"></input></br>
+  <input type="button" value="停止长链接" onclick="stopServer()"></input></br>
+  <div id="textCallBack"></div>
 </body>
 
 </html>

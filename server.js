@@ -1,30 +1,21 @@
 var qiniu = require('./index.js')
-//var http = require('http')
-//var fs = require('fs')
 var express = require('express')
-var bodyParser = require('body-parser')
-
 var app = express();
+
 //使用Demo/public下静态资源
 app.use(express.static(__dirname + '/Demo/public'));
-
-//只要加入这个配置，在req请求对象上会多出来一个属性
-//parse application/x-www-form-urlencoded
-app.use(bodyParser.urlencoded({
-  extended: false
-}))
-//parse application/json
-app.use(bodyParser.json())
-
 //返回html必备，views一定要指定到html目录下
 app.engine('html', require('ejs').renderFile);
 app.set('views', __dirname + '/Demo/public/view');
+
+
 //获取token
 app.get('/get/uptoken', function(req, res) {
   var token = getToken();
   res.send(token);
   res.end();
 });
+
 //打开上传页面
 app.get('/upload', function(req, res) {
   console.log('request at');
@@ -33,33 +24,42 @@ app.get('/upload', function(req, res) {
   });
   res.end();
 });
-var body = '';
 
-//callBackTest
+//html
 app.get('/testcb', function(req, res) {
   console.log('html return');
   res.render('qncallback.html');
   res.end();
 });
+var retBody = '';
+//qiniu callback
 app.post('/qncback', function(req, res) {
-  console.log('qn callback data');
-  body = body + req.body;
-  console.log(req.body);
+  console.log('post at');
+  retBody = getBody(req, (body) => {
+    retBody = body;
+    console.log(retBody);
+    res.end();
+  });
 });
-app.get('/get/qncback', function(req, res) {
-  //获取url中的请求参数
-  var query = req.query;
-  console.log(query);
-  //在Express中没有内置获取表单post请求的api，
-  //这里我们需要使用一个第三方包 body-parser
-  var params = req.body;
-  console.log(params);
 
-  res.send(body);
+//html.post,a listenning
+app.post('/get/qncback', function(req, res) {
+  console.log('post request  -' + retBody);
+  res.send(retBody);
   res.end();
-  body = '';
+  retBody = '';
 });
 
+//getBody
+function getBody(req, callback) {
+  var body = [];
+  req.on('data', function(chunk) {
+    body.push(chunk);
+  }).on('end', function() {
+    body = Buffer.concat(body).toString();
+    callback(body);
+  });
+}
 
 app.listen('11010', function() {
   console.log('Listening on port %d\n', '11010');
@@ -124,6 +124,6 @@ function getToken() {
   };
   var putPolicy = new qiniu.rs.PutPolicy(options);
   var uploadToken = putPolicy.uploadToken(mac);
-  return uploadToken;
   console.log(uploadToken);
+  return uploadToken;
 }
