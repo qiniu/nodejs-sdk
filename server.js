@@ -15,12 +15,31 @@ app.get('/get/uptoken', function(req, res) {
   res.end();
 });
 //打开上传页面
-app.get('/get/upload', function(req, res) {
+app.get('/upload', function(req, res) {
   console.log('request at');
   res.render('upload.html', {
 
   });
   res.end();
+});
+var body ='';
+
+//callBackTest
+app.get('/testcb',function(req,res){
+  console.log('test at');
+  res.render('qncallback.html');
+  res.end();
+});
+app.post('/qncback',function(req,res){
+  body = body+req.body;
+  console.log(req.body);
+});
+app.get('/get/qncback',function(req,res){
+  if(body!=''){
+    res.send(body);
+    res.end();
+    body = '';
+  }
 });
 
 
@@ -29,14 +48,12 @@ app.listen('11010', function() {
   console.log(
     '▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽  Demos  ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽ ▽');
   console.log(
-    ' ▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹  Upload: http://127.0.0.1:%d/get/upload   ◁ ◁ ◁ ◁ ◁ ◁ ◁',
-    '11010');
+    ' ▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹▹  Upload: http://node.ijemy.com/upload   ◁ ◁ ◁ ◁ ◁ ◁ ◁');
   console.log(
     '△ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △ △\n'
   );
 });
 
-console.log('kaishi');
 
 
 

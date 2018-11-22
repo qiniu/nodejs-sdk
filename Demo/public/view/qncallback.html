@@ -5,9 +5,34 @@
     <style>
       * { margin: 20; padding: 20; box-sizing: border-box; }
     </style>
+    <script src="../../js/jquery.min.js" charset="utf-8"></script>
+    <script>
+    function socketC(){
+      $.ajax({
+        url: '/get/qncback',
+        type: 'GET',
+        async: false,
+        success: function(data) {
+          var fileName = $("#textCallBack").html("<span>"+data+"</span>");
+          setTimeout(socketC(),2000);
+        }
+      });
+    }
+    function sendPost(){
+      $.ajax({
+        url: 'http://127.0.0.1:11010/qncback',
+        type: 'POST',
+        async: true,
+        data: '{"hello":"hehe","name":"zhangwei"}',
+        success: function(data) {
+          var fileName = $("#textCallBack").html("<span>"+data+"</span>");
+        }
+      });
+    }
+    </script>
   </head>
   <body>
-      <input type="button" value="链接" style="width:50px,height:30px"onclick="socketC()"></input>
+    <input type="button" value ="发送" onclick="sendPost()"></input>
+      <label  id="textCallBack"></label>
   </body>
 </html>
-    
