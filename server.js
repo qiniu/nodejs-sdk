@@ -26,15 +26,17 @@ var body ='';
 
 //callBackTest
 app.get('/testcb',function(req,res){
-  console.log('test at');
+  console.log('html return');
   res.render('qncallback.html');
   res.end();
 });
 app.post('/qncback',function(req,res){
+  console.log('qn callback data');
   body = body+req.body;
   console.log(req.body);
 });
 app.get('/get/qncback',function(req,res){
+  console.log('html request');
     res.send(body);
     res.end();
     body = '';

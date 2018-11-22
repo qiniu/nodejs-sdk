@@ -20,8 +20,8 @@
     }
     function sendPost(){
       $.ajax({
-        url: '/qncback',
-        type: 'POST',
+        url: '/get/qncback',
+        type: 'GET',
         async: true,
         data: '{"hello":"hehe","name":"zhangwei"}',
         success: function(data) {
@@ -31,7 +31,7 @@
     }
     </script>
   </head>
-  <body>
+  <body onload="socketC()">
     <input type="button" value ="发送" onclick="sendPost()"></input>
       <label  id="textCallBack"></label>
   </body>
