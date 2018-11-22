@@ -36,7 +36,7 @@ app.post('/qncback',function(req,res){
   console.log(req.body);
 });
 app.get('/get/qncback',function(req,res){
-  console.log('html request');
+    console.log('html request');
     res.send(body);
     res.end();
     body = '';

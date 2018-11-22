@@ -22,7 +22,7 @@
       $.ajax({
         url: '/get/qncback',
         type: 'GET',
-        async: true,
+        async: false,
         data: '{"hello":"hehe","name":"zhangwei"}',
         success: function(data) {
           var fileName = $("#textCallBack").html("<span>"+data+"</span>");
@@ -31,8 +31,9 @@
     }
     </script>
   </head>
-  <body onload="socketC()">
+  <body >
     <input type="button" value ="发送" onclick="sendPost()"></input>
-      <label  id="textCallBack"></label>
+      <label  id="textCallBack"></label></br>
+    <input type="button" value="建立长链接" onclick="socketC()"></input>
   </body>
 </html>
