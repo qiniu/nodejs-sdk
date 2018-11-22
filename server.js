@@ -35,11 +35,9 @@ app.post('/qncback',function(req,res){
   console.log(req.body);
 });
 app.get('/get/qncback',function(req,res){
-  if(body!=''){
     res.send(body);
     res.end();
     body = '';
-  }
 });
 
 
@@ -100,6 +98,9 @@ function getToken() {
     deadline: 120,
     insertOnly: 1,
     isPrefixalScope: 1,
+    callbackUrl:'http://node.ijemy.com/qncback',
+    callbackBody:'key=${key}&hash=$(hash)',
+    callbackBodyType:'application/json'
   };
   var putPolicy = new qiniu.rs.PutPolicy(options);
   var uploadToken = putPolicy.uploadToken(mac);
