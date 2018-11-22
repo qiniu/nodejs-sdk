@@ -1,10 +1,23 @@
 var qiniu = require('./index.js')
-const StringDecoder = require('string_decoder').StringDecoder;
-const decoder = new StringDecoder('utf8');
 var cdnManager = new qiniu.cdn.CdnManager();
 
-cdnManager.getCdnLogList(['cdn.iorange.vip'],'2018-11-18',(err,respBody,
+var domains = [
+   'img.blog.ijemy.com',
+];
+var logDay = '2018-11-22';
+cdnManager.getCdnLogList(domains,logDay,(err,respBody,
 	respInfo)=>{
-	var data = JSON.parse(decoder.write(Buffer.from(respInfo.data)));
-	console.log(data.data['cdn.iorange.vip'][0]['url']) ;
+	console.log('getLog-'+respInfo.statusCode);
+	if(respInfo.statusCode==200){
+		var body = JSON.parse(respBody);
+		console.log(body);
+		var logs = body.data;
+		var log = logs[domains[0]];
+		//console.log(log.length);
+		if (log!=null){
+			log.forEach((item)=>{
+			console.log(item.url);
+			});
+		}
+	}
 });
