@@ -72,45 +72,6 @@ app.listen('11010', function() {
   );
 });
 
-
-
-
-// http.createServer(function (req,res){
-//   console.log(req.url);
-//   try{
-//     if(req.url=='/get/uptoken'){
-//       var token = getToken();
-//       console.log(token);
-//       res.writeHead(200,{
-//         "Content-Type":"text/plain",
-//         "Cache-Control":"no-cache,no-store",
-//       });
-//       res.write(token);
-//       res.end();
-//     }else if(req.url=='/get/upload'){
-//       res.writeHead(200,{
-//         "Content-Type":"text/html",
-//         "Cache-Control":"public,max-age=5000",
-//       });
-//       fs.readFile('./upload.html','utf-8',function (err,data) {
-//         if(err){
-//           throw err;
-//         }
-//         res.end(data);
-//       });
-//     }
-//     else{
-//       res.writeHead(302,{
-//             'Location': 'http://cdn.iorange.vip/90d9b2965c60496d4c9b19bc452d1dde.jpg',
-//         });
-//         res.end();
-//     }
-//   }catch(e){
-//     res.end(e.stack);
-//   }
-// }).listen(11010);
-// console.log('server at 11010');
-//
 function getToken() {
   var mac = new qiniu.auth.digest.Mac(qiniu.conf.ACCESS_KEY, qiniu.conf.SECRET_KEY);
   var options = {
@@ -120,7 +81,7 @@ function getToken() {
     isPrefixalScope: 1,
     callbackUrl: 'http://node.ijemy.com/qncback',
     callbackBody: 'key=${key}&hash=$(hash)',
-    callbackBodyType: 'application/json'
+    callbackBodyType: 'application/json',
   };
   var putPolicy = new qiniu.rs.PutPolicy(options);
   var uploadToken = putPolicy.uploadToken(mac);
