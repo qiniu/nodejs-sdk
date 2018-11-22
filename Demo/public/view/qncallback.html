@@ -7,14 +7,6 @@
     </style>
   </head>
   <body>
-	<script src=""></script>
-	<script>
-	function socketC(){
- 		 var socket = io.connect('/');
-		socket.emit('qncallback','something');
-	}
-	</script>
-    <ul id="messages"></ul>
       <input type="button" value="链接" style="width:50px,height:30px"onclick="socketC()"></input>
   </body>
 </html>
