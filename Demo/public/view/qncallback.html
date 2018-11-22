@@ -1,12 +1,13 @@
 <!doctype html>
 <html>
-  <head>
-    <title>回调测试</title>
-    <style>
-      * { margin: 20; padding: 20; box-sizing: border-box; }
+
+<head>
+  <title>回调测试</title>
+  <style>
+    * { margin: 20; padding: 20; box-sizing: border-box; }
     </style>
-    <script src="../../js/jquery.min.js" charset="utf-8"></script>
-    <script>
+  <script src="../../js/jquery.min.js" charset="utf-8"></script>
+  <script>
     function socketC(){
       $.ajax({
         url: '/get/qncback',
@@ -23,7 +24,7 @@
       }
       socketC();
   }
-    }
+
     function sendPost(){
       $.ajax({
         url: '/get/qncback',
@@ -36,10 +37,12 @@
       });
     }
     </script>
-  </head>
-  <body >
-    <input type="button" value ="发送" onclick="sendPost()"></input>
-      <label  id="textCallBack"></label></br>
-    <input type="button" value="建立长链接" onclick="socketC()"></input>
-  </body>
+</head>
+
+<body>
+  <input type="button" value="发送" onclick="sendPost()"></input>
+  <label id="textCallBack"></label></br>
+  <input type="button" value="建立长链接" onclick="socketC()"></input>
+</body>
+
 </html>
