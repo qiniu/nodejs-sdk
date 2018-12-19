@@ -406,6 +406,8 @@ export declare namespace zone {
     const Zone_z2: conf.Zone;
     //beimei
     const Zone_na0: conf.Zone;
+    //Southeast Asia
+    const Zone_as0: conf.Zone;
 }
 
 export declare namespace fop {
