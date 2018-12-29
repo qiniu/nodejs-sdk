@@ -119,7 +119,7 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
     access += reqBody;
   }
 
-  console.log(access);
+  // console.log(access);
 
   var digest = exports.hmacSha1(access, mac.secretKey);
   var safeDigest = exports.base64ToUrlSafe(digest);
