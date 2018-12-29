@@ -1,5 +1,8 @@
 ## CHANGE LOG
 
+## v7.2.2
+- 一些log输出问题，travis增加eslint 检查
+
 ## v7.2.1
 - 修复rtc获取回复存在的问题
 
