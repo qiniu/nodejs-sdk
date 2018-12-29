@@ -8,8 +8,8 @@ const querystring = require('querystring');
 exports.OperationManager = OperationManager;
 
 function OperationManager(mac, config) {
-  this.mac = mac || new digest.Mac();
-  this.config = config || new conf.Config();
+    this.mac = mac || new digest.Mac();
+    this.config = config || new conf.Config();
 }
 
 // 发送持久化数据处理请求
@@ -22,79 +22,79 @@ function OperationManager(mac, config) {
 //                  force     结果是否强制覆盖已有的同名文件
 // @param callbackFunc(err, respBody, respInfo) - 回调函数
 OperationManager.prototype.pfop = function(bucket, key, fops, pipeline,
-  options, callbackFunc) {
-  options = options || {};
-  var that = this;
-  //必须参数
-  var reqParams = {
-    bucket: bucket,
-    key: key,
-    pipeline: pipeline,
-    fops: fops.join(";"),
-  };
+    options, callbackFunc) {
+    options = options || {};
+    var that = this;
+    //必须参数
+    var reqParams = {
+        bucket: bucket,
+        key: key,
+        pipeline: pipeline,
+        fops: fops.join(';'),
+    };
 
-  //notifyURL
-  if (options.notifyURL) {
-    reqParams.notifyURL = options.notifyURL;
-  }
-
-  //force
-  if (options.force) {
-    reqParams.force = 1;
-  }
-
-  var useCache = false;
-  if (this.config.zone) {
-    if (this.config.zoneExpire == -1) {
-      useCache = true;
-    } else {
-      if (!util.isTimestampExpired(this.config.zoneExpire)) {
-        useCache = true;
-      }
+    //notifyURL
+    if (options.notifyURL) {
+        reqParams.notifyURL = options.notifyURL;
     }
-  }
 
-  if (useCache) {
-    pfopReq(this.mac, this.config, reqParams, callbackFunc);
-  } else {
-    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
-      cZoneExpire) {
-      if (err) {
-        callbackFunc(err, null, null);
-        return;
-      }
+    //force
+    if (options.force) {
+        reqParams.force = 1;
+    }
 
-      //update object
-      that.config.zone = cZoneInfo;
-      that.config.zoneExpire = cZoneExpire;
-      //pfopReq
-      pfopReq(that.mac, that.config, reqParams, callbackFunc);
-    });
-  }
-}
+    var useCache = false;
+    if (this.config.zone) {
+        if (this.config.zoneExpire == -1) {
+            useCache = true;
+        } else {
+            if (!util.isTimestampExpired(this.config.zoneExpire)) {
+                useCache = true;
+            }
+        }
+    }
+
+    if (useCache) {
+        pfopReq(this.mac, this.config, reqParams, callbackFunc);
+    } else {
+        zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+            cZoneExpire) {
+            if (err) {
+                callbackFunc(err, null, null);
+                return;
+            }
+
+            //update object
+            that.config.zone = cZoneInfo;
+            that.config.zoneExpire = cZoneExpire;
+            //pfopReq
+            pfopReq(that.mac, that.config, reqParams, callbackFunc);
+        });
+    }
+};
 
 function pfopReq(mac, config, reqParams, callbackFunc) {
-  var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var requestURI = scheme + config.zone.apiHost + '/pfop/';
-  var reqBody = querystring.stringify(reqParams);
-  var auth = util.generateAccessToken(mac, requestURI, reqBody);
-  rpc.postWithForm(requestURI, reqBody, auth, callbackFunc);
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + config.zone.apiHost + '/pfop/';
+    var reqBody = querystring.stringify(reqParams);
+    var auth = util.generateAccessToken(mac, requestURI, reqBody);
+    rpc.postWithForm(requestURI, reqBody, auth, callbackFunc);
 }
 
 // 查询持久化数据处理进度
 // @param persistentId
 // @callbackFunc(err, respBody, respInfo) - 回调函数
 OperationManager.prototype.prefop = function(persistentId, callbackFunc) {
-  var apiHost = "api.qiniu.com";
-  if(this.config.zone) {
-    apiHost=this.config.zone.apiHost;
-  }
+    var apiHost = 'api.qiniu.com';
+    if(this.config.zone) {
+        apiHost=this.config.zone.apiHost;
+    }
   
-  var scheme = this.config.useHttpsDomain ? "https://" : "http://";
-  var requestURI = scheme + apiHost + "/status/get/prefop";
-  var reqParams = {
-    id: persistentId
-  };
-  var reqBody = querystring.stringify(reqParams);
-  rpc.postWithForm(requestURI, reqBody, null, callbackFunc);
-}
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + apiHost + '/status/get/prefop';
+    var reqParams = {
+        id: persistentId
+    };
+    var reqBody = querystring.stringify(reqParams);
+    rpc.postWithForm(requestURI, reqBody, null, callbackFunc);
+};

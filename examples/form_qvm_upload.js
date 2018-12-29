@@ -15,7 +15,7 @@ var config = new qiniu.conf.Config();
 var localFile = "/Users/jemy/Documents/qiniu.mp4";
 //config.zone = qiniu.zone.Zone_z0;
 
- //construct a new zone
+//construct a new zone
 //华东
 var zone_qvm_z0 = new conf.Zone([
     'free-qvm-z0-xs.qiniup.com'

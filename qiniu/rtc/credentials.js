@@ -10,7 +10,7 @@ Credentials.prototype.generateAccessToken = function(options, data) {
     var token = 'Qiniu' + ' ' + this.accessKey + ':' + sign;
 
     return token;
-}
+};
 
 Credentials.prototype._signRequest = function(options, body) {
     var contentType = options.headers['Content-Type'];
@@ -38,14 +38,14 @@ Credentials.prototype._signRequest = function(options, body) {
     var sageDigest = util.base64ToUrlSafe(digest);
 
     return sageDigest;
-}
+};
 
 Credentials.prototype.sign = function(data) {
     var digest = util.hmacSha1(data, this.secretKey);
     var sageDigest = util.base64ToUrlSafe(digest);
-    return this.accessKey + ":" + sageDigest;
+    return this.accessKey + ':' + sageDigest;
 
-}
+};
 
 Credentials.prototype.signJson = function(opt) {
 
@@ -56,6 +56,6 @@ Credentials.prototype.signJson = function(opt) {
 
     var token = this.accessKey + ':' + encodedSign + ':' + encodedStr;
     return token;
-}
+};
 
 module.exports = exports = Credentials;

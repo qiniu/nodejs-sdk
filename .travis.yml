@@ -1,7 +1,10 @@
 language: node_js
 node_js:
-- '6'
-- '8'
+  - "6"
+  - "8"
+  - "9"
+  - "10"
+  - "11"
 before_script:
 - export is_travis=true
 deploy:

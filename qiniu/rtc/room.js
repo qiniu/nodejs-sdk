@@ -1,6 +1,6 @@
-var http = require('http')
+var http = require('http');
 
-const host = 'rtc.qiniuapi.com'
+const host = 'rtc.qiniuapi.com';
 const headers = {
     'Content-Type': 'application/json',
 };
@@ -25,7 +25,7 @@ function get(credentials, options, fn){
                 var result = {
                     code: res.statusCode,
                     message: res.statusMessage
-                }
+                };
                 fn(result, null);
             } else {
                 fn(null, JSON.parse(responseString));
@@ -41,42 +41,42 @@ function get(credentials, options, fn){
 }
 
 
-function post(credentials, options, data, fn) {
-    var dataString = JSON.stringify(data);
+// function post(credentials, options, data, fn) {
+//     var dataString = JSON.stringify(data);
 
-    options.headers['Authorization'] = credentials.generateAccessToken(options, dataString);
+//     options.headers['Authorization'] = credentials.generateAccessToken(options, dataString);
 
-    var req = http.request(options, function(res) {
-        res.setEncoding('utf-8');
+//     var req = http.request(options, function(res) {
+//         res.setEncoding('utf-8');
 
-        var responseString = '';
+//         var responseString = '';
 
-        res.on('data', function(data) {
-            responseString += data;
-        });
+//         res.on('data', function(data) {
+//             responseString += data;
+//         });
 
-        res.on('end', function() {
-            var resultObject = JSON.parse(responseString);
+//         res.on('end', function() {
+//             var resultObject = JSON.parse(responseString);
 
-            if (res.statusCode != 200) {
-                var result = {
-                    code: res.statusCode,
-                    message: res.statusMessage
-                }
-                fn(result, null);
-            } else {
-                fn(null, resultObject);
-            }
-        });
-    });
-    req.on('error', function(e) {
-        fn(e, null);
-    });
+//             if (res.statusCode != 200) {
+//                 var result = {
+//                     code: res.statusCode,
+//                     message: res.statusMessage
+//                 };
+//                 fn(result, null);
+//             } else {
+//                 fn(null, resultObject);
+//             }
+//         });
+//     });
+//     req.on('error', function(e) {
+//         fn(e, null);
+//     });
 
-    req.write(dataString);
+//     req.write(dataString);
 
-    req.end();
-};
+//     req.end();
+// }
 
 
 exports.listUser = function(appId, roomName, credentials ,fn) {
@@ -87,8 +87,8 @@ exports.listUser = function(appId, roomName, credentials ,fn) {
         method: 'GET',
         headers: headers
     };
-    get(credentials, options, fn)
-}
+    get(credentials, options, fn);
+};
 
 exports.kickUser = function (appId, roomName, userId, credentials, fn) {
     var options = {
@@ -98,19 +98,19 @@ exports.kickUser = function (appId, roomName, userId, credentials, fn) {
         method: 'DELETE',
         headers: headers
     };
-    get(credentials, options, fn)
-}
+    get(credentials, options, fn);
+};
 
 exports.listActiveRooms = function (appId, roomNamePrefix, offset, limit, credentials, fn) {
     var options = {
         host: host,
         port: 80,
-        path: '/v3/apps/' + appId + "/rooms?prefix=" + roomNamePrefix + "&offset=" + offset + "&limit=" + limit ,
+        path: '/v3/apps/' + appId + '/rooms?prefix=' + roomNamePrefix + '&offset=' + offset + '&limit=' + limit ,
         method: 'GET',
         headers: headers
     };
-    get(credentials, options, fn)
-}
+    get(credentials, options, fn);
+};
 
 exports.getRoomToken = function (roomAccess, credentials) {
     if (!roomAccess.expireAt) {
@@ -118,5 +118,5 @@ exports.getRoomToken = function (roomAccess, credentials) {
     }
     return credentials.signJson(roomAccess);
 
-}
+};
 

@@ -1,6 +1,6 @@
-var http = require('http')
+var http = require('http');
 
-const host = 'rtc.qiniuapi.com'
+const host = 'rtc.qiniuapi.com';
 const headers = {
     'Content-Type': 'application/json',
 };
@@ -24,7 +24,7 @@ function get(credentials, options, fn){
                 var result = {
                     code: res.statusCode,
                     message: res.statusMessage
-                }
+                };
                 fn(result, null);
             } else {
                 fn(null, resultObject);
@@ -61,7 +61,7 @@ function post(credentials, options, data, fn) {
                 var result = {
                     code: res.statusCode,
                     message: res.statusMessage
-                }
+                };
                 fn(result, null);
             } else {
                 fn(null, resultObject);
@@ -75,7 +75,7 @@ function post(credentials, options, data, fn) {
     req.write(dataString);
 
     req.end();
-};
+}
 
 
 exports.createApp = function(app, credentials ,fn) {
@@ -86,8 +86,8 @@ exports.createApp = function(app, credentials ,fn) {
         method: 'POST',
         headers: headers
     };
-    post(credentials, options, app, fn)
-}
+    post(credentials, options, app, fn);
+};
 
 exports.getApp = function (appId, credentials, fn) {
     var options = {
@@ -97,8 +97,8 @@ exports.getApp = function (appId, credentials, fn) {
         method: 'GET',
         headers: headers
     };
-    get(credentials, options, fn)
-}
+    get(credentials, options, fn);
+};
 
 exports.deleteApp = function (appId, credentials, fn) {
     var options = {
@@ -108,8 +108,8 @@ exports.deleteApp = function (appId, credentials, fn) {
         method: 'DELETE',
         headers: headers
     };
-    get(credentials, options, fn)
-}
+    get(credentials, options, fn);
+};
 
 exports.updateApp = function (appId, app, credentials, fn) {
     var options = {
@@ -119,6 +119,6 @@ exports.updateApp = function (appId, app, credentials, fn) {
         method: 'POST',
         headers: headers
     };
-    post(credentials, options, app, fn)
-}
+    post(credentials, options, app, fn);
+};
 

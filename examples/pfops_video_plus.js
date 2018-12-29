@@ -1,4 +1,4 @@
-var qiniu = require('/Users/liangchao/qiniu/qiniu-sdk/node/node_modules/qiniu/qiniu');
+var qiniu = require("qiniu");
 var request = require('sync-request');
 var urllib = require('urllib');
 
