@@ -258,7 +258,7 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     rpc.post(requestURI, postBody, headers, function(err, ret, info) {
         if (info.statusCode == 200 || info.statusCode == 701 ||
       info.statusCode == 401) {
-            if (putExtra.resumeRecordFile) {
+            if (putExtra.resumeRecordFile && fs.existsSync(putExtra.resumeRecordFile)) {
                 fs.unlinkSync(putExtra.resumeRecordFile);
             }
         }
