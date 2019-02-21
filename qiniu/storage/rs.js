@@ -685,6 +685,11 @@ exports.copyOp = function(srcBucket, srcKey, destBucket, destKey, options) {
     return op;
 };
 
+exports.createBucketOp = function(bucketName, region) {
+  var encodedBucketName = util.urlsafeBase64Encode(bucketName);
+  return '/mkbucketv2/' + encodedBucketName + '/region/' + region;
+}
+
 // 空间资源下载
 
 // 获取私有空间的下载链接
@@ -716,6 +721,90 @@ BucketManager.prototype.publicDownloadUrl = function(domain, fileName) {
     return domain + '/' + encodeUrl(fileName);
 
 };
+
+//  修改文件状态
+// @link https://developer.qiniu.com/kodo/api/4173/modify-the-file-status
+// @param bucket  空间名称
+// @param key     文件名称
+// @param status  文件状态
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+//updateObjectStatus(bucketName string, key string, status ObjectStatus, condition UpdateObjectInfoCondition)
+BucketManager.prototype.updateObjectStatus = function(bucket, key, status,
+  callbackFunc) {
+  var useCache = false;
+  var that = this;
+  if (this.config.zone) {
+    if (this.config.zoneExpire == -1) {
+      useCache = true;
+    } else {
+      if (!util.isTimestampExpired(this.config.zoneExpire)) {
+        useCache = true;
+      }
+    }
+  }
+
+  if (useCache) {
+    updateStatusReq(this.mac, this.config, bucket, key, status, callbackFunc);
+  } else {
+    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+      cZoneExpire) {
+      if (err) {
+        callbackFunc(err, null, null);
+        return;
+      }
+
+      //update object
+      that.config.zone = cZoneInfo;
+      that.config.zoneExpire = cZoneExpire;
+      //req
+      updateStatusReq(that.mac, that.config, bucket, key, status,
+        callbackFunc);
+    });
+  }
+}
+
+function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
+  var scheme = config.useHttpsDomain ? "https://" : "http://";
+  var changeStatusOp = exports.changeStatusOp(bucket, key, status);
+  var requestURI = scheme + config.zone.rsHost + changeStatusOp;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//新建bucket
+//@link https://developer.qiniu.com/kodo/api/1382/mkbucketv2
+//@param bucketName 空间名称
+//@param regionId 存储区域
+//@param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.createBucket = function(bucketName, regionId, callbackFunc){
+  createBucketReq(this.mac,bucketName,regionId, callbackFunc);
+}
+
+function createBucketReq(mac, bucketName, region, callbackFunc){
+  var createBucketOp = exports.createBucketOp(bucketName, region);
+  var requestURI = conf.RS_HOST + createBucketOp;
+  var digest = util.generateAccessToken(mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//删除bucket
+//@link https://developer.qiniu.com/kodo/api/1601/drop-bucket
+//@param bucketName 空间名称
+//@param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.deleteBucket = function(bucketName, callbackFunc){
+  var requestURI = conf.RS_HOST + '/drop/' + bucketName;
+  var digest = util.generateAccessToken(this.mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//列举bucket
+//@link https://developer.qiniu.com/kodo/api/3926/get-service
+//@param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.listBucket = function(callbackFunc){
+  var requestURI = 'https://rs.qbox.me/buckets';
+  var digest = util.generateAccessToken(this.mac, requestURI, null);
+  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
 
 // 上传策略
 // @link https://developer.qiniu.com/kodo/manual/1206/put-policy
@@ -784,93 +873,3 @@ PutPolicy.prototype.uploadToken = function(mac) {
     var uploadToken = mac.accessKey + ':' + encodedSign + ':' + encodedFlags;
     return uploadToken;
 };
-
-//  修改文件状态
-// @link https://developer.qiniu.com/kodo/api/4173/modify-the-file-status
-// @param bucket  空间名称
-// @param key     文件名称
-// @param status  文件状态
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-//updateObjectStatus(bucketName string, key string, status ObjectStatus, condition UpdateObjectInfoCondition)
-BucketManager.prototype.updateObjectStatus = function(bucket, key, status,
-  callbackFunc) {
-  var useCache = false;
-  var that = this;
-  if (this.config.zone) {
-    if (this.config.zoneExpire == -1) {
-      useCache = true;
-    } else {
-      if (!util.isTimestampExpired(this.config.zoneExpire)) {
-        useCache = true;
-      }
-    }
-  }
-
-  if (useCache) {
-    updateStatusReq(this.mac, this.config, bucket, key, status, callbackFunc);
-  } else {
-    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
-      cZoneExpire) {
-      if (err) {
-        callbackFunc(err, null, null);
-        return;
-      }
-
-      //update object
-      that.config.zone = cZoneInfo;
-      that.config.zoneExpire = cZoneExpire;
-      //req
-      updateStatusReq(that.mac, that.config, bucket, key, status,
-        callbackFunc);
-    });
-  }
-}
-
-function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
-  var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var changeStatusOp = exports.changeStatusOp(bucket, key, status);
-  var requestURI = scheme + config.zone.rsHost + changeStatusOp;
-  var digest = util.generateAccessToken(mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
-}
-
-
-//新建bucket
-//@link https://developer.qiniu.com/kodo/api/1382/mkbucketv2
-//@param bucketName 空间名称
-//@param regionId 存储区域
-//@param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.createBucket = function(bucketName, regionId, callbackFunc){
-  createBucketReq(this.mac,bucketName,regionId, callbackFunc);
-}
-
-function createBucketReq(mac, bucketName, region, callbackFunc){
-  var createBucketOp = exports.createBucketOp(bucketName, region);
-  var requestURI = conf.RS_HOST + createBucketOp;
-  var digest = util.generateAccessToken(mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
-}
-
-exports.createBucketOp = function(bucketName, region) {
-  var encodedBucketName = util.urlsafeBase64Encode(bucketName);
-  return '/mkbucketv2/' + encodedBucketName + '/region/' + region;
-}
-
-//删除bucket
-//@link https://developer.qiniu.com/kodo/api/1601/drop-bucket
-//@param bucketName 空间名称
-//@param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.deleteBucket = function(bucketName, callbackFunc){
-  var requestURI = conf.RS_HOST + '/drop/' + bucketName;
-  var digest = util.generateAccessToken(this.mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
-}
-
-//列举bucket
-//@link https://developer.qiniu.com/kodo/api/3926/get-service
-//@param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.listBucket = function(callbackFunc){
-  var requestURI = 'https://rs.qbox.me/buckets';
-  var digest = util.generateAccessToken(this.mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
-}
