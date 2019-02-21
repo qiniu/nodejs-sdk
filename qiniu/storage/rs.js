@@ -685,11 +685,6 @@ exports.copyOp = function(srcBucket, srcKey, destBucket, destKey, options) {
     return op;
 };
 
-exports.createBucketOp = function(bucketName, region) {
-  var encodedBucketName = util.urlsafeBase64Encode(bucketName);
-  return '/mkbucketv2/' + encodedBucketName + '/region/' + region;
-}
-
 // 空间资源下载
 
 // 获取私有空间的下载链接
@@ -768,32 +763,6 @@ function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
   var changeStatusOp = exports.changeStatusOp(bucket, key, status);
   var requestURI = scheme + config.zone.rsHost + changeStatusOp;
   var digest = util.generateAccessToken(mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
-}
-
-//新建bucket
-//@link https://developer.qiniu.com/kodo/api/1382/mkbucketv2
-//@param bucketName 空间名称
-//@param regionId 存储区域
-//@param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.createBucket = function(bucketName, regionId, callbackFunc){
-  createBucketReq(this.mac,bucketName,regionId, callbackFunc);
-}
-
-function createBucketReq(mac, bucketName, region, callbackFunc){
-  var createBucketOp = exports.createBucketOp(bucketName, region);
-  var requestURI = conf.RS_HOST + createBucketOp;
-  var digest = util.generateAccessToken(mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
-}
-
-//删除bucket
-//@link https://developer.qiniu.com/kodo/api/1601/drop-bucket
-//@param bucketName 空间名称
-//@param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.deleteBucket = function(bucketName, callbackFunc){
-  var requestURI = conf.RS_HOST + '/drop/' + bucketName;
-  var digest = util.generateAccessToken(this.mac, requestURI, null);
   rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
