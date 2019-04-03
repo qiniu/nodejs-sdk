@@ -664,10 +664,10 @@ function listPrefixReqV2(mac, config, bucket, options, callbackFunc) {
         reqParams.prefix = '';
     }
 
-    if (options.limit >= 1 && options.limit <= 1000) {
-        reqParams.limit = options.limit;
+    if (options.limit) {
+        reqParams.limit = Math.min(1000, Math.max(0, options.limit));
     } else {
-        reqParams.limit = 1000;
+        reqParams.limit = 0;
     }
 
     if (options.marker) {
