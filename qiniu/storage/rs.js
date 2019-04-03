@@ -609,6 +609,87 @@ function listPrefixReq(mac, config, bucket, options, callbackFunc) {
     rpc.postWithForm(requestURI, null, auth, callbackFunc);
 }
 
+
+// 获取指定前缀的文件列表
+//
+// @param bucket 空间名称
+// @param options 列举操作的可选参数
+//                prefix    列举的文件前缀
+//                marker    上一次列举返回的位置标记，作为本次列举的起点信息
+//                limit     每次返回的最大列举文件数量
+//                delimiter 指定目录分隔符
+// @param callbackFunc(err, respBody, respInfo) - 回调函数
+BucketManager.prototype.listPrefixV2 = function(bucket, options, callbackFunc) {
+    var useCache = false;
+    var that = this;
+    if (this.config.zone) {
+        if (this.config.zoneExpire == -1) {
+            useCache = true;
+        } else {
+            if (!util.isTimestampExpired(this.config.zoneExpire)) {
+                useCache = true;
+            }
+        }
+    }
+
+    if (useCache) {
+        listPrefixReqV2(this.mac, this.config, bucket, options, callbackFunc);
+    } else {
+        zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+            cZoneExpire) {
+            if (err) {
+                callbackFunc(err, null, null);
+                return;
+            }
+
+            //update object
+            that.config.zone = cZoneInfo;
+            that.config.zoneExpire = cZoneExpire;
+            //req
+            listPrefixReqV2(that.mac, that.config, bucket, options, callbackFunc);
+        });
+    }
+};
+
+function listPrefixReqV2(mac, config, bucket, options, callbackFunc) {
+    options = options || {};
+    //必须参数
+    var reqParams = {
+        bucket: bucket,
+    };
+
+    if (options.prefix) {
+        reqParams.prefix = options.prefix;
+    } else {
+        reqParams.prefix = '';
+    }
+
+    if (options.limit >= 1 && options.limit <= 1000) {
+        reqParams.limit = options.limit;
+    } else {
+        reqParams.limit = 1000;
+    }
+
+    if (options.marker) {
+        reqParams.marker = options.marker;
+    } else {
+        reqParams.marker = '';
+    }
+
+    if (options.delimiter) {
+        reqParams.delimiter = options.delimiter;
+    } else {
+        reqParams.delimiter = '';
+    }
+
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + config.zone.rsfHost + '/v2/list?' + reqSpec;
+
+    var auth = util.generateAccessToken(mac, requestURI, null);
+    rpc.postWithForm(requestURI, null, auth, callbackFunc);
+}
+
 // 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
 BucketManager.prototype.batch = function(operations, callbackFunc) {
     var requestURI = conf.RS_HOST + '/batch';
