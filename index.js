@@ -1,19 +1,17 @@
-var libPath = process.env.QINIU_COV ? './lib-cov' : './qiniu';
-
 module.exports = {
     auth: {
-        digest: require(libPath + '/auth' + '/digest.js')
+        digest: require('./qiniu/auth' + '/digest.js')
     },
-    cdn: require(libPath + '/cdn.js'),
-    form_up: require(libPath + '/storage/form.js'),
-    resume_up: require(libPath + '/storage/resume.js'),
-    rs: require(libPath + '/storage/rs.js'),
-    fop: require(libPath + '/fop.js'),
-    conf: require(libPath + '/conf.js'),
-    rpc: require(libPath + '/rpc.js'),
-    util: require(libPath + '/util.js'),
-    zone: require(libPath + '/zone.js'),
-    app: require(libPath + '/rtc/app.js'),
-    room: require(libPath + '/rtc/room.js'),
-    Credentials: require(libPath + '/rtc/credentials.js')
+    cdn: require('./qiniu/cdn.js'),
+    form_up: require('./qiniu/storage/form.js'),
+    resume_up: require('./qiniu/storage/resume.js'),
+    rs: require('./qiniu/storage/rs.js'),
+    fop: require('./qiniu/fop.js'),
+    conf: require('./qiniu/conf.js'),
+    rpc: require('./qiniu/rpc.js'),
+    util: require('./qiniu/util.js'),
+    zone: require('./qiniu/zone.js'),
+    app: require('./qiniu/rtc/app.js'),
+    room: require('./qiniu/rtc/room.js'),
+    Credentials: require('./qiniu/rtc/credentials.js')
 };
