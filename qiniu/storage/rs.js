@@ -400,7 +400,7 @@ function fetchReq(mac, config, resUrl, bucket, key, callbackFunc) {
     var encodedEntryURI = util.encodedEntry(bucket, key);
     var encodedResURL = util.urlsafeBase64Encode(resUrl);
     var requestURI = scheme + config.zone.ioHost + '/fetch/' + encodedResURL +
-    '/to/' + encodedEntryURI;
+        '/to/' + encodedEntryURI;
     var digest = util.generateAccessToken(mac, requestURI, null);
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
@@ -806,55 +806,473 @@ BucketManager.prototype.publicDownloadUrl = function(domain, fileName) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 //updateObjectStatus(bucketName string, key string, status ObjectStatus, condition UpdateObjectInfoCondition)
 BucketManager.prototype.updateObjectStatus = function(bucket, key, status,
-  callbackFunc) {
-  var useCache = false;
-  var that = this;
-  if (this.config.zone) {
-    if (this.config.zoneExpire == -1) {
-      useCache = true;
-    } else {
-      if (!util.isTimestampExpired(this.config.zoneExpire)) {
-        useCache = true;
-      }
+    callbackFunc) {
+    var useCache = false;
+    var that = this;
+    if (this.config.zone) {
+        if (this.config.zoneExpire == -1) {
+            useCache = true;
+        } else {
+            if (!util.isTimestampExpired(this.config.zoneExpire)) {
+                useCache = true;
+            }
+        }
     }
-  }
 
-  if (useCache) {
-    updateStatusReq(this.mac, this.config, bucket, key, status, callbackFunc);
-  } else {
-    zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
-      cZoneExpire) {
-      if (err) {
-        callbackFunc(err, null, null);
-        return;
-      }
+    if (useCache) {
+        updateStatusReq(this.mac, this.config, bucket, key, status, callbackFunc);
+    } else {
+        zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+            cZoneExpire) {
+            if (err) {
+                callbackFunc(err, null, null);
+                return;
+            }
 
-      //update object
-      that.config.zone = cZoneInfo;
-      that.config.zoneExpire = cZoneExpire;
-      //req
-      updateStatusReq(that.mac, that.config, bucket, key, status,
-        callbackFunc);
-    });
-  }
+            //update object
+            that.config.zone = cZoneInfo;
+            that.config.zoneExpire = cZoneExpire;
+            //req
+            updateStatusReq(that.mac, that.config, bucket, key, status,
+                callbackFunc);
+        });
+    }
 }
 
 function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
-  var scheme = config.useHttpsDomain ? "https://" : "http://";
-  var changeStatusOp = exports.changeStatusOp(bucket, key, status);
-  var requestURI = scheme + config.zone.rsHost + changeStatusOp;
-  var digest = util.generateAccessToken(mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+    var scheme = config.useHttpsDomain ? "https://" : "http://";
+    var changeStatusOp = exports.changeStatusOp(bucket, key, status);
+    var requestURI = scheme + config.zone.rsHost + changeStatusOp;
+    var digest = util.generateAccessToken(mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
 //列举bucket
 //@link https://developer.qiniu.com/kodo/api/3926/get-service
 //@param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.listBucket = function(callbackFunc){
-  var requestURI = 'https://rs.qbox.me/buckets';
-  var digest = util.generateAccessToken(this.mac, requestURI, null);
-  rpc.postWithoutForm(requestURI, digest, callbackFunc);
+BucketManager.prototype.listBucket = function(callbackFunc) {
+    var requestURI = 'https://rs.qbox.me/buckets';
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
+
+//获取bucket信息
+//@param bucket 空间名
+//@param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.getBucketInfo = function(bucket, callbackFunc) {
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    requestURI = scheme + conf.UC_HOST + '/v2/bucketInfo?bucket=' + bucket;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//rules/add增加bucket规则
+//@param bucket 空间名
+//@param name: 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+//@param prefix: 同一个 bucket 里面前缀不能重复
+//@param to_line_after_days: 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，
+//      小于0表示上传的文件立即变低频存储
+//@param delete_after_days: 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+//@param history_delete_after_days: 指定文件成为历史版本多少天后删除，指定为0表示不删除，
+//      大于0表示多少天后删除
+//@param history_to_line_after_days: 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+BucketManager.prototype.putBucketLifecycleRule = function(bucket, options,
+    callbackFunc) {
+    PutBucketLifecycleRule(this.mac, this.config, bucket, options, callbackFunc);
+}
+
+function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
+    options = options || {};
+    var reqParams = {
+        bucket: bucket,
+        name: options.name,
+    };
+
+    if (options.prefix) {
+        reqParams.prefix = options.prefix;
+    } else {
+        reqParams.prefix = '';
+    }
+
+    if (options.to_line_after_days) {
+        reqParams.to_line_after_days = options.to_line_after_days;
+    } else {
+        reqParams.to_line_after_days = 0;
+    }
+
+    if (options.delete_after_days) {
+        reqParams.delete_after_days = options.delete_after_days;
+    } else {
+        reqParams.delete_after_days = 0;
+    }
+
+    if (options.history_delete_after_days) {
+        reqParams.history_delete_after_days = options.history_delete_after_days;
+    } else {
+        reqParams.history_delete_after_days = 0;
+    }
+
+    if (options.history_to_line_after_days) {
+        reqParams.history_to_line_after_days = options.history_to_line_after_days;
+    } else {
+        reqParams.history_to_line_after_days = 0;
+    }
+
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/rules/add?' + reqSpec;
+    var auth = util.generateAccessToken(mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, auth, callbackFunc);
+}
+
+//rules/delete 删除bucket规则
+//@param bucket 空间名
+//@param name: 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+BucketManager.prototype.deleteBucketLifecycleRule = function(bucket, name, callbackFunc) {
+    var reqParams = {
+        bucket: bucket,
+        name: name,
+    };
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/rules/delete?' + reqSpec;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//rules/update 更新bucket规则
+//@param bucket 空间名
+BucketManager.prototype.updateBucketLifecycleRule = function(bucket, options, callbackFunc) {
+    options = options || {};
+    var reqParams = {
+        bucket: bucket,
+        name: options.name,
+    };
+
+    if (options.prefix) {
+        reqParams.prefix = options.prefix;
+    }
+
+    if (options.to_line_after_days) {
+        reqParams.to_line_after_days = options.to_line_after_days;
+    }
+
+    if (options.delete_after_days) {
+        reqParams.delete_after_days = options.delete_after_days;
+    }
+
+    if (options.history_delete_after_days) {
+        reqParams.history_delete_after_days = options.history_delete_after_days;
+    }
+
+    if (options.history_to_line_after_days) {
+        reqParams.history_to_line_after_days = options.history_to_line_after_days;
+    }
+
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/rules/update?' + reqSpec;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//rules/get 获取bucket规则
+//@param bucket 空间名
+BucketManager.prototype.getBucketLifecycleRule = function(bucket, callbackFunc) {
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.UC_HOST + '/rules/get?bucket=' + bucket;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//events/add 增加事件通知规则
+BucketManager.prototype.putBucketEvent = function(bucket, options, callbackFunc) {
+    PutBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
+}
+
+function PutBucketEvent(mac, config, options, bucket, callbackFunc) {
+    options = options || {};
+    var reqParams = { //必填参数
+        bucket: bucket,
+        name: options.name,
+        event: options.event,
+        callbackURL: options.callbackURL,
+    }
+
+    if (options.prefix) {
+        reqParams.prefix = options.prefix;
+    } else {
+        reqParams.prefix = '';
+    }
+
+    if (options.suffix) {
+        reqParams.suffix = options.suffix;
+    } else {
+        reqParams.suffix = '';
+    }
+
+    if (options.access_key) {
+        reqParams.access_key = options.access_key;
+    } else {
+        reqParams.access_key = '';
+    }
+
+    if (options.host) {
+        reqParams.host = options.host;
+    } else {
+        reqParams.host = '';
+    }
+
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/events/add?' + reqSpec;
+    var digest = util.generateAccessToken(mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//events/get 更新事件通知规则
+BucketManager.prototype.updateBucketEvent = function(bucket, options, callbackFunc) {
+    UpdateBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
+}
+
+function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
+    options = options || {};
+    var reqParams = {
+        bucket: bucket,
+        name: options.name,
+    }
+
+    if (options.prefix) {
+        reqParams.prefix = options.prefix;
+    }
+
+    if (options.suffix) {
+        reqParams.suffix = options.suffix;
+    }
+
+    if (options.event) {
+        reqParams.event = options.event;
+    }
+
+    if (options.callbackURL) {
+        reqParams.callbackURL = options.callbackURL;
+    }
+
+    if (options.access_key) {
+        reqParams.access_key = options.access_key;
+    }
+
+    if (options.host) {
+        reqParams.host = options.host;
+    }
+
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/events/update?' + reqSpec;
+    var digest = util.generateAccessToken(mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//events/get 获取事件通知规则
+BucketManager.prototype.getBucketEvent = function(bucket, callbackFunc) {
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.UC_HOST + '/events/get?bucket=' + bucket;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//events/delete 删除事件通知规则
+BucketManager.prototype.deleteBucketEvent = function(bucket, name, callbackFunc) {
+    var reqParams = {
+        bucket: bucket,
+        name: name,
+    };
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/events/delete?' + reqSpec;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//设置防盗链
+//@param bucket: bucket 名
+//@param mode 0: 表示关闭Referer; 1: 表示设置Referer白名单; 2: 表示设置Referer黑名单
+//@param norefer 0: 表示不允许空 Refer 访问; 1: 表示允许空 Refer 访问
+//@param pattern  一种为空主机头域名, 比如 foo.com; 一种是泛域名, 比如 *.bar.com;
+//          一种是完全通配符, 即一个 *; 多个规则之间用;隔开
+//@param source_enabled=: 源站是否支持，默认为0只给CDN配置, 设置为1表示开启源站防盗链
+BucketManager.prototype.putReferAntiLeech = function(bucket, options, callbackFunc) {
+    PutReferAntiLeech(this.mac, this.config, bucket, options, callbackFunc);
+}
+
+function PutReferAntiLeech(mac, config, bucket, options, callbackFunc) {
+    options = options || {};
+    var reqParams = {
+        bucket: bucket,
+    };
+
+    if (options.mode) {
+        reqParams.mode = options.mode;
+    } else {
+        reqParams.mode = 0;
+    }
+
+    if (options.norefer) {
+        reqParams.norefer = options.norefer;
+    } else {
+        reqParams.norefer = 0;
+    }
+
+    if (options.pattern) {
+        reqParams.pattern = options.pattern;
+    } else {
+        reqParams.pattern = '*';
+    }
+
+    if (options.source_enabled) {
+        reqParams.source_enabled = options.source_enabled;
+    } else {
+        reqParams.source_enabled = 0;
+    }
+
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/referAntiLeech?' + reqSpec;
+    var digest = util.generateAccessToken(mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+
+}
+
+///corsRules/set 设置bucket的cors（跨域）规则
+BucketManager.prototype.putCorsRules = function(bucket, body, callbackFunc) {
+    PutCorsRules(this.mac, this.config, bucket, body, callbackFunc);
+}
+
+function PutCorsRules(mac, config, bucket, body, callbackFunc) {
+    var reqBody = JSON.stringify(body);
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.UC_HOST + '/corsRules/set/' + bucket;
+    var auth = util.generateAccessToken(mac, requestURI, reqBody);
+    rpc.postWithForm(requestURI, reqBody, auth, callbackFunc);
+}
+
+///corsRules/get 获取bucket跨域
+BucketManager.prototype.getCorsRules = function(bucket, callbackFunc) {
+    GetCorsRules(this.mac, this.config, bucket, callbackFunc);
+}
+
+function GetCorsRules(mac, config, bucket, callbackFunc) {
+    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.UC_HOST + '/corsRules/get/' + bucket;
+    var digest = util.generateAccessToken(mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+// BucketManager.prototype.getBucketSourceConfig = function(body, callbackFunc) {
+//     var reqBody = JSON.stringify(body);
+//     console.log(reqBody);
+//     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+//     var requestURI = scheme + conf.UC_HOST + '/mirrorConfig/get';
+//     var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', conf.FormMimeJson, reqBody);
+//     rpc.postWithForm(requestURI, reqBody,digest, callbackFunc);
+// }
+
+//原图保护
+//@param bucket 空间名称
+//@param mode 为1表示开启原图保护，0表示关闭
+BucketManager.prototype.putBucketAccessStyleMode = function(bucket, mode, callbackFunc) {
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.UC_HOST + '/accessMode/' + bucket + '/mode/' + mode;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//设置Bucket的cache-control: max-age属性
+//@param maxAge:为0或者负数表示为默认值（31536000）
+BucketManager.prototype.putBucketMaxAge = function(bucket, options, callbackFunc) {
+    var max_age = options.maxAge;
+    if (max_age <= 0) {
+        max_age = 31536000;
+    }
+    var reqParams = {
+        bucket: bucket,
+        maxAge: max_age,
+    };
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/maxAge?' + reqSpec;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//设置Bucket私有属性
+//@param private为0表示公开，为1表示私有
+BucketManager.prototype.putBucketAccessMode = function(bucket, options, callbackFunc) {
+    options = options || {};
+    var reqParams = {
+        bucket: bucket,
+    };
+
+    if (options.private) {
+        reqParams.private = options.private;
+    } else {
+        reqParams.private = 0;
+    }
+
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = querystring.stringify(reqParams);
+    var requestURI = scheme + conf.UC_HOST + '/private?' + reqSpec;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//设置配额
+//@param bucket: 空间名称，不支持授权空间
+//@param size: 空间存储量配额,参数传入0或不传表示不更改当前配置，传入-1表示取消限额，新创建的空间默认没有限额。
+//@param count: 空间文件数配额，参数含义同<size>
+BucketManager.prototype.putBucketQuota = function(bucket, options, callbackFunc) {
+    options = options || {};
+    var reqParams = {
+        bucket: bucket,
+    };
+
+    if (options.size) {
+        reqParams.size = options.size;
+    } else {
+        reqParams.size = 0;
+    }
+
+    if (options.count) {
+        reqParams.count = options.count;
+    } else {
+        reqParams.count = 0;
+    }
+
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var reqSpec = `${reqParams.bucket}/size/${reqParams.size}/count/${reqParams.count}`;
+    var requestURI = scheme + conf.UC_HOST + '/setbucketquota/' + reqSpec;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//获取配额
+//@param bucket: 空间名称，不支持授权空间
+BucketManager.prototype.getBucketQuota = function(bucket, callbackFunc) {
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.UC_HOST + '/getbucketquota/' + bucket;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
+//获得Bucket的所有域名
+//@param bucket:bucketName
+BucketManager.prototype.listBucketDomains = function(bucket, callbackFunc) {
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.UC_HOST + '/v3/domains?tbl=' + bucket;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+}
+
 
 // 上传策略
 // @link https://developer.qiniu.com/kodo/manual/1206/put-policy

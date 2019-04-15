@@ -18,6 +18,7 @@ exports.FormMimeJson = 'application/json';
 exports.FormMimeRaw = 'application/octet-stream';
 exports.RS_HOST = 'http://rs.qiniu.com';
 exports.RPC_TIMEOUT = 120000; //120s
+exports.UC_HOST = 'uc.qbox.me';
 
 //proxy
 exports.RPC_HTTP_AGENT = null;
@@ -69,7 +70,7 @@ exports.Zone = function(srcUpHosts, cdnUpHosts, ioHost, rsHost, rsfHost,
                 this.rsHost = 'rs-as0.qiniu.com';
                 this.rsfHost = 'rsf-as0.qiniu.com';
                 this.apiHost = 'api-as0.qiniu.com';
-                break;  
+                break;
             default:
                 this.rsHost = 'rs.qiniu.com';
                 this.rsfHost = 'rsf.qiniu.com';
