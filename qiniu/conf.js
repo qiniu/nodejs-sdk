@@ -29,7 +29,7 @@ exports.Config = function Config(options) {
     //use http or https protocol
     this.useHttpsDomain = !!(options.useHttpsDomain || false);
     //use cdn accerlated domains
-    this.useCdnDomain = !!(options.useCdnDomain && true);
+    this.useCdnDomain = options.useCdnDomain == false ? false : true;
     //zone of the bucket
     //z0 huadong, z1 huabei, z2 huanan, na0 beimei
     this.zone = options.zone || null;
