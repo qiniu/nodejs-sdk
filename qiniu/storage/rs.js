@@ -1286,6 +1286,7 @@ function PutPolicy(options) {
     this.expires = options.expires || 3600;
     this.insertOnly = options.insertOnly || null;
 
+    this.forceSaveKey = options.forceSaveKey || null;
     this.saveKey = options.saveKey || null;
     this.endUser = options.endUser || null;
 
@@ -1313,7 +1314,7 @@ function PutPolicy(options) {
 
 PutPolicy.prototype.getFlags = function() {
     var flags = {};
-    var attrs = ['scope', 'isPrefixalScope', 'insertOnly', 'saveKey', 'endUser',
+    var attrs = ['scope', 'isPrefixalScope', 'insertOnly', 'forceSaveKey', 'saveKey', 'endUser',
         'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost',
         'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps',
         'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit', 'fsizeMin',
