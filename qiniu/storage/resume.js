@@ -48,7 +48,7 @@ ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
 
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -74,7 +74,8 @@ ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
 
             //req
             putReq(that.config, uploadToken, key, rsStream, rsStreamLen,
@@ -161,11 +162,11 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
         if (bufferLen >= conf.BLOCK_SIZE || readLen == fileSize) {
             var readBuffersData = Buffer.concat(readBuffers);
             var blockSize = conf.BLOCK_SIZE - remainedData.length;
-    
+
             var postData = Buffer.concat([remainedData, readBuffersData.slice(0,blockSize)]);
             remainedData = new Buffer(readBuffersData.slice(blockSize,bufferLen));
             bufferLen =  bufferLen - conf.BLOCK_SIZE;
-            //reset buffer  
+            //reset buffer
             readBuffers = [];
 
             curBlock += 1; //set current block

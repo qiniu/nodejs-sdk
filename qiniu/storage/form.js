@@ -78,6 +78,7 @@ FormUploader.prototype.putStream = function(uploadToken, key, fsStream,
             that.config.zone = cZoneInfo;
             that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
             this.config = that.config;
+            this.config = that.config;
             //req
             createMultipartForm(uploadToken, key, fsStream,
                 putExtra,
