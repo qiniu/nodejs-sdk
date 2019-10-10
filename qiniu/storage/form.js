@@ -49,7 +49,7 @@ FormUploader.prototype.putStream = function(uploadToken, key, fsStream,
 
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -76,8 +76,8 @@ FormUploader.prototype.putStream = function(uploadToken, key, fsStream,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
-
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             createMultipartForm(uploadToken, key, fsStream,
                 putExtra,
