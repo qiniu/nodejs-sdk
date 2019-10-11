@@ -57,6 +57,7 @@
   ],
   "dependencies": {
     "agentkeepalive": "3.3.0",
+    "block-stream2": "^2.0.0",
     "crc32": "0.2.2",
     "encodeurl": "^1.0.1",
     "formstream": "1.1.0",
