@@ -44,7 +44,7 @@ OperationManager.prototype.pfop = function(bucket, key, fops, pipeline,
     }
 
     var useCache = false;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -66,7 +66,8 @@ OperationManager.prototype.pfop = function(bucket, key, fops, pipeline,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //pfopReq
             pfopReq(that.mac, that.config, reqParams, callbackFunc);
         });
@@ -89,7 +90,7 @@ OperationManager.prototype.prefop = function(persistentId, callbackFunc) {
     if(this.config.zone) {
         apiHost=this.config.zone.apiHost;
     }
-  
+
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + apiHost + '/status/get/prefop';
     var reqParams = {

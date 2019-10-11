@@ -22,7 +22,7 @@ function BucketManager(mac, config) {
 BucketManager.prototype.stat = function(bucket, key, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -44,7 +44,8 @@ BucketManager.prototype.stat = function(bucket, key, callbackFunc) {
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             statReq(that.mac, that.config, bucket, key, callbackFunc);
         });
@@ -69,7 +70,7 @@ BucketManager.prototype.changeMime = function(bucket, key, newMime,
     callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -91,7 +92,8 @@ BucketManager.prototype.changeMime = function(bucket, key, newMime,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             changeMimeReq(that.mac, that.config, bucket, key, newMime,
                 callbackFunc);
@@ -118,7 +120,7 @@ BucketManager.prototype.changeHeaders = function(bucket, key, headers,
     callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -140,7 +142,8 @@ BucketManager.prototype.changeHeaders = function(bucket, key, headers,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             changeHeadersReq(that.mac, that.config, bucket, key, headers,
                 callbackFunc);
@@ -169,7 +172,7 @@ BucketManager.prototype.move = function(srcBucket, srcKey, destBucket, destKey,
     options, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -192,7 +195,8 @@ BucketManager.prototype.move = function(srcBucket, srcKey, destBucket, destKey,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             moveReq(that.mac, that.config, srcBucket, srcKey, destBucket,
                 destKey, options, callbackFunc);
@@ -222,7 +226,7 @@ BucketManager.prototype.copy = function(srcBucket, srcKey, destBucket, destKey,
     options, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -245,7 +249,8 @@ BucketManager.prototype.copy = function(srcBucket, srcKey, destBucket, destKey,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             copyReq(that.mac, that.config, srcBucket, srcKey, destBucket,
                 destKey, options, callbackFunc);
@@ -271,7 +276,7 @@ function copyReq(mac, config, srcBucket, srcKey, destBucket, destKey,
 BucketManager.prototype.delete = function(bucket, key, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -293,7 +298,8 @@ BucketManager.prototype.delete = function(bucket, key, callbackFunc) {
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             deleteReq(that.mac, that.config, bucket, key, callbackFunc);
         });
@@ -319,7 +325,7 @@ BucketManager.prototype.deleteAfterDays = function(bucket, key, days,
     callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -341,7 +347,8 @@ BucketManager.prototype.deleteAfterDays = function(bucket, key, days,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             deleteAfterDaysReq(that.mac, that.config, bucket, key, days,
                 callbackFunc);
@@ -366,7 +373,7 @@ function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
 BucketManager.prototype.fetch = function(resUrl, bucket, key, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -388,7 +395,8 @@ BucketManager.prototype.fetch = function(resUrl, bucket, key, callbackFunc) {
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             fetchReq(that.mac, that.config, resUrl, bucket, key, callbackFunc);
         });
@@ -413,7 +421,7 @@ function fetchReq(mac, config, resUrl, bucket, key, callbackFunc) {
 BucketManager.prototype.prefetch = function(bucket, key, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -435,7 +443,8 @@ BucketManager.prototype.prefetch = function(bucket, key, callbackFunc) {
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             prefetchReq(that.mac, that.config, bucket, key, callbackFunc);
         });
@@ -460,7 +469,7 @@ BucketManager.prototype.changeType = function(bucket, key, newType,
     callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -482,7 +491,8 @@ BucketManager.prototype.changeType = function(bucket, key, newType,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             changeTypeReq(that.mac, that.config, bucket, key, newType,
                 callbackFunc);
@@ -541,7 +551,7 @@ BucketManager.prototype.unimage = function(bucket, callbackFunc) {
 BucketManager.prototype.listPrefix = function(bucket, options, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -563,7 +573,8 @@ BucketManager.prototype.listPrefix = function(bucket, options, callbackFunc) {
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             listPrefixReq(that.mac, that.config, bucket, options, callbackFunc);
         });
@@ -622,7 +633,7 @@ function listPrefixReq(mac, config, bucket, options, callbackFunc) {
 BucketManager.prototype.listPrefixV2 = function(bucket, options, callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -644,7 +655,8 @@ BucketManager.prototype.listPrefixV2 = function(bucket, options, callbackFunc) {
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             listPrefixReqV2(that.mac, that.config, bucket, options, callbackFunc);
         });
@@ -809,7 +821,7 @@ BucketManager.prototype.updateObjectStatus = function(bucket, key, status,
     callbackFunc) {
     var useCache = false;
     var that = this;
-    if (this.config.zone) {
+    if (this.config.zone!=""&&this.config.zone!=null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -831,7 +843,8 @@ BucketManager.prototype.updateObjectStatus = function(bucket, key, status,
 
             //update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire;
+            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            this.config = that.config;
             //req
             updateStatusReq(that.mac, that.config, bucket, key, status,
                 callbackFunc);
