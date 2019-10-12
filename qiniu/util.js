@@ -68,7 +68,7 @@ exports.hmacSha1 = function (encodedFlags, secretKey) {
 //                   application/x-www-form-urlencoded时才需要传入该参数
 exports.generateAccessToken = function (mac, requestURI, reqBody) {
     var u = new url.URL(requestURI);
-    var path = u.path;
+    var path = u.pathname + u.search;
     var access = path + '\n';
 
     if (reqBody) {
@@ -89,7 +89,7 @@ exports.generateAccessToken = function (mac, requestURI, reqBody) {
 //                       application/x-www-form-urlencoded 时才需要传入该参数
 exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContentType, reqBody) {
     var u = new url.URL(requestURI);
-    var path = u.path;
+    var path = u.pathname + u.search;
     var query = u.query;
     var host = u.host;
     var port = u.port;
