@@ -140,6 +140,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
 
                 finishedBlock += 1;
                 finishedCtxList.push(blkputRet.ctx);
+                finishedBlkPutRets.push(blkputRet);
             }
         } catch (e) {
             // log(e);
