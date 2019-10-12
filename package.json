@@ -77,7 +77,7 @@
     "eslint-plugin-standard": "^4.0.1",
     "mocha": "^6.2.1",
     "pedding": "*",
-    "should": "^1.2.2",
+    "should": "^13.2.3",
     "travis-cov": "*"
   },
   "license": "MIT"
