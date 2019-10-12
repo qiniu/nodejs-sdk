@@ -17,7 +17,7 @@
     "travis-cov": {
       "threshold": 90
     },
-    "lint": "./node_modules/eslint/bin/eslint.js **.js"
+    "lint": "eslint ."
   },
   "repository": {
     "type": "git",
@@ -68,12 +68,12 @@
   "devDependencies": {
     "@types/node": "^8.0.3",
     "blanket": "*",
-    "eslint": "^5.11.1",
-    "eslint-config-standard": "^12.0.0",
+    "eslint": "^6.5.1",
+    "eslint-config-standard": "^14.1.0",
     "eslint-plugin-import": "^2.11.0",
-    "eslint-plugin-node": "^6.0.1",
-    "eslint-plugin-promise": "^3.7.0",
-    "eslint-plugin-standard": "^3.1.0",
+    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
     "mocha": "^5.2.0",
     "pedding": "*",
     "should": "^1.2.2",

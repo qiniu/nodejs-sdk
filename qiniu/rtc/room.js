@@ -2,24 +2,24 @@ var http = require('http');
 
 const host = 'rtc.qiniuapi.com';
 const headers = {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json'
 };
 
-function get(credentials, options, fn){
-    options.headers['Authorization'] = credentials.generateAccessToken(options, null);
+function get (credentials, options, fn) {
+    options.headers.Authorization = credentials.generateAccessToken(options, null);
 
-    var req = http.request(options, function(res) {
+    var req = http.request(options, function (res) {
         res.setEncoding('utf-8');
 
         var responseString = '';
 
-        res.on('data', function(data) {
+        res.on('data', function (data) {
             responseString += data;
         });
 
-        res.on('end', function() {
-            //var resultObject = JSON.parse(responseString);
-            //console.log(JSON.parse(responseString))
+        res.on('end', function () {
+            // var resultObject = JSON.parse(responseString);
+            // console.log(JSON.parse(responseString))
 
             if (res.statusCode != 200) {
                 var result = {
@@ -33,13 +33,12 @@ function get(credentials, options, fn){
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         fn(e, null);
     });
 
     req.end();
 }
-
 
 // function post(credentials, options, data, fn) {
 //     var dataString = JSON.stringify(data);
@@ -78,8 +77,7 @@ function get(credentials, options, fn){
 //     req.end();
 // }
 
-
-exports.listUser = function(appId, roomName, credentials ,fn) {
+exports.listUser = function (appId, roomName, credentials, fn) {
     var options = {
         host: host,
         port: 80,
@@ -105,7 +103,7 @@ exports.listActiveRooms = function (appId, roomNamePrefix, offset, limit, creden
     var options = {
         host: host,
         port: 80,
-        path: '/v3/apps/' + appId + '/rooms?prefix=' + roomNamePrefix + '&offset=' + offset + '&limit=' + limit ,
+        path: '/v3/apps/' + appId + '/rooms?prefix=' + roomNamePrefix + '&offset=' + offset + '&limit=' + limit,
         method: 'GET',
         headers: headers
     };
@@ -117,6 +115,4 @@ exports.getRoomToken = function (roomAccess, credentials) {
         roomAccess.expireAt = Math.floor(Date.now() / 1000) + 3600;
     }
     return credentials.signJson(roomAccess);
-
 };
-

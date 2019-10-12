@@ -7,7 +7,7 @@ const querystring = require('querystring');
 
 exports.OperationManager = OperationManager;
 
-function OperationManager(mac, config) {
+function OperationManager (mac, config) {
     this.mac = mac || new digest.Mac();
     this.config = config || new conf.Config();
 }
@@ -21,30 +21,30 @@ function OperationManager(mac, config) {
 //                  notifyURL 回调业务服务器，通知处理结果
 //                  force     结果是否强制覆盖已有的同名文件
 // @param callbackFunc(err, respBody, respInfo) - 回调函数
-OperationManager.prototype.pfop = function(bucket, key, fops, pipeline,
+OperationManager.prototype.pfop = function (bucket, key, fops, pipeline,
     options, callbackFunc) {
     options = options || {};
     var that = this;
-    //必须参数
+    // 必须参数
     var reqParams = {
         bucket: bucket,
         key: key,
         pipeline: pipeline,
-        fops: fops.join(';'),
+        fops: fops.join(';')
     };
 
-    //notifyURL
+    // notifyURL
     if (options.notifyURL) {
         reqParams.notifyURL = options.notifyURL;
     }
 
-    //force
+    // force
     if (options.force) {
         reqParams.force = 1;
     }
 
     var useCache = false;
-    if (this.config.zone!=""&&this.config.zone!=null) {
+    if (this.config.zone != '' && this.config.zone != null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -57,24 +57,24 @@ OperationManager.prototype.pfop = function(bucket, key, fops, pipeline,
     if (useCache) {
         pfopReq(this.mac, this.config, reqParams, callbackFunc);
     } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function(err, cZoneInfo,
+        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
             cZoneExpire) {
             if (err) {
                 callbackFunc(err, null, null);
                 return;
             }
 
-            //update object
+            // update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
             this.config = that.config;
-            //pfopReq
+            // pfopReq
             pfopReq(that.mac, that.config, reqParams, callbackFunc);
         });
     }
 };
 
-function pfopReq(mac, config, reqParams, callbackFunc) {
+function pfopReq (mac, config, reqParams, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + config.zone.apiHost + '/pfop/';
     var reqBody = querystring.stringify(reqParams);
@@ -85,10 +85,10 @@ function pfopReq(mac, config, reqParams, callbackFunc) {
 // 查询持久化数据处理进度
 // @param persistentId
 // @callbackFunc(err, respBody, respInfo) - 回调函数
-OperationManager.prototype.prefop = function(persistentId, callbackFunc) {
+OperationManager.prototype.prefop = function (persistentId, callbackFunc) {
     var apiHost = 'api.qiniu.com';
-    if(this.config.zone) {
-        apiHost=this.config.zone.apiHost;
+    if (this.config.zone) {
+        apiHost = this.config.zone.apiHost;
     }
 
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
