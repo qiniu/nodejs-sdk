@@ -6,6 +6,7 @@ const path = require('path');
 const mime = require('mime');
 const fs = require('fs');
 const getCrc32 = require('crc32');
+const destroy = require('destroy');
 const BlockStream = require('block-stream2');
 
 exports.ResumeUploader = ResumeUploader;
@@ -43,7 +44,7 @@ ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
     rsStream.on('error', function (err) {
     // callbackFunc
         callbackFunc(err, null, null);
-        rsStream.close();
+        destroy(rsStream);
     });
 
     var useCache = false;
@@ -68,7 +69,7 @@ ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
             cZoneExpire) {
             if (err) {
                 callbackFunc(err, null, null);
-                rsStream.close();
+                destroy(rsStream);
                 return;
             }
 
@@ -159,7 +160,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
                 var bodyCrc32 = parseInt('0x' + getCrc32(chunk));
                 if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
                     callbackFunc(respErr, respBody, respInfo);
-                    rsStream.close();
+                    destroy(rsStream);
                 } else {
                     finishedBlock += 1;
                     var blkputRet = respBody;
@@ -183,7 +184,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
 
     blkStream.on('end', function () {
         mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
-        rsStream.close();
+        destroy(rsStream);
     });
 }
 

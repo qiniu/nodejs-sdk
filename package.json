@@ -59,6 +59,7 @@
     "agentkeepalive": "^4.0.2",
     "block-stream2": "^2.0.0",
     "crc32": "^0.2.2",
+    "destroy": "^1.0.4",
     "encodeurl": "^1.0.1",
     "formstream": "^1.1.0",
     "mime": "^2.4.4",
