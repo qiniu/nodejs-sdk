@@ -89,14 +89,14 @@ exports.generateAccessToken = function (mac, requestURI, reqBody) {
 //                       application/x-www-form-urlencoded 时才需要传入该参数
 exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContentType, reqBody) {
     var u = new url.URL(requestURI);
-    var path = u.pathname + u.search;
-    var query = u.query;
+    var path = u.pathname;
+    var search = u.search;
     var host = u.host;
     var port = u.port;
 
     var access = reqMethod.toUpperCase() + ' ' + path;
-    if (query) {
-        access += '?' + query;
+    if (search) {
+        access += search;
     }
     // add host
     access += '\nHost: ' + host;
