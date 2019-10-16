@@ -128,7 +128,6 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     var blockCnt = fileSize / conf.BLOCK_SIZE;
     var totalBlockNum = (fileSize % conf.BLOCK_SIZE == 0) ? blockCnt : (blockCnt +
     1);
-    console.log(blkStream.size);
     // read resumeRecordFile
     if (putExtra.resumeRecordFile) {
         try {
