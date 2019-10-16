@@ -6,11 +6,13 @@ const path = require('path');
 const mime = require('mime');
 const fs = require('fs');
 const getCrc32 = require('crc32');
+const destroy = require('destroy');
+const BlockStream = require('block-stream2');
 
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
 
-function ResumeUploader(config) {
+function ResumeUploader (config) {
     this.config = config || new conf.Config();
 }
 
@@ -20,7 +22,7 @@ function ResumeUploader(config) {
 // @param mimeType                    指定文件的mimeType
 // @param resumeRecordFile            断点续传的已上传的部分信息记录文件
 // @param progressCallback(uploadBytes, totalBytes) 上传进度回调
-function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback) {
+function PutExtra (fname, params, mimeType, resumeRecordFile, progressCallback) {
     this.fname = fname || '';
     this.params = params || {};
     this.mimeType = mimeType || null;
@@ -28,7 +30,7 @@ function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback) {
     this.progressCallback = progressCallback || null;
 }
 
-ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
+ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
     rsStreamLen, putExtra, callbackFunc) {
     putExtra = putExtra || new PutExtra();
     if (!putExtra.mimeType) {
@@ -36,19 +38,18 @@ ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
     }
 
     if (!putExtra.fname) {
-        putExtra.fname = key ? key : '?';
+        putExtra.fname = key || '?';
     }
 
-    rsStream.on('error', function(err) {
-    //callbackFunc
+    rsStream.on('error', function (err) {
+    // callbackFunc
         callbackFunc(err, null, null);
-        rsStream.close();
-        return;
+        destroy(rsStream);
     });
 
     var useCache = false;
     var that = this;
-    if (this.config.zone!=""&&this.config.zone!=null) {
+    if (this.config.zone != '' && this.config.zone != null) {
         if (this.config.zoneExpire == -1) {
             useCache = true;
         } else {
@@ -64,20 +65,20 @@ ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
         putReq(this.config, uploadToken, key, rsStream, rsStreamLen, putExtra,
             callbackFunc);
     } else {
-        zone.getZoneInfo(accessKey, bucket, function(err, cZoneInfo,
+        zone.getZoneInfo(accessKey, bucket, function (err, cZoneInfo,
             cZoneExpire) {
             if (err) {
                 callbackFunc(err, null, null);
-                rsStream.close();
+                destroy(rsStream);
                 return;
             }
 
-            //update object
+            // update object
             that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire+parseInt(Date.now() / 1000);
+            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
             this.config = that.config;
 
-            //req
+            // req
             putReq(that.config, uploadToken, key, rsStream, rsStreamLen,
                 putExtra,
                 callbackFunc);
@@ -85,25 +86,25 @@ ResumeUploader.prototype.putStream = function(uploadToken, key, rsStream,
     }
 };
 
-function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
+function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     callbackFunc) {
-    //set up hosts order
+    // set up hosts order
     var upHosts = [];
 
     if (config.useCdnDomain) {
         if (config.zone.cdnUpHosts) {
-            config.zone.cdnUpHosts.forEach(function(host) {
+            config.zone.cdnUpHosts.forEach(function (host) {
                 upHosts.push(host);
             });
         }
-        config.zone.srcUpHosts.forEach(function(host) {
+        config.zone.srcUpHosts.forEach(function (host) {
             upHosts.push(host);
         });
     } else {
-        config.zone.srcUpHosts.forEach(function(host) {
+        config.zone.srcUpHosts.forEach(function (host) {
             upHosts.push(host);
         });
-        config.zone.cdnUpHosts.forEach(function(host) {
+        config.zone.cdnUpHosts.forEach(function (host) {
             upHosts.push(host);
         });
     }
@@ -112,125 +113,95 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     var upDomain = scheme + upHosts[0];
     // block upload
 
-    var fileSize = rsStreamLen;
-    //console.log("file size:" + fileSize);
-    var blockCnt = fileSize / conf.BLOCK_SIZE;
-    var totalBlockNum = (fileSize % conf.BLOCK_SIZE == 0) ? blockCnt : (blockCnt +
-    1);
-    var finishedBlock = 0;
-    var curBlock = 0;
+    var blkStream = rsStream.pipe(new BlockStream({
+        size: conf.BLOCK_SIZE,
+        zeroPadding: false
+    }));
     var readLen = 0;
-    var bufferLen = 0;
-    var remainedData = new Buffer(0);
-    var readBuffers = [];
+    var curBlock = 0;
+    var finishedBlock = 0;
     var finishedCtxList = [];
     var finishedBlkPutRets = [];
-    //read resumeRecordFile
+    // read resumeRecordFile
     if (putExtra.resumeRecordFile) {
         try {
             var resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
             var blkputRets = JSON.parse(resumeRecords);
 
             for (var index = 0; index < blkputRets.length; index++) {
-                //check ctx expired or not
+                // check ctx expired or not
                 var blkputRet = blkputRets[index];
                 var expiredAt = blkputRet.expired_at;
-                //make sure the ctx at least has one day expiration
+                // make sure the ctx at least has one day expiration
                 expiredAt += 3600 * 24;
                 if (util.isTimestampExpired(expiredAt)) {
-                    //discard these ctxs
+                    // discard these ctxs
                     break;
                 }
 
                 finishedBlock += 1;
                 finishedCtxList.push(blkputRet.ctx);
+                finishedBlkPutRets.push(blkputRet);
             }
         } catch (e) {
             // log(e);
         }
     }
 
-    var isEnd = rsStream._readableState.ended;
-    var isSent = false;
-
-    //check when to mkblk
-    rsStream.on('data', function(chunk) {
+    // check when to mkblk
+    blkStream.on('data', function (chunk) {
         readLen += chunk.length;
-        bufferLen += chunk.length;
-        readBuffers.push(chunk);
-
-        if (bufferLen >= conf.BLOCK_SIZE || readLen == fileSize) {
-            var readBuffersData = Buffer.concat(readBuffers);
-            var blockSize = conf.BLOCK_SIZE - remainedData.length;
-
-            var postData = Buffer.concat([remainedData, readBuffersData.slice(0,blockSize)]);
-            remainedData = new Buffer(readBuffersData.slice(blockSize,bufferLen));
-            bufferLen =  bufferLen - conf.BLOCK_SIZE;
-            //reset buffer
-            readBuffers = [];
-
-            curBlock += 1; //set current block
-            if (curBlock > finishedBlock) {
-                rsStream.pause();
-                mkblkReq(upDomain, uploadToken, postData, function(respErr,
-                    respBody,
-                    respInfo) {
-                    var bodyCrc32 = parseInt('0x' + getCrc32(postData));
-                    if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
-                        callbackFunc(respErr, respBody, respInfo);
-                        rsStream.close();
-                        return;
-                    } else {
-                        finishedBlock += 1;
-                        var blkputRet = respBody;
-                        finishedCtxList.push(blkputRet.ctx);
-                        finishedBlkPutRets.push(blkputRet);
-                        if (putExtra.progressCallback) {
-                            putExtra.progressCallback(readLen, fileSize);
-                        }
-                        if (putExtra.resumeRecordFile) {
-                            var contents = JSON.stringify(finishedBlkPutRets);
-                            // console.log('write resume record ' + putExtra.resumeRecordFile);
-                            fs.writeFileSync(putExtra.resumeRecordFile, contents, {
-                                encoding: 'utf-8'
-                            });
-                        }
-
-                        rsStream.resume();
-                        if (isEnd  || finishedCtxList.length === Math.floor(totalBlockNum)) {
-                            mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
-                            isSent = true;
-                        }
+        curBlock += 1; // set current block
+        if (curBlock > finishedBlock) {
+            blkStream.pause();
+            mkblkReq(upDomain, uploadToken, chunk, function (respErr,
+                respBody,
+                respInfo) {
+                var bodyCrc32 = parseInt('0x' + getCrc32(chunk));
+                if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
+                    callbackFunc(respErr, respBody, respInfo);
+                    destroy(rsStream);
+                } else {
+                    finishedBlock += 1;
+                    var blkputRet = respBody;
+                    finishedCtxList.push(blkputRet.ctx);
+                    finishedBlkPutRets.push(blkputRet);
+                    if (putExtra.progressCallback) {
+                        putExtra.progressCallback(readLen, rsStreamLen);
                     }
-                });
-            }
+                    if (putExtra.resumeRecordFile) {
+                        var contents = JSON.stringify(finishedBlkPutRets);
+                        // console.log('write resume record ' + putExtra.resumeRecordFile);
+                        fs.writeFileSync(putExtra.resumeRecordFile, contents, {
+                            encoding: 'utf-8'
+                        });
+                    }
+                    blkStream.resume();
+                }
+            });
         }
     });
 
-    rsStream.on('end', function () {
-    // 0B file won't trigger 'data' event
-        if (!isSent && rsStreamLen === 0) {
-            mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
-        }
-
-        rsStream.close();
+    blkStream.on('end', function () {
+        mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+        destroy(rsStream);
     });
 }
 
-function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
-    //console.log("mkblk");
+function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
+    // console.log("mkblk");
     var requestURI = upDomain + '/mkblk/' + blkData.length;
     var auth = 'UpToken ' + uploadToken;
     var headers = {
-        'Authorization': auth,
+        Authorization: auth,
         'Content-Type': 'application/octet-stream'
     };
     rpc.post(requestURI, blkData, headers, callbackFunc);
 }
 
-function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
+function mkfileReq (upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     callbackFunc) {
-    //console.log("mkfile");
+    // console.log("mkfile");
     var requestURI = upDomain + '/mkfile/' + fileSize;
     if (key) {
         requestURI += '/key/' + util.urlsafeBase64Encode(key);
@@ -242,7 +213,7 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
         requestURI += '/fname/' + util.urlsafeBase64Encode(putExtra.fname);
     }
     if (putExtra.params) {
-    //putExtra params
+    // putExtra params
         for (var k in putExtra.params) {
             if (k.startsWith('x:') && putExtra.params[k]) {
                 requestURI += '/' + k + '/' + util.urlsafeBase64Encode(putExtra.params[
@@ -252,11 +223,11 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     }
     var auth = 'UpToken ' + uploadToken;
     var headers = {
-        'Authorization': auth,
+        Authorization: auth,
         'Content-Type': 'application/octet-stream'
     };
     var postBody = ctxList.join(',');
-    rpc.post(requestURI, postBody, headers, function(err, ret, info) {
+    rpc.post(requestURI, postBody, headers, function (err, ret, info) {
         if (info.statusCode == 200 || info.statusCode == 701 ||
       info.statusCode == 401) {
             if (putExtra.resumeRecordFile) {
@@ -267,11 +238,11 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     });
 }
 
-ResumeUploader.prototype.putFile = function(uploadToken, key, localFile,
+ResumeUploader.prototype.putFile = function (uploadToken, key, localFile,
     putExtra, callbackFunc) {
     putExtra = putExtra || new PutExtra();
-    var rsStream = fs.createReadStream(localFile,{
-        highWaterMark: conf.BLOCK_SIZE,
+    var rsStream = fs.createReadStream(localFile, {
+        highWaterMark: conf.BLOCK_SIZE
     });
     var rsStreamLen = fs.statSync(localFile).size;
     if (!putExtra.mimeType) {
@@ -286,7 +257,7 @@ ResumeUploader.prototype.putFile = function(uploadToken, key, localFile,
         callbackFunc);
 };
 
-ResumeUploader.prototype.putFileWithoutKey = function(uploadToken, localFile,
+ResumeUploader.prototype.putFileWithoutKey = function (uploadToken, localFile,
     putExtra, callbackFunc) {
     return this.putFile(uploadToken, null, localFile, putExtra, callbackFunc);
 };

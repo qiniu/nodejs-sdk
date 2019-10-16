@@ -17,7 +17,7 @@
     "travis-cov": {
       "threshold": 90
     },
-    "lint": "./node_modules/eslint/bin/eslint.js **.js"
+    "lint": "eslint ."
   },
   "repository": {
     "type": "git",
@@ -56,26 +56,28 @@
     "node >= 6"
   ],
   "dependencies": {
-    "agentkeepalive": "3.3.0",
-    "crc32": "0.2.2",
+    "agentkeepalive": "^4.0.2",
+    "block-stream2": "^2.0.0",
+    "crc32": "^0.2.2",
+    "destroy": "^1.0.4",
     "encodeurl": "^1.0.1",
-    "formstream": "1.1.0",
-    "mime": "2.3.1",
-    "tunnel-agent": "0.6.0",
-    "urllib": "2.22.0"
+    "formstream": "^1.1.0",
+    "mime": "^2.4.4",
+    "tunnel-agent": "^0.6.0",
+    "urllib": "^2.34.1"
   },
   "devDependencies": {
     "@types/node": "^8.0.3",
     "blanket": "*",
-    "eslint": "^5.11.1",
-    "eslint-config-standard": "^12.0.0",
+    "eslint": "^6.5.1",
+    "eslint-config-standard": "^14.1.0",
     "eslint-plugin-import": "^2.11.0",
-    "eslint-plugin-node": "^6.0.1",
-    "eslint-plugin-promise": "^3.7.0",
-    "eslint-plugin-standard": "^3.1.0",
-    "mocha": "^5.2.0",
+    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
+    "mocha": "^6.2.1",
     "pedding": "*",
-    "should": "^1.2.2",
+    "should": "^13.2.3",
     "travis-cov": "*"
   },
   "license": "MIT"

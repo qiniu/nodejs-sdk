@@ -7,43 +7,41 @@ const console = require('console');
 // const fs = require('fs');
 
 // eslint-disable-next-line no-undef
-before(function(done) {
-    if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY || !
-    process.env.QINIU_TEST_BUCKET || !process.env.QINIU_TEST_DOMAIN) {
+before(function (done) {
+    if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY || !process.env.QINIU_TEST_BUCKET || !process.env.QINIU_TEST_DOMAIN) {
         console.log('should run command `source test-env.sh` first\n');
         process.exit(0);
     }
     done();
 });
 
-
-//file to upload
+// file to upload
 var imageFile = path.join(__dirname, 'logo.png');
 
 // eslint-disable-next-line no-undef
-describe('test resume up', function() {
+describe('test resume up', function () {
     var accessKey = proc.env.QINIU_ACCESS_KEY;
     var secretKey = proc.env.QINIU_SECRET_KEY;
     var bucket = proc.env.QINIU_TEST_BUCKET;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
-    //config.useHttpsDomain = true;
+    // config.useHttpsDomain = true;
     config.zone = qiniu.zone.Zone_z0;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
-    //delete all the files uploaded
+    // delete all the files uploaded
     var keysToDelete = [];
 
     // eslint-disable-next-line no-undef
-    after(function(done) {
+    after(function (done) {
         var deleteOps = [];
-        keysToDelete.forEach(function(key) {
+        keysToDelete.forEach(function (key) {
             deleteOps.push(qiniu.rs.deleteOp(bucket, key));
         });
 
-        bucketManager.batch(deleteOps, function(respErr, respBody, respInfo) {
+        bucketManager.batch(deleteOps, function (respErr, respBody, respInfo) {
             console.log(respBody, respInfo);
-            respBody.forEach(function(ret) {
+            respBody.forEach(function (ret) {
                 ret.should.eql({
                     code: 200
                 });
@@ -53,7 +51,7 @@ describe('test resume up', function() {
     });
 
     var options = {
-        scope: bucket,
+        scope: bucket
     };
     var putPolicy = new qiniu.rs.PutPolicy(options);
     var uploadToken = putPolicy.uploadToken(mac);
@@ -62,12 +60,12 @@ describe('test resume up', function() {
     var putExtra = new qiniu.resume_up.PutExtra();
 
     // eslint-disable-next-line no-undef
-    describe('test resume up#putFileWithoutKey', function() {
+    describe('test resume up#putFileWithoutKey', function () {
         // eslint-disable-next-line no-undef
-        it('test resume up#putFileWithoutKey', function(done) {
+        it('test resume up#putFileWithoutKey', function (done) {
             resumeUploader.putFileWithoutKey(uploadToken, imageFile,
                 putExtra,
-                function(
+                function (
                     respErr,
                     respBody, respInfo) {
                     console.log(respBody, respInfo);
@@ -80,12 +78,12 @@ describe('test resume up', function() {
     });
 
     // eslint-disable-next-line no-undef
-    describe('test resume up#putFile', function() {
+    describe('test resume up#putFile', function () {
         // eslint-disable-next-line no-undef
-        it('test resume up#putFile', function(done) {
+        it('test resume up#putFile', function (done) {
             var key = 'storage_putFile_test' + Math.random(1000);
             resumeUploader.putFile(uploadToken, key, imageFile, putExtra,
-                function(
+                function (
                     respErr,
                     respBody, respInfo) {
                     console.log(respBody, respInfo);
