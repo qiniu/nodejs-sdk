@@ -117,11 +117,17 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
         size: conf.BLOCK_SIZE,
         zeroPadding: false
     }));
+
     var readLen = 0;
     var curBlock = 0;
     var finishedBlock = 0;
     var finishedCtxList = [];
     var finishedBlkPutRets = [];
+    var isSent = false;
+    var fileSize = rsStreamLen;
+    var blockCnt = fileSize / conf.BLOCK_SIZE;
+    var totalBlockNum = (fileSize % conf.BLOCK_SIZE == 0) ? blockCnt : (blockCnt +
+    1);
     // read resumeRecordFile
     if (putExtra.resumeRecordFile) {
         try {
@@ -177,13 +183,19 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
                         });
                     }
                     blkStream.resume();
+                    if (finishedCtxList.length === Math.floor(totalBlockNum)) {
+                        mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
+                        isSent = true;
+                    }
                 }
             });
         }
     });
 
     blkStream.on('end', function () {
-        mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+        if (!isSent && rsStreamLen === 0) {
+            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+        }
         destroy(rsStream);
     });
 }
