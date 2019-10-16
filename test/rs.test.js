@@ -430,6 +430,18 @@ describe('test start bucket manager', function () {
                     done();
                 });
             });
+            it('test cancel putBucketQuota', function (done) {
+                var options = {
+                    size: -1,
+                    count: -1
+                };
+                bucketManager.putBucketQuota(bucket, options, function (err, respBody, respInfo) {
+                    should.not.exist(err);
+                    console.log(JSON.stringify(respBody) + '\n');
+                    console.log(JSON.stringify(respInfo));
+                    done();
+                });
+            });
         });
         describe('test getBucketQuota', function () {
             it('test getBucketQuota', function (done) {

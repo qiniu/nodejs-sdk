@@ -4,6 +4,8 @@ const should = require('should');
 const qiniu = require('../index.js');
 const proc = require('process');
 const console = require('console');
+const crypto = require('crypto');
+const Readable = require('stream').Readable;
 // const fs = require('fs');
 
 // eslint-disable-next-line no-undef
@@ -83,6 +85,30 @@ describe('test resume up', function () {
         it('test resume up#putFile', function (done) {
             var key = 'storage_putFile_test' + Math.random(1000);
             resumeUploader.putFile(uploadToken, key, imageFile, putExtra,
+                function (
+                    respErr,
+                    respBody, respInfo) {
+                    console.log(respBody, respInfo);
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                });
+        });
+    });
+
+    describe('test resume up#putStream', function () {
+        // eslint-disable-next-line no-undef
+        it('test resume up#putStream', function (done) {
+            var key = 'storage_putStream_test' + Math.random(1000);
+            var stream = new Readable();
+            var blkSize = 1024 * 1024;
+            var blkCnt = 9;
+            for (var i = 0; i < blkCnt; i++) {
+                stream.push(crypto.randomBytes(blkSize));
+            }
+            stream.push(null);
+            resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
                 function (
                     respErr,
                     respBody, respInfo) {

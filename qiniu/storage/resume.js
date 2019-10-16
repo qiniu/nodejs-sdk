@@ -124,10 +124,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     var finishedCtxList = [];
     var finishedBlkPutRets = [];
     var isSent = false;
-    var fileSize = rsStreamLen;
-    var blockCnt = fileSize / conf.BLOCK_SIZE;
-    var totalBlockNum = (fileSize % conf.BLOCK_SIZE == 0) ? blockCnt : (blockCnt +
-    1);
+    var totalBlockNum = Math.ceil(rsStreamLen / conf.BLOCK_SIZE);
     // read resumeRecordFile
     if (putExtra.resumeRecordFile) {
         try {
@@ -183,8 +180,8 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
                         });
                     }
                     blkStream.resume();
-                    if (finishedCtxList.length === Math.floor(totalBlockNum)) {
-                        mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
+                    if (finishedCtxList.length === totalBlockNum) {
+                        mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
                         isSent = true;
                     }
                 }
