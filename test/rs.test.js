@@ -18,6 +18,7 @@ describe('test start bucket manager', function () {
     var accessKey = proc.env.QINIU_ACCESS_KEY;
     var secretKey = proc.env.QINIU_SECRET_KEY;
     var srcBucket = proc.env.QINIU_TEST_BUCKET;
+    var domain = proc.env.QINIU_TEST_DOMAIN;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
     // config.useHttpsDomain = true;
@@ -38,6 +39,15 @@ describe('test start bucket manager', function () {
                     'putTime', 'type');
                 done();
             });
+        });
+    });
+
+    describe('test privateDownloadUrl', function () {
+        it('test privateDownloadUrl', function (done) {
+            var key = 'qiniu.mp4';
+            var url = bucketManager.privateDownloadUrl('http://' + domain, key, 20);
+            should.equal(url, 'http://' + domain + '/qiniu.mp4?e=20&token=ExAdnmHq914NVa8addkXooUvXSyzGPHYzxzJwDnN:vZRvLfuw4U9vJzweTVgPdPFIY-g=');
+            done();
         });
     });
 
@@ -99,6 +109,37 @@ describe('test start bucket manager', function () {
         });
     });
 
+    // test copy and deleteAfterDays
+    describe('test copy', function () {
+        it('test copy', function (done) {
+            var destBucket = srcBucket;
+            var srcKey = 'qiniu.mp4';
+            var destKey = 'qiniu_delete_after_days.mp4';
+            var options = {
+                force: true
+            };
+            bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options,
+                function (err, respBody, respInfo) {
+                    // console.log(respBody);
+                    should.not.exist(err);
+                    assert.strictEqual(respInfo.statusCode, 200);
+                    done();
+
+                    // test deleteAfterDays
+                    describe('test deleteAfterDays', function () {
+                        it('test deleteAfterDays', function (done1) {
+                            bucketManager.deleteAfterDays(destBucket, destKey, 1,
+                                function (err1, ret1, info1) {
+                                    should.not.exist(err1);
+                                    assert.strictEqual(info1.statusCode, 200);
+                                    done1();
+                                });
+                        });
+                    });
+                });
+        });
+    });
+
     // eslint-disable-next-line no-undef
     describe('test fetch', function () {
         // eslint-disable-next-line no-undef
@@ -145,14 +186,67 @@ describe('test start bucket manager', function () {
                 'Content-Type': 'text/plain',
                 'Last-Modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
                 'x-qn-test-custom-header': '0'
-            },
-            function (err, respBody, respInfo) {
+            }, function (err, respBody, respInfo) {
                 console.log(respInfo);
                 should.not.exist(err);
                 assert.strictEqual(respInfo.statusCode, 200);
                 done();
-            }
-            );
+            });
+        });
+    });
+
+    // stat file and changeType
+    describe('test changeType', function () {
+        it('test changeType', function (done) {
+            var key = 'test_file';
+            var bucket = srcBucket;
+            bucketManager.stat(bucket, key, function (e, res, info) {
+                should.not.exist(e);
+                assert.strictEqual(info.statusCode, 200);
+                var type = res.type === 1 ? 0 : 1;
+                bucketManager.changeType(bucket, key, type,
+                    function (err, respBody, respInfo) {
+                        should.not.exist(err);
+                        assert.strictEqual(respInfo.statusCode, 200);
+                        done();
+                    }
+                );
+            });
+        });
+    });
+
+    describe('test updateObjectStatus', function () {
+        it('test updateObjectStatus disable', function (done) {
+            var key = 'test_file';
+            var bucket = srcBucket;
+            bucketManager.updateObjectStatus(bucket, key, 1, function (err, respBody, respInfo) {
+                should.not.exist(err);
+                assert.strictEqual(respInfo.statusCode, 200);
+                done();
+            });
+        });
+
+        it('test updateObjectStatus enable', function (done) {
+            var key = 'test_file';
+            var bucket = srcBucket;
+            bucketManager.updateObjectStatus(bucket, key, 0, function (err, respBody, respInfo) {
+                should.not.exist(err);
+                assert.strictEqual(respInfo.statusCode, 200);
+                done();
+            });
+        });
+    });
+
+    describe('test listBucket', function () {
+        it('test listBucket', function (done) {
+            bucketManager.listBucket(function (err,
+                respBody, respInfo) {
+                should.not.exist(err);
+                console.log(JSON.stringify(respBody) + '\n');
+                console.log(JSON.stringify(respInfo));
+                respBody.should.containEql(srcBucket);
+                done();
+            });
         });
     });
 
@@ -167,6 +261,44 @@ describe('test start bucket manager', function () {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
                 console.log(JSON.stringify(respInfo));
+                done();
+            });
+        });
+    });
+
+    describe('test listPrefix', function () {
+        it('test listPrefix', function (done) {
+            var bucket = srcBucket;
+
+            bucketManager.listPrefix(bucket, {
+                prefix: 'test'
+            }, function (err, respBody, respInfo) {
+                should.not.exist(err);
+                console.log(JSON.stringify(respBody) + '\n');
+                console.log(JSON.stringify(respInfo));
+                respBody.should.have.keys('items');
+                respBody.items.forEach(function (item) {
+                    item.should.have.keys('key', 'hash');
+                    item.key.should.startWith('test');
+                });
+                done();
+            });
+        });
+    });
+
+    describe('test listPrefixV2', function () {
+        it('test listPrefixV2', function (done) {
+            var bucket = srcBucket;
+
+            bucketManager.listPrefixV2(bucket, {
+                prefix: 'test'
+            }, function (err, respBody, respInfo) {
+                should.not.exist(err);
+                console.log(JSON.stringify(respBody) + '\n');
+                console.log(JSON.stringify(respInfo));
+                respBody.should.have.keys('item');
+                respBody.item.should.have.keys('key', 'hash');
+                respBody.item.key.should.startWith('test');
                 done();
             });
         });
