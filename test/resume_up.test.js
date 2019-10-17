@@ -1,12 +1,12 @@
+const os = require('os');
+const fs = require('fs');
 const path = require('path');
 const should = require('should');
-// const assert = require('assert');
 const qiniu = require('../index.js');
 const proc = require('process');
 const console = require('console');
 const crypto = require('crypto');
 const Readable = require('stream').Readable;
-// const fs = require('fs');
 
 // eslint-disable-next-line no-undef
 before(function (done) {
@@ -108,6 +108,41 @@ describe('test resume up', function () {
                 stream.push(crypto.randomBytes(blkSize));
             }
             stream.push(null);
+            resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
+                function (
+                    respErr,
+                    respBody, respInfo) {
+                    console.log(respBody, respInfo);
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                });
+        });
+
+        it('test resume up#putStream resume', function (done) {
+            config.zone = null;
+
+            var key = 'storage_putStream_resume_test' + Math.random(1000);
+            var stream = new Readable();
+            var blkSize = 1024 * 1024;
+            var blkCnt = 5;
+            for (var i = 0; i < blkCnt; i++) {
+                stream.push(crypto.randomBytes(blkSize));
+            }
+            stream.push(null);
+            var tmpfile = path.join(os.tmpdir(), '/resume_file');
+            fs.writeFileSync(tmpfile, '');
+            putExtra.resumeRecordFile = tmpfile;
+            putExtra.progressCallback = function (len, total) {
+                if (len === total) {
+                    var content = fs.readFileSync(tmpfile);
+                    var data = JSON.parse(content);
+                    data.forEach(function (item) {
+                        item.should.have.keys('ctx', 'expired_at', 'crc32');
+                    });
+                }
+            };
             resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
                 function (
                     respErr,

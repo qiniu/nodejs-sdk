@@ -22,8 +22,10 @@ describe('test start fop', function () {
     // config.useHttpsDomain = true;
     config.zone = qiniu.zone.Zone_z0;
 
-    // eslint-disable-next-line no-undef
-    it('test video fop', function (done) {
+    var persistentId;
+
+    function fopTest (zone, force, done) {
+        config.zone = zone;
         console.log(srcBucket);
 
         var pipeline = 'sdktest';
@@ -42,7 +44,7 @@ describe('test start fop', function () {
 
         var options = {
             notifyURL: 'http://api.example.com/pfop/callback',
-            force: false
+            force: force
         };
 
         // 持久化数据处理返回的是任务的persistentId，可以根据这个id查询处理状态
@@ -51,6 +53,28 @@ describe('test start fop', function () {
                 console.log(respBody, respInfo);
                 should.not.exist(err);
                 respBody.should.have.keys('persistentId');
+                persistentId = respBody.persistentId;
+                done();
+            });
+    }
+
+    it('test video fop', function (done) {
+        fopTest(qiniu.zone.Zone_z0, false, done);
+    });
+
+    it('test video fop zone=null', function (done) {
+        fopTest(null, true, done);
+    });
+
+    it('test video prefop', function (done) {
+        var operManager = new qiniu.fop.OperationManager(mac, config);
+        // 查询处理状态
+        operManager.prefop(persistentId,
+            function (err, respBody, respInfo) {
+                console.log(respBody, respInfo);
+                should.not.exist(err);
+                respBody.should.have.keys('id', 'pipeline', 'inputBucket', 'inputKey');
+                respBody.should.have.property('id', persistentId);
                 done();
             });
     });

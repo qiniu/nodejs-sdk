@@ -1,22 +1,11 @@
-TESTS = test/*.test.js
-TIMEOUT = 25000
-REPORTER = spec
-MOCHA_OPTS =
 test:
-		@NODE_ENV=test ./node_modules/.bin/mocha \
-			--require should \
-			--reporter $(REPORTER) \
-			--timeout $(TIMEOUT) \
-			$(MOCHA_OPTS) \
-			$(TESTS)
+	@npm test
 
-test-cov:
-	@rm -f coverage.html
-	@$(MAKE) test MOCHA_OPTS='--require blanket' REPORTER=html-cov > coverage.html
-	#@$(MAKE) test MOCHA_OPTS='--require blanket' REPORTER=travis-cov
-	@ls -lh coverage.html
+test-cov: clean
+	@npm run cover
+	@npm run report
 
 clean:
-		rm -rf ./lib-cov coverage.html
+	rm -rf ./coverage ./.nyc_output
 
-.PHONY: test-cov lib-cov test
+.PHONY: test-cov test

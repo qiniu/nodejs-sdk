@@ -2,7 +2,6 @@ const util = require('./util');
 const rpc = require('./rpc');
 const conf = require('./conf');
 const digest = require('./auth/digest');
-const zone = require('./zone.js');
 const querystring = require('querystring');
 
 exports.OperationManager = OperationManager;
@@ -24,7 +23,6 @@ function OperationManager (mac, config) {
 OperationManager.prototype.pfop = function (bucket, key, fops, pipeline,
     options, callbackFunc) {
     options = options || {};
-    var that = this;
     // 必须参数
     var reqParams = {
         bucket: bucket,
@@ -43,35 +41,13 @@ OperationManager.prototype.pfop = function (bucket, key, fops, pipeline,
         reqParams.force = 1;
     }
 
-    var useCache = false;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        pfopReq(this.mac, this.config, reqParams, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // pfopReq
-            pfopReq(that.mac, that.config, reqParams, callbackFunc);
-        });
-    }
+        pfopReq(ctx.mac, ctx.config, reqParams, callbackFunc);
+    });
 };
 
 function pfopReq (mac, config, reqParams, callbackFunc) {

@@ -7,7 +7,6 @@ const path = require('path');
 const mime = require('mime');
 const Readable = require('stream').Readable;
 const formstream = require('formstream');
-const zone = require('../zone');
 
 exports.FormUploader = FormUploader;
 exports.PutExtra = PutExtra;
@@ -46,46 +45,18 @@ FormUploader.prototype.putStream = function (uploadToken, key, fsStream,
         callbackFunc(err, null, null);
     });
 
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
-        }
-    }
-
     var accessKey = util.getAKFromUptoken(uploadToken);
     var bucket = util.getBucketFromUptoken(uploadToken);
-    if (useCache) {
-        createMultipartForm(uploadToken, key, fsStream, putExtra, function (
-            postForm) {
-            putReq(that.config, postForm, callbackFunc);
-        });
-    } else {
-        zone.getZoneInfo(accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
 
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            this.config = that.config;
-            // req
-            createMultipartForm(uploadToken, key, fsStream,
-                putExtra,
-                function (postForm) {
-                    putReq(that.config, postForm, callbackFunc);
-                });
+    util.prepareZone(this, accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
+        }
+        createMultipartForm(uploadToken, key, fsStream, putExtra, function (postForm) {
+            putReq(ctx.config, postForm, callbackFunc);
         });
-    }
+    });
 };
 
 function putReq (config, postForm, callbackFunc) {

@@ -18,18 +18,11 @@ function CdnManager (mac) {
 // @param logDay  日期，例如 2016-07-01
 // @param callbackFunc(err, respBody, respInfo)
 CdnManager.prototype.getCdnLogList = function (domains, logDay, callbackFunc) {
-    var url = '/v2/tune/log/list\n';
-    var accessToken = util.generateAccessToken(this.mac, url, '');
-    var headers = {
-        'Content-Type': 'application/json',
-        Authorization: accessToken
-    };
     var postBody = {
         day: logDay,
         domains: domains.join(';')
     };
-
-    req('/v2/tune/log/list', headers, postBody, callbackFunc);
+    req(this.mac, '/v2/tune/log/list', postBody, callbackFunc);
 };
 
 // 获取域名访问流量数据
@@ -43,20 +36,13 @@ CdnManager.prototype.getCdnLogList = function (domains, logDay, callbackFunc) {
 CdnManager.prototype.getFluxData = function (startDate, endDate, granularity,
     domains,
     callbackFunc) {
-    var url = '/v2/tune/flux\n';
-    var accessToken = util.generateAccessToken(this.mac, url, '');
-    var headers = {
-        'Content-Type': 'application/json',
-        Authorization: accessToken
-    };
     var data = {
         startDate: startDate,
         endDate: endDate,
         granularity: granularity,
         domains: domains.join(';')
     };
-
-    req('/v2/tune/flux', headers, data, callbackFunc);
+    req(this.mac, '/v2/tune/flux', data, callbackFunc);
 };
 
 // 获取域名访问带宽数据
@@ -69,20 +55,13 @@ CdnManager.prototype.getFluxData = function (startDate, endDate, granularity,
 CdnManager.prototype.getBandwidthData = function (startDate, endDate,
     granularity, domains,
     callbackFunc) {
-    var url = '/v2/tune/bandwidth\n';
-    var accessToken = util.generateAccessToken(this.mac, url, '');
-    var headers = {
-        'Content-Type': 'application/json',
-        Authorization: accessToken
-    };
     var data = {
         startDate: startDate,
         endDate: endDate,
         granularity: granularity,
         domains: domains.join(';')
     };
-
-    req('/v2/tune/bandwidth', headers, data, callbackFunc);
+    req(this.mac, '/v2/tune/bandwidth', data, callbackFunc);
 };
 
 // 预取文件链接
@@ -94,14 +73,7 @@ CdnManager.prototype.prefetchUrls = function (urls, callbackFunc) {
     var postBody = {
         urls: urls
     };
-    var url = '/v2/tune/prefetch\n';
-    var accessToken = util.generateAccessToken(this.mac, url, '');
-    var headers = {
-        'Content-Type': 'application/json',
-        Authorization: accessToken
-    };
-
-    req('/v2/tune/prefetch', headers, postBody, callbackFunc);
+    req(this.mac, '/v2/tune/prefetch', postBody, callbackFunc);
 };
 
 // 刷新链接
@@ -124,22 +96,22 @@ CdnManager.prototype.refreshUrlsAndDirs = function (urls, dirs, callbackFunc) {
         urls: urls,
         dirs: dirs
     };
-    var url = '/v2/tune/refresh\n';
-    var accessToken = util.generateAccessToken(this.mac, url, '');
+    req(this.mac, '/v2/tune/refresh', postBody, callbackFunc);
+};
+
+// post 请求
+function req (mac, reqPath, reqBody, callbackFunc) {
+    var url = 'http://fusion.qiniuapi.com' + reqPath;
+    var accessToken = util.generateAccessToken(mac, url, '');
     var headers = {
         'Content-Type': 'application/json',
         Authorization: accessToken
     };
-
-    req('/v2/tune/refresh', headers, postBody, callbackFunc);
-};
-
-// post 请求
-function req (reqPath, header, reqBody, callbackFunc) {
-    urllib.request('http://fusion.qiniuapi.com' + reqPath, {
+    urllib.request(url, {
         method: 'POST',
-        headers: header,
-        data: reqBody
+        headers: headers,
+        data: reqBody,
+        dataType: 'json'
     }, callbackFunc);
 }
 
