@@ -21,7 +21,7 @@ describe('test start cdn', function () {
     var cdnManager = new qiniu.cdn.CdnManager(mac);
 
     it('test getCdnLogList', function (done) {
-        var day = '2019-10-01';
+        var day = (new Date()).toISOString().substring(0, 10);
         cdnManager.getCdnLogList([domain], day,
             function (err, respBody, respInfo) {
                 console.log(respBody, respInfo);
@@ -32,8 +32,10 @@ describe('test start cdn', function () {
     });
 
     it('test getFluxData', function (done) {
-        var startDay = '2019-10-01';
-        var endDay = '2019-10-16';
+        var today = new Date();
+        var endDay = today.toISOString().substring(0, 10);
+        today.setDate(today.getDate() - 30);
+        var startDay = today.toISOString().substring(0, 10);
         cdnManager.getFluxData(startDay, endDay, '5hour', [domain],
             function (err, respBody, respInfo) {
                 console.log(respBody, respInfo);
@@ -44,8 +46,10 @@ describe('test start cdn', function () {
     });
 
     it('test getBandwidthData', function (done) {
-        var startDay = '2019-10-01';
-        var endDay = '2019-10-16';
+        var today = new Date();
+        var endDay = today.toISOString().substring(0, 10);
+        today.setDate(today.getDate() - 30);
+        var startDay = today.toISOString().substring(0, 10);
         cdnManager.getBandwidthData(startDay, endDay, '5hour', [domain],
             function (err, respBody, respInfo) {
                 console.log(respBody, respInfo);
