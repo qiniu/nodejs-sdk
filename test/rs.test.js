@@ -2,6 +2,7 @@ const should = require('should');
 const assert = require('assert');
 const qiniu = require('../index.js');
 const proc = require('process');
+const urllib = require('urllib');
 const console = require('console');
 
 // eslint-disable-next-line no-undef
@@ -44,10 +45,14 @@ describe('test start bucket manager', function () {
 
     describe('test privateDownloadUrl', function () {
         it('test privateDownloadUrl', function (done) {
-            var key = 'qiniu.mp4';
+            var key = 'test_file';
             var url = bucketManager.privateDownloadUrl('http://' + domain, key, 20);
-            should.equal(url, 'http://' + domain + '/qiniu.mp4?e=20&token=ExAdnmHq914NVa8addkXooUvXSyzGPHYzxzJwDnN:vZRvLfuw4U9vJzweTVgPdPFIY-g=');
-            done();
+            urllib.request(url, function (err, respBody, respInfo) {
+                console.log(respBody.toString(), respInfo);
+                should.not.exist(err);
+                should.equal(respInfo.status, 200);
+                done();
+            });
         });
     });
 
