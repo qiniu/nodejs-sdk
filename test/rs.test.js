@@ -299,11 +299,7 @@ describe('test start bucket manager', function () {
                 prefix: 'test'
             }, function (err, respBody, respInfo) {
                 // the irregular data return from Server that Cannot be converted by urllib to JSON Object
-                // so err !=null and you can judge if err.res.statusCode==200
-                if (err.res.statusCode != 200) {
-                    console.log(err);
-                    throw err;
-                }
+                // so err !=null and you can judge respBody==null or err.res.statusCode==200
                 console.log(respBody + '\n');
                 console.log(JSON.stringify(respInfo));
                 done();
