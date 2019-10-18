@@ -1,5 +1,4 @@
 const conf = require('../conf');
-const zone = require('../zone');
 const util = require('../util');
 const rpc = require('../rpc');
 const path = require('path');
@@ -47,43 +46,18 @@ ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
         destroy(rsStream);
     });
 
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
-        }
-    }
-
     var accessKey = util.getAKFromUptoken(uploadToken);
     var bucket = util.getBucketFromUptoken(uploadToken);
-    if (useCache) {
-        putReq(this.config, uploadToken, key, rsStream, rsStreamLen, putExtra,
+
+    util.prepareZone(this, accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            destroy(rsStream);
+            return;
+        }
+        putReq(ctx.config, uploadToken, key, rsStream, rsStreamLen, putExtra,
             callbackFunc);
-    } else {
-        zone.getZoneInfo(accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                destroy(rsStream);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-
-            // req
-            putReq(that.config, uploadToken, key, rsStream, rsStreamLen,
-                putExtra,
-                callbackFunc);
-        });
-    }
+    });
 };
 
 function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
@@ -124,10 +98,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
     var finishedCtxList = [];
     var finishedBlkPutRets = [];
     var isSent = false;
-    var fileSize = rsStreamLen;
-    var blockCnt = fileSize / conf.BLOCK_SIZE;
-    var totalBlockNum = (fileSize % conf.BLOCK_SIZE == 0) ? blockCnt : (blockCnt +
-    1);
+    var totalBlockNum = Math.ceil(rsStreamLen / conf.BLOCK_SIZE);
     // read resumeRecordFile
     if (putExtra.resumeRecordFile) {
         try {
@@ -183,8 +154,8 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra,
                         });
                     }
                     blkStream.resume();
-                    if (finishedCtxList.length === Math.floor(totalBlockNum)) {
-                        mkfileReq(upDomain, uploadToken, fileSize, finishedCtxList, key, putExtra, callbackFunc);
+                    if (finishedCtxList.length === totalBlockNum) {
+                        mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
                         isSent = true;
                     }
                 }

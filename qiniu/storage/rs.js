@@ -4,7 +4,6 @@ const rpc = require('../rpc');
 const conf = require('../conf');
 const digest = require('../auth/digest');
 const util = require('../util');
-const zone = require('../zone');
 
 exports.BucketManager = BucketManager;
 exports.PutPolicy = PutPolicy;
@@ -20,36 +19,13 @@ function BucketManager (mac, config) {
 // @param key    文件名称
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.stat = function (bucket, key, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        statReq(this.mac, this.config, bucket, key, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            statReq(that.mac, that.config, bucket, key, callbackFunc);
-        });
-    }
+        statReq(ctx.mac, ctx.config, bucket, key, callbackFunc);
+    });
 };
 
 function statReq (mac, config, bucket, key, callbackFunc) {
@@ -68,37 +44,13 @@ function statReq (mac, config, bucket, key, callbackFunc) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.changeMime = function (bucket, key, newMime,
     callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        changeMimeReq(this.mac, this.config, bucket, key, newMime, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            changeMimeReq(that.mac, that.config, bucket, key, newMime,
-                callbackFunc);
-        });
-    }
+        changeMimeReq(ctx.mac, ctx.config, bucket, key, newMime, callbackFunc);
+    });
 };
 
 function changeMimeReq (mac, config, bucket, key, newMime, callbackFunc) {
@@ -117,37 +69,13 @@ function changeMimeReq (mac, config, bucket, key, newMime, callbackFunc) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.changeHeaders = function (bucket, key, headers,
     callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        changeHeadersReq(this.mac, this.config, bucket, key, headers, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            changeHeadersReq(that.mac, that.config, bucket, key, headers,
-                callbackFunc);
-        });
-    }
+        changeHeadersReq(ctx.mac, ctx.config, bucket, key, headers, callbackFunc);
+    });
 };
 
 function changeHeadersReq (mac, config, bucket, key, headers, callbackFunc) {
@@ -169,38 +97,14 @@ function changeHeadersReq (mac, config, bucket, key, headers, callbackFunc) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.move = function (srcBucket, srcKey, destBucket, destKey,
     options, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, srcBucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        moveReq(this.mac, this.config, srcBucket, srcKey, destBucket, destKey,
+        moveReq(ctx.mac, ctx.config, srcBucket, srcKey, destBucket, destKey,
             options, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, srcBucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            moveReq(that.mac, that.config, srcBucket, srcKey, destBucket,
-                destKey, options, callbackFunc);
-        });
-    }
+    });
 };
 
 function moveReq (mac, config, srcBucket, srcKey, destBucket, destKey,
@@ -223,38 +127,14 @@ function moveReq (mac, config, srcBucket, srcKey, destBucket, destKey,
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.copy = function (srcBucket, srcKey, destBucket, destKey,
     options, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, srcBucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        copyReq(this.mac, this.config, srcBucket, srcKey, destBucket, destKey,
+        copyReq(ctx.mac, ctx.config, srcBucket, srcKey, destBucket, destKey,
             options, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, srcBucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            copyReq(that.mac, that.config, srcBucket, srcKey, destBucket,
-                destKey, options, callbackFunc);
-        });
-    }
+    });
 };
 
 function copyReq (mac, config, srcBucket, srcKey, destBucket, destKey,
@@ -273,36 +153,13 @@ function copyReq (mac, config, srcBucket, srcKey, destBucket, destKey,
 // @param key    文件名称
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.delete = function (bucket, key, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        deleteReq(this.mac, this.config, bucket, key, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            deleteReq(that.mac, that.config, bucket, key, callbackFunc);
-        });
-    }
+        deleteReq(ctx.mac, ctx.config, bucket, key, callbackFunc);
+    });
 };
 
 function deleteReq (mac, config, bucket, key, callbackFunc) {
@@ -321,37 +178,13 @@ function deleteReq (mac, config, bucket, key, callbackFunc) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.deleteAfterDays = function (bucket, key, days,
     callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        deleteAfterDaysReq(this.mac, this.config, bucket, key, days, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            deleteAfterDaysReq(that.mac, that.config, bucket, key, days,
-                callbackFunc);
-        });
-    }
+        deleteAfterDaysReq(ctx.mac, ctx.config, bucket, key, days, callbackFunc);
+    });
 };
 
 function deleteAfterDaysReq (mac, config, bucket, key, days, callbackFunc) {
@@ -369,36 +202,13 @@ function deleteAfterDaysReq (mac, config, bucket, key, days, callbackFunc) {
 // @param key    文件名称
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.fetch = function (resUrl, bucket, key, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        fetchReq(this.mac, this.config, resUrl, bucket, key, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            fetchReq(that.mac, that.config, resUrl, bucket, key, callbackFunc);
-        });
-    }
+        fetchReq(ctx.mac, ctx.config, resUrl, bucket, key, callbackFunc);
+    });
 };
 
 function fetchReq (mac, config, resUrl, bucket, key, callbackFunc) {
@@ -417,36 +227,13 @@ function fetchReq (mac, config, resUrl, bucket, key, callbackFunc) {
 // @param key    文件名称
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.prefetch = function (bucket, key, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        prefetchReq(this.mac, this.config, bucket, key, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            prefetchReq(that.mac, that.config, bucket, key, callbackFunc);
-        });
-    }
+        prefetchReq(ctx.mac, ctx.config, bucket, key, callbackFunc);
+    });
 };
 
 function prefetchReq (mac, config, bucket, key, callbackFunc) {
@@ -465,37 +252,13 @@ function prefetchReq (mac, config, bucket, key, callbackFunc) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.changeType = function (bucket, key, newType,
     callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        changeTypeReq(this.mac, this.config, bucket, key, newType, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            changeTypeReq(that.mac, that.config, bucket, key, newType,
-                callbackFunc);
-        });
-    }
+        changeTypeReq(ctx.mac, ctx.config, bucket, key, newType, callbackFunc);
+    });
 };
 
 function changeTypeReq (mac, config, bucket, key, newType, callbackFunc) {
@@ -546,36 +309,13 @@ BucketManager.prototype.unimage = function (bucket, callbackFunc) {
 //                delimiter 指定目录分隔符
 // @param callbackFunc(err, respBody, respInfo) - 回调函数
 BucketManager.prototype.listPrefix = function (bucket, options, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        listPrefixReq(this.mac, this.config, bucket, options, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            listPrefixReq(that.mac, that.config, bucket, options, callbackFunc);
-        });
-    }
+        listPrefixReq(ctx.mac, ctx.config, bucket, options, callbackFunc);
+    });
 };
 
 function listPrefixReq (mac, config, bucket, options, callbackFunc) {
@@ -627,36 +367,13 @@ function listPrefixReq (mac, config, bucket, options, callbackFunc) {
 //                delimiter 指定目录分隔符
 // @param callbackFunc(err, respBody, respInfo) - 回调函数
 BucketManager.prototype.listPrefixV2 = function (bucket, options, callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        listPrefixReqV2(this.mac, this.config, bucket, options, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            listPrefixReqV2(that.mac, that.config, bucket, options, callbackFunc);
-        });
-    }
+        listPrefixReqV2(ctx.mac, ctx.config, bucket, options, callbackFunc);
+    });
 };
 
 function listPrefixReqV2 (mac, config, bucket, options, callbackFunc) {
@@ -814,37 +531,13 @@ BucketManager.prototype.publicDownloadUrl = function (domain, fileName) {
 // updateObjectStatus(bucketName string, key string, status ObjectStatus, condition UpdateObjectInfoCondition)
 BucketManager.prototype.updateObjectStatus = function (bucket, key, status,
     callbackFunc) {
-    var useCache = false;
-    var that = this;
-    if (this.config.zone != '' && this.config.zone != null) {
-        if (this.config.zoneExpire == -1) {
-            useCache = true;
-        } else {
-            if (!util.isTimestampExpired(this.config.zoneExpire)) {
-                useCache = true;
-            }
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
         }
-    }
-
-    if (useCache) {
-        updateStatusReq(this.mac, this.config, bucket, key, status, callbackFunc);
-    } else {
-        zone.getZoneInfo(this.mac.accessKey, bucket, function (err, cZoneInfo,
-            cZoneExpire) {
-            if (err) {
-                callbackFunc(err, null, null);
-                return;
-            }
-
-            // update object
-            that.config.zone = cZoneInfo;
-            that.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
-            this.config = that.config;
-            // req
-            updateStatusReq(that.mac, that.config, bucket, key, status,
-                callbackFunc);
-        });
-    }
+        updateStatusReq(ctx.mac, ctx.config, bucket, key, status, callbackFunc);
+    });
 };
 
 function updateStatusReq (mac, config, bucket, key, status, callbackFunc) {

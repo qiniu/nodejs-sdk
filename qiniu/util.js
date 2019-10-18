@@ -1,5 +1,6 @@
-var url = require('url');
-var crypto = require('crypto');
+const url = require('url');
+const crypto = require('crypto');
+const zone = require('./zone');
 
 // Check Timestamp Expired or not
 exports.isTimestampExpired = function (timestamp) {
@@ -133,4 +134,33 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
 exports.isQiniuCallback = function (mac, requestURI, reqBody, callbackAuth) {
     var auth = exports.generateAccessToken(mac, requestURI, reqBody);
     return auth === callbackAuth;
+};
+
+exports.prepareZone = function (ctx, accessKey, bucket, callback) {
+    var useCache = false;
+    if (ctx.config.zone != '' && ctx.config.zone != null) {
+        if (ctx.config.zoneExpire == -1) {
+            useCache = true;
+        } else {
+            if (!exports.isTimestampExpired(ctx.config.zoneExpire)) {
+                useCache = true;
+            }
+        }
+    }
+
+    if (useCache) {
+        callback(null, ctx);
+    } else {
+        zone.getZoneInfo(accessKey, bucket, function (err, cZoneInfo,
+            cZoneExpire) {
+            if (err) {
+                callback(err);
+                return;
+            }
+            // update object
+            ctx.config.zone = cZoneInfo;
+            ctx.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
+            callback(null, ctx);
+        });
+    }
 };

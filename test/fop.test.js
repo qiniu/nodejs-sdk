@@ -22,7 +22,8 @@ describe('test start fop', function () {
     // config.useHttpsDomain = true;
     config.zone = qiniu.zone.Zone_z0;
 
-    // eslint-disable-next-line no-undef
+    var persistentId;
+
     it('test video fop', function (done) {
         console.log(srcBucket);
 
@@ -51,6 +52,20 @@ describe('test start fop', function () {
                 console.log(respBody, respInfo);
                 should.not.exist(err);
                 respBody.should.have.keys('persistentId');
+                persistentId = respBody.persistentId;
+                done();
+            });
+    });
+
+    it('test video prefop', function (done) {
+        var operManager = new qiniu.fop.OperationManager(mac, config);
+        // 查询处理状态
+        operManager.prefop(persistentId,
+            function (err, respBody, respInfo) {
+                console.log(respBody, respInfo);
+                should.not.exist(err);
+                respBody.should.have.keys('id', 'pipeline', 'inputBucket', 'inputKey');
+                respBody.should.have.property('id', persistentId);
                 done();
             });
     });

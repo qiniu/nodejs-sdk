@@ -7,16 +7,9 @@
     "test": "test"
   },
   "scripts": {
-    "test": "make test",
-    "blanket": {
-      "pattern": "qiniu/qiniu",
-      "data-cover-flags": {
-        "debug": false
-      }
-    },
-    "travis-cov": {
-      "threshold": 90
-    },
+    "test": "NODE_ENV=test mocha -t 25000",
+    "cover": "nyc npm run test",
+    "report": "nyc report --reporter=html",
     "lint": "eslint ."
   },
   "repository": {
@@ -68,7 +61,6 @@
   },
   "devDependencies": {
     "@types/node": "^8.0.3",
-    "blanket": "*",
     "eslint": "^6.5.1",
     "eslint-config-standard": "^14.1.0",
     "eslint-plugin-import": "^2.11.0",
@@ -76,9 +68,8 @@
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.1",
     "mocha": "^6.2.1",
-    "pedding": "*",
-    "should": "^13.2.3",
-    "travis-cov": "*"
+    "nyc": "^14.1.1",
+    "should": "^13.2.3"
   },
   "license": "MIT"
 }
