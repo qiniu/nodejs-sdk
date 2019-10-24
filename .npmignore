@@ -1,7 +1,12 @@
 test/
 test-env.sh
 .travis.yml
+.eslintrc.js
 coverage.html
+gopher.png
 lib-cov/
 Makefile
 docs/
+examples/
+coverage/
+.nyc_output/

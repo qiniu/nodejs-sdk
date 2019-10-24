@@ -1,9 +1,9 @@
-# Qiniu Resource Storage SDK for Node.js
+# Qiniu Cloud SDK for Node.js
 
 [![@qiniu on weibo](http://img.shields.io/badge/weibo-%40qiniutek-blue.svg)](http://weibo.com/qiniutek)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE.md)
-[![Build Status](https://travis-ci.org/qiniu/nodejs-sdk.v6.png?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk.v6)
-[![Code Climate](https://codeclimate.com/github/qiniu/nodejs-sdk.png)](https://codeclimate.com/github/qiniu/nodejs-sdk)
+[![Build Status](https://api.travis-ci.org/qiniu/nodejs-sdk.svg?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
+[![Code Climate](https://codeclimate.com/github/qiniu/nodejs-sdk.svg)](https://codeclimate.com/github/qiniu/nodejs-sdk)
 [![Latest Stable Version](https://img.shields.io/npm/v/qiniu.svg)](https://www.npmjs.com/package/qiniu)
 
 ## 下载
@@ -18,7 +18,7 @@ $ npm install qiniu
 
 ### 从 release 版本下载
 
-下载地址：https://github.com/qiniu/nodejs-sdk/releases
+下载地址：[https://github.com/qiniu/nodejs-sdk/releases](https://github.com/qiniu/nodejs-sdk/releases)
 
 这里可以下载到旧版本的SDK，release 版本有版本号，有 [CHANGELOG](https://github.com/qiniu/nodejs-sdk/blob/master/CHANGELOG.md)，使用规格也会比较稳定。
 
@@ -28,7 +28,14 @@ $ npm install qiniu
 
 ## 使用
 
-参考文档：[七牛云存储 Node.js SDK 使用指南](http://developer.qiniu.com/kodo/sdk/nodejs)
+参考文档：[七牛云存储 Node.js SDK 使用指南](http://developer.qiniu.com/kodo/sdk/nodejs)  
+
+## 测试
+```    
+$ cd ./test/  
+$ source test-env.sh  
+$ mocha --grep 'bucketinfo'
+```   
 
 ## 贡献代码
 

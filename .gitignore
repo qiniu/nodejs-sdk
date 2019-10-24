@@ -10,6 +10,7 @@ lib-cov
 *.out
 *.pid
 *.gz
+test-env.sh
 
 pids
 logs
@@ -18,3 +19,7 @@ results
 node_modules
 npm-debug.log
 test/config.js
+package-lock.json
+
+coverage/
+.nyc_output/
