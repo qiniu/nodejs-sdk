@@ -1,6 +1,6 @@
 /**
- * typescript definition for qiniu 7.0.2
- * @date 2017-06-27
+ * typescript definition for qiniu 7.2.2
+ * @date 2019-10-24 祝大家节日快乐~
  * @author xialeistudio<xialeistudio@gmail.com>
  */
 export declare type callback = (e?: Error, respBody?: any, respInfo?: any) => void;
@@ -100,54 +100,6 @@ export declare namespace cdn {
          * @return signedUrl  最终的带时间戳防盗链的url
          */
         createTimestampAntiLeechUrl(domain: string, fileName: string, query: any, encryptKey: string, deadline: number): string;
-    }
-}
-
-export declare namespace conf {
-    let ACCESS_KEY: string;
-    let SECRET_KEY: string;
-    let USER_AGENT: string;
-    let BLOCK_SIZE: number;
-    let FormMimeUrl: string;
-    let FormMimeJson: string;
-    let FormMimeRaw: string;
-    let RS_HOST: string;
-    let RPC_TIMEOUT: number;
-
-    interface ConfigOptions {
-        /**
-         * @default false
-         */
-        useHttpsDomain?: boolean;
-
-        /**
-         * @default true
-         */
-        useCdnDomain?: boolean;
-
-        /**
-         * @default null
-         */
-        zone?: Zone,
-
-        /**
-         * @default -1
-         */
-        zoneExpire?: number;
-    }
-    class Config implements ConfigOptions {
-        constructor(options?: ConfigOptions);
-    }
-
-    class Zone {
-        srcUpHosts: any;
-        cdnUpHosts: any;
-        ioHost: string;
-        rsHost: string;
-        rsfHost: string;
-        apiHost: string;
-
-        constructor(srcUpHosts?: any, cdnUpHosts?: any, ioHost?: string, rsHost?: string, rsfHost?: string, apiHost?: string);
     }
 }
 
@@ -306,145 +258,6 @@ export declare namespace resume_up {
          * @param progressCallback
          */
         constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, progressCallback?: (data: any) => void);
-    }
-}
-
-export declare namespace util {
-    function isTimestampExpired(timestamp: number): boolean;
-
-    function encodedEntry(bucket: string, key?: string): string;
-
-    function getAKFromUptoken(uploadToken: string): string;
-
-    function getBucketFromUptoken(uploadToken: string): string;
-
-    function base64ToUrlSafe(v: string): string;
-
-    function urlSafeToBase64(v: string): string;
-
-    function urlsafeBase64Encode(jsonFlags: string): string;
-
-    function urlSafeBase64Decode(fromStr: string): string;
-
-    function hmacSha1(encodedFlags: string | Buffer, secretKey: string | Buffer): string;
-
-    /**
-     * 创建AccessToken凭证
-     * @param mac AK&SK对象
-     * @param requestURI 请求URL
-     * @param reqBody  请求Body，仅当请求的ContentType为application/x-www-form-urlencoded 时才需要传入该参数
-     */
-    function generateAccessToken(mac: auth.digest.Mac, requestURI: string, reqBody?: string): string;
-
-
-    /**
-     * 创建AccessToken凭证
-     * @param mac            AK&SK对象
-     * @param requestURI     请求URL
-     * @param reqMethod      请求方法，例如 GET，POST
-     * @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
-     * @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者 application/x-www-form-urlencoded 时才需要传入该参数
-     */
-    function generateAccessTokenV2(mac: auth.digest.Mac, requestURI: string, reqMethod: string, reqContentType: string, reqBody?: string): string;
-
-    /**
-     * 校验七牛上传回调的Authorization
-     * @param mac AK&SK对象
-     * @param requestURI 回调的URL中的requestURI
-     * @param reqBody 回调的URL中的requestURI 请求Body，仅当请求的ContentType为application/x-www-form-urlencoded时才需要传入该参数
-     * @param callbackAuth 回调时请求的Authorization头部值
-     */
-    function isQiniuCallback(mac: auth.digest.Mac, requestURI: string, reqBody: string | null, callbackAuth: string): boolean;
-}
-
-export declare namespace rpc {
-    interface Headers {
-        'User-Agent'?: string;
-        Connection?: string;
-    }
-    /**
-     *
-     * @param requestURI
-     * @param requestForm
-     * @param headers
-     * @param callback
-     */
-    function post(requestURI: string, requestForm: Buffer | string | NodeJS.ReadableStream | null, headers: Headers | null, callback: callback): void;
-
-    /**
-     *
-     * @param requestURI
-     * @param requestForm
-     * @param callback
-     */
-    function postMultipart(requestURI: string, requestForm: Buffer | string | NodeJS.ReadableStream | null, callback: callback): void;
-
-    /**
-     *
-     * @param requestURI
-     * @param requestForm
-     * @param token
-     * @param callback
-     */
-    function postWithForm(requestURI: string, requestForm: Buffer | string | NodeJS.ReadableStream | null, token: string | null, callback: callback): void;
-
-    /**
-     *
-     * @param requestURI
-     * @param token
-     * @param callback
-     */
-    function postWithoutForm(requestURI: string, token: string | null, callback: callback): void;
-}
-
-export declare namespace zone {
-    //huadong
-    const Zone_z0: conf.Zone;
-    //huabei
-    const Zone_z1: conf.Zone;
-    //huanan
-    const Zone_z2: conf.Zone;
-    //beimei
-    const Zone_na0: conf.Zone;
-    //Southeast Asia
-    const Zone_as0: conf.Zone;
-}
-
-export declare namespace fop {
-    interface PfopOptions {
-        /**
-         * 回调业务服务器，通知处理结果
-         */
-        notifyURL?: string;
-
-        /**
-         * 结果是否强制覆盖已有的同名文件
-         */
-        force?: boolean;
-    }
-    class OperationManager {
-        mac: auth.digest.Mac;
-        config: conf.Config;
-
-        constructor(mac?: auth.digest.Mac, config?: conf.Config);
-
-        /**
-         * 发送持久化数据处理请求
-         * @param bucket 空间名称
-         * @param key 文件名称
-         * @param fops 处理指令集合
-         * @param pipeline 处理队列名称
-         * @param options
-         * @param callback
-         */
-        pfop(bucket: string, key: string, fops: string[], pipeline: string, options: PfopOptions | null, callback: callback): void;
-
-        /**
-         * 查询持久化数据处理进度
-         * @param persistentId pfop操作返回的持久化处理ID
-         * @param callback
-         */
-        prefop(persistentId: string, callback: callback): void;
     }
 }
 
@@ -741,4 +554,239 @@ export declare namespace rs {
 
         uploadToken(mac?: auth.digest.Mac): string;
     }
+}
+
+export declare namespace fop {
+    interface PfopOptions {
+        /**
+         * 回调业务服务器，通知处理结果
+         */
+        notifyURL?: string;
+
+        /**
+         * 结果是否强制覆盖已有的同名文件
+         */
+        force?: boolean;
+    }
+    class OperationManager {
+        mac: auth.digest.Mac;
+        config: conf.Config;
+
+        constructor(mac?: auth.digest.Mac, config?: conf.Config);
+
+        /**
+         * 发送持久化数据处理请求
+         * @param bucket 空间名称
+         * @param key 文件名称
+         * @param fops 处理指令集合
+         * @param pipeline 处理队列名称
+         * @param options
+         * @param callback
+         */
+        pfop(bucket: string, key: string, fops: string[], pipeline: string, options: PfopOptions | null, callback: callback): void;
+
+        /**
+         * 查询持久化数据处理进度
+         * @param persistentId pfop操作返回的持久化处理ID
+         * @param callback
+         */
+        prefop(persistentId: string, callback: callback): void;
+    }
+}
+
+export declare namespace conf {
+    let ACCESS_KEY: string;
+    let SECRET_KEY: string;
+    let USER_AGENT: string;
+    let BLOCK_SIZE: number;
+    let FormMimeUrl: string;
+    let FormMimeJson: string;
+    let FormMimeRaw: string;
+    let RS_HOST: string;
+    let RPC_TIMEOUT: number;
+
+    interface ConfigOptions {
+        /**
+         * @default false
+         */
+        useHttpsDomain?: boolean;
+
+        /**
+         * @default true
+         */
+        useCdnDomain?: boolean;
+
+        /**
+         * @default null
+         */
+        zone?: Zone,
+
+        /**
+         * @default -1
+         */
+        zoneExpire?: number;
+    }
+    class Config implements ConfigOptions {
+        constructor(options?: ConfigOptions);
+    }
+
+    class Zone {
+        srcUpHosts: any;
+        cdnUpHosts: any;
+        ioHost: string;
+        rsHost: string;
+        rsfHost: string;
+        apiHost: string;
+
+        constructor(srcUpHosts?: any, cdnUpHosts?: any, ioHost?: string, rsHost?: string, rsfHost?: string, apiHost?: string);
+    }
+}
+
+
+export declare namespace rpc {
+    interface Headers {
+        'User-Agent'?: string;
+        Connection?: string;
+    }
+    /**
+     *
+     * @param requestURI
+     * @param requestForm
+     * @param headers
+     * @param callback
+     */
+    function post(requestURI: string, requestForm: Buffer | string | NodeJS.ReadableStream | null, headers: Headers | null, callback: callback): void;
+
+    /**
+     *
+     * @param requestURI
+     * @param requestForm
+     * @param callback
+     */
+    function postMultipart(requestURI: string, requestForm: Buffer | string | NodeJS.ReadableStream | null, callback: callback): void;
+
+    /**
+     *
+     * @param requestURI
+     * @param requestForm
+     * @param token
+     * @param callback
+     */
+    function postWithForm(requestURI: string, requestForm: Buffer | string | NodeJS.ReadableStream | null, token: string | null, callback: callback): void;
+
+    /**
+     *
+     * @param requestURI
+     * @param token
+     * @param callback
+     */
+    function postWithoutForm(requestURI: string, token: string | null, callback: callback): void;
+}
+
+export declare namespace util {
+    function isTimestampExpired(timestamp: number): boolean;
+
+    function encodedEntry(bucket: string, key?: string): string;
+
+    function getAKFromUptoken(uploadToken: string): string;
+
+    function getBucketFromUptoken(uploadToken: string): string;
+
+    function base64ToUrlSafe(v: string): string;
+
+    function urlSafeToBase64(v: string): string;
+
+    function urlsafeBase64Encode(jsonFlags: string): string;
+
+    function urlSafeBase64Decode(fromStr: string): string;
+
+    function hmacSha1(encodedFlags: string | Buffer, secretKey: string | Buffer): string;
+
+    /**
+     * 创建AccessToken凭证
+     * @param mac AK&SK对象
+     * @param requestURI 请求URL
+     * @param reqBody  请求Body，仅当请求的ContentType为application/x-www-form-urlencoded 时才需要传入该参数
+     */
+    function generateAccessToken(mac: auth.digest.Mac, requestURI: string, reqBody?: string): string;
+
+
+    /**
+     * 创建AccessToken凭证
+     * @param mac            AK&SK对象
+     * @param requestURI     请求URL
+     * @param reqMethod      请求方法，例如 GET，POST
+     * @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
+     * @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者 application/x-www-form-urlencoded 时才需要传入该参数
+     */
+    function generateAccessTokenV2(mac: auth.digest.Mac, requestURI: string, reqMethod: string, reqContentType: string, reqBody?: string): string;
+
+    /**
+     * 校验七牛上传回调的Authorization
+     * @param mac AK&SK对象
+     * @param requestURI 回调的URL中的requestURI
+     * @param reqBody 回调的URL中的requestURI 请求Body，仅当请求的ContentType为application/x-www-form-urlencoded时才需要传入该参数
+     * @param callbackAuth 回调时请求的Authorization头部值
+     */
+    function isQiniuCallback(mac: auth.digest.Mac, requestURI: string, reqBody: string | null, callbackAuth: string): boolean;
+}
+export declare namespace zone {
+    //huadong
+    const Zone_z0: conf.Zone;
+    //huabei
+    const Zone_z1: conf.Zone;
+    //huanan
+    const Zone_z2: conf.Zone;
+    //beimei
+    const Zone_na0: conf.Zone;
+    //Southeast Asia
+    const Zone_as0: conf.Zone;
+    /**
+     * 获取空间信息
+     * @param accessKey 
+     * @param bucket 
+     * @param callback 
+     */
+    function getZoneInfo(accessKey: string, bucket: string, callback: callback): void;
+}
+
+interface RtcError {
+    code: number;
+    message: string;
+}
+type RtcCallback<T> = (e: T | null, resultObject: any) => void;
+export declare namespace app {
+    function createApp(app: any, credentials: Credentials, callback: RtcCallback<RtcError>): void;
+
+    function getApp(appId: string | number, credentials: Credentials, callback: RtcCallback<RtcError>): void;
+
+    function updateApp(appId: string | number, app: any, credentials: Credentials, callback: RtcCallback<RtcError>): void;
+
+    function deleteApp(appId: string | number, credentials: Credentials, callback: RtcCallback<RtcError>): void;
+}
+
+export declare namespace room {
+    function listUser(appId: string | number, roomName: string | number, credentials: Credentials, callback: RtcCallback<RtcError>): void;
+    function kickUser(appId: string | number, roomName: string | number, userId: string | number, credentials: Credentials, callback: RtcCallback<RtcError>): void;
+    function listActiveRooms(appId: string | number, roomNamePrefix: string, offset: number, limit: number, credentials: Credentials, callback: RtcCallback<RtcError>): void;
+
+    interface RoomAccess {
+        expireAt: number | null;
+    }
+    function getRoomToken(roomAccess: RoomAccess, credentials: Credentials): string;
+}
+
+export declare class Credentials {
+    accessKey: string;
+    secretKey: string;
+
+    constructor(accessKey: string, secretKey: string);
+
+    generateAccessToken(options: any, data: any): string;
+
+    private _signRequest(options: any, body: any): string;
+
+    sign(data: string): string;
+
+    signJson(data: any): string;
 }
