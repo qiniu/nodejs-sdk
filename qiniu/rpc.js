@@ -1,7 +1,9 @@
 var urllib = require('urllib');
 var conf = require('./conf');
+var axios = require('axios').default;
 
 exports.post = post;
+exports.request = axios.create();
 exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;

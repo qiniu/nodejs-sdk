@@ -290,8 +290,13 @@ BucketManager.prototype.restore = function (bucket, key, freezeAfterDays,
         Authorization: accessToken,
         'Content-Type': contentType
     };
-    
-    rpc.post(reqURL, reqBody, headers, callbackFunc);    
+
+    rpc.request({
+        url: reqURL,
+        method: 'post',
+        headers,
+        data: reqBody
+    }).then(callbackFunc) 
 };
 
 // 设置空间镜像源
