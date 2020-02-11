@@ -277,7 +277,7 @@ function changeTypeReq (mac, config, bucket, key, newType, callbackFunc) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.restore = function (bucket, key, freezeAfterDays,
     callbackFunc) {
-    var requestURI = conf.RS_HOST + '/restoreAr';
+    var reqURL = conf.RS_HOST + '/restoreAr';
     var reqBody = {
         bucket: bucket,
         key: key,
