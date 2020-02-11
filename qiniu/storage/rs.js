@@ -269,6 +269,31 @@ function changeTypeReq (mac, config, bucket, key, newType, callbackFunc) {
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
+// 解冻归档存储文件
+// @link https://developer.qiniu.com/kodo/api/6380/restore-archive
+// @param bucket  空间名称
+// @param key     文件名称
+// @param freeze_after_days 解冻有效时长，1～7天
+// @param callbackFunc(err, respBody, respInfo) 回调函数
+BucketManager.prototype.restore = function (bucket, key, freezeAfterDays,
+    callbackFunc) {
+    var requestURI = conf.RS_HOST + '/restoreAr';
+    var reqBody = {
+        bucket: bucket,
+        key: key,
+        freeze_after_days: freezeAfterDays
+    };
+    var contentType = 'application/json';
+    var accessToken = util.generateAccessTokenV2(this.mac, requestURI, 'POST', contentType, reqBody);
+
+    var headers = {
+        Authorization: accessToken,
+        'Content-Type': contentType
+    };
+    
+    rpc.post(reqURL, reqBody, headers, callbackFunc);    
+};
+
 // 设置空间镜像源
 // @link https://developer.qiniu.com/kodo/api/1370/mirror
 // @param bucket 空间名称
