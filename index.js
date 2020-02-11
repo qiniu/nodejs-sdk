@@ -1,6 +1,6 @@
 module.exports = {
     auth: {
-        digest: require('./qiniu/auth' + '/digest.js')
+        digest: require('./qiniu/auth/digest.js')
     },
     cdn: require('./qiniu/cdn.js'),
     form_up: require('./qiniu/storage/form.js'),
@@ -13,5 +13,8 @@ module.exports = {
     zone: require('./qiniu/zone.js'),
     app: require('./qiniu/rtc/app.js'),
     room: require('./qiniu/rtc/room.js'),
-    Credentials: require('./qiniu/rtc/credentials.js')
+    Credentials: require('./qiniu/rtc/credentials.js'),
+    sms: {
+        message: require('./qiniu/sms/message.js'),
+    }
 };

@@ -1,8 +1,9 @@
 module.exports = {
     "env": {
-        "node": true
+        "node": true,
+        "mocha": true
     },
-    "extends": "eslint:recommended",
+    "extends": "standard",
     "parserOptions": {
         "ecmaVersion": 6
     },
@@ -22,6 +23,7 @@ module.exports = {
         "semi": [
             "error",
             "always"
-        ]
+        ],
+        "eqeqeq": [0]
     }
 };

@@ -2,22 +2,22 @@ var http = require('http');
 
 const host = 'rtc.qiniuapi.com';
 const headers = {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json'
 };
 
-function get(credentials, options, fn){
-    options.headers['Authorization'] = credentials.generateAccessToken(options, null);
+function get (credentials, options, fn) {
+    options.headers.Authorization = credentials.generateAccessToken(options, null);
 
-    var req = http.request(options, function(res) {
+    var req = http.request(options, function (res) {
         res.setEncoding('utf-8');
 
         var responseString = '';
 
-        res.on('data', function(data) {
+        res.on('data', function (data) {
             responseString += data;
         });
 
-        res.on('end', function() {
+        res.on('end', function () {
             var resultObject = JSON.parse(responseString);
 
             if (res.statusCode != 200) {
@@ -32,29 +32,28 @@ function get(credentials, options, fn){
         });
     });
 
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         fn(e, null);
     });
 
     req.end();
 }
 
-
-function post(credentials, options, data, fn) {
+function post (credentials, options, data, fn) {
     var dataString = JSON.stringify(data);
 
-    options.headers['Authorization'] = credentials.generateAccessToken(options, dataString);
+    options.headers.Authorization = credentials.generateAccessToken(options, dataString);
 
-    var req = http.request(options, function(res) {
+    var req = http.request(options, function (res) {
         res.setEncoding('utf-8');
 
         var responseString = '';
 
-        res.on('data', function(data) {
+        res.on('data', function (data) {
             responseString += data;
         });
 
-        res.on('end', function() {
+        res.on('end', function () {
             var resultObject = JSON.parse(responseString);
 
             if (res.statusCode != 200) {
@@ -68,7 +67,7 @@ function post(credentials, options, data, fn) {
             }
         });
     });
-    req.on('error', function(e) {
+    req.on('error', function (e) {
         fn(e, null);
     });
 
@@ -77,8 +76,7 @@ function post(credentials, options, data, fn) {
     req.end();
 }
 
-
-exports.createApp = function(app, credentials ,fn) {
+exports.createApp = function (app, credentials, fn) {
     var options = {
         host: host,
         port: 80,
@@ -121,4 +119,3 @@ exports.updateApp = function (appId, app, credentials, fn) {
     };
     post(credentials, options, app, fn);
 };
-

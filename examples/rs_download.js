@@ -1,5 +1,5 @@
-const qiniu = require("qiniu");
-const proc = require("process");
+const qiniu = require('qiniu');
+const proc = require('process');
 
 var accessKey = proc.env.QINIU_ACCESS_KEY;
 var secretKey = proc.env.QINIU_SECRET_KEY;
@@ -10,13 +10,13 @@ var publicBucketDomain = 'http://if-pbl.qiniudn.com';
 var privateBucketDomain = 'http://if-pri.qiniudn.com';
 var key = 'qiniu.mp4';
 
-//public
+// public
 var publicDownloadUrl = bucketManager.publicDownloadUrl(publicBucketDomain, key);
 console.log(publicDownloadUrl);
 
-//private
-var deadline = parseInt(Date.now() / 1000) + 3600; //1小时过期
+// private
+var deadline = parseInt(Date.now() / 1000) + 3600; // 1小时过期
 var privateDownloadUrl = bucketManager.privateDownloadUrl(privateBucketDomain,
-  key,
-  deadline);
+    key,
+    deadline);
 console.log(privateDownloadUrl);

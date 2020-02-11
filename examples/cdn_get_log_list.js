@@ -1,27 +1,27 @@
-const qiniu = require("qiniu");
-const proc = require("process");
+const qiniu = require('qiniu');
+const proc = require('process');
 
-//域名列表
+// 域名列表
 var domains = [
-  'if-pbl.qiniudn.com',
-  'qdisk.qiniudn.com'
+    'if-pbl.qiniudn.com',
+    'qdisk.qiniudn.com'
 ];
 
-//指定日期
+// 指定日期
 var logDay = '2017-06-20';
 var accessKey = proc.env.QINIU_ACCESS_KEY;
 var secretKey = proc.env.QINIU_SECRET_KEY;
 var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
 
 var cdnManager = new qiniu.cdn.CdnManager(mac);
-//获取域名日志
-cdnManager.getCdnLogList(domains, logDay, function(err, respBody, respInfo) {
-  if (err) {
-    throw err;
-  }
+// 获取域名日志
+cdnManager.getCdnLogList(domains, logDay, function (err, respBody, respInfo) {
+    if (err) {
+        throw err;
+    }
 
-  console.log(respInfo.statusCode);
-  if (respInfo.statusCode == 200) {
+    console.log(respInfo.statusCode);
+    if (respInfo.statusCode == 200) {
     /**
       {
         "code":0,
@@ -38,22 +38,22 @@ cdnManager.getCdnLogList(domains, logDay, function(err, respBody, respInfo) {
         }
     }
     */
-    var jsonBody = JSON.parse(respBody);
-    var code = jsonBody.code;
-    console.log(code);
-    var logData = jsonBody.data;
-    domains.forEach(function(domain) {
-      console.log("log for domain: " + domain);
-      var domainLogs = logData[domain];
-      if (domainLogs != null) {
-        domainLogs.forEach(function(logItem) {
-          console.log(logItem.name);
-          console.log(logItem.size);
-          console.log(logItem.mtime);
-          console.log(logItem.url);
+        var jsonBody = JSON.parse(respBody);
+        var code = jsonBody.code;
+        console.log(code);
+        var logData = jsonBody.data;
+        domains.forEach(function (domain) {
+            console.log('log for domain: ' + domain);
+            var domainLogs = logData[domain];
+            if (domainLogs != null) {
+                domainLogs.forEach(function (logItem) {
+                    console.log(logItem.name);
+                    console.log(logItem.size);
+                    console.log(logItem.mtime);
+                    console.log(logItem.url);
+                });
+                console.log('------------------');
+            }
         });
-        console.log("------------------");
-      }
-    });
-  }
+    }
 });
