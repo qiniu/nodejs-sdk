@@ -284,7 +284,7 @@ BucketManager.prototype.restore = function (bucket, key, freezeAfterDays,
         freeze_after_days: freezeAfterDays
     };
     var contentType = 'application/json';
-    var accessToken = util.generateAccessTokenV2(this.mac, requestURI, 'POST', contentType, reqBody);
+    var accessToken = util.generateAccessTokenV2(this.mac, reqURL, 'POST', contentType, reqBody);
 
     var headers = {
         Authorization: accessToken,
