@@ -279,12 +279,18 @@ BucketManager.prototype.restore = function (bucket, key, freezeAfterDays,
     callbackFunc) {
     var reqURL = conf.RS_HOST + '/restoreAr';
     var reqBody = {
-        bucket: bucket,
-        key: key,
-        freeze_after_days: freezeAfterDays
+        entries: [
+            {
+                bucket: bucket,
+                key: key,
+                freeze_after_days: freezeAfterDays
+            }
+        ]
     };
     var contentType = 'application/json';
-    var accessToken = util.generateAccessTokenV2(this.mac, reqURL, 'POST', contentType, reqBody);
+
+    var reqBodyStr = JSON.stringify(reqBody);
+    var accessToken = util.generateAccessTokenV2(this.mac, reqURL, 'POST', contentType, reqBodyStr)
 
     var headers = {
         Authorization: accessToken,
@@ -296,7 +302,7 @@ BucketManager.prototype.restore = function (bucket, key, freezeAfterDays,
         method: 'post',
         headers,
         data: reqBody
-    }).then(callbackFunc) 
+    }).then(callbackFunc).catch(err => console.log(err))
 };
 
 // 设置空间镜像源

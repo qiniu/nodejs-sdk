@@ -45,9 +45,9 @@
       "email": "jinxinxin@qiniu.com"
     }
   ],
-  "engines": [
-    "node >= 6"
-  ],
+  "engines": {
+    "node": ">= 8"
+  },
   "dependencies": {
     "agentkeepalive": "^4.0.2",
     "axios": "^0.19.2",

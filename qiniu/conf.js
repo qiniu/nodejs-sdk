@@ -16,7 +16,7 @@ exports.BLOCK_SIZE = 4 * 1024 * 1024; // 4MB, never change
 exports.FormMimeUrl = 'application/x-www-form-urlencoded';
 exports.FormMimeJson = 'application/json';
 exports.FormMimeRaw = 'application/octet-stream';
-exports.RS_HOST = 'http://rs.qiniu.com';
+exports.RS_HOST = 'https://rs.qiniu.com';
 exports.RPC_TIMEOUT = 120000; // 120s
 exports.UC_HOST = 'uc.qbox.me';
 
