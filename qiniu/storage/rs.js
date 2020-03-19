@@ -973,6 +973,14 @@ BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
+//解冻归档存储文件
+BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFunc) {
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.RS_QBOX + "/restoreAr/"+util.urlsafeBase64Encode(entry)+"/freezeAfterDays/"+freezeAfterDays;
+    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+};
+
 // 上传策略
 // @link https://developer.qiniu.com/kodo/manual/1206/put-policy
 function PutPolicy (options) {
