@@ -49,26 +49,24 @@
     "node >= 6"
   ],
   "dependencies": {
-    "agentkeepalive": "^4.0.2",
+    "axios": "^0.19.2",
     "block-stream2": "^2.0.0",
     "crc32": "^0.2.2",
     "destroy": "^1.0.4",
     "encodeurl": "^1.0.1",
-    "formstream": "^1.1.0",
-    "mime": "^2.4.4",
-    "tunnel-agent": "^0.6.0",
-    "urllib": "^2.34.1"
+    "form-data": "^3.0.0",
+    "mime": "^2.4.4"
   },
   "devDependencies": {
-    "@types/node": "^8.0.3",
+    "@types/node": "^13.9.2",
     "eslint": "^6.5.1",
     "eslint-config-standard": "^14.1.0",
     "eslint-plugin-import": "^2.11.0",
-    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-node": "^11.0.0",
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.1",
-    "mocha": "^6.2.1",
-    "nyc": "^14.1.1",
+    "mocha": "^7.1.1",
+    "nyc": "^15.0.0",
     "should": "^13.2.3"
   },
   "license": "MIT"

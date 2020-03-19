@@ -1,6 +1,6 @@
 const url = require('url');
 const crypto = require('crypto');
-const urllib = require('urllib');
+const rpc = require('./rpc');
 const util = require('./util');
 const digest = require('./auth/digest.js');
 const encodeUrl = require('encodeurl');
@@ -107,12 +107,7 @@ function req (mac, reqPath, reqBody, callbackFunc) {
         'Content-Type': 'application/json',
         Authorization: accessToken
     };
-    urllib.request(url, {
-        method: 'POST',
-        headers: headers,
-        data: reqBody,
-        dataType: 'json'
-    }, callbackFunc);
+    rpc.post(url, reqBody, headers, callbackFunc);
 }
 
 // 构建标准的基于时间戳的防盗链

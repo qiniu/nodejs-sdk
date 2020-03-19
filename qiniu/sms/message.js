@@ -1,5 +1,6 @@
 const util = require('../util');
-const urllib = require('urllib');
+const rpc = require('../rpc');
+
 exports.sendMessage = function (reqBody,mac,callbackFunc){
     reqBody = JSON.stringify(reqBody);
     var args = {
@@ -47,12 +48,5 @@ function post(args,callbackFunc){
         'Authorization': accessToken,
         'Content-Type': contentType,
     }
-
-    var data = {
-        method: 'POST',
-        headers: headers,
-        data: args.reqBody,
-    }
-
-    urllib.request(args.requestURI, data, callbackFunc);
+    rpc.post(args.requestURI, args.reqBody, headers, callbackFunc);
 }

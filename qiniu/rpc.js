@@ -1,13 +1,14 @@
-var urllib = require('urllib');
-var conf = require('./conf');
+const axios = require('axios');
+const conf = require('./conf');
 
+exports.get = get;
 exports.post = post;
 exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
 
 function postMultipart (requestURI, requestForm, callbackFunc) {
-    return post(requestURI, requestForm, requestForm.headers(), callbackFunc);
+    return post(requestURI, requestForm, requestForm.getHeaders(), callbackFunc);
 }
 
 function postWithForm (requestURI, requestForm, token, callbackFunc) {
@@ -30,50 +31,56 @@ function postWithoutForm (requestURI, token, callbackFunc) {
     return post(requestURI, null, headers, callbackFunc);
 }
 
+function get (requestURI, callbackFunc) {
+    return axios.get(requestURI).then((res) => {
+        res.statusCode = res.status;
+        callbackFunc(null, res.data, res);
+    }).catch((err) => {
+        let respBody = null;
+        if (err.response) {
+            err.response.statusCode = err.response.status;
+            respBody = err.response.data;
+        }
+        callbackFunc(err, respBody, err.response);
+    });
+}
+
 function post (requestURI, requestForm, headers, callbackFunc) {
-    // var start = parseInt(Date.now() / 1000);
     headers = headers || {};
     headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
     headers.Connection = 'keep-alive';
 
-    var data = {
+    const data = {
+        url: requestURI,
         headers: headers,
         method: 'POST',
-        dataType: 'json',
+        responseType: 'json',
         timeout: conf.RPC_TIMEOUT,
-        gzip: true
-    //  timing: true,
+        decompress: false
     };
 
     if (conf.RPC_HTTP_AGENT) {
-        data.agent = conf.RPC_HTTP_AGENT;
+        data.httpAgent = conf.RPC_HTTP_AGENT;
     }
 
     if (conf.RPC_HTTPS_AGENT) {
         data.httpsAgent = conf.RPC_HTTPS_AGENT;
     }
 
-    if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
-        data.content = requestForm;
-    } else if (requestForm) {
-        data.stream = requestForm;
+    if (requestForm) {
+        data.data = requestForm;
     } else {
         data.headers['Content-Length'] = 0;
     }
-
-    var req = urllib.request(requestURI, data, function (respErr, respBody,
-        respInfo) {
-    // var end = parseInt(Date.now() / 1000);
-    // console.log((end - start) + " seconds");
-    // console.log("queuing:\t" + respInfo.timing.queuing);
-    // console.log("dnslookup:\t" + respInfo.timing.dnslookup);
-    // console.log("connected:\t" + respInfo.timing.connected);
-    // console.log("requestSent:\t" + respInfo.timing.requestSent);
-    // console.log("waiting:\t" + respInfo.timing.waiting);
-    // console.log("contentDownload:\t" + respInfo.timing.contentDownload);
-
-        callbackFunc(respErr, respBody, respInfo);
+    return axios.request(data).then((res) => {
+        res.statusCode = res.status;
+        callbackFunc(null, res.data, res);
+    }).catch((err) => {
+        let respBody = null;
+        if (err.response) {
+            err.response.statusCode = err.response.status;
+            respBody = err.response.data;
+        }
+        callbackFunc(err, respBody, err.response);
     });
-
-    return req;
 }
