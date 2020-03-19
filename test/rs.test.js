@@ -2,7 +2,6 @@ const should = require('should');
 const assert = require('assert');
 const qiniu = require('../index.js');
 const proc = require('process');
-const urllib = require('urllib');
 const console = require('console');
 
 // eslint-disable-next-line no-undef
@@ -47,7 +46,7 @@ describe('test start bucket manager', function () {
         it('test privateDownloadUrl', function (done) {
             var key = 'test_file';
             var url = bucketManager.privateDownloadUrl('http://' + domain, key, 20);
-            urllib.request(url, function (err, respBody, respInfo) {
+            qiniu.rpc.get(url, function (err, respBody, respInfo) {
                 console.log(respBody.toString(), respInfo);
                 should.not.exist(err);
                 should.equal(respInfo.status, 200);
@@ -248,7 +247,7 @@ describe('test start bucket manager', function () {
                 respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 respBody.should.containEql(srcBucket);
                 done();
             });
@@ -265,7 +264,7 @@ describe('test start bucket manager', function () {
                 respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 done();
             });
         });
@@ -280,7 +279,7 @@ describe('test start bucket manager', function () {
             }, function (err, respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 respBody.should.have.keys('items');
                 respBody.items.forEach(function (item) {
                     item.should.have.keys('key', 'hash');
@@ -300,8 +299,9 @@ describe('test start bucket manager', function () {
             }, function (err, respBody, respInfo) {
                 // the irregular data return from Server that Cannot be converted by urllib to JSON Object
                 // so err !=null and you can judge respBody==null or err.res.statusCode==200
+                should.not.exist(err);
                 console.log(respBody + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 done();
             });
         });
@@ -322,20 +322,7 @@ describe('test start bucket manager', function () {
                     respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
-                    done();
-                });
-            });
-        });
-
-        // delete
-        describe('test deleteLifeRule', function () {
-            it('test deleteLifeRule', function (done) {
-                bucketManager.deleteBucketLifecycleRule(bucket, 'hello', function (err,
-                    respBody, respInfo) {
-                    should.not.exist(err);
-                    console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -354,7 +341,7 @@ describe('test start bucket manager', function () {
                     respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -367,7 +354,20 @@ describe('test start bucket manager', function () {
                     respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
+                    done();
+                });
+            });
+        });
+
+        // delete
+        describe('test deleteLifeRule', function () {
+            it('test deleteLifeRule', function (done) {
+                bucketManager.deleteBucketLifecycleRule(bucket, 'hello', function (err,
+                    respBody, respInfo) {
+                    should.not.exist(err);
+                    console.log(JSON.stringify(respBody) + '\n');
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -379,14 +379,14 @@ describe('test start bucket manager', function () {
         describe('test addEvents', function () {
             it('test addEvents', function (done) {
                 var options = {
-                    name: 'event_testt',
+                    name: 'event_test',
                     event: 'mkfile',
                     callbackURL: 'http://node.ijemy.com/qncback'
                 };
                 bucketManager.putBucketEvent(bucket, options, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -395,14 +395,14 @@ describe('test start bucket manager', function () {
         describe('test updateEvents', function () {
             it('test updateEvents', function (done) {
                 var options = {
-                    name: 'event_testt',
+                    name: 'event_test',
                     event: 'copy',
                     callbackURL: 'http://node.ijemy.com/qncback'
                 };
                 bucketManager.updateBucketEvent(bucket, options, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -413,7 +413,7 @@ describe('test start bucket manager', function () {
                 bucketManager.getBucketEvent(bucket, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -424,7 +424,7 @@ describe('test start bucket manager', function () {
                 bucketManager.deleteBucketEvent(bucket, 'event_test', function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -443,7 +443,7 @@ describe('test start bucket manager', function () {
                 bucketManager.putReferAntiLeech(bucket, options, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -472,7 +472,7 @@ describe('test start bucket manager', function () {
                 bucketManager.putCorsRules(bucket, body, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -483,7 +483,7 @@ describe('test start bucket manager', function () {
                 bucketManager.getCorsRules(bucket, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -500,7 +500,7 @@ describe('test start bucket manager', function () {
     //             bucketManager.getBucketSourceConfig(body, function(err, respBody, respInfo) {
     //                 should.not.exist(err);
     //                 console.log(JSON.stringify(respBody) + "\n");
-    //                 console.log(JSON.stringify(respInfo));
+    //                 console.log(respInfo);
     //                 done();
     //             });
     //         });
@@ -514,7 +514,7 @@ describe('test start bucket manager', function () {
             bucketManager.putBucketAccessStyleMode(bucket, mode, function (err, respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 done();
             });
         });
@@ -543,7 +543,7 @@ describe('test start bucket manager', function () {
             bucketManager.putBucketMaxAge(bucket, options, function (err, respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 done();
             });
         });
@@ -558,7 +558,7 @@ describe('test start bucket manager', function () {
             bucketManager.putBucketAccessMode(bucket, options, function (err, respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 done();
             });
         });
@@ -575,7 +575,7 @@ describe('test start bucket manager', function () {
                 bucketManager.putBucketQuota(bucket, options, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -587,7 +587,7 @@ describe('test start bucket manager', function () {
                 bucketManager.putBucketQuota(bucket, options, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -597,7 +597,7 @@ describe('test start bucket manager', function () {
                 bucketManager.getBucketQuota(bucket, function (err, respBody, respInfo) {
                     should.not.exist(err);
                     console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
+                    console.log(respInfo);
                     done();
                 });
             });
@@ -610,7 +610,7 @@ describe('test start bucket manager', function () {
             bucketManager.listBucketDomains(bucket, function (err, respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
+                console.log(respInfo);
                 done();
             });
         });

@@ -1,5 +1,5 @@
-const urllib = require('urllib');
 const util = require('util');
+const rpc = require('./rpc');
 const conf = require('./conf');
 
 // huadong
@@ -62,7 +62,7 @@ exports.Zone_as0 = new conf.Zone([
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
     var apiAddr = util.format('https://uc.qbox.me/v2/query?ak=%s&bucket=%s',
         accessKey, bucket);
-    urllib.request(apiAddr, function (respErr, respData, respInfo) {
+    rpc.get(apiAddr, function (respErr, respData, respInfo) {
         if (respErr) {
             callbackFunc(respErr, null, null);
             return;
@@ -75,7 +75,7 @@ exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
             return;
         }
 
-        var zoneData = JSON.parse(respData);
+        var zoneData = respData || {};
         var srcUpHosts = [];
         var cdnUpHosts = [];
         var zoneExpire = 0;

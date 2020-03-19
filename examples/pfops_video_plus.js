@@ -1,5 +1,4 @@
 var qiniu = require('qiniu');
-var urllib = require('urllib');
 
 qiniu.conf.ACCESS_KEY = 'ak';
 qiniu.conf.SECRET_KEY = 'sk';
@@ -44,13 +43,9 @@ var json = {
 
 var accessToken = qiniu.util.generateAccessTokenV2(mac, url, 'POST', 'application/json', JSON.stringify(json));
 
-urllib.request(url, {
-    method: 'POST',
-    headers: {
-        Authorization: accessToken,
-        'Content-Type': 'application/json'
-    },
-    data: JSON.stringify(json)
+qiniu.rpc.post(url, JSON.stringify(json), {
+    Authorization: accessToken,
+    'Content-Type': 'application/json'
 }, function (err, data, res) {
     if (err) {
         console.log(err);

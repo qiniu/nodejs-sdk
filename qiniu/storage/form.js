@@ -6,7 +6,7 @@ const getCrc32 = require('crc32');
 const path = require('path');
 const mime = require('mime');
 const Readable = require('stream').Readable;
-const formstream = require('formstream');
+const FormData = require('form-data');
 
 exports.FormUploader = FormUploader;
 exports.PutExtra = PutExtra;
@@ -104,17 +104,20 @@ FormUploader.prototype.putWithoutKey = function (uploadToken, body, putExtra,
 };
 
 function createMultipartForm (uploadToken, key, fsStream, putExtra, callbackFunc) {
-    var postForm = formstream();
-    postForm.field('token', uploadToken);
+    var postForm = new FormData();
+    postForm.append('token', uploadToken);
     if (key) {
-        postForm.field('key', key);
+        postForm.append('key', key);
     }
-    postForm.stream('file', fsStream, putExtra.fname, putExtra.mimeType);
+    postForm.append('file', fsStream, {
+        filename: putExtra.fname,
+        contentType: putExtra.mimeType
+    });
 
     // putExtra params
     for (var k in putExtra.params) {
         if (k.startsWith('x:')) {
-            postForm.field(k, putExtra.params[k].toString());
+            postForm.append(k, putExtra.params[k].toString());
         }
     }
     var fileBody = [];
@@ -125,7 +128,7 @@ function createMultipartForm (uploadToken, key, fsStream, putExtra, callbackFunc
     fsStream.on('end', function () {
         fileBody = Buffer.concat(fileBody);
         var bodyCrc32 = parseInt('0x' + getCrc32(fileBody));
-        postForm.field('crc32', bodyCrc32);
+        postForm.append('crc32', bodyCrc32);
     });
     callbackFunc(postForm);
 }
