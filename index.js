@@ -15,6 +15,6 @@ module.exports = {
     room: require('./qiniu/rtc/room.js'),
     Credentials: require('./qiniu/rtc/credentials.js'),
     sms: {
-        message: require('./qiniu/sms/message.js'),
+        message: require('./qiniu/sms/message.js')
     }
 };
