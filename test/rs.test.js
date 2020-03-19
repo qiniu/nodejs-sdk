@@ -2,7 +2,6 @@ const should = require('should');
 const assert = require('assert');
 const qiniu = require('../index.js');
 const proc = require('process');
-const axios = require('axios');
 const console = require('console');
 
 // eslint-disable-next-line no-undef
@@ -47,12 +46,11 @@ describe('test start bucket manager', function () {
         it('test privateDownloadUrl', function (done) {
             var key = 'test_file';
             var url = bucketManager.privateDownloadUrl('http://' + domain, key, 20);
-            axios.get(url).then((res) => {
-                console.log(res.data.toString(), res);
-                should.equal(res.status, 200);
+            qiniu.rpc.get(url, function (err, respBody, respInfo) {
+                console.log(respBody.toString(), respInfo);
+                should.not.exist(err);
+                should.equal(respInfo.status, 200);
                 done();
-            }).catch((err) => {
-                done(err);
             });
         });
     });
