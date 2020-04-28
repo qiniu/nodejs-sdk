@@ -106,7 +106,7 @@ FormUploader.prototype.putWithoutKey = function (uploadToken, body, putExtra,
 function createMultipartForm (uploadToken, key, fsStream, putExtra, callbackFunc) {
     var postForm = formstream();
     postForm.field('token', uploadToken);
-    if (key) {
+    if (key != null) {
         postForm.field('key', key);
     }
     postForm.stream('file', fsStream, putExtra.fname, putExtra.mimeType);
