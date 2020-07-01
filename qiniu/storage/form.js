@@ -122,10 +122,16 @@ function createMultipartForm (uploadToken, key, fsStream, putExtra, callbackFunc
         fileBody.push(data);
     });
 
-    fsStream.on('end', function () {
-        fileBody = Buffer.concat(fileBody);
-        var bodyCrc32 = parseInt('0x' + getCrc32(fileBody));
-        postForm.field('crc32', bodyCrc32);
+    fsStream.on('end', function() {
+        if (putExtra.checkCrc) {
+            if (putExtra.crc32 == null) {
+                fileBody = Buffer.concat(fileBody);
+                var bodyCrc32 = parseInt('0x' + getCrc32(fileBody));
+                postForm.field('crc32', bodyCrc32);
+            } else {
+                postForm.field('crc32', putExtra.crc32);
+            }
+        }
     });
     callbackFunc(postForm);
 }
