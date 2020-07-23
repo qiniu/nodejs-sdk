@@ -5,8 +5,17 @@ node_js:
   - "9"
   - "10"
   - "11"
+
+install:
+  - npm install -g codecov
+  - npm install -g istanbul
+
 before_script:
 - export is_travis=true
+script:
+  - istanbul cover ./node_modules/mocha/bin/_mocha --reporter test -- -R spec
+  - codecov
+
 deploy:
   provider: npm
   email: sdk@qiniu.com
