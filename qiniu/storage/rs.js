@@ -994,6 +994,7 @@ function PutPolicy (options) {
     this.insertOnly = options.insertOnly || null;
 
     this.saveKey = options.saveKey || null;
+    this.forceSaveKey = options.forceSaveKey || null;
     this.endUser = options.endUser || null;
 
     this.returnUrl = options.returnUrl || null;
@@ -1020,8 +1021,8 @@ function PutPolicy (options) {
 
 PutPolicy.prototype.getFlags = function () {
     var flags = {};
-    var attrs = ['scope', 'isPrefixalScope', 'insertOnly', 'saveKey', 'endUser',
-        'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost',
+    var attrs = ['scope', 'isPrefixalScope', 'insertOnly', 'saveKey', 'forceSaveKey',
+        'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost',
         'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps',
         'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit', 'fsizeMin',
         'detectMime', 'mimeLimit', 'deleteAfterDays', 'fileType'
