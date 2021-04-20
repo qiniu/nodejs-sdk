@@ -7,12 +7,14 @@ node_js:
   - "11"
 
 install:
+  - npm install
   - npm install -g codecov
   - npm install -g istanbul
 
 before_script:
-- export is_travis=true
+  - export is_travis=true
 script:
+  - npm test
   - istanbul cover ./node_modules/mocha/bin/_mocha --reporter test -- -R spec
   - codecov
 

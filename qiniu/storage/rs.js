@@ -8,7 +8,7 @@ const util = require('../util');
 exports.BucketManager = BucketManager;
 exports.PutPolicy = PutPolicy;
 
-function BucketManager (mac, config) {
+function BucketManager(mac, config) {
     this.mac = mac || new digest.Mac();
     this.config = config || new conf.Config();
 }
@@ -28,7 +28,7 @@ BucketManager.prototype.stat = function (bucket, key, callbackFunc) {
     });
 };
 
-function statReq (mac, config, bucket, key, callbackFunc) {
+function statReq(mac, config, bucket, key, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var statOp = exports.statOp(bucket, key);
     var requestURI = scheme + config.zone.rsHost + statOp;
@@ -53,7 +53,7 @@ BucketManager.prototype.changeMime = function (bucket, key, newMime,
     });
 };
 
-function changeMimeReq (mac, config, bucket, key, newMime, callbackFunc) {
+function changeMimeReq(mac, config, bucket, key, newMime, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeMimeOp = exports.changeMimeOp(bucket, key, newMime);
     var requestURI = scheme + config.zone.rsHost + changeMimeOp;
@@ -78,7 +78,7 @@ BucketManager.prototype.changeHeaders = function (bucket, key, headers,
     });
 };
 
-function changeHeadersReq (mac, config, bucket, key, headers, callbackFunc) {
+function changeHeadersReq(mac, config, bucket, key, headers, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeHeadersOp = exports.changeHeadersOp(bucket, key, headers);
     var requestURI = scheme + config.zone.rsHost + changeHeadersOp;
@@ -107,7 +107,7 @@ BucketManager.prototype.move = function (srcBucket, srcKey, destBucket, destKey,
     });
 };
 
-function moveReq (mac, config, srcBucket, srcKey, destBucket, destKey,
+function moveReq(mac, config, srcBucket, srcKey, destBucket, destKey,
     options, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var moveOp = exports.moveOp(srcBucket, srcKey, destBucket, destKey, options);
@@ -137,7 +137,7 @@ BucketManager.prototype.copy = function (srcBucket, srcKey, destBucket, destKey,
     });
 };
 
-function copyReq (mac, config, srcBucket, srcKey, destBucket, destKey,
+function copyReq(mac, config, srcBucket, srcKey, destBucket, destKey,
     options, callbackFunc) {
     options = options || {};
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
@@ -162,7 +162,7 @@ BucketManager.prototype.delete = function (bucket, key, callbackFunc) {
     });
 };
 
-function deleteReq (mac, config, bucket, key, callbackFunc) {
+function deleteReq(mac, config, bucket, key, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var deleteOp = exports.deleteOp(bucket, key);
     var requestURI = scheme + config.zone.rsHost + deleteOp;
@@ -187,7 +187,7 @@ BucketManager.prototype.deleteAfterDays = function (bucket, key, days,
     });
 };
 
-function deleteAfterDaysReq (mac, config, bucket, key, days, callbackFunc) {
+function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var deleteAfterDaysOp = exports.deleteAfterDaysOp(bucket, key, days);
     var requestURI = scheme + config.zone.rsHost + deleteAfterDaysOp;
@@ -211,7 +211,7 @@ BucketManager.prototype.fetch = function (resUrl, bucket, key, callbackFunc) {
     });
 };
 
-function fetchReq (mac, config, resUrl, bucket, key, callbackFunc) {
+function fetchReq(mac, config, resUrl, bucket, key, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var encodedEntryURI = util.encodedEntry(bucket, key);
     var encodedResURL = util.urlsafeBase64Encode(resUrl);
@@ -236,7 +236,7 @@ BucketManager.prototype.prefetch = function (bucket, key, callbackFunc) {
     });
 };
 
-function prefetchReq (mac, config, bucket, key, callbackFunc) {
+function prefetchReq(mac, config, bucket, key, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var encodedEntryURI = util.encodedEntry(bucket, key);
     var requestURI = scheme + config.zone.ioHost + '/prefetch/' + encodedEntryURI;
@@ -261,7 +261,7 @@ BucketManager.prototype.changeType = function (bucket, key, newType,
     });
 };
 
-function changeTypeReq (mac, config, bucket, key, newType, callbackFunc) {
+function changeTypeReq(mac, config, bucket, key, newType, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeTypeOp = exports.changeTypeOp(bucket, key, newType);
     var requestURI = scheme + config.zone.rsHost + changeTypeOp;
@@ -318,7 +318,7 @@ BucketManager.prototype.listPrefix = function (bucket, options, callbackFunc) {
     });
 };
 
-function listPrefixReq (mac, config, bucket, options, callbackFunc) {
+function listPrefixReq(mac, config, bucket, options, callbackFunc) {
     options = options || {};
     // 必须参数
     var reqParams = {
@@ -376,7 +376,7 @@ BucketManager.prototype.listPrefixV2 = function (bucket, options, callbackFunc) 
     });
 };
 
-function listPrefixReqV2 (mac, config, bucket, options, callbackFunc) {
+function listPrefixReqV2(mac, config, bucket, options, callbackFunc) {
     options = options || {};
     // 必须参数
     var reqParams = {
@@ -417,7 +417,8 @@ function listPrefixReqV2 (mac, config, bucket, options, callbackFunc) {
 
 // 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
 BucketManager.prototype.batch = function (operations, callbackFunc) {
-    var requestURI = conf.RS_HOST + '/batch';
+    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    var requestURI = scheme + conf.RS_HOST + '/batch';
     var reqParams = {
         op: operations
     };
@@ -540,7 +541,7 @@ BucketManager.prototype.updateObjectStatus = function (bucket, key, status,
     });
 };
 
-function updateStatusReq (mac, config, bucket, key, status, callbackFunc) {
+function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeStatusOp = exports.changeStatusOp(bucket, key, status);
     var requestURI = scheme + config.zone.rsHost + changeStatusOp;
@@ -582,7 +583,7 @@ BucketManager.prototype.putBucketLifecycleRule = function (bucket, options,
     PutBucketLifecycleRule(this.mac, this.config, bucket, options, callbackFunc);
 };
 
-function PutBucketLifecycleRule (mac, config, bucket, options, callbackFunc) {
+function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
     options = options || {};
     var reqParams = {
         bucket: bucket,
@@ -691,7 +692,7 @@ BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc
     PutBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
 };
 
-function PutBucketEvent (mac, config, options, bucket, callbackFunc) {
+function PutBucketEvent(mac, config, options, bucket, callbackFunc) {
     options = options || {};
     var reqParams = { // 必填参数
         bucket: bucket,
@@ -736,7 +737,7 @@ BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackF
     UpdateBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
 };
 
-function UpdateBucketEvent (mac, config, options, bucket, callbackFunc) {
+function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
     options = options || {};
     var reqParams = {
         bucket: bucket,
@@ -806,7 +807,7 @@ BucketManager.prototype.putReferAntiLeech = function (bucket, options, callbackF
     PutReferAntiLeech(this.mac, this.config, bucket, options, callbackFunc);
 };
 
-function PutReferAntiLeech (mac, config, bucket, options, callbackFunc) {
+function PutReferAntiLeech(mac, config, bucket, options, callbackFunc) {
     options = options || {};
     var reqParams = {
         bucket: bucket
@@ -848,7 +849,7 @@ BucketManager.prototype.putCorsRules = function (bucket, body, callbackFunc) {
     PutCorsRules(this.mac, this.config, bucket, body, callbackFunc);
 };
 
-function PutCorsRules (mac, config, bucket, body, callbackFunc) {
+function PutCorsRules(mac, config, bucket, body, callbackFunc) {
     var reqBody = JSON.stringify(body);
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/corsRules/set/' + bucket;
@@ -861,7 +862,7 @@ BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
     GetCorsRules(this.mac, this.config, bucket, callbackFunc);
 };
 
-function GetCorsRules (mac, config, bucket, callbackFunc) {
+function GetCorsRules(mac, config, bucket, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/corsRules/get/' + bucket;
     var digest = util.generateAccessToken(mac, requestURI, null);
@@ -976,14 +977,14 @@ BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
 //解冻归档存储文件
 BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.RS_QBOX + "/restoreAr/"+util.urlsafeBase64Encode(entry)+"/freezeAfterDays/"+freezeAfterDays;
+    var requestURI = scheme + conf.RS_HOST + "/restoreAr/" + util.urlsafeBase64Encode(entry) + "/freezeAfterDays/" + freezeAfterDays;
     var digest = util.generateAccessToken(this.mac, requestURI, null);
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
 // 上传策略
 // @link https://developer.qiniu.com/kodo/manual/1206/put-policy
-function PutPolicy (options) {
+function PutPolicy(options) {
     if (typeof options !== 'object') {
         throw new Error('invalid putpolicy options');
     }
