@@ -305,7 +305,7 @@ export declare namespace resume_up {
          * @param resumeRecordFile
          * @param progressCallback
          */
-        constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, progressCallback?: (data: any) => void);
+        constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, progressCallback?: (uploadBytes: number, totalBytes: number) => void);
     }
 }
 
