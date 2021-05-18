@@ -1,5 +1,8 @@
 ## CHANGE LOG
 
+## 7.3.3
+修复上传策略中forceSaveKey指定无效
+
 ## 7.3.2
 修复crc32指定值无效
 修复checkCrc指定无效
