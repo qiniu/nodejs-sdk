@@ -50,6 +50,7 @@
   ],
   "dependencies": {
     "agentkeepalive": "^4.0.2",
+    "before": "^0.0.1",
     "block-stream2": "^2.0.0",
     "crc32": "^0.2.2",
     "destroy": "^1.0.4",
