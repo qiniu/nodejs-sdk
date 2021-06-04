@@ -35,7 +35,6 @@ function PutExtra (fname, params, mimeType, resumeRecordFile, progressCallback, 
 
 ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
     rsStreamLen, putExtra, callbackFunc) {
-    console.log(putExtra)
     putExtra = putExtra || new PutExtra();
     if (!putExtra.mimeType) {
         putExtra.mimeType = 'application/octet-stream';
