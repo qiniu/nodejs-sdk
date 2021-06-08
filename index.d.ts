@@ -304,8 +304,11 @@ export declare namespace resume_up {
          * @param mimeType 指定文件的mimeType
          * @param resumeRecordFile
          * @param progressCallback
+         * @param version 分片上传版本 目前支持v1/v2版本 默认v1
+         * @param partSize 分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
          */
-        constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, progressCallback?: (data: any) => void);
+        constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, version?:string, partSize?:bigint,
+                    progressCallback?: (data: any) => void);
     }
 }
 
