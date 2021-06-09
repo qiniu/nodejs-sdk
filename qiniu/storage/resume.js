@@ -138,7 +138,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
                 }
 
             } else {
-                throw  new Error("分片上传版本号错误")
+                throw  new Error("part upload version number error")
             }
         } catch (e) {
             //log(e)
@@ -170,7 +170,6 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
                         }
                         if (putExtra.resumeRecordFile) {
                             var contents = JSON.stringify(finishedBlkPutRets);
-                            // console.log('write resume record ' + putExtra.resumeRecordFile);
                             fs.writeFileSync(putExtra.resumeRecordFile, contents, {
                                 encoding: 'utf-8'
                             });
@@ -204,12 +203,11 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
                 totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
         }
     } else {
-        throw  new Error("分片上传版本号错误")
+        throw  new Error("part upload version number error")
     }
 }
 
 function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
-    // console.log("mkblk");
     var requestURI = upDomain + '/mkblk/' + blkData.length;
     var auth = 'UpToken ' + uploadToken;
     var headers = {
@@ -221,7 +219,6 @@ function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
 
 function mkfileReq (upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     callbackFunc) {
-    // console.log("mkfile");
     var requestURI = upDomain + '/mkfile/' + fileSize;
     if (key) {
         requestURI += '/key/' + util.urlsafeBase64Encode(key);

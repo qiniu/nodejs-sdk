@@ -64,15 +64,6 @@ function post (requestURI, requestForm, headers, callbackFunc) {
 
     var req = urllib.request(requestURI, data, function (respErr, respBody,
         respInfo) {
-    // var end = parseInt(Date.now() / 1000);
-    // console.log((end - start) + " seconds");
-    // console.log("queuing:\t" + respInfo.timing.queuing);
-    // console.log("dnslookup:\t" + respInfo.timing.dnslookup);
-    // console.log("connected:\t" + respInfo.timing.connected);
-    // console.log("requestSent:\t" + respInfo.timing.requestSent);
-    // console.log("waiting:\t" + respInfo.timing.waiting);
-    // console.log("contentDownload:\t" + respInfo.timing.contentDownload);
-
         callbackFunc(respErr, respBody, respInfo);
     });
 

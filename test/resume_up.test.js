@@ -211,21 +211,17 @@ describe('test resume up', function () {
                 });
         });
 
-        it('test resume up#putStream resume_v2_2m', function (done) {
+        it('test resume up#putStream resume_v2', function (done) {
             config.zone = null;
 
-            var key = 'storage_putStream_resume_test_v2_2m' + Math.random(1000);
+            var key = 'storage_putStream_resume_test_v2' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
-            var blkCnt = 2;
-            for (var i = 0; i < blkCnt; i++) {
-                stream.push(crypto.randomBytes(blkSize));
-            }
-            stream.push(null);
+            var blkCnt = [2, 4, 6, 10];
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
             fs.writeFileSync(tmpfile, '');
             putExtra.resumeRecordFile = tmpfile;
-            putExtra.partSize = 6 * 1024 * 1024
+            putExtra.partSize = 4 * 1024 * 1024
             putExtra.version = 'v2'
             putExtra.progressCallback = function (len, total) {
                 if (len === total) {
@@ -236,124 +232,22 @@ describe('test resume up', function () {
                     });
                 }
             };
-            resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
-                function (
-                    respErr,
-                    respBody, respInfo) {
-                    console.log(respBody, respInfo);
-                    should.not.exist(respErr);
-                    respBody.should.have.keys('key', 'hash');
-                    keysToDelete.push(respBody.key);
-                });
-        });
-
-        it('test resume up#putStream resume_v2_4m', function (done) {
-            config.zone = null;
-
-            var key = 'storage_putStream_resume_test_v2_4m' + Math.random(1000);
-            var stream = new Readable();
-            var blkSize = 1024 * 1024;
-            var blkCnt = 4;
-            for (var i = 0; i < blkCnt; i++) {
-                stream.push(crypto.randomBytes(blkSize));
-            }
-            stream.push(null);
-            var tmpfile = path.join(os.tmpdir(), '/resume_file');
-            fs.writeFileSync(tmpfile, '');
-            putExtra.resumeRecordFile = tmpfile;
-            putExtra.partSize = 6 * 1024 * 1024
-            putExtra.version = 'v2'
-            putExtra.progressCallback = function (len, total) {
-                if (len === total) {
-                    var content = fs.readFileSync(tmpfile);
-                    var data = JSON.parse(content);
-                    data.etags.forEach(function (item) {
-                        item.should.have.keys('etag', 'partNumber');
-                    });
+            for (var i = 0; i < blkCnt.length; i++) {
+                for (var j = 0; j < blkCnt[i]; j++) {
+                    stream.push(crypto.randomBytes(blkSize));
                 }
-            };
-            resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
-                function (
-                    respErr,
-                    respBody, respInfo) {
-                    console.log(respBody, respInfo);
-                    should.not.exist(respErr);
-                    respBody.should.have.keys('key', 'hash');
-                    keysToDelete.push(respBody.key);
-                });
-        });
-
-        it('test resume up#putStream resume_v2_6m', function (done) {
-            config.zone = null;
-
-            var key = 'storage_putStream_resume_test_v2_6m' + Math.random(1000);
-            var stream = new Readable();
-            var blkSize = 1024 * 1024;
-            var blkCnt = 6;
-            for (var i = 0; i < blkCnt; i++) {
-                stream.push(crypto.randomBytes(blkSize));
-            }
-            stream.push(null);
-            var tmpfile = path.join(os.tmpdir(), '/resume_file');
-            fs.writeFileSync(tmpfile, '');
-            putExtra.resumeRecordFile = tmpfile;
-            putExtra.partSize = 6 * 1024 * 1024
-            putExtra.version = 'v2'
-            putExtra.progressCallback = function (len, total) {
-                if (len === total) {
-                    var content = fs.readFileSync(tmpfile);
-                    var data = JSON.parse(content);
-                    data.etags.forEach(function (item) {
-                        item.should.have.keys('etag', 'partNumber');
+                stream.push(null);
+                resumeUploader.putStream(uploadToken, key, stream, blkCnt[i] * blkSize, putExtra,
+                    function (
+                        respErr,
+                        respBody, respInfo) {
+                        console.log(respBody, respInfo);
+                        should.not.exist(respErr);
+                        respBody.should.have.keys('key', 'hash');
+                        keysToDelete.push(respBody.key);
                     });
-                }
-            };
-            resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
-                function (
-                    respErr,
-                    respBody, respInfo) {
-                    console.log(respBody, respInfo);
-                    should.not.exist(respErr);
-                    respBody.should.have.keys('key', 'hash');
-                    keysToDelete.push(respBody.key);
-                });
-        });
-
-        it('test resume up#putStream resume_v2_10m', function (done) {
-            config.zone = null;
-
-            var key = 'storage_putStream_resume_test_v2_10m' + Math.random(1000);
-            var stream = new Readable();
-            var blkSize = 1024 * 1024;
-            var blkCnt = 10;
-            for (var i = 0; i < blkCnt; i++) {
-                stream.push(crypto.randomBytes(blkSize));
             }
-            stream.push(null);
-            var tmpfile = path.join(os.tmpdir(), '/resume_file');
-            fs.writeFileSync(tmpfile, '');
-            putExtra.resumeRecordFile = tmpfile;
-            putExtra.partSize = 6 * 1024 * 1024
-            putExtra.version = 'v2'
-            putExtra.progressCallback = function (len, total) {
-                if (len === total) {
-                    var content = fs.readFileSync(tmpfile);
-                    var data = JSON.parse(content);
-                    data.etags.forEach(function (item) {
-                        item.should.have.keys('etag', 'partNumber');
-                    });
-                }
-            };
-            resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
-                function (
-                    respErr,
-                    respBody, respInfo) {
-                    console.log(respBody, respInfo);
-                    should.not.exist(respErr);
-                    respBody.should.have.keys('key', 'hash');
-                    keysToDelete.push(respBody.key);
-                });
-        });
 
+        });
     });
 });
