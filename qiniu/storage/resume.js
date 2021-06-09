@@ -111,6 +111,11 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
         try {
             var resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
             var blkputRets = JSON.parse(resumeRecords);
+        } catch (e) {
+            console.log(e)
+            var blkputRets = null
+        }
+        if (blkputRets !== null) {
             if (putExtra.version === 'v1') {
                 for (var index = 0; index < blkputRets.length; index++) {
                     // check ctx expired or not
@@ -136,12 +141,9 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
                     finishedEtags.expiredAt = blkputRets.expiredAt;
                     finishedBlock = finishedEtags.etags.length;
                 }
-
             } else {
                 throw  new Error("part upload version number error")
             }
-        } catch (e) {
-            //log(e)
         }
     }
 
