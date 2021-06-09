@@ -217,7 +217,7 @@ describe('test resume up', function () {
             var key = 'storage_putStream_resume_test_v2' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
-            var blkCnt = [2, 4, 6, 10];
+            var blkCnt = [2,4,6,10];
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
             fs.writeFileSync(tmpfile, '');
             putExtra.resumeRecordFile = tmpfile;
