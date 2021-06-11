@@ -134,7 +134,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
             } else if (putExtra.version === 'v2') {
                 //check etag expired or not
                 var expiredAt = blkputRets.expiredAt;
-                var timeNow = Date.parse(new Date()) / 1000
+                var timeNow = new Date() / 1000
                 if (expiredAt > timeNow && blkputRets.uploadId !== '') {
                     finishedEtags.etags = blkputRets.etags;
                     finishedEtags.uploadId = blkputRets.uploadId;
