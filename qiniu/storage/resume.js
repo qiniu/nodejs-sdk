@@ -344,11 +344,14 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
         Authorization: 'UpToken ' + uploadToken,
         'Content-Type': 'application/json'
     };
+    var sortedParts = finishedEtags.etags.sort(function (a, b) {
+        return a.partNumber - b.partNumber;
+    });
     var body = {
         'fname': putExtra.fname,
         'mimeType': putExtra.mimeType,
         'customVars': customVars || {},
-        'parts': util.sortObjArr(finishedEtags.etags)
+        'parts': sortedParts
     };
     var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
     var requestBody = JSON.stringify(body);

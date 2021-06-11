@@ -285,17 +285,37 @@ export declare namespace resume_up {
         /**
          * @default ''
          */
-        fname: string;
+        fname?: string;
 
         /**
          * @default {}
          */
-        params: any;
+        params?: any;
 
         /**
          * @default null
          */
         mimeType?: string;
+
+        /**
+         * @default null
+         */
+        resumeRecordFile?: string
+
+        /**
+         * @default null
+         */
+        progressCallback?: any
+
+        /**
+         * @default v1
+         */
+        version?: string
+
+        /**
+         * @default 4 * 1024 * 1024
+         */
+        partSize?: number
 
         /**
          * 上传可选参数
@@ -307,7 +327,7 @@ export declare namespace resume_up {
          * @param version 分片上传版本 目前支持v1/v2版本 默认v1
          * @param partSize 分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
          */
-        constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, version?:string, partSize?:bigint,
+        constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, version?:string, partSize?:number,
                     progressCallback?: (data: any) => void);
     }
 }
