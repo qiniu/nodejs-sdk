@@ -11,7 +11,7 @@ const BlockStream = require('block-stream2');
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
 
-function ResumeUploader (config) {
+function ResumeUploader(config) {
     this.config = config || new conf.Config();
 }
 
@@ -23,14 +23,15 @@ function ResumeUploader (config) {
 // @param progressCallback(uploadBytes, totalBytes) 上传进度回调
 // @param partSize                    分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
 // @param version                     分片上传版本 目前支持v1/v2版本 默认v1
-function PutExtra (fname, params, mimeType, resumeRecordFile, progressCallback, partSize, version) {
+function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback, partSize,
+                   version) {
     this.fname = fname || '';
     this.params = params || {};
     this.mimeType = mimeType || null;
     this.resumeRecordFile = resumeRecordFile || null;
     this.progressCallback = progressCallback || null;
-    this.partSize = partSize || conf.BLOCK_SIZE
-    this.version = version || 'v1'
+    this.partSize = partSize || conf.BLOCK_SIZE;
+    this.version = version || 'v1';
 }
 
 ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
@@ -63,7 +64,7 @@ ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
     });
 };
 
-function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, callbackFunc) {
+function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callbackFunc) {
     // set up hosts order
     var upHosts = [];
 
@@ -100,6 +101,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
     var finishedCtxList = [];
     var finishedBlkPutRets = [];
     var isSent = false;
+    var blkputRets = null;
     var totalBlockNum = Math.ceil(rsStreamLen / putExtra.partSize);
     var finishedEtags = {
         etags: [],
@@ -110,10 +112,9 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
     if (putExtra.resumeRecordFile) {
         try {
             var resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
-            var blkputRets = JSON.parse(resumeRecords);
+            blkputRets = JSON.parse(resumeRecords);
         } catch (e) {
-            console.log(e)
-            var blkputRets = null
+            console.log(e);
         }
         if (blkputRets !== null) {
             if (putExtra.version === 'v1') {
@@ -132,9 +133,9 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
                     finishedBlkPutRets.push(blkputRet);
                 }
             } else if (putExtra.version === 'v2') {
-                //check etag expired or not
+                // check etag expired or not
                 var expiredAt = blkputRets.expiredAt;
-                var timeNow = new Date() / 1000
+                var timeNow = new Date() / 1000;
                 if (expiredAt > timeNow && blkputRets.uploadId !== '') {
                     finishedEtags.etags = blkputRets.etags;
                     finishedEtags.uploadId = blkputRets.uploadId;
@@ -142,7 +143,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
                     finishedBlock = finishedEtags.etags.length;
                 }
             } else {
-                throw  new Error("part upload version number error")
+                throw new Error('part upload version number error');
             }
         }
     }
@@ -159,7 +160,7 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
                                                                  respBody,
                                                                  respInfo) {
                     var bodyCrc32 = parseInt('0x' + getCrc32(chunk));
-                    if (respInfo.statusCode != 200 || respBody.crc32 != bodyCrc32) {
+                    if (respInfo.statusCode !== 200 || respBody.crc32 !== bodyCrc32) {
                         callbackFunc(respErr, respBody, respInfo);
                         destroy(rsStream);
                     } else {
@@ -193,23 +194,23 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
             destroy(rsStream);
         });
 
-    } else if (putExtra.version === 'v2'){
+    } else if (putExtra.version === 'v2') {
         var encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
         if (finishedEtags.uploadId) {
-            //if it has resumeRecordFile
-            resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags, finishedBlock,
-                totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
+            // if it has resumeRecordFile
+            resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+                finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
         } else {
-            //init an new uploadId for next step
-            initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags, finishedBlock,
-                totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
+            // init an new uploadId for next step
+            initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+                finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
         }
     } else {
-        throw  new Error("part upload version number error")
+        throw new Error('part upload version number error');
     }
 }
 
-function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
+function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
     var requestURI = upDomain + '/mkblk/' + blkData.length;
     var auth = 'UpToken ' + uploadToken;
     var headers = {
@@ -219,7 +220,7 @@ function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
     rpc.post(requestURI, blkData, headers, callbackFunc);
 }
 
-function mkfileReq (upDomain, uploadToken, fileSize, ctxList, key, putExtra,
+function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     callbackFunc) {
     var requestURI = upDomain + '/mkfile/' + fileSize;
     if (key) {
@@ -247,8 +248,7 @@ function mkfileReq (upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     };
     var postBody = ctxList.join(',');
     rpc.post(requestURI, postBody, headers, function (err, ret, info) {
-        if (info.statusCode == 200 || info.statusCode == 701 ||
-      info.statusCode == 401) {
+        if (info.statusCode === 200 || info.statusCode === 701 || info.statusCode === 401) {
             if (putExtra.resumeRecordFile) {
                 fs.unlinkSync(putExtra.resumeRecordFile);
             }
@@ -257,26 +257,26 @@ function mkfileReq (upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     });
 }
 
-function initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags, finishedBlock,
-                 totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
-    var requestUrl = upDomain + "/buckets/" + bucket + "/objects/" + encodedObjectName + "/uploads";
+function initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
+                 finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
+    var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads';
     var headers = {
         Authorization: 'UpToken ' + uploadToken,
         'Content-Type': 'application/json'
     };
     rpc.post(requestUrl, '', headers, function (err, ret, info) {
-        if (info.statusCode != 200) {
-            callbackFunc(err, ret ,info);
+        if (info.statusCode !== 200) {
+            callbackFunc(err, ret, info);
         }
         finishedEtags.expiredAt = ret.expireAt;
         finishedEtags.uploadId = ret.uploadId;
-        resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags, finishedBlock,
-            totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
-})
+        resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+            finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
+    });
 }
 
-function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags, finishedBlock,
-                     totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
+function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
+                       finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
     blkStream.on('data', function (chunk) {
         var partNumber = 0;
         readLen += chunk.length;
@@ -287,7 +287,7 @@ function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStre
             var bodyMd5 = util.getMd5(chunk);
             uploadPart(bucket, upDomain, uploadToken, encodedObjectName, chunk, finishedEtags.uploadId, partNumber,
                 function (respErr, respBody, respInfo) {
-                    if (respInfo.statusCode != 200 || respBody.md5 != bodyMd5) {
+                    if (respInfo.statusCode !== 200 || respBody.md5 !== bodyMd5) {
                         callbackFunc(respErr, respBody, respInfo);
                         destroy(rsStream);
                     } else {
@@ -334,7 +334,7 @@ function uploadPart(bucket, upDomain, uploadToken, encodedObjectName, chunk, upl
         'Content-MD5': util.getMd5(chunk)
     };
     var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + uploadId;
-    requestUrl +=  '/' + partNumber.toString();
+    requestUrl += '/' + partNumber.toString();
     rpc.put(requestUrl, chunk, headers, callbackFunc);
 }
 
@@ -342,7 +342,7 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
                      customVars, putExtra, callbackFunc) {
     var headers = {
         Authorization: 'UpToken ' + uploadToken,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
     };
     var body = {
         'fname': putExtra.fname,
@@ -351,7 +351,7 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
         'parts': util.sortObjArr(finishedEtags.etags)
     };
     var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
-    requestBody = JSON.stringify(body);
+    var requestBody = JSON.stringify(body);
     rpc.post(requestUrl, requestBody, headers, function (err, ret, info) {
         if (info.statusCode !== '200') {
             if (putExtra.resumeRecordFile) {
@@ -359,7 +359,7 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
             }
         }
         callbackFunc(err, ret, info);
-    })
+    });
 }
 
 

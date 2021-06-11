@@ -7,11 +7,11 @@ exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
 
-function postMultipart (requestURI, requestForm, callbackFunc) {
+function postMultipart(requestURI, requestForm, callbackFunc) {
     return post(requestURI, requestForm, requestForm.headers(), callbackFunc);
 }
 
-function postWithForm (requestURI, requestForm, token, callbackFunc) {
+function postWithForm(requestURI, requestForm, token, callbackFunc) {
     var headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
     };
@@ -21,7 +21,7 @@ function postWithForm (requestURI, requestForm, token, callbackFunc) {
     return post(requestURI, requestForm, headers, callbackFunc);
 }
 
-function postWithoutForm (requestURI, token, callbackFunc) {
+function postWithoutForm(requestURI, token, callbackFunc) {
     var headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
     };
@@ -31,7 +31,7 @@ function postWithoutForm (requestURI, token, callbackFunc) {
     return post(requestURI, null, headers, callbackFunc);
 }
 
-function post (requestURI, requestForm, headers, callbackFunc) {
+function post(requestURI, requestForm, headers, callbackFunc) {
     // var start = parseInt(Date.now() / 1000);
     headers = headers || {};
     headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
@@ -70,7 +70,7 @@ function post (requestURI, requestForm, headers, callbackFunc) {
     return req;
 }
 
-function put (requestURL, requestForm, headers, callbackFunc) {
+function put(requestURL, requestForm, headers, callbackFunc) {
     // var start = parseInt(Date.now() / 1000);
     headers = headers || {};
     headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
@@ -103,7 +103,7 @@ function put (requestURL, requestForm, headers, callbackFunc) {
 
     var req = urllib.request(requestURL, data, function (err, ret, info) {
         callbackFunc(err, ret, info);
-    })
+    });
 
     return req;
 }
