@@ -114,7 +114,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callb
             var resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
             blkputRets = JSON.parse(resumeRecords);
         } catch (e) {
-            console.log(e);
+            console.error(e);
         }
         if (blkputRets !== null) {
             if (putExtra.version === 'v1') {
