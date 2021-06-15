@@ -305,7 +305,7 @@ export declare namespace resume_up {
         /**
          * @default null
          */
-        progressCallback?: any
+        progressCallback?: (data: any) => void
 
         /**
          * @default v1
