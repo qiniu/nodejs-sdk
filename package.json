@@ -3,6 +3,7 @@
   "version": "7.3.3",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
+  "types": "index.d.ts",
   "directories": {
     "test": "test"
   },
