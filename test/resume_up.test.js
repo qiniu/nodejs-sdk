@@ -133,6 +133,7 @@ describe('test resume up', function () {
     describe('test resume up#putStream', function () {
         // eslint-disable-next-line no-undef
         it('test resume up#putStream', function (done) {
+            this.timeout(5000);
             var key = 'storage_putStream_test' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
@@ -151,9 +152,11 @@ describe('test resume up', function () {
                     keysToDelete.push(respBody.key);
                     done();
                 });
+            setTimeout(callback, 3000);
         });
 
         it('test resume up#putStream_v2', function (done) {
+            this.timeout(5000);
             var key = 'storage_putStream_test_v2' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
@@ -174,11 +177,12 @@ describe('test resume up', function () {
                     keysToDelete.push(respBody.key);
                     done();
                 });
+            setTimeout(callback, 3000);
         });
 
         it('test resume up#putStream resume', function (done) {
+            this.timeout(5000);
             config.zone = null;
-
             var key = 'storage_putStream_resume_test' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
@@ -209,13 +213,12 @@ describe('test resume up', function () {
                     keysToDelete.push(respBody.key);
                     done();
                 });
+            setTimeout(callback, 3000);
         });
 
         it('test resume up#putStream resume_v2', function (done) {
+            this.timeout(5000);
             config.zone = null;
-
-            var key = 'storage_putStream_resume_test_v2' + Math.random(1000);
-            var stream = new Readable();
             var blkSize = 1024 * 1024;
             var blkCnt = [2,4,6,10];
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
@@ -232,12 +235,14 @@ describe('test resume up', function () {
                     });
                 }
             };
-            for (var i = 0; i < blkCnt.length; i++) {
-                for (var j = 0; j < blkCnt[i]; j++) {
+            blkCnt.forEach(function (i) {
+                var stream = new Readable();
+                for (var j = 0; j < i; j++) {
                     stream.push(crypto.randomBytes(blkSize));
                 }
                 stream.push(null);
-                resumeUploader.putStream(uploadToken, key, stream, blkCnt[i] * blkSize, putExtra,
+                var key = 'storage_putStream_resume_test_v2' + Math.random(1000);
+                resumeUploader.putStream(uploadToken, key, stream, i * blkSize, putExtra,
                     function (
                         respErr,
                         respBody, respInfo) {
@@ -245,9 +250,10 @@ describe('test resume up', function () {
                         should.not.exist(respErr);
                         respBody.should.have.keys('key', 'hash');
                         keysToDelete.push(respBody.key);
+                        done();
                     });
-            }
-
+                setTimeout(callback, 3000);
+            });
         });
     });
 });
