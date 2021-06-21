@@ -133,7 +133,6 @@ describe('test resume up', function () {
     describe('test resume up#putStream', function () {
         // eslint-disable-next-line no-undef
         it('test resume up#putStream', function (done) {
-            this.timeout(5000);
             var key = 'storage_putStream_test' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
@@ -152,11 +151,9 @@ describe('test resume up', function () {
                     keysToDelete.push(respBody.key);
                     done();
                 });
-            setTimeout(callback, 3000);
         });
 
         it('test resume up#putStream_v2', function (done) {
-            this.timeout(5000);
             var key = 'storage_putStream_test_v2' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
@@ -177,11 +174,9 @@ describe('test resume up', function () {
                     keysToDelete.push(respBody.key);
                     done();
                 });
-            setTimeout(callback, 3000);
         });
 
         it('test resume up#putStream resume', function (done) {
-            this.timeout(5000);
             config.zone = null;
             var key = 'storage_putStream_resume_test' + Math.random(1000);
             var stream = new Readable();
@@ -213,11 +208,9 @@ describe('test resume up', function () {
                     keysToDelete.push(respBody.key);
                     done();
                 });
-            setTimeout(callback, 3000);
         });
 
         it('test resume up#putStream resume_v2', function (done) {
-            this.timeout(5000);
             config.zone = null;
             var blkSize = 1024 * 1024;
             var blkCnt = [2,4,6,10];
@@ -252,7 +245,6 @@ describe('test resume up', function () {
                         keysToDelete.push(respBody.key);
                         done();
                     });
-                setTimeout(callback, 3000);
             });
         });
     });
