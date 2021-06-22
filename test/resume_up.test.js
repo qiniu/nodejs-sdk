@@ -73,7 +73,8 @@ describe('test resume up', function () {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
-                    keysToDelete.push(respBody.key);
+                    console.log(respBody.key)
+                    keysToDelete.push("1",respBody.key);
                     done();
                 });
         });
@@ -89,6 +90,7 @@ describe('test resume up', function () {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
+                    console.log("2",respBody.key)
                     keysToDelete.push(respBody.key);
                     done();
                 });
@@ -132,6 +134,7 @@ describe('test resume up', function () {
 
     describe('test resume up#putStream', function () {
         // eslint-disable-next-line no-undef
+        this.timeout(0)
         it('test resume up#putStream', function (done) {
             var key = 'storage_putStream_test' + Math.random(1000);
             var stream = new Readable();
@@ -142,9 +145,7 @@ describe('test resume up', function () {
             }
             stream.push(null);
             resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
-                function (
-                    respErr,
-                    respBody, respInfo) {
+                function (respErr, respBody, respInfo) {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
@@ -175,13 +176,16 @@ describe('test resume up', function () {
                     done();
                 });
         });
+    });
 
+    describe('test resume up#putStream resume', function () {
+        this.timeout(0)
         it('test resume up#putStream resume', function (done) {
             config.zone = null;
             var key = 'storage_putStream_resume_test' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
-            var blkCnt = 5;
+            var blkCnt = 4;
             for (var i = 0; i < blkCnt; i++) {
                 stream.push(crypto.randomBytes(blkSize));
             }
@@ -189,6 +193,7 @@ describe('test resume up', function () {
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
             fs.writeFileSync(tmpfile, '');
             putExtra.resumeRecordFile = tmpfile;
+            putExtra.version = 'v1';
             putExtra.progressCallback = function (len, total) {
                 if (len === total) {
                     var content = fs.readFileSync(tmpfile);
@@ -213,7 +218,7 @@ describe('test resume up', function () {
         it('test resume up#putStream resume_v2', function (done) {
             config.zone = null;
             var blkSize = 1024 * 1024;
-            var blkCnt = [2,4,6,10];
+            var blkCnt = [2,4,4.1,6,10];
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
             fs.writeFileSync(tmpfile, '');
             putExtra.resumeRecordFile = tmpfile;
@@ -233,6 +238,9 @@ describe('test resume up', function () {
                 for (var j = 0; j < i; j++) {
                     stream.push(crypto.randomBytes(blkSize));
                 }
+                if (i ===+i && i !==(i|0)) {
+                    stream.push('0f');
+                }
                 stream.push(null);
                 var key = 'storage_putStream_resume_test_v2' + Math.random(1000);
                 resumeUploader.putStream(uploadToken, key, stream, i * blkSize, putExtra,
@@ -243,9 +251,9 @@ describe('test resume up', function () {
                         should.not.exist(respErr);
                         respBody.should.have.keys('key', 'hash');
                         keysToDelete.push(respBody.key);
-                        done();
                     });
             });
+            done();
         });
-    });
+    })
 });

@@ -45,6 +45,10 @@ ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
         putExtra.fname = key || '?';
     }
 
+    if (!putExtra.version) {
+        putExtra.version = 'v1';
+    }
+
     rsStream.on('error', function (err) {
     // callbackFunc
         callbackFunc(err, null, null);
@@ -168,14 +172,14 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callb
                         var blkputRet = respBody;
                         finishedCtxList.push(blkputRet.ctx);
                         finishedBlkPutRets.push(blkputRet);
-                        if (putExtra.progressCallback) {
-                            putExtra.progressCallback(readLen, rsStreamLen);
-                        }
                         if (putExtra.resumeRecordFile) {
                             var contents = JSON.stringify(finishedBlkPutRets);
                             fs.writeFileSync(putExtra.resumeRecordFile, contents, {
                                 encoding: 'utf-8'
                             });
+                        }
+                        if (putExtra.progressCallback) {
+                            putExtra.progressCallback(readLen, rsStreamLen);
                         }
                         blkStream.resume();
                         if (finishedCtxList.length === totalBlockNum) {
