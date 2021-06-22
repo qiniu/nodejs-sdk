@@ -229,8 +229,8 @@ describe('test resume up', function () {
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
             fs.writeFileSync(tmpfile, '');
             putExtra.resumeRecordFile = tmpfile;
-            putExtra.partSize = 4 * 1024 * 1024
-            putExtra.version = 'v2'
+            putExtra.partSize = 4 * 1024 * 1024;
+            putExtra.version = 'v2';
             putExtra.progressCallback = function (len, total) {
                 if (len === total) {
                     var content = fs.readFileSync(tmpfile);

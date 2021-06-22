@@ -360,7 +360,7 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
     var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
     var requestBody = JSON.stringify(body);
     rpc.post(requestUrl, requestBody, headers, function (err, ret, info) {
-        if (info.statusCode !== '200') {
+        if (info.statusCode !== 200) {
             if (putExtra.resumeRecordFile) {
                 fs.unlinkSync(putExtra.resumeRecordFile);
             }
