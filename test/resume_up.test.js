@@ -59,12 +59,12 @@ describe('test resume up', function () {
     var uploadToken = putPolicy.uploadToken(mac);
     config.zone = qiniu.zone.Zone_z0;
     var resumeUploader = new qiniu.resume_up.ResumeUploader(config);
-    var putExtra = new qiniu.resume_up.PutExtra();
 
     // eslint-disable-next-line no-undef
     describe('test resume up#putFileWithoutKey', function () {
         // eslint-disable-next-line no-undef
         it('test resume up#putFileWithoutKey', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             resumeUploader.putFileWithoutKey(uploadToken, imageFile,
                 putExtra,
                 function (
@@ -73,13 +73,13 @@ describe('test resume up', function () {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
-                    console.log(respBody.key)
-                    keysToDelete.push("1",respBody.key);
+                    keysToDelete.push(respBody.key);
                     done();
                 });
         });
 
         it('test resume up#putFileWithoutKey_v2', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             putExtra.partSize = 6 * 1024 * 1024
             putExtra.version = 'v2'
             resumeUploader.putFileWithoutKey(uploadToken, imageFile,
@@ -90,8 +90,9 @@ describe('test resume up', function () {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
-                    console.log("2",respBody.key)
-                    keysToDelete.push(respBody.key);
+                    if (keysToDelete.indexOf(respBody.key) === -1) {
+                        keysToDelete.push(respBody.key);
+                    }
                     done();
                 });
         });
@@ -102,6 +103,7 @@ describe('test resume up', function () {
     describe('test resume up#putFile', function () {
         // eslint-disable-next-line no-undef
         it('test resume up#putFile', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             var key = 'storage_putFile_test' + Math.random(1000);
             resumeUploader.putFile(uploadToken, key, imageFile, putExtra,
                 function (
@@ -116,6 +118,7 @@ describe('test resume up', function () {
         });
 
         it('test resume up#putFile_v2', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             var key = 'storage_putFile_test_v2' + Math.random(1000);
             putExtra.partSize = 6 * 1024 * 1024
             putExtra.version = 'v2'
@@ -136,6 +139,7 @@ describe('test resume up', function () {
         // eslint-disable-next-line no-undef
         this.timeout(0)
         it('test resume up#putStream', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             var key = 'storage_putStream_test' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
@@ -155,6 +159,7 @@ describe('test resume up', function () {
         });
 
         it('test resume up#putStream_v2', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             var key = 'storage_putStream_test_v2' + Math.random(1000);
             var stream = new Readable();
             var blkSize = 1024 * 1024;
@@ -181,6 +186,7 @@ describe('test resume up', function () {
     describe('test resume up#putStream resume', function () {
         this.timeout(0)
         it('test resume up#putStream resume', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             config.zone = null;
             var key = 'storage_putStream_resume_test' + Math.random(1000);
             var stream = new Readable();
@@ -193,7 +199,6 @@ describe('test resume up', function () {
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
             fs.writeFileSync(tmpfile, '');
             putExtra.resumeRecordFile = tmpfile;
-            putExtra.version = 'v1';
             putExtra.progressCallback = function (len, total) {
                 if (len === total) {
                     var content = fs.readFileSync(tmpfile);
@@ -216,7 +221,9 @@ describe('test resume up', function () {
         });
 
         it('test resume up#putStream resume_v2', function (done) {
+            var putExtra = new qiniu.resume_up.PutExtra();
             config.zone = null;
+            var num = 0;
             var blkSize = 1024 * 1024;
             var blkCnt = [2,4,4.1,6,10];
             var tmpfile = path.join(os.tmpdir(), '/resume_file');
@@ -251,9 +258,12 @@ describe('test resume up', function () {
                         should.not.exist(respErr);
                         respBody.should.have.keys('key', 'hash');
                         keysToDelete.push(respBody.key);
+                        num ++;
+                        if (num === blkCnt.length) {
+                            done();
+                        }
                     });
             });
-            done();
         });
     })
 });
