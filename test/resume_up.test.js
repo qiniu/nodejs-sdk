@@ -63,6 +63,7 @@ describe('test resume up', function () {
     // eslint-disable-next-line no-undef
     describe('test resume up#putFileWithoutKey', function () {
         // eslint-disable-next-line no-undef
+        this.timeout(0);
         it('test resume up#putFileWithoutKey', function (done) {
             var putExtra = new qiniu.resume_up.PutExtra();
             resumeUploader.putFileWithoutKey(uploadToken, imageFile,
@@ -102,6 +103,7 @@ describe('test resume up', function () {
     // eslint-disable-next-line no-undef
     describe('test resume up#putFile', function () {
         // eslint-disable-next-line no-undef
+        this.timeout(0);
         it('test resume up#putFile', function (done) {
             var putExtra = new qiniu.resume_up.PutExtra();
             var key = 'storage_putFile_test' + Math.random(1000);
@@ -137,7 +139,7 @@ describe('test resume up', function () {
 
     describe('test resume up#putStream', function () {
         // eslint-disable-next-line no-undef
-        this.timeout(0)
+        this.timeout(0);
         it('test resume up#putStream', function (done) {
             var putExtra = new qiniu.resume_up.PutExtra();
             var key = 'storage_putStream_test' + Math.random(1000);
@@ -184,7 +186,7 @@ describe('test resume up', function () {
     });
 
     describe('test resume up#putStream resume', function () {
-        this.timeout(0)
+        this.timeout(0);
         it('test resume up#putStream resume', function (done) {
             var putExtra = new qiniu.resume_up.PutExtra();
             config.zone = null;
