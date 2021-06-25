@@ -6,7 +6,7 @@ const console = require('console');
 
 // eslint-disable-next-line no-undef
 before(function (done) {
-    if (!process.env.QINIU_PILI_ACCESS_KEY || !process.env.QINIU_PILI_SECRET_KEY) {
+    if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY) {
         console.log('should run command `source test-env.sh` first\n');
         process.exit(0);
     }
@@ -21,7 +21,7 @@ describe('test rtc credentials', function () {
     var credentials = new qiniu.Credentials(accessKey, secretKey);
     var appId = null;
     var appData = {
-        hub: 'sdk-live',
+        hub: 'hailong',
         title: 'testtitle',
         maxUsers: 10,
         noAutoKickUser: true

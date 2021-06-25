@@ -1,0 +1,37 @@
+name: NodeJS CI with NPM
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        node_version: ['6', '8', '10', '12', '14', '16']
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup NodeJS
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node_version }}
+      - name: Setup dependencies
+        run: |
+          npm install
+          npm install -g codecov@3.8.1
+          npm install -g istanbul
+      - name: Run cases
+        run: |
+          npm test
+          istanbul cover ./node_modules/mocha/bin/_mocha --reporter test -- -R spec
+          codecov
+        env:
+          QINIU_ACCESS_KEY: ${{ secrets.QINIU_ACCESS_KEY }}
+          QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
+          QINIU_TEST_BUCKET: ${{ secrets.QINIU_TEST_BUCKET }}
+          QINIU_TEST_DOMAIN: ${{ secrets.QINIU_TEST_DOMAIN }}
