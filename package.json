@@ -45,11 +45,12 @@
       "email": "jinxinxin@qiniu.com"
     }
   ],
-  "engines": [
-    "node >= 6"
-  ],
+  "engines": {
+    "node": ">= 8"
+  },
   "dependencies": {
     "agentkeepalive": "^4.0.2",
+    "axios": "^0.19.2",
     "before": "^0.0.1",
     "block-stream2": "^2.0.0",
     "crc32": "^0.2.2",
