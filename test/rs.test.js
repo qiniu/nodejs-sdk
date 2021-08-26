@@ -520,6 +520,20 @@ describe('test start bucket manager', function () {
         });
     });
 
+    describe('test restoreAr', function () {
+        var bucket = srcBucket;
+        it('test restoreAr', function (done) {
+            var entry = "wxapptest:30ae7f2c51c3b5d1d90b75f0515a1183.mp4";
+            var freezeAfterDays = 2;
+            bucketManager.restoreAr(entry,freezeAfterDays, function (err, respBody, respInfo) {
+                should.not.exist(err);
+                console.log(JSON.stringify(respBody) + '\n');
+                console.log(JSON.stringify(respInfo));
+                done();
+            });
+        });
+    });
+
     describe('test putBucketMaxAge', function () {
         var bucket = srcBucket;
         it('test putBucketMaxAge', function (done) {

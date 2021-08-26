@@ -1,5 +1,21 @@
 ## CHANGE LOG
 
+## 7.4.0
+- 支持 [分片上传 V2](https://developer.qiniu.com/kodo/6364/multipartupload-interface)
+
+
+## 7.3.3
+- 修复上传策略中forceSaveKey指定无效
+
+## 7.3.2
+- 修复crc32指定值无效
+- 修复checkCrc指定无效
+- 统一checkCrc类型
+
+## 7.3.1
+- 新增归档存储解冻接口
+- 支持上传时key值为空字符串
+
 ## v7.3.0
 - 新增 19 个bucket及文件相关操作
 - 新增文件列举 v2 接口功能

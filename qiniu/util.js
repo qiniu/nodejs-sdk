@@ -62,6 +62,12 @@ exports.hmacSha1 = function (encodedFlags, secretKey) {
     return hmac.digest('base64');
 };
 
+// get md5
+exports.getMd5 = function (data) {
+    var md5 = crypto.createHash('md5');
+    return md5.update(data).digest('hex');
+};
+
 // 创建 AccessToken 凭证
 // @param mac         AK&SK对象
 // @param requestURI 请求URL
@@ -107,7 +113,7 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
     }
 
     // add content type
-    if (reqContentType && (reqContentType == 'application/json' || reqContentType == 'application/x-www-form-urlencoded')) {
+    if (reqContentType && (reqContentType === 'application/json' || reqContentType === 'application/x-www-form-urlencoded')) {
         access += '\nContent-Type: ' + reqContentType;
     }
 
@@ -138,8 +144,8 @@ exports.isQiniuCallback = function (mac, requestURI, reqBody, callbackAuth) {
 
 exports.prepareZone = function (ctx, accessKey, bucket, callback) {
     var useCache = false;
-    if (ctx.config.zone != '' && ctx.config.zone != null) {
-        if (ctx.config.zoneExpire == -1) {
+    if (ctx.config.zone !== '' && ctx.config.zone != null) {
+        if (ctx.config.zoneExpire === -1) {
             useCache = true;
         } else {
             if (!exports.isTimestampExpired(ctx.config.zoneExpire)) {

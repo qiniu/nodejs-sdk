@@ -5,7 +5,7 @@ const headers = {
     'Content-Type': 'application/json'
 };
 
-function get (credentials, options, fn) {
+function get(credentials, options, fn) {
     options.headers.Authorization = credentials.generateAccessToken(options, null);
 
     var req = http.request(options, function (res) {
@@ -39,7 +39,7 @@ function get (credentials, options, fn) {
     req.end();
 }
 
-function post (credentials, options, data, fn) {
+function post(credentials, options, data, fn) {
     var dataString = JSON.stringify(data);
 
     options.headers.Authorization = credentials.generateAccessToken(options, dataString);

@@ -3,7 +3,9 @@
 [![@qiniu on weibo](http://img.shields.io/badge/weibo-%40qiniutek-blue.svg)](http://weibo.com/qiniutek)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE.md)
 [![Build Status](https://api.travis-ci.org/qiniu/nodejs-sdk.svg?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
+[![GitHub release](https://img.shields.io/github/v/tag/qiniu/nodejs-sdk.svg?label=release)](https://github.com/qiniu/nodejs-sdk/releases)
 [![Code Climate](https://codeclimate.com/github/qiniu/nodejs-sdk.svg)](https://codeclimate.com/github/qiniu/nodejs-sdk)
+[![Coverage Status](https://codecov.io/gh/qiniu/nodejs-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/qiniu/nodejs-sdk)
 [![Latest Stable Version](https://img.shields.io/npm/v/qiniu.svg)](https://www.npmjs.com/package/qiniu)
 
 ## 下载

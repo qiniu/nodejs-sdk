@@ -6,7 +6,7 @@ exports.SECRET_KEY = '<DONT SEND YOUR SECRET KEY TO ANYONE>';
 
 var defaultUserAgent = function () {
     return 'QiniuNodejs/' + pkg.version + ' (' + os.type() + '; ' + os.platform() +
-    '; ' + os.arch() + '; )';
+        '; ' + os.arch() + '; )';
 };
 
 exports.USER_AGENT = defaultUserAgent();
@@ -16,15 +16,15 @@ exports.BLOCK_SIZE = 4 * 1024 * 1024; // 4MB, never change
 exports.FormMimeUrl = 'application/x-www-form-urlencoded';
 exports.FormMimeJson = 'application/json';
 exports.FormMimeRaw = 'application/octet-stream';
-exports.RS_HOST = 'https://rs.qiniu.com';
-exports.RPC_TIMEOUT = 120000; // 120s
+exports.RS_HOST = 'rs.qiniu.com';
+exports.RPC_TIMEOUT = 600000; // 600s
 exports.UC_HOST = 'uc.qbox.me';
 
 // proxy
 exports.RPC_HTTP_AGENT = null;
 exports.RPC_HTTPS_AGENT = null;
 
-exports.Config = function Config (options) {
+exports.Config = function Config(options) {
     options = options || {};
     // use http or https protocol
     this.useHttpsDomain = !!(options.useHttpsDomain || false);
@@ -51,31 +51,31 @@ exports.Zone = function (srcUpHosts, cdnUpHosts, ioHost, rsHost, rsfHost,
         if (zoneSepIndex != -1) {
             var zoneTag = ioTag.substring(zoneSepIndex + 1);
             switch (zoneTag) {
-            case 'z1':
-                this.rsHost = 'rs-z1.qiniu.com';
-                this.rsfHost = 'rsf-z1.qiniu.com';
-                this.apiHost = 'api-z1.qiniu.com';
-                break;
-            case 'z2':
-                this.rsHost = 'rs-z2.qiniu.com';
-                this.rsfHost = 'rsf-z2.qiniu.com';
-                this.apiHost = 'api-z2.qiniu.com';
-                break;
-            case 'na0':
-                this.rsHost = 'rs-na0.qiniu.com';
-                this.rsfHost = 'rsf-na0.qiniu.com';
-                this.apiHost = 'api-na0.qiniu.com';
-                break;
-            case 'as0':
-                this.rsHost = 'rs-as0.qiniu.com';
-                this.rsfHost = 'rsf-as0.qiniu.com';
-                this.apiHost = 'api-as0.qiniu.com';
-                break;
-            default:
-                this.rsHost = 'rs.qiniu.com';
-                this.rsfHost = 'rsf.qiniu.com';
-                this.apiHost = 'api.qiniu.com';
-                break;
+                case 'z1':
+                    this.rsHost = 'rs-z1.qiniu.com';
+                    this.rsfHost = 'rsf-z1.qiniu.com';
+                    this.apiHost = 'api-z1.qiniu.com';
+                    break;
+                case 'z2':
+                    this.rsHost = 'rs-z2.qiniu.com';
+                    this.rsfHost = 'rsf-z2.qiniu.com';
+                    this.apiHost = 'api-z2.qiniu.com';
+                    break;
+                case 'na0':
+                    this.rsHost = 'rs-na0.qiniu.com';
+                    this.rsfHost = 'rsf-na0.qiniu.com';
+                    this.apiHost = 'api-na0.qiniu.com';
+                    break;
+                case 'as0':
+                    this.rsHost = 'rs-as0.qiniu.com';
+                    this.rsfHost = 'rsf-as0.qiniu.com';
+                    this.apiHost = 'api-as0.qiniu.com';
+                    break;
+                default:
+                    this.rsHost = 'rs.qiniu.com';
+                    this.rsfHost = 'rsf.qiniu.com';
+                    this.apiHost = 'api.qiniu.com';
+                    break;
             }
         }
     }

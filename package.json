@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "7.3.0",
+  "version": "7.4.0",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {
@@ -51,6 +51,7 @@
   "dependencies": {
     "agentkeepalive": "^4.0.2",
     "axios": "^0.19.2",
+    "before": "^0.0.1",
     "block-stream2": "^2.0.0",
     "crc32": "^0.2.2",
     "destroy": "^1.0.4",

@@ -239,6 +239,11 @@ balanced-match@^1.0.0:
   resolved "https://mirrors.huaweicloud.com/repository/npm/balanced-match/-/balanced-match-1.0.0.tgz#89b4d199ab2bee49de164ea02b89ce462d71b767"
   integrity sha1-ibTRmasr7kneFk6gK4nORi1xt2c=
 
+before@^0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/before/-/before-0.0.1.tgz#d21270e98747e9097253441e868adb325ae72dda"
+  integrity sha1-0hJw6YdH6QlyU0QehorbMlrnLdo=
+
 block-stream2@^2.0.0:
   version "2.0.0"
   resolved "https://mirrors.huaweicloud.com/repository/npm/block-stream2/-/block-stream2-2.0.0.tgz#680b9d357ca8b9d5637f4ec8a41fb5968029108f"
