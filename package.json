@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "NODE_ENV=test mocha -t 25000",
+    "test": "NODE_ENV=test mocha -t 300000",
     "cover": "nyc npm run test",
     "report": "nyc report --reporter=html",
     "lint": "eslint ."
