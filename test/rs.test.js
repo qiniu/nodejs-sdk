@@ -16,6 +16,8 @@ before(function (done) {
 
 // eslint-disable-next-line no-undef
 describe('test start bucket manager', function () {
+    this.timeout(0);
+
     var accessKey = proc.env.QINIU_ACCESS_KEY;
     var secretKey = proc.env.QINIU_SECRET_KEY;
     var srcBucket = proc.env.QINIU_TEST_BUCKET;
@@ -525,7 +527,7 @@ describe('test start bucket manager', function () {
         it('test restoreAr', function (done) {
             var entry = "wxapptest:30ae7f2c51c3b5d1d90b75f0515a1183.mp4";
             var freezeAfterDays = 2;
-            bucketManager.restoreAr(entry,freezeAfterDays, function (err, respBody, respInfo) {
+            bucketManager.restoreAr(entry, freezeAfterDays, function (err, respBody, respInfo) {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
                 console.log(JSON.stringify(respInfo));

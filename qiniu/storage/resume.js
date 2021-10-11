@@ -202,7 +202,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callb
         var encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
         if (finishedEtags.uploadId) {
             // if it has resumeRecordFile
-            resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+            resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
                 finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
         } else {
             // init an new uploadId for next step
@@ -274,12 +274,12 @@ function initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, is
         }
         finishedEtags.expiredAt = ret.expireAt;
         finishedEtags.uploadId = ret.uploadId;
-        resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+        resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
             finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
     });
 }
 
-function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
+function resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
                        finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
     blkStream.on('data', function (chunk) {
         var partNumber = 0;
@@ -314,7 +314,7 @@ function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStre
                         blkStream.resume();
                         if (finishedEtags.etags.length === totalBlockNum) {
                             completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-                                '', putExtra, callbackFunc);
+                                putExtra, callbackFunc);
                             isSent = true;
                         }
                     }
@@ -325,7 +325,7 @@ function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStre
     blkStream.on('end', function () {
         if (!isSent && rsStreamLen === 0) {
             completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-                '', putExtra, callbackFunc);
+                putExtra, callbackFunc);
         }
         destroy(rsStream);
     });
@@ -343,7 +343,7 @@ function uploadPart(bucket, upDomain, uploadToken, encodedObjectName, chunk, upl
 }
 
 function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-                     customVars, putExtra, callbackFunc) {
+    putExtra, callbackFunc) {
     var headers = {
         Authorization: 'UpToken ' + uploadToken,
         'Content-Type': 'application/json'
@@ -354,7 +354,7 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
     var body = {
         'fname': putExtra.fname,
         'mimeType': putExtra.mimeType,
-        'customVars': customVars || {},
+        'customVars': putExtra.params,
         'parts': sortedParts
     };
     var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
