@@ -26,7 +26,7 @@ function PutExtra (fname, params, mimeType, crc32, checkCrc) {
     this.params = params || {};
     this.mimeType = mimeType || null;
     this.crc32 = crc32 || null;
-    this.checkCrc = checkCrc || true;
+    this.checkCrc = checkCrc || false;
 }
 
 FormUploader.prototype.putStream = function (uploadToken, key, fsStream,
