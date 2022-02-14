@@ -21,12 +21,14 @@ function FormUploader (config) {
 // @param mimeType 指定文件的mimeType
 // @param crc32    指定文件的crc32值
 // @param checkCrc 指定是否检测文件的crc32值
-function PutExtra (fname, params, mimeType, crc32, checkCrc) {
+// @param metadata 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+function PutExtra (fname, params, mimeType, crc32, checkCrc, metadata) {
     this.fname = fname || '';
     this.params = params || {};
     this.mimeType = mimeType || null;
     this.crc32 = crc32 || null;
     this.checkCrc = checkCrc || true;
+    this.metadata = metadata || {};
 }
 
 FormUploader.prototype.putStream = function (uploadToken, key, fsStream,
@@ -117,6 +119,14 @@ function createMultipartForm (uploadToken, key, fsStream, putExtra, callbackFunc
             postForm.field(k, putExtra.params[k].toString());
         }
     }
+
+    // putExtra metadata
+    for (var metadataKey in putExtra.metadata) {
+        if (metadataKey.startsWith('x-qn-meta-')) {
+            postForm.field(metadataKey, putExtra.metadata[metadataKey].toString());
+        }
+    }
+
     var fileBody = [];
     fsStream.on('data', function (data) {
         fileBody.push(data);

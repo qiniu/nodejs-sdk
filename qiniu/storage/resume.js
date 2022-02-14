@@ -23,8 +23,9 @@ function ResumeUploader(config) {
 // @param progressCallback(uploadBytes, totalBytes) 上传进度回调
 // @param partSize                    分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
 // @param version                     分片上传版本 目前支持v1/v2版本 默认v1
+// @param metadata                    元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
 function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback, partSize,
-                   version) {
+                   version, metadata) {
     this.fname = fname || '';
     this.params = params || {};
     this.mimeType = mimeType || null;
@@ -32,6 +33,7 @@ function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback, p
     this.progressCallback = progressCallback || null;
     this.partSize = partSize || conf.BLOCK_SIZE;
     this.version = version || 'v1';
+    this.metadata = metadata || {};
 }
 
 ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
@@ -245,6 +247,18 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
             }
         }
     }
+
+    // putExtra metadata
+    if (putExtra.metadata) {
+        for (var metadataKey in putExtra.metadata) {
+            if (metadataKey.startsWith('x-qn-meta-') && putExtra.metadata[metadataKey]) {
+                requestURI +=
+                    '/' + metadataKey + '/' +
+                    util.urlsafeBase64Encode(putExtra.metadata[metadataKey].toString());
+            }
+        }
+    }
+
     var auth = 'UpToken ' + uploadToken;
     var headers = {
         Authorization: auth,
@@ -355,6 +369,7 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
         'fname': putExtra.fname,
         'mimeType': putExtra.mimeType,
         'customVars': putExtra.params,
+        'metadata': putExtra.metadata,
         'parts': sortedParts
     };
     var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
