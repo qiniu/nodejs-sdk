@@ -33,6 +33,7 @@ describe('test resume up', function () {
     var bucket = proc.env.QINIU_TEST_BUCKET;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
+    config.useCdnDomain = true;
     // config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
