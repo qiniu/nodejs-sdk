@@ -233,14 +233,20 @@ export declare namespace form_up {
         checkCrc?: number | boolean;
 
         /**
+         * @default {}
+         */
+        metadata?: Record<string, string>;
+
+        /**
          * 上传可选参数
          * @param fname 请求体中的文件的名称
          * @param params 额外参数设置，参数名称必须以x:开头
          * @param mimeType 指定文件的mimeType
          * @param crc32 指定文件的crc32值
          * @param checkCrc 指定是否检测文件的crc32值
+         * @param metadata 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
          */
-        constructor(fname?: string, params?: any, mimeType?: string, crc32?: string, checkCrc?: number | boolean);
+        constructor(fname?: string, params?: Record<string, string>, mimeType?: string, crc32?: string, checkCrc?: number | boolean, metadata?: Record<string, string>);
     }
 }
 
@@ -290,7 +296,7 @@ export declare namespace resume_up {
         /**
          * @default {}
          */
-        params?: any;
+        params?: Record<string, string>;
 
         /**
          * @default null
@@ -318,17 +324,24 @@ export declare namespace resume_up {
         partSize?: number
 
         /**
+         * @default {}
+         */
+        metadata?: Record<string, string>
+
+        /**
          * 上传可选参数
          * @param fname 请求体中的文件的名称
          * @param params 额外参数设置，参数名称必须以x:开头
          * @param mimeType 指定文件的mimeType
          * @param resumeRecordFile
          * @param progressCallback
-         * @param version 分片上传版本 目前支持v1/v2版本 默认v1
          * @param partSize 分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
+         * @param version 分片上传版本 目前支持v1/v2版本 默认v1
+         * @param metadata 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
          */
-        constructor(fname?: string, params?: any, mimeType?: string, resumeRecordFile?: string, version?:string, partSize?:number,
-                    progressCallback?: (uploadBytes: number, totalBytes: number) => void);
+        constructor(fname?: string, params?: Record<string, string>, mimeType?: string, resumeRecordFile?: string,
+                    progressCallback?: (uploadBytes: number, totalBytes: number) => void,
+                    partSize?:number, version?:string, metadata?: Record<string, string>);
     }
 }
 

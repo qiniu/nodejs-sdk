@@ -41,6 +41,7 @@ describe('test form up', function () {
     var bucket = proc.env.QINIU_TEST_BUCKET;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
+    config.useCdnDomain = true;
     // config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
@@ -173,6 +174,58 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
+                    done();
+                });
+        });
+    });
+
+    // eslint-disable-next-line no-undef
+    describe('test form up#putFileWithParams', function () {
+        // eslint-disable-next-line no-undef
+        it('test form up#putFileWithMetadata', function (done) {
+            const key = 'storage_put_test_with_metadata';
+            var putExtra = new qiniu.form_up.PutExtra();
+            putExtra.metadata = {
+                'x-qn-meta-name': 'qiniu',
+                'x-qn-meta-age': '18'
+            };
+            formUploader.putFile(uploadToken, key, testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody) {
+                    should.not.exist(respErr);
+                    keysToDelete.push(respBody.key);
+                    respBody.should.have.keys('key', 'hash');
+                    bucketManager.stat(bucket, key, function (
+                        err,
+                        respBody,
+                        respInfo) {
+                        should.not.exist(err);
+                        respBody.should.have.keys('x-qn-meta');
+                        respBody['x-qn-meta'].name.should.eql('qiniu');
+                        respBody['x-qn-meta'].age.should.eql('18');
+                        done();
+                    });
+                });
+        });
+
+        // eslint-disable-next-line no-undef
+        it('test form up#putFileWithCustomerData', function (done) {
+            const key = 'storage_put_test_with_customer_data';
+            var putExtra = new qiniu.form_up.PutExtra();
+            putExtra.params = {
+                'x:location': 'shanghai',
+                'x:price': 1500
+            };
+            formUploader.putFile(uploadToken, key, testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody) {
+                    should.not.exist(respErr);
+                    keysToDelete.push(respBody.key);
+                    respBody.should.have.keys('x:location', 'x:price');
                     done();
                 });
         });

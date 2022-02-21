@@ -19,6 +19,9 @@ var putExtra = new qiniu.form_up.PutExtra();
 // file
 putExtra.fname = 'test01.csv';
 putExtra.crc32 = 3497766758;
+putExtra.metadata = {
+    'x-qn-meta-name': 'qiniu'
+};
 formUploader.putFile(uploadToken, null, localFile, putExtra, function (respErr,
     respBody, respInfo) {
     if (respErr) {

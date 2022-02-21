@@ -21,6 +21,9 @@ putExtra.params = {
     'x:name': '',
     'x:age': 27
 };
+putExtra.metadata = {
+    'x-qn-meta-name': 'qiniu'
+};
 putExtra.fname = 'testfile.mp4';
 putExtra.resumeRecordFile = 'progress.log';
 putExtra.progressCallback = function (uploadBytes, totalBytes) {

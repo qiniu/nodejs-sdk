@@ -33,6 +33,7 @@ describe('test resume up', function () {
     var bucket = proc.env.QINIU_TEST_BUCKET;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
+    config.useCdnDomain = true;
     // config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
@@ -70,6 +71,10 @@ describe('test resume up', function () {
         it('test resume up#putFileWithoutKey', function (done) {
             var putExtra = new qiniu.resume_up.PutExtra();
             putExtra.params = { 'x:var_1': 'val_1', 'x:var_2': 'val_2' };
+            putExtra.metadata = {
+                'x-qn-meta-name': 'qiniu',
+                'x-qn-meta-age': '18'
+            };
             resumeUploader.putFileWithoutKey(uploadToken, testFilePath,
                 putExtra,
                 function (
@@ -81,7 +86,17 @@ describe('test resume up', function () {
                     should(respBody['var_1']).eql('val_1');
                     should(respBody['var_2']).eql('val_2');
                     keysToDelete.push(respBody.key);
-                    done();
+
+                    bucketManager.stat(bucket, respBody.key, function (
+                        err,
+                        statRespBody,
+                        respInfo) {
+                        should.not.exist(err);
+                        statRespBody.should.have.keys('x-qn-meta');
+                        statRespBody['x-qn-meta'].name.should.eql('qiniu');
+                        statRespBody['x-qn-meta'].age.should.eql('18');
+                        done();
+                    });
                 });
         });
 
@@ -90,6 +105,10 @@ describe('test resume up', function () {
             putExtra.partSize = 6 * 1024 * 1024
             putExtra.version = 'v2'
             putExtra.params = { 'x:var_1': 'val_1', 'x:var_2': 'val_2' };
+            putExtra.metadata = {
+                'x-qn-meta-name': 'qiniu',
+                'x-qn-meta-age': '18'
+            };
             resumeUploader.putFileWithoutKey(uploadToken, testFilePath,
                 putExtra,
                 function (
@@ -103,7 +122,16 @@ describe('test resume up', function () {
                     if (keysToDelete.indexOf(respBody.key) === -1) {
                         keysToDelete.push(respBody.key);
                     }
-                    done();
+                    bucketManager.stat(bucket, respBody.key, function (
+                        err,
+                        statRespBody,
+                        respInfo) {
+                        should.not.exist(err);
+                        statRespBody.should.have.keys('x-qn-meta');
+                        statRespBody['x-qn-meta'].name.should.eql('qiniu');
+                        statRespBody['x-qn-meta'].age.should.eql('18');
+                        done();
+                    });
                 });
         });
 
