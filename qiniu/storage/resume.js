@@ -23,8 +23,9 @@ function ResumeUploader(config) {
 // @param progressCallback(uploadBytes, totalBytes) 上传进度回调
 // @param partSize                    分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
 // @param version                     分片上传版本 目前支持v1/v2版本 默认v1
+// @param metadata                    元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
 function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback, partSize,
-                   version) {
+                   version, metadata) {
     this.fname = fname || '';
     this.params = params || {};
     this.mimeType = mimeType || null;
@@ -32,6 +33,7 @@ function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback, p
     this.progressCallback = progressCallback || null;
     this.partSize = partSize || conf.BLOCK_SIZE;
     this.version = version || 'v1';
+    this.metadata = metadata || {};
 }
 
 ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
@@ -202,7 +204,7 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callb
         var encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
         if (finishedEtags.uploadId) {
             // if it has resumeRecordFile
-            resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+            resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
                 finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
         } else {
             // init an new uploadId for next step
@@ -245,6 +247,18 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
             }
         }
     }
+
+    // putExtra metadata
+    if (putExtra.metadata) {
+        for (var metadataKey in putExtra.metadata) {
+            if (metadataKey.startsWith('x-qn-meta-') && putExtra.metadata[metadataKey]) {
+                requestURI +=
+                    '/' + metadataKey + '/' +
+                    util.urlsafeBase64Encode(putExtra.metadata[metadataKey].toString());
+            }
+        }
+    }
+
     var auth = 'UpToken ' + uploadToken;
     var headers = {
         Authorization: auth,
@@ -274,12 +288,12 @@ function initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, is
         }
         finishedEtags.expiredAt = ret.expireAt;
         finishedEtags.uploadId = ret.uploadId;
-        resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+        resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
             finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
     });
 }
 
-function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
+function resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
                        finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
     blkStream.on('data', function (chunk) {
         var partNumber = 0;
@@ -314,7 +328,7 @@ function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStre
                         blkStream.resume();
                         if (finishedEtags.etags.length === totalBlockNum) {
                             completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-                                '', putExtra, callbackFunc);
+                                putExtra, callbackFunc);
                             isSent = true;
                         }
                     }
@@ -325,7 +339,7 @@ function resumUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStre
     blkStream.on('end', function () {
         if (!isSent && rsStreamLen === 0) {
             completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-                '', putExtra, callbackFunc);
+                putExtra, callbackFunc);
         }
         destroy(rsStream);
     });
@@ -343,7 +357,7 @@ function uploadPart(bucket, upDomain, uploadToken, encodedObjectName, chunk, upl
 }
 
 function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-                     customVars, putExtra, callbackFunc) {
+    putExtra, callbackFunc) {
     var headers = {
         Authorization: 'UpToken ' + uploadToken,
         'Content-Type': 'application/json'
@@ -354,7 +368,8 @@ function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishe
     var body = {
         'fname': putExtra.fname,
         'mimeType': putExtra.mimeType,
-        'customVars': customVars || {},
+        'customVars': putExtra.params,
+        'metadata': putExtra.metadata,
         'parts': sortedParts
     };
     var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
