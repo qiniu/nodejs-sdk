@@ -59,10 +59,18 @@ exports.Zone_as0 = new conf.Zone([
 'rsf-as0.qbox.me',
 'api-as0.qiniu.com');
 
+const REQUEST_OPTIONS = {
+
+};
+
+if (process.env.QINIU_NODESDK_REQUEST_MIN_TIMEOUT_MS) {
+    REQUEST_OPTIONS.timeout = parseInt(process.env.QINIU_NODESDK_REQUEST_MIN_TIMEOUT_MS, 10);
+}
+
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
     var apiAddr = util.format('https://uc.qbox.me/v2/query?ak=%s&bucket=%s',
         accessKey, bucket);
-    urllib.request(apiAddr, function (respErr, respData, respInfo) {
+    urllib.request(apiAddr, REQUEST_OPTIONS, function (respErr, respData, respInfo) {
         if (respErr) {
             callbackFunc(respErr, null, null);
             return;
