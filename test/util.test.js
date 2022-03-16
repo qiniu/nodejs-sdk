@@ -73,5 +73,224 @@ describe('test util functions', function () {
                 done();
             });
         });
+
+        it('test canonicalMimeHeaderKey', function () {
+            const fieldNames = [
+                ':status',
+                ':x-test-1',
+                ':x-Test-2',
+                'content-type',
+                'CONTENT-LENGTH',
+                'oRiGin',
+                'ReFer',
+                'Last-Modified',
+                'acCePt-ChArsEt',
+                'x-test-3',
+                'cache-control',
+                '七牛'
+            ];
+            const expectCanonicalFieldNames = [
+                ':status',
+                ':x-test-1',
+                ':x-Test-2',
+                'Content-Type',
+                'Content-Length',
+                'Origin',
+                'Refer',
+                'Last-Modified',
+                'Accept-Charset',
+                'X-Test-3',
+                'Cache-Control',
+                '七牛'
+            ];
+            should.equal(fieldNames.length, expectCanonicalFieldNames.length);
+            for (let i = 0; i < fieldNames.length; i++) {
+                should.equal(qiniu.util.canonicalMimeHeaderKey(fieldNames[i]), expectCanonicalFieldNames[i]);
+            }
+        });
+
+        it('test generateAccessTokenV2', function () {
+            const mac = new qiniu.auth.digest.Mac('ak', 'sk');
+
+            const testCases = [
+                {
+                    method: 'GET',
+                    host: undefined,
+                    url: 'http://rs.qbox.me',
+                    qheaders: {
+                        'x-Qiniu-': 'a',
+                        'X-qIniu': 'b',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    contentType: 'application/x-www-form-urlencoded',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:CK4wBVOL6sLbVE4G4mrXqL_yEc4='
+                },
+                {
+                    method: 'GET',
+                    host: undefined,
+                    url: 'http://rs.qbox.me',
+                    qheaders: {
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    contentType: 'application/x-www-form-urlencoded',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:CK4wBVOL6sLbVE4G4mrXqL_yEc4='
+                },
+                {
+                    method: 'GET',
+                    host: undefined,
+                    url: 'http://rs.qbox.me',
+                    qheaders: {
+                        'Content-Type': 'application/json'
+                    },
+                    contentType: 'application/json',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:ksh7bJBnBzFO0yxJ_tLLUcg0csM='
+                },
+                {
+                    method: 'POST',
+                    host: undefined,
+                    url: 'http://rs.qbox.me',
+                    qheaders: {
+                        'Content-Type': 'application/json',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: 'application/json',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:IlW01tHjGQ0pGPXV_3jjR1AdD34='
+                },
+                {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com',
+                    qheaders: {
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    contentType: 'application/x-www-form-urlencoded',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:156x8Q4x1zadPcAyMRVDsioIyAk='
+                },
+                {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com',
+                    qheaders: {
+                        'Content-Type': 'application/json',
+                        'X-Qiniu-Bbb': 'BBB',
+                        'X-Qiniu-Aaa': 'DDD',
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: 'application/json',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:eOaX4RziJPW9ywnJ02jshmEMfhI='
+                },
+                {
+                    method: 'gET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com',
+                    qheaders: {
+                        'Content-Type': 'application/json',
+                        'X-Qiniu-Bbb': 'BBB',
+                        'x-qIniu-aAa': 'DDD',
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: 'application/json',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:eOaX4RziJPW9ywnJ02jshmEMfhI='
+                },
+                {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com',
+                    qheaders: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Qiniu-Bbb': 'BBB',
+                        'X-Qiniu-Aaa': 'DDD',
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: 'application/x-www-form-urlencoded',
+                    body: 'name=test&language=go',
+                    exceptSignToken: 'Qiniu ak:A5PMXECSPZQxitJqLj0op2B2GEM='
+                },
+                {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com',
+                    qheaders: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Qiniu-Bbb': 'BBB',
+                        'X-Qiniu-Aaa': 'DDD'
+                    },
+                    contentType: 'application/x-www-form-urlencoded',
+                    body: 'name=test&language=go',
+                    exceptSignToken: 'Qiniu ak:A5PMXECSPZQxitJqLj0op2B2GEM='
+                },
+                {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com/mkfile/sdf.jpg',
+                    qheaders: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Qiniu-Bbb': 'BBB',
+                        'X-Qiniu-Aaa': 'DDD',
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: 'application/x-www-form-urlencoded',
+                    body: 'name=test&language=go',
+                    exceptSignToken: 'Qiniu ak:fkRck5_LeyfwdkyyLk-hyNwGKac='
+                },
+                {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com/mkfile/sdf.jpg?s=er3&df',
+                    qheaders: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Qiniu-Bbb': 'BBB',
+                        'X-Qiniu-Aaa': 'DDD',
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: 'application/x-www-form-urlencoded',
+                    body: 'name=test&language=go',
+                    exceptSignToken: 'Qiniu ak:PUFPWsEUIpk_dzUvvxTTmwhp3p4='
+                },
+                {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com/mkfile/sdf.jpg?s=er3&df',
+                    qheaders: {
+                        'X-Qiniu-Bbb': 'BBB',
+                        'X-Qiniu-Aaa': 'DDD',
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: undefined,
+                    body: 'name=test&language=go',
+                    exceptSignToken: 'Qiniu ak:PUFPWsEUIpk_dzUvvxTTmwhp3p4='
+                }
+            ];
+            for (const testCase of testCases) {
+                should.equal(
+                    qiniu.util.generateAccessTokenV2(
+                        mac,
+                        testCase.url,
+                        testCase.method,
+                        testCase.contentType,
+                        testCase.body,
+                        testCase.qheaders
+                    ),
+                    testCase.exceptSignToken
+                );
+            }
+        });
     });
 });

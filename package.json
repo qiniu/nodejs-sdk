@@ -1,6 +1,6 @@
 {
   "name": "qiniu",
-  "version": "7.4.0",
+  "version": "7.5.0",
   "description": "Node wrapper for Qiniu Resource (Cloud) Storage API",
   "main": "index.js",
   "directories": {
@@ -45,9 +45,9 @@
       "email": "jinxinxin@qiniu.com"
     }
   ],
-  "engines": [
-    "node >= 6"
-  ],
+  "engines": {
+    "node": ">= 6"
+  },
   "dependencies": {
     "agentkeepalive": "^4.0.2",
     "before": "^0.0.1",

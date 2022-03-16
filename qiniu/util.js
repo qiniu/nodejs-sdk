@@ -87,6 +87,115 @@ exports.generateAccessToken = function (mac, requestURI, reqBody) {
     return 'QBox ' + mac.accessKey + ':' + safeDigest;
 };
 
+const isTokenTable = {
+    '!': true,
+    '#': true,
+    $: true,
+    '%': true,
+    '&': true,
+    '\\': true,
+    '*': true,
+    '+': true,
+    '-': true,
+    '.': true,
+    0: true,
+    1: true,
+    2: true,
+    3: true,
+    4: true,
+    5: true,
+    6: true,
+    7: true,
+    8: true,
+    9: true,
+    A: true,
+    B: true,
+    C: true,
+    D: true,
+    E: true,
+    F: true,
+    G: true,
+    H: true,
+    I: true,
+    J: true,
+    K: true,
+    L: true,
+    M: true,
+    N: true,
+    O: true,
+    P: true,
+    Q: true,
+    R: true,
+    S: true,
+    T: true,
+    U: true,
+    W: true,
+    V: true,
+    X: true,
+    Y: true,
+    Z: true,
+    '^': true,
+    _: true,
+    '`': true,
+    a: true,
+    b: true,
+    c: true,
+    d: true,
+    e: true,
+    f: true,
+    g: true,
+    h: true,
+    i: true,
+    j: true,
+    k: true,
+    l: true,
+    m: true,
+    n: true,
+    o: true,
+    p: true,
+    q: true,
+    r: true,
+    s: true,
+    t: true,
+    u: true,
+    v: true,
+    w: true,
+    x: true,
+    y: true,
+    z: true,
+    '|': true,
+    '~': true
+};
+/**
+ * 是否合法的 header field name 字符
+ * @param ch string
+ * @return boolean|undefined
+ */
+function validHeaderKeyChar (ch) {
+    if (ch.charCodeAt(0) >= 128) {
+        return false;
+    }
+    return isTokenTable[ch];
+}
+
+/**
+ * 规范化 header field name
+ * @param fieldName string
+ * @return string
+ */
+exports.canonicalMimeHeaderKey = function (fieldName) {
+    for (const ch of fieldName) {
+        if (!validHeaderKeyChar(ch)) {
+            return fieldName;
+        }
+    }
+    return fieldName.split('-')
+        .map(function (text) {
+            return text.substring(0, 1).toUpperCase() + text.substring(1).toLowerCase();
+        })
+        .join('-');
+};
+
 // 创建 AccessToken 凭证
 // @param mac            AK&SK对象
 // @param requestURI     请求URL
@@ -94,7 +203,7 @@ exports.generateAccessToken = function (mac, requestURI, reqBody) {
 // @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
 // @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者
 //                       application/x-www-form-urlencoded 时才需要传入该参数
-exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContentType, reqBody) {
+exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContentType, reqBody, reqHeaders) {
     var u = new url.URL(requestURI);
     var path = u.pathname;
     var search = u.search;
@@ -113,8 +222,31 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
     }
 
     // add content type
-    if (reqContentType && (reqContentType === 'application/json' || reqContentType === 'application/x-www-form-urlencoded')) {
+    if (reqContentType) {
         access += '\nContent-Type: ' + reqContentType;
+    } else {
+        access += '\nContent-Type: application/x-www-form-urlencoded';
+    }
+
+    // add headers
+    if (reqHeaders) {
+        const canonicalHeaders = Object.keys(reqHeaders)
+            .reduce(function (acc, k) {
+                acc[exports.canonicalMimeHeaderKey(k)] = reqHeaders[k];
+                return acc;
+            }, {});
+        const headerText = Object.keys(canonicalHeaders)
+            .filter(function (k) {
+                return k.startsWith('X-Qiniu-') && k.length > 'X-Qiniu-'.length;
+            })
+            .sort()
+            .map(function (k) {
+                return k + ': ' + canonicalHeaders[k];
+            })
+            .join('\n');
+        if (headerText) {
+            access += '\n' + headerText;
+        }
     }
 
     access += '\n\n';
@@ -123,8 +255,6 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
     if (reqBody) {
         access += reqBody;
     }
-
-    // console.log(access);
 
     var digest = exports.hmacSha1(access, mac.secretKey);
     var safeDigest = exports.base64ToUrlSafe(digest);

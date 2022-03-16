@@ -32,7 +32,7 @@ function statReq(mac, config, bucket, key, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var statOp = exports.statOp(bucket, key);
     var requestURI = scheme + config.zone.rsHost + statOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -57,7 +57,7 @@ function changeMimeReq(mac, config, bucket, key, newMime, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeMimeOp = exports.changeMimeOp(bucket, key, newMime);
     var requestURI = scheme + config.zone.rsHost + changeMimeOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -82,7 +82,7 @@ function changeHeadersReq(mac, config, bucket, key, headers, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeHeadersOp = exports.changeHeadersOp(bucket, key, headers);
     var requestURI = scheme + config.zone.rsHost + changeHeadersOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -112,7 +112,7 @@ function moveReq(mac, config, srcBucket, srcKey, destBucket, destKey,
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var moveOp = exports.moveOp(srcBucket, srcKey, destBucket, destKey, options);
     var requestURI = scheme + config.zone.rsHost + moveOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -143,7 +143,7 @@ function copyReq(mac, config, srcBucket, srcKey, destBucket, destKey,
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var copyOp = exports.copyOp(srcBucket, srcKey, destBucket, destKey, options);
     var requestURI = scheme + config.zone.rsHost + copyOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -166,7 +166,7 @@ function deleteReq(mac, config, bucket, key, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var deleteOp = exports.deleteOp(bucket, key);
     var requestURI = scheme + config.zone.rsHost + deleteOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -191,7 +191,7 @@ function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var deleteAfterDaysOp = exports.deleteAfterDaysOp(bucket, key, days);
     var requestURI = scheme + config.zone.rsHost + deleteAfterDaysOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -217,7 +217,7 @@ function fetchReq(mac, config, resUrl, bucket, key, callbackFunc) {
     var encodedResURL = util.urlsafeBase64Encode(resUrl);
     var requestURI = scheme + config.zone.ioHost + '/fetch/' + encodedResURL +
         '/to/' + encodedEntryURI;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -240,7 +240,7 @@ function prefetchReq(mac, config, bucket, key, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var encodedEntryURI = util.encodedEntry(bucket, key);
     var requestURI = scheme + config.zone.ioHost + '/prefetch/' + encodedEntryURI;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -265,7 +265,7 @@ function changeTypeReq(mac, config, bucket, key, newType, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeTypeOp = exports.changeTypeOp(bucket, key, newType);
     var requestURI = scheme + config.zone.rsHost + changeTypeOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -284,7 +284,7 @@ BucketManager.prototype.image = function (bucket, srcSiteUrl, srcHost,
         var encodedHost = util.urlsafeBase64Encode(srcHost);
         requestURI += '/host/' + encodedHost;
     }
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -294,7 +294,7 @@ BucketManager.prototype.image = function (bucket, srcSiteUrl, srcHost,
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.unimage = function (bucket, callbackFunc) {
     var requestURI = PU_HOST + '/unimage/' + bucket;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -353,7 +353,7 @@ function listPrefixReq(mac, config, bucket, options, callbackFunc) {
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + config.zone.rsfHost + '/list?' + reqSpec;
 
-    var auth = util.generateAccessToken(mac, requestURI, null);
+    var auth = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithForm(requestURI, null, auth, callbackFunc);
 }
 
@@ -411,7 +411,7 @@ function listPrefixReqV2(mac, config, bucket, options, callbackFunc) {
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + config.zone.rsfHost + '/v2/list?' + reqSpec;
 
-    var auth = util.generateAccessToken(mac, requestURI, null);
+    var auth = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithForm(requestURI, null, auth, callbackFunc);
 }
 
@@ -423,7 +423,7 @@ BucketManager.prototype.batch = function (operations, callbackFunc) {
         op: operations
     };
     var reqBody = querystring.stringify(reqParams);
-    var digest = util.generateAccessToken(this.mac, requestURI, reqBody);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded', reqBody);
     rpc.postWithForm(requestURI, reqBody, digest, callbackFunc);
 };
 
@@ -545,7 +545,7 @@ function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var changeStatusOp = exports.changeStatusOp(bucket, key, status);
     var requestURI = scheme + config.zone.rsHost + changeStatusOp;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -554,7 +554,7 @@ function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
 // @param callbackFunc(err, respBody, respInfo) 回调函数
 BucketManager.prototype.listBucket = function (callbackFunc) {
     var requestURI = 'https://rs.qbox.me/buckets';
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -564,7 +564,7 @@ BucketManager.prototype.listBucket = function (callbackFunc) {
 BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/v2/bucketInfo?bucket=' + bucket;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -623,7 +623,7 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/rules/add?' + reqSpec;
-    var auth = util.generateAccessToken(mac, requestURI, null);
+    var auth = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, auth, callbackFunc);
 }
 
@@ -638,7 +638,7 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/rules/delete?' + reqSpec;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -674,7 +674,7 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/rules/update?' + reqSpec;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -683,7 +683,7 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
 BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/rules/get?bucket=' + bucket;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -728,7 +728,7 @@ function PutBucketEvent(mac, config, options, bucket, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/events/add?' + reqSpec;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -771,7 +771,7 @@ function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/events/update?' + reqSpec;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -779,7 +779,7 @@ function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
 BucketManager.prototype.getBucketEvent = function (bucket, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/events/get?bucket=' + bucket;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -792,7 +792,7 @@ BucketManager.prototype.deleteBucketEvent = function (bucket, name, callbackFunc
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/events/delete?' + reqSpec;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -840,7 +840,7 @@ function PutReferAntiLeech(mac, config, bucket, options, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/referAntiLeech?' + reqSpec;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -853,7 +853,7 @@ function PutCorsRules(mac, config, bucket, body, callbackFunc) {
     var reqBody = JSON.stringify(body);
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/corsRules/set/' + bucket;
-    var auth = util.generateAccessToken(mac, requestURI, reqBody);
+    var auth = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded', reqBody);
     rpc.postWithForm(requestURI, reqBody, auth, callbackFunc);
 }
 
@@ -865,7 +865,7 @@ BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
 function GetCorsRules(mac, config, bucket, callbackFunc) {
     var scheme = config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/corsRules/get/' + bucket;
-    var digest = util.generateAccessToken(mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
@@ -884,7 +884,7 @@ function GetCorsRules(mac, config, bucket, callbackFunc) {
 BucketManager.prototype.putBucketAccessStyleMode = function (bucket, mode, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/accessMode/' + bucket + '/mode/' + mode;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -902,7 +902,7 @@ BucketManager.prototype.putBucketMaxAge = function (bucket, options, callbackFun
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/maxAge?' + reqSpec;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -923,7 +923,7 @@ BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbac
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = querystring.stringify(reqParams);
     var requestURI = scheme + conf.UC_HOST + '/private?' + reqSpec;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -952,7 +952,7 @@ BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var reqSpec = `${reqParams.bucket}/size/${reqParams.size}/count/${reqParams.count}`;
     var requestURI = scheme + conf.UC_HOST + '/setbucketquota/' + reqSpec;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -961,7 +961,7 @@ BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc
 BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/getbucketquota/' + bucket;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -970,7 +970,7 @@ BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
 BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/v3/domains?tbl=' + bucket;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
@@ -978,7 +978,7 @@ BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
 BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.RS_HOST + "/restoreAr/" + util.urlsafeBase64Encode(entry) + "/freezeAfterDays/" + freezeAfterDays;
-    var digest = util.generateAccessToken(this.mac, requestURI, null);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
