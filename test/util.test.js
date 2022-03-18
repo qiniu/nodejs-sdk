@@ -191,6 +191,21 @@ describe('test util functions', function () {
                     exceptSignToken: 'Qiniu ak:eOaX4RziJPW9ywnJ02jshmEMfhI='
                 },
                 {
+                    method: 'GET',
+                    host: 'upload.qiniup.com',
+                    url: 'http://upload.qiniup.com',
+                    qheaders: {
+                        'Content-Type': 'application/octet-stream',
+                        'X-Qiniu-Bbb': 'BBB',
+                        'X-Qiniu-Aaa': 'DDD',
+                        'X-Qiniu-': 'a',
+                        'X-Qiniu': 'b'
+                    },
+                    contentType: 'application/octet-stream',
+                    body: '{"name": "test"}',
+                    exceptSignToken: 'Qiniu ak:GQQrYvDCdN_RaVjyJC7hIkv5TYk='
+                },
+                {
                     method: 'gET',
                     host: 'upload.qiniup.com',
                     url: 'http://upload.qiniup.com',

@@ -252,7 +252,7 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
     access += '\n\n';
 
     // add reqbody
-    if (reqBody) {
+    if (reqBody && reqContentType !== 'application/octet-stream') {
         access += reqBody;
     }
 
