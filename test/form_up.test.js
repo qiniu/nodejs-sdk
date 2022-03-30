@@ -182,6 +182,77 @@ describe('test form up', function () {
         });
     });
 
+    describe('test form up#putFileWithFileType', function () {
+        it('test form up#putFileWithFileType IA', function (done) {
+            const key = 'storage_put_test_with_file_type' + Math.random();
+            const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
+                fileType: 1
+            }));
+            const uploadToken = putPolicy.uploadToken(mac);
+            formUploader.putFile(
+                uploadToken,
+                key,
+                testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody
+                ) {
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                }
+            );
+        });
+
+        it('test form up#putFileWithFileType Archive', function (done) {
+            const key = 'storage_put_test_with_file_type' + Math.random();
+            const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
+                fileType: 2
+            }));
+            const uploadToken = putPolicy.uploadToken(mac);
+            formUploader.putFile(
+                uploadToken,
+                key,
+                testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody
+                ) {
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                }
+            );
+        });
+
+        it('test form up#putFileWithFileType DeepArchive', function (done) {
+            const key = 'storage_put_test_with_file_type' + Math.random();
+            const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
+                fileType: 3
+            }));
+            const uploadToken = putPolicy.uploadToken(mac);
+            formUploader.putFile(
+                uploadToken,
+                key,
+                testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody
+                ) {
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                }
+            );
+        });
+    });
+
     // eslint-disable-next-line no-undef
     describe('test form up#putFileWithParams', function () {
         // eslint-disable-next-line no-undef

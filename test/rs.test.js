@@ -24,7 +24,7 @@ describe('test start bucket manager', function () {
     var domain = proc.env.QINIU_TEST_DOMAIN;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
-    config.useCdnDomain = true;
+    // config.useCdnDomain = true;
     config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
@@ -353,70 +353,114 @@ describe('test start bucket manager', function () {
         });
     });
 
-    // eslint-disable-next-line no-undef
     // 空间生命周期
     describe('test lifeRule', function () {
-        var bucket = srcBucket;
-        // add
-        describe('test putLifeRule', function () {
-            it('test putLifeRule', function (done) {
-                var options = {
-                    name: 'hello',
-                    prefix: 'test'
-                };
-                bucketManager.putBucketLifecycleRule(bucket, options, function (err,
-                    respBody, respInfo) {
+        const bucket = srcBucket;
+        const ruleName = 'test_rule_name_' + Math.floor(Math.random() * 1000);
+
+        function testGet (expectItem, nextCall, otherRespInfo) {
+            bucketManager.getBucketLifecycleRule(
+                bucket,
+                function (
+                    err,
+                    respBody,
+                    respInfo
+                ) {
                     should.not.exist(err);
-                    console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
-                    done();
-                });
-            });
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                    if (!expectItem && !respBody) {
+                        nextCall();
+                        return;
+                    }
+                    const actualItem = respBody.find(function (item) {
+                        return item.name === ruleName;
+                    });
+                    if (!expectItem) {
+                        should.not.exist(actualItem);
+                        nextCall();
+                        return;
+                    }
+                    should.exist(actualItem, JSON.stringify({
+                        respInfo: respInfo,
+                        otherRespInfo: otherRespInfo
+                    }));
+                    actualItem.should.have.properties(expectItem);
+                    nextCall();
+                }
+            );
+        }
+
+        before(function (done) {
+            bucketManager.deleteBucketLifecycleRule(bucket, ruleName, done);
         });
 
-        // delete
-        describe('test deleteLifeRule', function () {
-            it('test deleteLifeRule', function (done) {
-                bucketManager.deleteBucketLifecycleRule(bucket, 'hello', function (err,
-                    respBody, respInfo) {
-                    should.not.exist(err);
-                    console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
-                    done();
-                });
-            });
-        });
-
-        // update
-        describe('test updateLifeRule', function () {
-            var options = {
-                name: 'hello',
-                history_to_line_after_days: 10,
-                delete_after_days: 10,
-                to_line_after_days: 8
+        it('test lifeRule put', function (done) {
+            const options = {
+                name: ruleName,
+                prefix: 'test',
+                to_line_after_days: 30,
+                to_archive_after_days: 40,
+                to_deep_archive_after_days: 50,
+                delete_after_days: 65
             };
-            it('test updateLifeRule', function (done) {
-                bucketManager.updateBucketLifecycleRule(bucket, options, function (err,
-                    respBody, respInfo) {
+            bucketManager.putBucketLifecycleRule(
+                bucket,
+                options,
+                function (err, respBody, respInfo) {
                     should.not.exist(err);
-                    console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
-                    done();
-                });
-            });
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                    testGet({
+                        prefix: 'test',
+                        to_line_after_days: 30,
+                        to_archive_after_days: 40,
+                        to_deep_archive_after_days: 50,
+                        delete_after_days: 65,
+                        history_delete_after_days: 0,
+                        history_to_line_after_days: 0
+                    }, done, respInfo);
+                }
+            );
         });
 
-        // get
-        describe('test getLifeRule', function () {
-            it('test getLifeRule', function (done) {
-                bucketManager.getBucketLifecycleRule(bucket, function (err,
-                    respBody, respInfo) {
+        it('test lifeRule update', function (done) {
+            const options = {
+                name: ruleName,
+                prefix: 'update_prefix',
+                to_line_after_days: 30,
+                to_archive_after_days: 50,
+                to_deep_archive_after_days: 60,
+                delete_after_days: 65
+            };
+            bucketManager.updateBucketLifecycleRule(
+                bucket,
+                options,
+                function (err, respBody, respInfo) {
                     should.not.exist(err);
-                    console.log(JSON.stringify(respBody) + '\n');
-                    console.log(JSON.stringify(respInfo));
-                    done();
-                });
-            });
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+
+                    testGet({
+                        prefix: 'update_prefix',
+                        to_line_after_days: 30,
+                        to_archive_after_days: 50,
+                        to_deep_archive_after_days: 60,
+                        delete_after_days: 65,
+                        history_delete_after_days: 0,
+                        history_to_line_after_days: 0
+                    }, done, respInfo);
+                }
+            );
+        });
+
+        it('test lifeRule delete', function (done) {
+            bucketManager.deleteBucketLifecycleRule(
+                bucket,
+                ruleName,
+                function (err, respBody, respInfo) {
+                    should.not.exist(err);
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                    testGet(null, done, respInfo);
+                }
+            );
         });
     });
 
@@ -587,6 +631,21 @@ describe('test start bucket manager', function () {
                 // change file type to Archive
                 changeType(key, 2, function () {
                     const freezeAfterDays = 1;
+                    const entry = bucket + (key ? ':' + key : '');
+                    bucketManager.restoreAr(entry, freezeAfterDays, function (err, respBody, respInfo) {
+                        should.not.exist(err);
+                        respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                        done();
+                    });
+                });
+            });
+        });
+
+        it('test restoreAr DeepArchive', function (done) {
+            testObjectOperationWrapper(bucket, 'test_restore_ar_deep_archive', function (key) {
+                // change file type to DeepArchive
+                changeType(key, 3, function () {
+                    const freezeAfterDays = 2;
                     const entry = bucket + (key ? ':' + key : '');
                     bucketManager.restoreAr(entry, freezeAfterDays, function (err, respBody, respInfo) {
                         should.not.exist(err);

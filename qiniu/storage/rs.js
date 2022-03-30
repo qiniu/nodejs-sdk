@@ -87,7 +87,7 @@ function changeHeadersReq(mac, config, bucket, key, headers, callbackFunc) {
 }
 
 // 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
-// @link https://developer.qiniu.com/kodo/api/1257/delete
+// @link https://developer.qiniu.com/kodo/1288/move
 // @param srcBucket  源空间名称
 // @param srcKey     源文件名称
 // @param destBucket 目标空间名称
@@ -568,16 +568,22 @@ BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
-// rules/add增加bucket规则
-// @param bucket 空间名
-// @param name: 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
-// @param prefix: 同一个 bucket 里面前缀不能重复
-// @param to_line_after_days: 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，
-//      小于0表示上传的文件立即变低频存储
-// @param delete_after_days: 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
-// @param history_delete_after_days: 指定文件成为历史版本多少天后删除，指定为0表示不删除，
-//      大于0表示多少天后删除
-// @param history_to_line_after_days: 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+/**
+ * rules/add 增加 bucket 规则
+ * @param { string } bucket 空间名
+ *
+ * @param { Object } options - 配置项
+ * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+ * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
+ * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
+ * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
+ * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+ * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param { number } options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param { number } options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+ *
+ * @param { function } callbackFunc - 回调函数
+ */
 BucketManager.prototype.putBucketLifecycleRule = function (bucket, options,
     callbackFunc) {
     PutBucketLifecycleRule(this.mac, this.config, bucket, options, callbackFunc);
@@ -600,6 +606,18 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
         reqParams.to_line_after_days = options.to_line_after_days;
     } else {
         reqParams.to_line_after_days = 0;
+    }
+
+    if (options.to_archive_after_days) {
+        reqParams.to_archive_after_days = options.to_archive_after_days;
+    } else {
+        reqParams.to_archive_after_days = 0;
+    }
+
+    if (options.to_deep_archive_after_days) {
+        reqParams.to_deep_archive_after_days = options.to_deep_archive_after_days;
+    } else {
+        reqParams.to_deep_archive_after_days = 0;
     }
 
     if (options.delete_after_days) {
@@ -627,9 +645,10 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
     rpc.postWithoutForm(requestURI, auth, callbackFunc);
 }
 
-// rules/delete 删除bucket规则
-// @param bucket 空间名
-// @param name: 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+/** rules/delete 删除 bucket 规则
+ * @param { string } bucket 空间名
+ * @param { string } name: 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+ */
 BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, callbackFunc) {
     var reqParams = {
         bucket: bucket,
@@ -642,8 +661,21 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
-// rules/update 更新bucket规则
-// @param bucket 空间名
+/** rules/update 更新 bucket 规则
+ * @param bucket 空间名
+ *
+ * @param { Object } options - 配置项
+ * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线:
+ * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
+ * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
+ * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
+ * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+ * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param { number } options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param { number } options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+ *
+ * @param { function } callbackFunc - 回调函数
+ */
 BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, callbackFunc) {
     options = options || {};
     var reqParams = {
@@ -657,6 +689,14 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
 
     if (options.to_line_after_days) {
         reqParams.to_line_after_days = options.to_line_after_days;
+    }
+
+    if (options.to_archive_after_days) {
+        reqParams.to_archive_after_days = options.to_archive_after_days;
+    }
+
+    if (options.to_deep_archive_after_days) {
+        reqParams.to_deep_archive_after_days = options.to_deep_archive_after_days;
     }
 
     if (options.delete_after_days) {
@@ -678,8 +718,10 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
-// rules/get 获取bucket规则
-// @param bucket 空间名
+/** rules/get - 获取 bucket 规则
+ *  @param { string } bucket - 空间名
+ *  @param { function } callbackFunc - 回调函数
+ */
 BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/rules/get?bucket=' + bucket;
@@ -974,10 +1016,10 @@ BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
-//解冻归档存储文件
+// 解冻归档存储文件
 BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.RS_HOST + "/restoreAr/" + util.urlsafeBase64Encode(entry) + "/freezeAfterDays/" + freezeAfterDays;
+    var requestURI = scheme + conf.RS_HOST + '/restoreAr/' + util.urlsafeBase64Encode(entry) + '/freezeAfterDays/' + freezeAfterDays;
     var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
