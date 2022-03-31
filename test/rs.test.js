@@ -24,8 +24,48 @@ describe('test start bucket manager', function () {
     var domain = proc.env.QINIU_TEST_DOMAIN;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
-    // config.useHttpsDomain = true;
+    config.useCdnDomain = true;
+    config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
+
+    const keysToDeleteAfter = [];
+    after(function (done) {
+        const deleteOps = [];
+        keysToDeleteAfter.forEach(function (key) {
+            deleteOps.push(qiniu.rs.deleteOp(srcBucket, key));
+        });
+
+        bucketManager.batch(deleteOps, function (respErr, respBody) {
+            respBody.forEach(function (ret, i) {
+                ret.code.should.be.eql(
+                    200,
+                    JSON.stringify({
+                        key: keysToDeleteAfter[i],
+                        ret: ret
+                    })
+                );
+            });
+            done();
+        });
+    });
+
+    // TODO: using this method to wrapper all operation. done test:
+    //       - restoreAr
+    function testObjectOperationWrapper (destBucket, destObjectKey, callback) {
+        const srcKey = 'qiniu.mp4';
+        const destKey = destObjectKey + Math.random();
+        const options = {
+            force: true
+        };
+        bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options,
+            function (err, respBody, respInfo) {
+                // console.log(respBody);
+                should.not.exist(err);
+                respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                keysToDeleteAfter.push(destKey);
+                callback(destKey);
+            });
+    }
     // test stat
     // eslint-disable-next-line no-undef
     describe('test stat', function () {
@@ -150,17 +190,22 @@ describe('test start bucket manager', function () {
     describe('test fetch', function () {
         // eslint-disable-next-line no-undef
         it('test fetch', function (done) {
-            var resUrl = 'http://devtools.qiniu.com/qiniu.png';
-            var bucket = srcBucket;
-            var key = 'qiniu.png';
+            const resUrl = 'http://devtools.qiniu.com/qiniu.png';
+            const bucket = srcBucket;
+            const key = 'qiniu.png';
 
-            bucketManager.fetch(resUrl, bucket, key, function (err,
-                respBody) {
-                should.not.exist(err);
-                respBody.should.have.keys('hash', 'fsize', 'mimeType',
-                    'key');
-                done();
-            });
+            bucketManager.fetch(resUrl, bucket, key,
+                function (err, respBody, respInfo) {
+                    should.not.exist(err, respInfo);
+                    respBody.should.have.keys(
+                        'hash',
+                        'fsize',
+                        'mimeType',
+                        'key'
+                    );
+                    done();
+                }
+            );
         });
     });
 
@@ -522,15 +567,33 @@ describe('test start bucket manager', function () {
     });
 
     describe('test restoreAr', function () {
-        var bucket = srcBucket;
-        it('test restoreAr', function (done) {
-            var entry = "wxapptest:30ae7f2c51c3b5d1d90b75f0515a1183.mp4";
-            var freezeAfterDays = 2;
-            bucketManager.restoreAr(entry, freezeAfterDays, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
-                done();
+        const bucket = srcBucket;
+
+        function changeType (key, type, callback) {
+            bucketManager.changeType(
+                bucket,
+                key,
+                type,
+                function (err, respBody, respInfo) {
+                    should.not.exist(err);
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                    callback();
+                }
+            );
+        }
+
+        it('test restoreAr Archive', function (done) {
+            testObjectOperationWrapper(bucket, 'test_restore_ar_archive', function (key) {
+                // change file type to Archive
+                changeType(key, 2, function () {
+                    const freezeAfterDays = 1;
+                    const entry = bucket + (key ? ':' + key : '');
+                    bucketManager.restoreAr(entry, freezeAfterDays, function (err, respBody, respInfo) {
+                        should.not.exist(err);
+                        respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                        done();
+                    });
+                });
             });
         });
     });

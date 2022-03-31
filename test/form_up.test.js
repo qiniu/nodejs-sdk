@@ -42,7 +42,7 @@ describe('test form up', function () {
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
     config.useCdnDomain = true;
-    // config.useHttpsDomain = true;
+    config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
     // delete all the files uploaded
@@ -50,17 +50,20 @@ describe('test form up', function () {
 
     // eslint-disable-next-line no-undef
     after(function (done) {
-        var deleteOps = [];
+        const deleteOps = [];
         keysToDelete.forEach(function (key) {
             deleteOps.push(qiniu.rs.deleteOp(bucket, key));
         });
 
         bucketManager.batch(deleteOps, function (respErr, respBody) {
-            // console.log(respBody);
-            respBody.forEach(function (ret) {
-                ret.should.eql({
-                    code: 200
-                });
+            respBody.forEach(function (ret, i) {
+                ret.code.should.be.eql(
+                    200,
+                    JSON.stringify({
+                        key: keysToDelete[i],
+                        ret: ret
+                    })
+                );
             });
             done();
         });
