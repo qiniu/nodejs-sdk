@@ -36,47 +36,54 @@ exports.Config = function Config(options) {
     this.zoneExpire = options.zoneExpire || -1;
 };
 
-exports.Zone = function (srcUpHosts, cdnUpHosts, ioHost, rsHost, rsfHost,
-    apiHost) {
-    this.srcUpHosts = srcUpHosts || {};
-    this.cdnUpHosts = cdnUpHosts || {};
+exports.Zone = function (
+    srcUpHosts,
+    cdnUpHosts,
+    ioHost,
+    rsHost,
+    rsfHost,
+    apiHost
+) {
+    this.srcUpHosts = srcUpHosts || [];
+    this.cdnUpHosts = cdnUpHosts || [];
     this.ioHost = ioHost || '';
-    this.rsHost = rsHost || 'rs.qiniu.com';
-    this.rsfHost = rsfHost || 'rsf.qiniu.com';
-    this.apiHost = apiHost || 'api.qiniu.com';
-    var dotIndex = this.ioHost.indexOf('.');
-    if (dotIndex != -1) {
-        var ioTag = this.ioHost.substring(0, dotIndex);
-        var zoneSepIndex = ioTag.indexOf('-');
-        if (zoneSepIndex != -1) {
-            var zoneTag = ioTag.substring(zoneSepIndex + 1);
+    this.rsHost = rsHost;
+    this.rsfHost = rsfHost;
+    this.apiHost = apiHost;
+
+    // set specific hosts if possible
+    const dotIndex = this.ioHost.indexOf('.');
+    if (dotIndex !== -1) {
+        const ioTag = this.ioHost.substring(0, dotIndex);
+        const zoneSepIndex = ioTag.indexOf('-');
+        if (zoneSepIndex !== -1) {
+            const zoneTag = ioTag.substring(zoneSepIndex + 1);
             switch (zoneTag) {
-                case 'z1':
-                    this.rsHost = 'rs-z1.qiniu.com';
-                    this.rsfHost = 'rsf-z1.qiniu.com';
-                    this.apiHost = 'api-z1.qiniu.com';
-                    break;
-                case 'z2':
-                    this.rsHost = 'rs-z2.qiniu.com';
-                    this.rsfHost = 'rsf-z2.qiniu.com';
-                    this.apiHost = 'api-z2.qiniu.com';
-                    break;
-                case 'na0':
-                    this.rsHost = 'rs-na0.qiniu.com';
-                    this.rsfHost = 'rsf-na0.qiniu.com';
-                    this.apiHost = 'api-na0.qiniu.com';
-                    break;
-                case 'as0':
-                    this.rsHost = 'rs-as0.qiniu.com';
-                    this.rsfHost = 'rsf-as0.qiniu.com';
-                    this.apiHost = 'api-as0.qiniu.com';
-                    break;
-                default:
-                    this.rsHost = 'rs.qiniu.com';
-                    this.rsfHost = 'rsf.qiniu.com';
-                    this.apiHost = 'api.qiniu.com';
-                    break;
+            case 'z1':
+                !this.rsHost && (this.rsHost = 'rs-z1.qbox.me');
+                !this.rsfHost && (this.rsfHost = 'rsf-z1.qbox.me');
+                !this.apiHost && (this.apiHost = 'api-z1.qiniu.com');
+                break;
+            case 'z2':
+                !this.rsHost && (this.rsHost = 'rs-z2.qbox.me');
+                !this.rsfHost && (this.rsfHost = 'rsf-z2.qbox.me');
+                !this.apiHost && (this.apiHost = 'api-z2.qiniu.com');
+                break;
+            case 'na0':
+                !this.rsHost && (this.rsHost = 'rs-na0.qbox.me');
+                !this.rsfHost && (this.rsfHost = 'rsf-na0.qbox.me');
+                !this.apiHost && (this.apiHost = 'api-na0.qiniu.com');
+                break;
+            case 'as0':
+                !this.rsHost && (this.rsHost = 'rs-as0.qbox.me');
+                !this.rsfHost && (this.rsfHost = 'rsf-as0.qbox.me');
+                !this.apiHost && (this.apiHost = 'api-as0.qiniu.com');
+                break;
             }
         }
     }
+
+    !this.rsHost && (this.rsHost = 'rs.qiniu.com');
+    !this.rsfHost && (this.rsfHost = 'rsf.qiniu.com');
+    !this.apiHost && (this.apiHost = 'api.qiniu.com');
 };

@@ -25,7 +25,6 @@ describe('test start bucket manager', function () {
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
     // config.useHttpsDomain = true;
-    config.zone = qiniu.zone.Zone_z0;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
     // test stat
     // eslint-disable-next-line no-undef
