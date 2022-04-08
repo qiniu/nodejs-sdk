@@ -725,8 +725,8 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
 BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc) {
     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     var requestURI = scheme + conf.UC_HOST + '/rules/get?bucket=' + bucket;
-    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
-    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'GET', 'application/x-www-form-urlencoded');
+    rpc.getWithToken(requestURI, digest, callbackFunc);
 };
 
 // events/add 增加事件通知规则

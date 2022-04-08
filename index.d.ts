@@ -401,6 +401,23 @@ export declare namespace rpc {
         'User-Agent'?: string;
         Connection?: string;
     }
+
+    /**
+     *
+     * @param requestUrl 请求地址
+     * @param headers 请求 headers
+     * @param callbackFunc 回调函数
+     */
+    function get(requestUrl: string, headers: Headers | null, callbackFunc: callback): void;
+
+    /**
+     *
+     * @param requestUrl 请求地址
+     * @param token 请求认证签名
+     * @param callbackFunc 回调函数
+     */
+    function getWithToken(requestUrl: string, token: string | null, callbackFunc: callback): void;
+
     /**
      *
      * @param requestURI
