@@ -364,6 +364,8 @@ export declare namespace util {
 
     function hmacSha1(encodedFlags: string | Buffer, secretKey: string | Buffer): string;
 
+    function canonicalMimeHeaderKey(fieldName: string): string;
+
     /**
      * 创建AccessToken凭证
      * @param mac AK&SK对象
@@ -380,8 +382,9 @@ export declare namespace util {
      * @param reqMethod      请求方法，例如 GET，POST
      * @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
      * @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者 application/x-www-form-urlencoded 时才需要传入该参数
+     * @param reqHeaders     请求Headers，例如 {"X-Qiniu-Name": "Qiniu", "Content-Type": "application/x-www-form-urlencoded"}
      */
-    function generateAccessTokenV2(mac: auth.digest.Mac, requestURI: string, reqMethod: string, reqContentType: string, reqBody?: string): string;
+    function generateAccessTokenV2(mac: auth.digest.Mac, requestURI: string, reqMethod: string, reqContentType: string, reqBody?: string, reqHeaders?: Record<string, string>): string;
 
     /**
      * 校验七牛上传回调的Authorization
