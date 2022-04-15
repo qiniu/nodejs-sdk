@@ -1,5 +1,11 @@
 ## CHANGE LOG
 
+
+## 7.5.0
+- 对象存储，新增对[深度归档]存储类型支持(https://developer.qiniu.com/kodo/3956/kodo-category#deep_archive)
+- 对象存储，修复在不制定区域信息情况下自动获取区域信息异常问题
+- 修复 Qiniu 签名算法在对部分 http header 处理异常问题
+
 ## 7.4.0
 - 支持 [分片上传 V2](https://developer.qiniu.com/kodo/6364/multipartupload-interface)
 
