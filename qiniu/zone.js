@@ -60,8 +60,11 @@ exports.Zone_as0 = new conf.Zone([
 'api-as0.qiniu.com');
 
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
-    var apiAddr = util.format('https://uc.qbox.me/v2/query?ak=%s&bucket=%s',
-        accessKey, bucket);
+    const apiAddr = util.format(
+        'https://uc.qbox.me/v2/query?ak=%s&bucket=%s',
+        accessKey,
+        bucket
+    );
     urllib.request(apiAddr, function (respErr, respData, respInfo) {
         if (respErr) {
             callbackFunc(respErr, null, null);
@@ -75,10 +78,10 @@ exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
             return;
         }
 
-        var zoneData = JSON.parse(respData);
-        var srcUpHosts = [];
-        var cdnUpHosts = [];
-        var zoneExpire = 0;
+        const zoneData = JSON.parse(respData);
+        const srcUpHosts = [];
+        const cdnUpHosts = [];
+        let zoneExpire = 0;
 
         try {
             zoneExpire = zoneData.ttl;
@@ -102,8 +105,18 @@ exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
                 });
             }
 
-            var ioHost = zoneData.io.src.main[0];
-            var zoneInfo = new conf.Zone(srcUpHosts, cdnUpHosts, ioHost);
+            const ioHost = zoneData.io.src.main[0];
+            const rsHost = zoneData.rs.acc.main[0];
+            const rsfHost = zoneData.rsf.acc.main[0];
+            const apiHost = zoneData.api.acc.main[0];
+            const zoneInfo = new conf.Zone(
+                srcUpHosts,
+                cdnUpHosts,
+                ioHost,
+                rsHost,
+                rsfHost,
+                apiHost
+            );
             callbackFunc(null, zoneInfo, zoneExpire);
         } catch (e) {
             callbackFunc(e, null, null);

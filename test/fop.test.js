@@ -19,7 +19,7 @@ describe('test start fop', function () {
     var srcBucket = proc.env.QINIU_TEST_BUCKET;
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
-    // config.useHttpsDomain = true;
+    config.useHttpsDomain = true;
     config.zone = qiniu.zone.Zone_z0;
 
     var persistentId;

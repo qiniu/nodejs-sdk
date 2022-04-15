@@ -401,6 +401,23 @@ export declare namespace rpc {
         'User-Agent'?: string;
         Connection?: string;
     }
+
+    /**
+     *
+     * @param requestUrl 请求地址
+     * @param headers 请求 headers
+     * @param callbackFunc 回调函数
+     */
+    function get(requestUrl: string, headers: Headers | null, callbackFunc: callback): void;
+
+    /**
+     *
+     * @param requestUrl 请求地址
+     * @param token 请求认证签名
+     * @param callbackFunc 回调函数
+     */
+    function getWithToken(requestUrl: string, token: string | null, callbackFunc: callback): void;
+
     /**
      *
      * @param requestURI
@@ -596,6 +613,14 @@ export declare namespace rs {
         deleteAfterDays(bucket: string, key: string, days: number, callback: callback): void;
 
         /**
+         * 解冻归档存储文件
+         * @param entry
+         * @param freezeAfterDays
+         * @param callbackFunc
+         */
+        restoreAr(entry: string, freezeAfterDays: number, callbackFunc: callback): void;
+
+        /**
          * 抓取资源
          * @see https://developer.qiniu.com/kodo/api/1263/fetch
          *
@@ -678,6 +703,84 @@ export declare namespace rs {
          * @param fileName 原始文件名
          */
         publicDownloadUrl(domain: string, fileName: string): string;
+
+        /**
+         * rules/add 增加 bucket 规则
+         *
+         * @param bucket - 空间名
+         *
+         * @param options - 配置项
+         * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+         * @param options.prefix - 同一个 bucket 里面前缀不能重复
+         * @param options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
+         * @param options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
+         * @param options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+         * @param options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+         * @param options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+         * @param options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+         *
+         * @param callbackFunc - 回调函数
+         */
+        putBucketLifecycleRule(
+            bucket: string,
+            options: {
+                name: string,
+                prefix?: string,
+                to_line_after_days?: number,
+                to_archive_after_days?: number,
+                to_deep_archive_after_days?: number,
+                delete_after_days?: number,
+                history_delete_after_days?: number,
+                history_to_line_after_days?: number,
+            },
+            callbackFunc: callback
+        ): void;
+
+        /** rules/delete 删除 bucket 规则
+         * @param bucket - 空间名
+         * @param name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+         * @param callbackFunc - 回调函数
+         */
+        deleteBucketLifecycleRule(bucket: string, name: string, callbackFunc: callback): void;
+
+        /**
+         * rules/update 更新 bucket 规则
+         *
+         * @param bucket - 空间名
+         *
+         * @param options - 配置项
+         * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+         * @param options.prefix - 同一个 bucket 里面前缀不能重复
+         * @param options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
+         * @param options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
+         * @param options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+         * @param options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+         * @param options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+         * @param options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+         *
+         * @param callbackFunc - 回调函数
+         */
+        updateBucketLifecycleRule(
+            bucket: string,
+            options: {
+                name: string,
+                prefix?: string,
+                to_line_after_days?: number,
+                to_archive_after_days?: number,
+                to_deep_archive_after_days?: number,
+                delete_after_days?: number,
+                history_delete_after_days?: number,
+                history_to_line_after_days?: number,
+            },
+            callbackFunc: callback
+        ): void;
+
+
+        /** rules/get - 获取 bucket 规则
+         *  @param bucket - 空间名
+         *  @param callbackFunc - 回调函数
+         */
+        getBucketLifecycleRule(bucket: string, callbackFunc: callback): void
     }
 
     /**

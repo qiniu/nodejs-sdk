@@ -34,7 +34,7 @@ describe('test resume up', function () {
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
     config.useCdnDomain = true;
-    // config.useHttpsDomain = true;
+    config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
     // delete all the files uploaded
@@ -42,17 +42,21 @@ describe('test resume up', function () {
 
     // eslint-disable-next-line no-undef
     after(function (done) {
-        var deleteOps = [];
+        const deleteOps = [];
+
         keysToDelete.forEach(function (key) {
             deleteOps.push(qiniu.rs.deleteOp(bucket, key));
         });
 
-        bucketManager.batch(deleteOps, function (respErr, respBody, respInfo) {
-            console.log(respBody, respInfo);
-            respBody.forEach(function (ret) {
-                ret.should.eql({
-                    code: 200
-                });
+        bucketManager.batch(deleteOps, function (respErr, respBody) {
+            respBody.forEach(function (ret, i) {
+                ret.code.should.be.eql(
+                    200,
+                    JSON.stringify({
+                        key: keysToDelete[i],
+                        ret: ret
+                    })
+                );
             });
             done();
         });
@@ -140,93 +144,92 @@ describe('test resume up', function () {
     // eslint-disable-next-line no-undef
     describe('test resume up#putFile', function () {
         it('test resume up#putFile', function (done) {
-            var putExtra = new qiniu.resume_up.PutExtra();
+            const putExtra = new qiniu.resume_up.PutExtra();
             putExtra.mimeType = 'application/json';
-            var key = 'storage_putFile_test' + Math.random(1000);
-            var domain = proc.env.QINIU_TEST_DOMAIN;
+            const key = 'storage_putFile_test' + Math.floor(Math.random() * 1000);
+            const domain = proc.env.QINIU_TEST_DOMAIN;
             resumeUploader.putFile(uploadToken, key, testFilePath, putExtra,
-                function (
-                    respErr,
-                    respBody, respInfo) {
-
+                function (respErr, respBody, respInfo) {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
 
-                    var expectedMd5 = undefined, actualMd5 = undefined;
-                    {
-                        var md5 = crypto.createHash('md5');
-                        var stream = fs.ReadStream(testFilePath);
+                    const localFileMd5Promise = new Promise(function (resolve) {
+                        const md5 = crypto.createHash('md5');
+                        const stream = fs.createReadStream(testFilePath);
                         stream.on('data', function (data) {
                             md5.update(data);
                         });
                         stream.on('end', function () {
-                            expectedMd5 = md5.digest('hex');
+                            resolve(md5.digest('hex'));
                         });
-                    }
-
-                    http.get("http://" + domain + "/" + key, function (response) {
-                        response.statusCode.should.eql(200);
-                        response.headers['content-type'].should.eql('application/json');
-                        {
-                            var md5 = crypto.createHash('md5');
+                    });
+                    const remoteFileMd5Promise = new Promise(function (resolve) {
+                        http.get('http://' + domain + '/' + key, function (response) {
+                            response.statusCode.should.eql(200);
+                            response.headers['content-type'].should.eql('application/json');
+                            const md5 = crypto.createHash('md5');
                             response.on('data', function (data) {
                                 md5.update(data);
                             });
                             response.on('end', function () {
-                                actualMd5 = md5.digest('hex');
-                                should(actualMd5).eql(expectedMd5);
-                                done();
+                                resolve(md5.digest('hex'));
                             });
-                        }
+                        });
                     });
+
+                    Promise.all([localFileMd5Promise, remoteFileMd5Promise])
+                        .then(function ([expectedMd5, actualMd5]) {
+                            actualMd5.should.eql(expectedMd5);
+                            done();
+                        });
                 });
         });
 
         it('test resume up#putFile_v2', function (done) {
-            var putExtra = new qiniu.resume_up.PutExtra();
-            var key = 'storage_putFile_test_v2' + Math.random(1000);
-            var domain = proc.env.QINIU_TEST_DOMAIN;
-            putExtra.partSize = 6 * 1024 * 1024
-            putExtra.version = 'v2'
+            const putExtra = new qiniu.resume_up.PutExtra();
+            const key = 'storage_putFile_test_v2' + Math.floor(Math.random() * 1000);
+            const domain = proc.env.QINIU_TEST_DOMAIN;
+            putExtra.partSize = 6 * 1024 * 1024;
+            putExtra.version = 'v2';
             putExtra.mimeType = 'application/x-www-form-urlencoded';
             resumeUploader.putFile(uploadToken, key, testFilePath, putExtra,
-                function (
-                    respErr,
-                    respBody, respInfo) {
+                function (respErr, respBody, respInfo) {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
 
-                    var expectedMd5 = undefined, actualMd5 = undefined;
-                    {
-                        var md5 = crypto.createHash('md5');
-                        var stream = fs.ReadStream(testFilePath);
+                    const localFileMd5Promise = new Promise(function (resolve) {
+                        const md5 = crypto.createHash('md5');
+                        const stream = fs.createReadStream(testFilePath);
                         stream.on('data', function (data) {
                             md5.update(data);
                         });
                         stream.on('end', function () {
-                            expectedMd5 = md5.digest('hex');
+                            resolve(md5.digest('hex'));
                         });
-                    }
-
-                    http.get("http://" + domain + "/" + key, function (response) {
-                        response.statusCode.should.eql(200);
-                        response.headers['content-type'].should.eql('application/x-www-form-urlencoded');
-                        {
-                            var md5 = crypto.createHash('md5');
+                    });
+                    const remoteFileMd5Promise = new Promise(function (resolve) {
+                        http.get('http://' + domain + '/' + key, function (response) {
+                            response.statusCode.should.eql(200);
+                            response.headers['content-type'].should.eql('application/x-www-form-urlencoded');
+                            const md5 = crypto.createHash('md5');
                             response.on('data', function (data) {
                                 md5.update(data);
                             });
                             response.on('end', function () {
-                                actualMd5 = md5.digest('hex');
-                                should(actualMd5).eql(expectedMd5);
-                                done();
+                                resolve(md5.digest('hex'));
                             });
-                        }
+                        });
                     });
+
+                    Promise.all([localFileMd5Promise, remoteFileMd5Promise])
+                        .then(function ([expectedMd5, actualMd5]) {
+                            actualMd5.should.eql(expectedMd5);
+                            done();
+                        });
                 });
         });
     });

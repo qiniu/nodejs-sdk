@@ -42,7 +42,7 @@ describe('test form up', function () {
     var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
     var config = new qiniu.conf.Config();
     config.useCdnDomain = true;
-    // config.useHttpsDomain = true;
+    config.useHttpsDomain = true;
     var bucketManager = new qiniu.rs.BucketManager(mac, config);
 
     // delete all the files uploaded
@@ -50,17 +50,20 @@ describe('test form up', function () {
 
     // eslint-disable-next-line no-undef
     after(function (done) {
-        var deleteOps = [];
+        const deleteOps = [];
         keysToDelete.forEach(function (key) {
             deleteOps.push(qiniu.rs.deleteOp(bucket, key));
         });
 
         bucketManager.batch(deleteOps, function (respErr, respBody) {
-            // console.log(respBody);
-            respBody.forEach(function (ret) {
-                ret.should.eql({
-                    code: 200
-                });
+            respBody.forEach(function (ret, i) {
+                ret.code.should.be.eql(
+                    200,
+                    JSON.stringify({
+                        key: keysToDelete[i],
+                        ret: ret
+                    })
+                );
             });
             done();
         });
@@ -176,6 +179,77 @@ describe('test form up', function () {
                     keysToDelete.push(respBody.key);
                     done();
                 });
+        });
+    });
+
+    describe('test form up#putFileWithFileType', function () {
+        it('test form up#putFileWithFileType IA', function (done) {
+            const key = 'storage_put_test_with_file_type' + Math.random();
+            const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
+                fileType: 1
+            }));
+            const uploadToken = putPolicy.uploadToken(mac);
+            formUploader.putFile(
+                uploadToken,
+                key,
+                testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody
+                ) {
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                }
+            );
+        });
+
+        it('test form up#putFileWithFileType Archive', function (done) {
+            const key = 'storage_put_test_with_file_type' + Math.random();
+            const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
+                fileType: 2
+            }));
+            const uploadToken = putPolicy.uploadToken(mac);
+            formUploader.putFile(
+                uploadToken,
+                key,
+                testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody
+                ) {
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                }
+            );
+        });
+
+        it('test form up#putFileWithFileType DeepArchive', function (done) {
+            const key = 'storage_put_test_with_file_type' + Math.random();
+            const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
+                fileType: 3
+            }));
+            const uploadToken = putPolicy.uploadToken(mac);
+            formUploader.putFile(
+                uploadToken,
+                key,
+                testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody
+                ) {
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                    done();
+                }
+            );
         });
     });
 
