@@ -49,8 +49,9 @@ describe('test start bucket manager', function () {
         });
     });
 
-    // TODO: using this method to wrapper all operation. done test:
+    // TODO: using this method to wrapper all operation. done tests:
     //       - restoreAr
+    //       - setObjectLifecycle
     function testObjectOperationWrapper (destBucket, destObjectKey, callback) {
         const srcKey = 'qiniu.mp4';
         const destKey = destObjectKey + Math.random();
@@ -461,6 +462,59 @@ describe('test start bucket manager', function () {
                     testGet(null, done, respInfo);
                 }
             );
+        });
+    });
+
+    describe('test object lifecycle', function () {
+        const bucket = srcBucket;
+
+        it('test setObjectLifeCycle', function (done) {
+            testObjectOperationWrapper(bucket, 'test_set_object_lifecycle', function (key) {
+                bucketManager.setObjectLifeCycle(
+                    bucket,
+                    key,
+                    {
+                        toIaAfterDays: 10,
+                        toArchiveAfterDays: 20,
+                        toDeepArchiveAfterDays: 30,
+                        deleteAfterDays: 40
+                    },
+                    function (err, respBody, respInfo) {
+                        should.not.exist(err);
+                        respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                        done();
+                    }
+                );
+            });
+        });
+
+        it('test setObjectLifeCycle with cond', function (done) {
+            testObjectOperationWrapper(bucket, 'test_set_object_lifecycle_cond', function (key) {
+                bucketManager.stat(bucket, key, function (err, respBody, respInfo) {
+                    should.not.exist(err);
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                    const { hash } = respBody;
+
+                    bucketManager.setObjectLifeCycle(
+                        bucket,
+                        key,
+                        {
+                            toIaAfterDays: 10,
+                            toArchiveAfterDays: 20,
+                            toDeepArchiveAfterDays: 30,
+                            deleteAfterDays: 40,
+                            cond: {
+                                hash: hash
+                            }
+                        },
+                        function (err, respBody, respInfo) {
+                            should.not.exist(err);
+                            respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                            done();
+                        }
+                    );
+                });
+            });
         });
     });
 
