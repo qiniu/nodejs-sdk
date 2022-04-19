@@ -14,6 +14,8 @@ before(function (done) {
 
 // eslint-disable-next-line no-undef
 describe('test start fop', function () {
+    this.timeout(0);
+
     var accessKey = proc.env.QINIU_ACCESS_KEY;
     var secretKey = proc.env.QINIU_SECRET_KEY;
     var srcBucket = proc.env.QINIU_TEST_BUCKET;
