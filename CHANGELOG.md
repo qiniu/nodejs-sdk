@@ -1,6 +1,9 @@
 ## CHANGE LOG
 
 
+## 7.6.0
+- 对象存储，新增 setObjectLifeCycle 设置对象生命周期 API
+
 ## 7.5.0
 - 对象存储，新增支持 [深度归档存储类型](https://developer.qiniu.com/kodo/3956/kodo-category#deep_archive)
 - 对象存储，修复在不制定区域信息情况下自动获取区域信息异常问题
