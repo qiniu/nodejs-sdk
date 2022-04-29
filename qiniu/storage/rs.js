@@ -195,6 +195,44 @@ function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 }
 
+/**
+ * @param { string } bucket - 空间名称
+ * @param { string } key - 文件名称
+ * @param { Object } options - 配置项
+ * @param { number } options.toIaAfterDays - 多少天后将文件转为低频存储，设置为 -1 表示取消已设置的转低频存储的生命周期规则， 0 表示不修改转低频生命周期规则。
+ * @param { number } options.toArchiveAfterDays - 多少天后将文件转为归档存储，设置为 -1 表示取消已设置的转归档存储的生命周期规则， 0 表示不修改转归档生命周期规则。
+ * @param { number } options.toDeepArchiveAfterDays - 多少天后将文件转为深度归档存储，设置为 -1 表示取消已设置的转深度归档存储的生命周期规则， 0 表示不修改转深度归档生命周期规则。
+ * @param { number } options.deleteAfterDays - 多少天后将文件删除，设置为 -1 表示取消已设置的删除存储的生命周期规则， 0 表示不修改删除存储的生命周期规则。
+ * @param { Object } options.cond - 匹配条件，只有条件匹配才会设置成功
+ * @param { string } options.cond.hash
+ * @param { string } options.cond.mime
+ * @param { number } options.cond.fsize
+ * @param { number } options.cond.putTime
+ * @param { function } callbackFunc - 回调函数
+ */
+BucketManager.prototype.setObjectLifeCycle = function (
+    bucket,
+    key,
+    options,
+    callbackFunc
+) {
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
+        }
+        setObjectLifecycleReq(ctx.mac, ctx.config, bucket, key, options, callbackFunc);
+    });
+};
+
+function setObjectLifecycleReq (mac, config, bucket, key, options, callbackFunc) {
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const setObjectLifecycleOp = exports.setObjectLifecycleOp(bucket, key, options);
+    const requestUrl = scheme + config.zone.rsHost + setObjectLifecycleOp;
+    const digest = util.generateAccessTokenV2(mac, requestUrl, 'POST', 'application/x-www-form-urlencoded');
+    rpc.postWithoutForm(requestUrl, digest, callbackFunc);
+}
+
 // 抓取资源
 // @link https://developer.qiniu.com/kodo/api/1263/fetch
 // @param resUrl 资源链接
@@ -439,6 +477,25 @@ exports.deleteOp = function (bucket, key) {
 exports.deleteAfterDaysOp = function (bucket, key, days) {
     var encodedEntryURI = util.encodedEntry(bucket, key);
     return '/deleteAfterDays/' + encodedEntryURI + '/' + days;
+};
+
+exports.setObjectLifecycleOp = function (bucket, key, options) {
+    const encodedEntry = util.encodedEntry(bucket, key);
+    let result = '/lifecycle/' + encodedEntry +
+        '/toIAAfterDays/' + (options.toIaAfterDays || 0) +
+        '/toArchiveAfterDays/' + (options.toArchiveAfterDays || 0) +
+        '/toDeepArchiveAfterDays/' + (options.toDeepArchiveAfterDays || 0) +
+        '/deleteAfterDays/' + (options.deleteAfterDays || 0);
+    if (options.cond) {
+        const condStr = Object.keys(options.cond)
+            .reduce(function (acc, key) {
+                acc.push(key + '=' + options.cond[key]);
+                return acc;
+            }, [])
+            .join('&');
+        result += '/cond/' + util.urlsafeBase64Encode(condStr);
+    }
+    return result;
 };
 
 exports.changeMimeOp = function (bucket, key, newMime) {

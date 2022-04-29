@@ -602,7 +602,7 @@ export declare namespace rs {
         delete(bucket: string, key: string, callback: callback): void;
 
         /**
-         * 更新文件的生命周期
+         * 设置文件删除的生命周期
          * @see https://developer.qiniu.com/kodo/api/1732/update-file-lifecycle
          *
          * @param bucket 空间名称
@@ -611,6 +611,40 @@ export declare namespace rs {
          * @param callback
          */
         deleteAfterDays(bucket: string, key: string, days: number, callback: callback): void;
+
+        /**
+         * 设置文件的生命周期
+         * @param { string } bucket - 空间名称
+         * @param { string } key - 文件名称
+         * @param { Object } options - 配置项
+         * @param { number } options.toIaAfterDays - 多少天后将文件转为低频存储，设置为 -1 表示取消已设置的转低频存储的生命周期规则， 0 表示不修改转低频生命周期规则。
+         * @param { number } options.toArchiveAfterDays - 多少天后将文件转为归档存储，设置为 -1 表示取消已设置的转归档存储的生命周期规则， 0 表示不修改转归档生命周期规则。
+         * @param { number } options.toDeepArchiveAfterDays - 多少天后将文件转为深度归档存储，设置为 -1 表示取消已设置的转深度归档存储的生命周期规则， 0 表示不修改转深度归档生命周期规则。
+         * @param { number } options.deleteAfterDays - 多少天后将文件删除，设置为 -1 表示取消已设置的删除存储的生命周期规则， 0 表示不修改删除存储的生命周期规则。
+         * @param { Object } options.cond - 匹配条件，只有条件匹配才会设置成功
+         * @param { string } options.cond.hash
+         * @param { string } options.cond.mime
+         * @param { number } options.cond.fsize
+         * @param { number } options.cond.putTime
+         * @param { function } callbackFunc - 回调函数
+         */
+        setObjectLifeCycle(
+            bucket: string,
+            key: string,
+            options: {
+                toIaAfterDays?: number,
+                toArchiveAfterDays?: number,
+                toDeepArchiveAfterDays?: number,
+                deleteAfterDays?: number
+                cond?: {
+                    hash?: string,
+                    mime?: string,
+                    fsize?: number,
+                    putTime?: number
+                }
+            },
+            callbackFunc: callback
+        )
 
         /**
          * 解冻归档存储文件
