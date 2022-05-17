@@ -74,6 +74,27 @@ describe('test util functions', function () {
             });
         });
 
+        it('test formatDateUTC', function () {
+            const caseList = [
+                {
+                    date: new Date('2022-05-19T03:28:46.816Z'),
+                    layout: 'YYYY-MM-DD HH:mm:ss.SSS',
+                    expect: '2022-05-19 03:28:46.816'
+                },
+                {
+                    date: new Date('2022-05-19T03:28:46.816Z'),
+                    layout: 'YYYYMMDDTHHmmssZ',
+                    expect: '20220519T032846Z'
+                }
+            ];
+
+            for (let i = 0; i < caseList.length; i++) {
+                const actual = qiniu.util.formatDateUTC(caseList[i].date, caseList[i].layout);
+                const expect = caseList[i].expect;
+                should.equal(actual, expect);
+            }
+        });
+
         it('test canonicalMimeHeaderKey', function () {
             const fieldNames = [
                 ':status',

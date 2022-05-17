@@ -7,6 +7,39 @@ exports.isTimestampExpired = function (timestamp) {
     return timestamp < parseInt(Date.now() / 1000);
 };
 
+// Format Data
+exports.formatDateUTC = function (date, layout) {
+    function pad (num, digit) {
+        const d = digit || 2;
+        let result = num.toString();
+        while (result.length < d) {
+            result = '0' + result;
+        }
+        return result;
+    }
+
+    const d = new Date(date);
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    const hour = d.getUTCHours();
+    const minute = d.getUTCMinutes();
+    const second = d.getUTCSeconds();
+    const millisecond = d.getUTCMilliseconds();
+
+    let result = layout || 'YYYY-MM-DDTHH:MM:ss.SSSZ';
+
+    result = result.replace(/YYYY/g, year.toString())
+        .replace(/MM/g, pad(month))
+        .replace(/DD/g, pad(day))
+        .replace(/HH/g, pad(hour))
+        .replace(/mm/g, pad(minute))
+        .replace(/ss/g, pad(second))
+        .replace(/SSS/g, pad(millisecond, 3));
+
+    return result;
+};
+
 // Encoded Entry
 exports.encodedEntry = function (bucket, key) {
     return exports.urlsafeBase64Encode(bucket + (key ? ':' + key : ''));

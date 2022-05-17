@@ -1,13 +1,60 @@
 var urllib = require('urllib');
 var conf = require('./conf');
+const digest = require('./auth/digest');
+const util = require('./util');
 
 exports.get = get;
 exports.post = post;
 exports.put = put;
+exports.getWithOptions = getWithOptions;
 exports.getWithToken = getWithToken;
+exports.postWithOptions = postWithOptions;
 exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
+
+function addAuthHeaders (headers, mac) {
+    const xQiniuDate = util.formatDateUTC(new Date(), 'YYYYMMDDTHHmmssZ');
+    if (mac.options.disableQiniuTimestampSignature !== null) {
+        if (!mac.options.disableQiniuTimestampSignature) {
+            headers['X-Qiniu-Date'] = xQiniuDate;
+        }
+    } else if (process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE) {
+        if (process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE.toLowerCase() !== 'true') {
+            headers['X-Qiniu-Date'] = xQiniuDate;
+        }
+    } else {
+        headers['X-Qiniu-Date'] = xQiniuDate;
+    }
+    return headers;
+}
+
+function getWithOptions (requestURI, options, callbackFunc) {
+    let headers = options.headers || {};
+    const mac = options.mac || new digest.Mac();
+
+    if (!headers['Content-Type']) {
+        headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    }
+
+    headers = addAuthHeaders(headers, mac);
+
+    // if there are V3, V4 token generator in the future, extends options with signVersion
+    const token = util.generateAccessTokenV2(
+        mac,
+        requestURI,
+        'GET',
+        headers['Content-Type'],
+        null,
+        headers
+    );
+
+    if (mac.accessKey) {
+        headers.Authorization = token;
+    }
+
+    return get(requestURI, headers, callbackFunc);
+}
 
 function getWithToken (requestUrl, token, callbackFunc) {
     const headers = {
@@ -17,6 +64,33 @@ function getWithToken (requestUrl, token, callbackFunc) {
         headers.Authorization = token;
     }
     return get(requestUrl, headers, callbackFunc);
+}
+
+function postWithOptions (requestURI, requestForm, options, callbackFunc) {
+    let headers = options.headers || {};
+    const mac = options.mac || new digest.Mac();
+
+    if (!headers['Content-Type']) {
+        headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    }
+
+    headers = addAuthHeaders(headers, mac);
+
+    // if there are V3, V4 token generator in the future, extends options with signVersion
+    const token = util.generateAccessTokenV2(
+        mac,
+        requestURI,
+        'POST',
+        headers['Content-Type'],
+        requestForm,
+        headers
+    );
+
+    if (mac.accessKey) {
+        headers.Authorization = token;
+    }
+
+    return post(requestURI, requestForm, headers, callbackFunc);
 }
 
 function postMultipart(requestURI, requestForm, callbackFunc) {
