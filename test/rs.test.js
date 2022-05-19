@@ -35,7 +35,7 @@ describe('test start bucket manager', function () {
             deleteOps.push(qiniu.rs.deleteOp(srcBucket, key));
         });
 
-        bucketManager.batch(deleteOps, function (respErr, respBody) {
+        deleteOps.length && bucketManager.batch(deleteOps, function (respErr, respBody) {
             respBody.forEach(function (ret, i) {
                 ret.code.should.be.eql(
                     200,
@@ -357,7 +357,7 @@ describe('test start bucket manager', function () {
     // 空间生命周期
     describe('test lifeRule', function () {
         const bucket = srcBucket;
-        const ruleName = 'test_rule_name_' + Math.floor(Math.random() * 1000);
+        const ruleName = 'test_rule_name';
 
         function testGet (expectItem, nextCall, otherRespInfo) {
             bucketManager.getBucketLifecycleRule(
