@@ -165,15 +165,21 @@ describe('test resume up', function () {
                             resolve(md5.digest('hex'));
                         });
                     });
-                    const remoteFileMd5Promise = new Promise(function (resolve) {
+                    const remoteFileMd5Promise = new Promise(function (resolve, reject) {
                         http.get('http://' + domain + '/' + key, function (response) {
                             response.statusCode.should.eql(200);
                             response.headers['content-type'].should.eql('application/json');
+                            const contentLength = parseInt(response.headers['content-length']);
+                            let receivedSize = 0;
                             const md5 = crypto.createHash('md5');
                             response.on('data', function (data) {
+                                receivedSize += data.length;
                                 md5.update(data);
                             });
                             response.on('end', function () {
+                                if (receivedSize !== contentLength) {
+                                    reject(new Error(`Content-Length is ${contentLength}, but received ${receivedSize}`));
+                                }
                                 resolve(md5.digest('hex'));
                             });
                         });
@@ -183,6 +189,9 @@ describe('test resume up', function () {
                         .then(function ([expectedMd5, actualMd5]) {
                             actualMd5.should.eql(expectedMd5);
                             done();
+                        })
+                        .catch(function (err) {
+                            should.not.exist(err);
                         });
                 });
         });
@@ -211,15 +220,21 @@ describe('test resume up', function () {
                             resolve(md5.digest('hex'));
                         });
                     });
-                    const remoteFileMd5Promise = new Promise(function (resolve) {
+                    const remoteFileMd5Promise = new Promise(function (resolve, reject) {
                         http.get('http://' + domain + '/' + key, function (response) {
                             response.statusCode.should.eql(200);
                             response.headers['content-type'].should.eql('application/x-www-form-urlencoded');
+                            const contentLength = parseInt(response.headers['content-length']);
+                            let receivedSize = 0;
                             const md5 = crypto.createHash('md5');
                             response.on('data', function (data) {
+                                receivedSize += data.length;
                                 md5.update(data);
                             });
                             response.on('end', function () {
+                                if (receivedSize !== contentLength) {
+                                    reject(new Error(`Content-Length is ${contentLength}, but received ${receivedSize}`));
+                                }
                                 resolve(md5.digest('hex'));
                             });
                         });
@@ -229,6 +244,9 @@ describe('test resume up', function () {
                         .then(function ([expectedMd5, actualMd5]) {
                             actualMd5.should.eql(expectedMd5);
                             done();
+                        })
+                        .catch(function (err) {
+                            should.not.exist(err);
                         });
                 });
         });
@@ -261,17 +279,19 @@ describe('test resume up', function () {
                     http.get("http://" + domain + "/" + key, function (response) {
                         response.statusCode.should.eql(200);
                         response.headers['content-type'].should.eql('application/x-www-form-urlencoded');
-                        {
-                            var actualMd5Crypto = crypto.createHash('md5');
-                            response.on('data', function (data) {
-                                actualMd5Crypto.update(data);
-                            });
-                            response.on('end', function () {
-                                var actualMd5 = actualMd5Crypto.digest('hex');
-                                should(actualMd5).eql(expectedMd5);
-                                done();
-                            });
-                        }
+                        const contentLength = parseInt(response.headers['content-length']);
+                        let receivedSize = 0;
+                        const actualMd5Crypto = crypto.createHash('md5');
+                        response.on('data', function (data) {
+                            receivedSize += data.length;
+                            actualMd5Crypto.update(data);
+                        });
+                        response.on('end', function () {
+                            receivedSize.should.eql(contentLength);
+                            const actualMd5 = actualMd5Crypto.digest('hex');
+                            should(actualMd5).eql(expectedMd5);
+                            done();
+                        });
                     });
                 });
         });
@@ -306,17 +326,19 @@ describe('test resume up', function () {
                     http.get("http://" + domain + "/" + key, function (response) {
                         response.statusCode.should.eql(200);
                         response.headers['content-type'].should.eql('application/xml');
-                        {
-                            var actualMd5Crypto = crypto.createHash('md5');
-                            response.on('data', function (data) {
-                                actualMd5Crypto.update(data);
-                            });
-                            response.on('end', function () {
-                                var actualMd5 = actualMd5Crypto.digest('hex');
-                                should(actualMd5).eql(expectedMd5);
-                                done();
-                            });
-                        }
+                        const contentLength = parseInt(response.headers['content-length']);
+                        let receivedSize = 0;
+                        const actualMd5Crypto = crypto.createHash('md5');
+                        response.on('data', function (data) {
+                            receivedSize += data.length;
+                            actualMd5Crypto.update(data);
+                        });
+                        response.on('end', function () {
+                            receivedSize.should.eql(contentLength);
+                            const actualMd5 = actualMd5Crypto.digest('hex');
+                            should(actualMd5).eql(expectedMd5);
+                            done();
+                        });
                     });
                 });
         });
