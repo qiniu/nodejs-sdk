@@ -1,5 +1,7 @@
 ## CHANGE LOG
 
+## 7.6.1
+- 添加sms typing
 
 ## 7.6.0
 - 对象存储，新增 setObjectLifeCycle 设置对象生命周期 API
