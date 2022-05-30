@@ -873,7 +873,7 @@ describe('test start bucket manager', function () {
                 done();
             });
         });
-        it('test invalid X-Qiniu-Date env be ignored expect 200', function (done) {
+        it('test invalid X-Qiniu-Date env be ignored expect 403', function (done) {
             process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE = 'true';
             const mac = new qiniu.auth.digest.Mac(
                 accessKey,
