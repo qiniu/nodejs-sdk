@@ -23,3 +23,5 @@ package-lock.json
 
 coverage/
 .nyc_output/
+.idea
+yarn.lock

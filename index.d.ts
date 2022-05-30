@@ -3,6 +3,8 @@
  * @date 2017-06-27
  * @author xialeistudio<xialeistudio@gmail.com>
  */
+import { Callback } from 'urllib';
+
 export declare type callback = (e?: Error, respBody?: any, respInfo?: any) => void;
 
 export declare namespace auth {
@@ -966,4 +968,76 @@ export declare namespace rs {
 
         uploadToken(mac?: auth.digest.Mac): string;
     }
+}
+
+export declare namespace sms {
+  namespace message {
+    /**
+     * 发送短信 (POST Message)
+     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#1
+     * @param reqBody
+     * @param mac
+     * @param callback
+     */
+    function sendMessage(
+      reqBody: {
+        "template_id": string,
+        "mobiles": string[],
+        "parameters"?: Record<string, string>
+      },
+      mac: auth.digest.Mac,
+      callback: Callback<{ job_id: string }>
+    ): void;
+
+    /**
+     * 发送单条短信 (POST Single Message)
+     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#2
+     * @param reqBody
+     * @param mac
+     * @param callback
+     */
+    function sendSingleMessage(
+      reqBody: {
+        "template_id": string,
+        "mobile": string,
+        "parameters"?: Record<string, string>
+      },
+      mac: auth.digest.Mac,
+      callback: Callback<{ message_id: string }>
+    ): void;
+
+    /**
+     * 发送国际/港澳台短信 (POST Oversea Message)
+     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#3
+     * @param reqBody
+     * @param mac
+     * @param callback
+     */
+    function sendOverseaMessage(
+      reqBody: {
+        "template_id": string,
+        "mobile": string,
+        "parameters"?: Record<string, string>
+      },
+      mac: auth.digest.Mac,
+      callback: Callback<{ message_id: string }>
+    ): void;
+
+    /**
+     * 发送全文本短信(不需要传模版 ID) (POST Fulltext Message)
+     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#4
+     * @param reqBody
+     * @param mac
+     * @param callback
+     */
+    function sendFulltextMessage(
+      reqBody: {
+        "mobiles": string[],
+        "content": string,
+        "template_type": string
+      },
+      mac: auth.digest.Mac,
+      callback: Callback<{ job_id: string }>
+    ): void;
+  }
 }
