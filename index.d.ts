@@ -9,11 +9,15 @@ export declare type callback = (e?: Error, respBody?: any, respInfo?: any) => vo
 
 export declare namespace auth {
     namespace digest {
+        interface MacOptions {
+            disableQiniuTimestampSignature?: boolean;
+        }
+
         class Mac {
             accessKey: string;
             secretKey: string;
 
-            constructor(accessKey?: string, secretKey?: string);
+            constructor(accessKey?: string, secretKey?: string, options?: MacOptions);
         }
     }
 }
@@ -350,6 +354,21 @@ export declare namespace resume_up {
 export declare namespace util {
     function isTimestampExpired(timestamp: number): boolean;
 
+    /**
+     * 使用 UTC 时间来格式化日期时间
+     *
+     * @param date 与 new Date() 接受的参数一样，内部会使用 new Date(date) 生成日期时间对象
+     * @param layout 目前仅接受
+     *      YYYY
+     *      MM
+     *      DD
+     *      HH
+     *      mm
+     *      ss
+     *      SSS
+     */
+    function formatDateUTC(date: Date | number | string, layout?: string): string;
+
     function encodedEntry(bucket: string, key?: string): string;
 
     function getAKFromUptoken(uploadToken: string): string;
@@ -399,9 +418,14 @@ export declare namespace util {
 }
 
 export declare namespace rpc {
-    interface Headers {
+    type Headers = Record<string, string> & {
         'User-Agent'?: string;
         Connection?: string;
+    }
+
+    interface RequestOptions {
+        headers: Headers;
+        mac: auth.digest.Mac;
     }
 
     /**
@@ -411,6 +435,17 @@ export declare namespace rpc {
      * @param callbackFunc 回调函数
      */
     function get(requestUrl: string, headers: Headers | null, callbackFunc: callback): void;
+
+    /**
+     * @param requestUrl 请求地址
+     * @param options 请求的配置
+     * @param callbackFunc 回调函数
+     */
+    function getWithOptions(
+        requestUrl: string,
+        options: RequestOptions | null,
+        callbackFunc: callback
+    ): ReturnType<typeof get>;
 
     /**
      *
@@ -428,6 +463,20 @@ export declare namespace rpc {
      * @param callback
      */
     function post(requestURI: string, requestForm: Buffer | string | NodeJS.ReadableStream | null, headers: Headers | null, callback: callback): void;
+
+
+    /**
+     * @param requestUrl 请求地址
+     * @param requestForm 请求体
+     * @param options 请求的配置
+     * @param callbackFunc 回调函数
+     */
+    function postWithOptions(
+        requestUrl: string,
+        requestForm: Buffer | string | NodeJS.ReadableStream | null,
+        options: RequestOptions | null,
+        callbackFunc: callback
+    ): ReturnType<typeof post>;
 
     /**
      *

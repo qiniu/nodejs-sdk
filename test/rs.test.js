@@ -4,6 +4,7 @@ const qiniu = require('../index.js');
 const proc = require('process');
 const urllib = require('urllib');
 const console = require('console');
+const mockDate = require('mockdate');
 
 // eslint-disable-next-line no-undef
 before(function (done) {
@@ -35,7 +36,7 @@ describe('test start bucket manager', function () {
             deleteOps.push(qiniu.rs.deleteOp(srcBucket, key));
         });
 
-        bucketManager.batch(deleteOps, function (respErr, respBody) {
+        deleteOps.length && bucketManager.batch(deleteOps, function (respErr, respBody) {
             respBody.forEach(function (ret, i) {
                 ret.code.should.be.eql(
                     200,
@@ -357,7 +358,7 @@ describe('test start bucket manager', function () {
     // 空间生命周期
     describe('test lifeRule', function () {
         const bucket = srcBucket;
-        const ruleName = 'test_rule_name_' + Math.floor(Math.random() * 1000);
+        const ruleName = 'test_rule_name';
 
         function testGet (expectItem, nextCall, otherRespInfo) {
             bucketManager.getBucketLifecycleRule(
@@ -788,6 +789,111 @@ describe('test start bucket manager', function () {
                 should.not.exist(err);
                 console.log(JSON.stringify(respBody) + '\n');
                 console.log(JSON.stringify(respInfo));
+                done();
+            });
+        });
+    });
+
+    describe('test invalid X-Qiniu-Date', function () {
+        beforeEach(function () {
+            mockDate.set(new Date(0));
+        });
+
+        afterEach(function () {
+            delete process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE;
+        });
+
+        after(function () {
+            mockDate.reset();
+        });
+
+        it('test invalid X-Qiniu-Date expect 403', function (done) {
+            const bucket = srcBucket;
+            const key = 'qiniu.mp4';
+            bucketManager.stat(bucket, key, function (
+                err,
+                respBody,
+                respInfo
+            ) {
+                should.not.exist(err);
+                respInfo.statusCode.should.be.eql(403, JSON.stringify(respInfo));
+                done();
+            });
+        });
+
+        it('test invalid X-Qiniu-Date expect 200 by disable date sign', function (done) {
+            const mac = new qiniu.auth.digest.Mac(
+                accessKey,
+                secretKey,
+                { disableQiniuTimestampSignature: true }
+            );
+            const config = new qiniu.conf.Config({
+                useHttpsDomain: true
+            });
+            const bucketManager = new qiniu.rs.BucketManager(mac, config);
+
+            const bucket = srcBucket;
+            const key = 'qiniu.mp4';
+            bucketManager.stat(bucket, key, function (
+                err,
+                respBody,
+                respInfo
+            ) {
+                should.not.exist(err, JSON.stringify(respInfo));
+                respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                respBody.should.have.keys(
+                    'hash',
+                    'fsize',
+                    'mimeType',
+                    'putTime',
+                    'type'
+                );
+                done();
+            });
+        });
+
+        it('test invalid X-Qiniu-Date env expect 200', function (done) {
+            process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE = 'true';
+            const bucket = srcBucket;
+            const key = 'qiniu.mp4';
+            bucketManager.stat(bucket, key, function (
+                err,
+                respBody,
+                respInfo
+            ) {
+                should.not.exist(err, JSON.stringify(respInfo));
+                respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                respBody.should.have.keys(
+                    'hash',
+                    'fsize',
+                    'mimeType',
+                    'putTime',
+                    'type'
+                );
+                done();
+            });
+        });
+        it('test invalid X-Qiniu-Date env be ignored expect 403', function (done) {
+            process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE = 'true';
+            const mac = new qiniu.auth.digest.Mac(
+                accessKey,
+                secretKey,
+                { disableQiniuTimestampSignature: false }
+            );
+            const config = new qiniu.conf.Config({
+                useHttpsDomain: true
+            });
+            const bucketManager = new qiniu.rs.BucketManager(mac, config);
+
+            const bucket = srcBucket;
+            const key = 'qiniu.mp4';
+            bucketManager.stat(bucket, key, function (
+                err,
+                respBody,
+                respInfo
+            ) {
+                should.not.exist(err);
+                respInfo.statusCode.should.be.eql(403, JSON.stringify(respInfo));
                 done();
             });
         });
