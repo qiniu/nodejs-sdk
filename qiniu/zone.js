@@ -4,13 +4,9 @@ const conf = require('./conf');
 
 // huadong
 exports.Zone_z0 = new conf.Zone([
-    'up.qiniup.com',
-    'up-nb.qiniup.com',
-    'up-xs.qiniup.com'
+    'up.qiniup.com'
 ], [
-    'upload.qiniup.com',
-    'upload-nb.qiniup.com',
-    'upload-xs.qiniup.com'
+    'upload.qiniup.com'
 ], 'iovip.qbox.me',
 'rs.qbox.me',
 'rsf.qbox.me',
@@ -28,13 +24,9 @@ exports.Zone_z1 = new conf.Zone([
 
 // huanan
 exports.Zone_z2 = new conf.Zone([
-    'up-z2.qiniup.com',
-    'up-gz.qiniup.com',
-    'up-fs.qiniup.com'
+    'up-z2.qiniup.com'
 ], [
-    'upload-z2.qiniup.com',
-    'upload-gz.qiniup.com',
-    'upload-fs.qiniup.com'
+    'upload-z2.qiniup.com'
 ], 'iovip-z2.qbox.me',
 'rs-z2.qbox.me',
 'rsf-z2.qbox.me',
