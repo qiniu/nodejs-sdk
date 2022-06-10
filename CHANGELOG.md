@@ -1,4 +1,6 @@
 ## CHANGE LOG
+## 7.7.0
+- 对象存储，管理类 API 发送请求时增加 [X-Qiniu-Date](https://developer.qiniu.com/kodo/3924/common-request-headers) （生成请求的时间） header
 
 ## 7.6.1
 - 添加sms typing
