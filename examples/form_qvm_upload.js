@@ -24,7 +24,7 @@ var ZONE_QVM_Z0 = new qiniu.conf.Zone([
 ], 'iovip.qbox.me',
 'rs.qbox.me',
 'rsf.qbox.me',
-'api.qiniu.com');
+'api.qiniuapi.com');
 
 // 华北
 var ZONE_QVM_Z1 = new qiniu.conf.Zone([
@@ -34,7 +34,7 @@ var ZONE_QVM_Z1 = new qiniu.conf.Zone([
 ], 'iovip-z1.qbox.me',
 'rs-z1.qbox.me',
 'rsf-z1.qbox.me',
-'api-z1.qiniu.com');
+'api-z1.qiniuapi.com');
 
 config.zone = ZONE_QVM_Z0;
 config.zone = ZONE_QVM_Z1;

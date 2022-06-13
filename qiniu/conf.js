@@ -62,22 +62,22 @@ exports.Zone = function (
             case 'z1':
                 !this.rsHost && (this.rsHost = 'rs-z1.qbox.me');
                 !this.rsfHost && (this.rsfHost = 'rsf-z1.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-z1.qiniu.com');
+                !this.apiHost && (this.apiHost = 'api-z1.qiniuapi.com');
                 break;
             case 'z2':
                 !this.rsHost && (this.rsHost = 'rs-z2.qbox.me');
                 !this.rsfHost && (this.rsfHost = 'rsf-z2.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-z2.qiniu.com');
+                !this.apiHost && (this.apiHost = 'api-z2.qiniuapi.com');
                 break;
             case 'na0':
                 !this.rsHost && (this.rsHost = 'rs-na0.qbox.me');
                 !this.rsfHost && (this.rsfHost = 'rsf-na0.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-na0.qiniu.com');
+                !this.apiHost && (this.apiHost = 'api-na0.qiniuapi.com');
                 break;
             case 'as0':
                 !this.rsHost && (this.rsHost = 'rs-as0.qbox.me');
                 !this.rsfHost && (this.rsfHost = 'rsf-as0.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-as0.qiniu.com');
+                !this.apiHost && (this.apiHost = 'api-as0.qiniuapi.com');
                 break;
             }
         }
@@ -85,5 +85,5 @@ exports.Zone = function (
 
     !this.rsHost && (this.rsHost = 'rs.qiniu.com');
     !this.rsfHost && (this.rsfHost = 'rsf.qiniu.com');
-    !this.apiHost && (this.apiHost = 'api.qiniu.com');
+    !this.apiHost && (this.apiHost = 'api.qiniuapi.com');
 };
