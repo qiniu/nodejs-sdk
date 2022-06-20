@@ -16,6 +16,16 @@ exports.Zone_z0 = new conf.Zone([
 'rsf.qbox.me',
 'api.qiniu.com');
 
+// huadong2
+exports.Zone_cn_east_2 = new conf.Zone([
+    'up-cn-east-2.qiniup.com'
+], [
+    'upload-cn-east-2.qiniup.com'
+], 'iovip-cn-east-2.qiniuio.com',
+'rs-cn-east-2.qiniuapi.com',
+'rsf-cn-east-2.qiniuapi.com',
+'api-cn-east-2.qiniuapi.com');
+
 // huabei
 exports.Zone_z1 = new conf.Zone([
     'up-z1.qiniup.com'
@@ -50,6 +60,7 @@ exports.Zone_na0 = new conf.Zone([
 'rsf-na0.qbox.me',
 'api-na0.qiniu.com');
 
+// singapore
 exports.Zone_as0 = new conf.Zone([
     'up-as0.qiniup.com'
 ], [
@@ -58,6 +69,16 @@ exports.Zone_as0 = new conf.Zone([
 'rs-as0.qbox.me',
 'rsf-as0.qbox.me',
 'api-as0.qiniu.com');
+
+// seoul
+exports.Zone_ap_northeast_1 = new conf.Zone([
+    'up-ap-northeast-1.qiniup.com'
+], [
+    'upload-ap-northeast-1.qiniup.com'
+], 'iovip-ap-northeast-1.qiniuio.com',
+'rs-ap-northeast-1.qiniuapi.com',
+'rsf-ap-northeast-1.qiniuapi.com',
+'api-ap-northeast-1.qiniuapi.com');
 
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
     const apiAddr = util.format(
