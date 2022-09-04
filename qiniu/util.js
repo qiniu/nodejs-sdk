@@ -4,7 +4,7 @@ const zone = require('./zone');
 
 // Check Timestamp Expired or not
 exports.isTimestampExpired = function (timestamp) {
-    return timestamp < parseInt(Date.now() / 1000);
+    return timestamp < Math.trunc(Date.now() / 1000);
 };
 
 // Format Data
