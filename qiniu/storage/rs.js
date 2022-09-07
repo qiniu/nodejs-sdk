@@ -962,7 +962,7 @@ function PutBucketEvent(mac, config, options, bucket, callbackFunc) {
         requestURI,
         null,
         {
-            mac: this.mac
+            mac: mac
         },
         callbackFunc
     );
@@ -1011,7 +1011,7 @@ function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
         requestURI,
         null,
         {
-            mac: this.mac
+            mac: mac
         },
         callbackFunc
     );
@@ -1098,7 +1098,7 @@ function PutReferAntiLeech(mac, config, bucket, options, callbackFunc) {
         requestURI,
         null,
         {
-            mac: this.mac
+            mac: mac
         },
         callbackFunc
     );
@@ -1115,9 +1115,9 @@ function PutCorsRules(mac, config, bucket, body, callbackFunc) {
     var requestURI = scheme + conf.UC_HOST + '/corsRules/set/' + bucket;
     rpc.postWithOptions(
         requestURI,
-        null,
+        reqBody,
         {
-            mac: this.mac
+            mac: mac
         },
         callbackFunc
     );
@@ -1135,7 +1135,7 @@ function GetCorsRules(mac, config, bucket, callbackFunc) {
         requestURI,
         null,
         {
-            mac: this.mac
+            mac: mac
         },
         callbackFunc
     );
