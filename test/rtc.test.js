@@ -26,6 +26,13 @@ describe('test rtc credentials', function () {
         maxUsers: 10,
         noAutoKickUser: true
     };
+
+    after(function (done) {
+        qiniu.app.deleteApp(appId, credentials, function () {
+            done();
+        });
+    });
+
     // eslint-disable-next-line no-undef
     describe('test create app', function () {
         // eslint-disable-next-line no-undef
