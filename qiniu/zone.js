@@ -4,17 +4,13 @@ const conf = require('./conf');
 
 // huadong
 exports.Zone_z0 = new conf.Zone([
-    'up.qiniup.com',
-    'up-nb.qiniup.com',
-    'up-xs.qiniup.com'
+    'up.qiniup.com'
 ], [
-    'upload.qiniup.com',
-    'upload-nb.qiniup.com',
-    'upload-xs.qiniup.com'
+    'upload.qiniup.com'
 ], 'iovip.qbox.me',
 'rs.qbox.me',
 'rsf.qbox.me',
-'api.qiniu.com');
+'api.qiniuapi.com');
 
 // huabei
 exports.Zone_z1 = new conf.Zone([
@@ -24,21 +20,17 @@ exports.Zone_z1 = new conf.Zone([
 ], 'iovip-z1.qbox.me',
 'rs-z1.qbox.me',
 'rsf-z1.qbox.me',
-'api-z1.qiniu.com');
+'api-z1.qiniuapi.com');
 
 // huanan
 exports.Zone_z2 = new conf.Zone([
-    'up-z2.qiniup.com',
-    'up-gz.qiniup.com',
-    'up-fs.qiniup.com'
+    'up-z2.qiniup.com'
 ], [
-    'upload-z2.qiniup.com',
-    'upload-gz.qiniup.com',
-    'upload-fs.qiniup.com'
+    'upload-z2.qiniup.com'
 ], 'iovip-z2.qbox.me',
 'rs-z2.qbox.me',
 'rsf-z2.qbox.me',
-'api-z2.qiniu.com');
+'api-z2.qiniuapi.com');
 
 // beimei
 exports.Zone_na0 = new conf.Zone([
@@ -48,7 +40,7 @@ exports.Zone_na0 = new conf.Zone([
 ], 'iovip-na0.qbox.me',
 'rs-na0.qbox.me',
 'rsf-na0.qbox.me',
-'api-na0.qiniu.com');
+'api-na0.qiniuapi.com');
 
 exports.Zone_as0 = new conf.Zone([
     'up-as0.qiniup.com'
@@ -57,7 +49,7 @@ exports.Zone_as0 = new conf.Zone([
 ], 'iovip-as0.qbox.me',
 'rs-as0.qbox.me',
 'rsf-as0.qbox.me',
-'api-as0.qiniu.com');
+'api-as0.qiniuapi.com');
 
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
     const apiAddr = util.format(
