@@ -1,4 +1,11 @@
 ## CHANGE LOG
+## 7.8.0
+- 移除不推荐域名，并增加 亚太-首尔 和 华东-浙江2 固定区域
+- RTC，优化请求失败的错误信息
+- 对象存储，优化分片上传 ctx 超时检测
+- 对象存储，修复事件、跨域部分 API 身份认证错误（v7.7.0 引入）
+- 对象存储，新增事件、跨域 API 的类型声明（.d.ts）
+
 ## 7.7.0
 - 对象存储，管理类 API 发送请求时增加 [X-Qiniu-Date](https://developer.qiniu.com/kodo/3924/common-request-headers) （生成请求的时间） header
 
