@@ -11,21 +11,46 @@ const BlockStream = require('block-stream2');
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
 
-function ResumeUploader(config) {
+function ResumeUploader (config) {
     this.config = config || new conf.Config();
 }
 
-// 上传可选参数
-// @params fname                      请求体中的文件的名称
-// @params params                     额外参数设置，参数名称必须以x:开头
-// @param mimeType                    指定文件的mimeType
-// @param resumeRecordFile            断点续传的已上传的部分信息记录文件
-// @param progressCallback(uploadBytes, totalBytes) 上传进度回调
-// @param partSize                    分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
-// @param version                     分片上传版本 目前支持v1/v2版本 默认v1
-// @param metadata                    元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
-function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback, partSize,
-                   version, metadata) {
+/**
+ * @callback reqCallback
+ *
+ * @param { Error } err
+ * @param { Object } ret
+ * @param { http.IncomingMessage } info
+ */
+
+/**
+ * @callback progressCallback
+ *
+ * @param { number } uploadBytes
+ * @param { number } totalBytes
+ */
+
+/**
+  * 上传可选参数
+  * @param { string } fname                      请求体中的文件的名称
+  * @param { Object } params                     额外参数设置，参数名称必须以x:开头
+  * @param { string | null } mimeType            指定文件的mimeType
+  * @param { string | null } resumeRecordFile    断点续传的已上传的部分信息记录文件路径
+  * @param { progressCallback } progressCallback 上传进度回调，回调参数为 (uploadBytes, totalBytes)
+  * @param { number } partSize                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
+  * @param { 'v1' | 'v2' } version               分片上传版本 目前支持v1/v2版本 默认v1
+  * @param { Object } metadata                   元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+  */
+function PutExtra (
+    fname,
+    params,
+    mimeType,
+    resumeRecordFile,
+    progressCallback,
+    partSize,
+    version,
+    metadata
+) {
     this.fname = fname || '';
     this.params = params || {};
     this.mimeType = mimeType || null;
@@ -36,8 +61,14 @@ function PutExtra(fname, params, mimeType, resumeRecordFile, progressCallback, p
     this.metadata = metadata || {};
 }
 
-ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
-    rsStreamLen, putExtra, callbackFunc) {
+ResumeUploader.prototype.putStream = function (
+    uploadToken,
+    key,
+    rsStream,
+    rsStreamLen,
+    putExtra,
+    callbackFunc
+) {
     putExtra = putExtra || new PutExtra();
     if (!putExtra.mimeType) {
         putExtra.mimeType = 'application/octet-stream';
@@ -57,8 +88,8 @@ ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
         destroy(rsStream);
     });
 
-    var accessKey = util.getAKFromUptoken(uploadToken);
-    var bucket = util.getBucketFromUptoken(uploadToken);
+    const accessKey = util.getAKFromUptoken(uploadToken);
+    const bucket = util.getBucketFromUptoken(uploadToken);
 
     util.prepareZone(this, accessKey, bucket, function (err, ctx) {
         if (err) {
@@ -70,10 +101,9 @@ ResumeUploader.prototype.putStream = function (uploadToken, key, rsStream,
     });
 };
 
-function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callbackFunc) {
+function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, callbackFunc) {
     // set up hosts order
-    var upHosts = [];
-
+    const upHosts = [];
     if (config.useCdnDomain) {
         if (config.zone.cdnUpHosts) {
             config.zone.cdnUpHosts.forEach(function (host) {
@@ -91,91 +121,143 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callb
             upHosts.push(host);
         });
     }
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const upDomain = scheme + upHosts[0];
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var upDomain = scheme + upHosts[0];
-    // block upload
-
-    var blkStream = rsStream.pipe(new BlockStream({
+    // make block stream
+    const blkStream = rsStream.pipe(new BlockStream({
         size: putExtra.partSize,
         zeroPadding: false
     }));
 
-    var readLen = 0;
-    var curBlock = 0;
-    var finishedBlock = 0;
-    var finishedCtxList = [];
-    var finishedBlkPutRets = [];
-    var isSent = false;
-    var blkputRets = null;
-    var totalBlockNum = Math.ceil(rsStreamLen / putExtra.partSize);
-    var finishedEtags = {
-        etags: [],
-        uploadId: '',
-        expiredAt: 0
-    };
+    // get resume record info
+    let blkputRets = null;
+    const totalBlockNum = Math.ceil(rsStreamLen / putExtra.partSize);
     // read resumeRecordFile
     if (putExtra.resumeRecordFile) {
         try {
-            var resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
+            const resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
             blkputRets = JSON.parse(resumeRecords);
         } catch (e) {
             console.error(e);
         }
-        if (blkputRets !== null) {
-            if (putExtra.version === 'v1') {
-                for (var index = 0; index < blkputRets.length; index++) {
-                    // check ctx expired or not
-                    var blkputRet = blkputRets[index];
-                    var expiredAt = blkputRet.expired_at;
-                    // make sure the ctx at least has one day expiration
-                    expiredAt += 3600 * 24;
-                    if (util.isTimestampExpired(expiredAt)) {
-                        // discard these ctxs
-                        break;
-                    }
-                    finishedBlock += 1;
-                    finishedCtxList.push(blkputRet.ctx);
-                    finishedBlkPutRets.push(blkputRet);
-                }
-            } else if (putExtra.version === 'v2') {
-                // check etag expired or not
-                var expiredAt = blkputRets.expiredAt;
-                var timeNow = new Date() / 1000;
-                if (expiredAt > timeNow && blkputRets.uploadId !== '') {
-                    finishedEtags.etags = blkputRets.etags;
-                    finishedEtags.uploadId = blkputRets.uploadId;
-                    finishedEtags.expiredAt = blkputRets.expiredAt;
-                    finishedBlock = finishedEtags.etags.length;
-                }
-            } else {
-                throw new Error('part upload version number error');
-            }
-        }
     }
 
-    var bucket = util.getBucketFromUptoken(uploadToken);
+    // upload parts
     if (putExtra.version === 'v1') {
-        // check when to mkblk
-        blkStream.on('data', function (chunk) {
-            readLen += chunk.length;
-            curBlock += 1; // set current block
-            if (curBlock > finishedBlock) {
-                blkStream.pause();
-                mkblkReq(upDomain, uploadToken, chunk, function (respErr,
-                                                                 respBody,
-                                                                 respInfo) {
-                    var bodyCrc32 = parseInt('0x' + getCrc32(chunk));
+        putReqV1(
+            {
+                blkputRets,
+                rsStream,
+                rsStreamLen,
+                blkStream,
+                totalBlockNum
+            },
+            {
+                key,
+                upDomain,
+                uploadToken,
+                putExtra
+            },
+            callbackFunc
+        );
+    } else if (putExtra.version === 'v2') {
+        putReqV2(
+            {
+                blkputRets,
+                blkStream,
+                totalBlockNum,
+                rsStreamLen,
+                rsStream
+            },
+            {
+                upDomain,
+                uploadToken,
+                key,
+                putExtra
+            },
+            callbackFunc
+        );
+    } else {
+        throw new Error('part upload version number error');
+    }
+}
+
+/**
+ * @param { Object } sourceOptions
+ * @param { Object[] | null } sourceOptions.blkputRets
+ * @param { ReadableStream } sourceOptions.rsStream
+ * @param { BlockStream } sourceOptions.blkStream
+ * @param { number } sourceOptions.rsStreamLen
+ * @param { number } sourceOptions.totalBlockNum
+ * @param { Object } uploadOptions
+ * @param { string } uploadOptions.key
+ * @param { string } uploadOptions.upDomain
+ * @param { string } uploadOptions.uploadToken
+ * @param { PutExtra } uploadOptions.putExtra
+ * @param { reqCallback } callbackFunc
+ */
+function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
+    const {
+        blkputRets,
+        rsStream,
+        blkStream,
+        rsStreamLen,
+        totalBlockNum
+    } = sourceOptions;
+    const {
+        key,
+        upDomain,
+        uploadToken,
+        putExtra
+    } = uploadOptions;
+
+    // initial state
+    const finishedCtxList = [];
+    const finishedBlkPutRets = [];
+
+    // upload parts
+    let readLen = 0;
+    let curBlock = 0;
+    let isSent = false;
+    blkStream.on('data', function (chunk) {
+        readLen += chunk.length;
+        let needUploadBlk = true;
+        // check uploaded parts
+        if (blkputRets && blkputRets.length > 0 && blkputRets[curBlock]) {
+            const blkputRet = blkputRets[curBlock];
+            let expiredAt = blkputRet.expired_at;
+            // make sure the ctx at least has one day expiration
+            expiredAt += 3600 * 24;
+            if (!util.isTimestampExpired(expiredAt)) {
+                needUploadBlk = false;
+                finishedCtxList.push(blkputRet.ctx);
+                finishedBlkPutRets.push(blkputRet);
+            }
+        }
+
+        curBlock += 1; // set current block
+        if (needUploadBlk) {
+            blkStream.pause();
+            mkblkReq(
+                upDomain,
+                uploadToken,
+                chunk,
+                function (
+                    respErr,
+                    respBody,
+                    respInfo
+                ) {
+                    const bodyCrc32 = parseInt('0x' + getCrc32(chunk));
                     if (respInfo.statusCode !== 200 || respBody.crc32 !== bodyCrc32) {
                         callbackFunc(respErr, respBody, respInfo);
                         destroy(rsStream);
                     } else {
-                        finishedBlock += 1;
-                        var blkputRet = respBody;
+                        const blkputRet = respBody;
                         finishedCtxList.push(blkputRet.ctx);
                         finishedBlkPutRets.push(blkputRet);
                         if (putExtra.resumeRecordFile) {
-                            var contents = JSON.stringify(finishedBlkPutRets);
+                            const contents = JSON.stringify(finishedBlkPutRets);
                             fs.writeFileSync(putExtra.resumeRecordFile, contents, {
                                 encoding: 'utf-8'
                             });
@@ -190,45 +272,103 @@ function putReq(config, uploadToken, key, rsStream, rsStreamLen, putExtra, callb
                         }
                     }
                 });
-            }
-        });
-
-        blkStream.on('end', function () {
-            if (!isSent && rsStreamLen === 0) {
-                mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
-            }
-            destroy(rsStream);
-        });
-
-    } else if (putExtra.version === 'v2') {
-        var encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
-        if (finishedEtags.uploadId) {
-            // if it has resumeRecordFile
-            resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
-                finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
-        } else {
-            // init an new uploadId for next step
-            initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
-                finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
         }
+    });
+
+    blkStream.on('end', function () {
+        if (!isSent && rsStreamLen === 0) {
+            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+        }
+        destroy(rsStream);
+    });
+}
+
+/**
+ * @param { Object } sourceOptions
+ * @param { Object | null } sourceOptions.blkputRets
+ * @param { ReadableStream } sourceOptions.rsStream
+ * @param { BlockStream } sourceOptions.blkStream
+ * @param { number } sourceOptions.rsStreamLen
+ * @param { number } sourceOptions.totalBlockNum
+ * @param { Object } uploadOptions
+ * @param { string } uploadOptions.key
+ * @param { string } uploadOptions.upDomain
+ * @param { string } uploadOptions.uploadToken
+ * @param { PutExtra } uploadOptions.putExtra
+ * @param { reqCallback } callbackFunc
+ */
+function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
+    const {
+        blkputRets,
+        blkStream,
+        totalBlockNum,
+        rsStreamLen,
+        rsStream
+    } = sourceOptions;
+    const {
+        uploadToken,
+        key,
+        upDomain,
+        putExtra
+    } = uploadOptions;
+
+    // try resume upload blocks
+    let finishedBlock = 0;
+    const finishedEtags = {
+        etags: [],
+        uploadId: '',
+        expiredAt: 0
+    };
+    if (blkputRets !== null) {
+        // check etag expired or not
+        const expiredAt = blkputRets.expiredAt;
+        const timeNow = Date.now() / 1000;
+        if (expiredAt > timeNow && blkputRets.uploadId !== '') {
+            finishedEtags.etags = blkputRets.etags;
+            finishedEtags.uploadId = blkputRets.uploadId;
+            finishedEtags.expiredAt = blkputRets.expiredAt;
+            finishedBlock = finishedEtags.etags.length;
+        }
+    }
+
+    const bucket = util.getBucketFromUptoken(uploadToken);
+    const encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
+    if (finishedEtags.uploadId) {
+        if (finishedBlock === totalBlockNum) {
+            completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
+                putExtra, callbackFunc);
+            return;
+        }
+        // if it has resumeRecordFile
+        resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream,
+            finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
     } else {
-        throw new Error('part upload version number error');
+        // init a new uploadId for next step
+        initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream,
+            finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
     }
 }
 
-function mkblkReq(upDomain, uploadToken, blkData, callbackFunc) {
-    var requestURI = upDomain + '/mkblk/' + blkData.length;
-    var auth = 'UpToken ' + uploadToken;
-    var headers = {
+function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
+    const requestURI = upDomain + '/mkblk/' + blkData.length;
+    const auth = 'UpToken ' + uploadToken;
+    const headers = {
         Authorization: auth,
         'Content-Type': 'application/octet-stream'
     };
     rpc.post(requestURI, blkData, headers, callbackFunc);
 }
 
-function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
-    callbackFunc) {
-    var requestURI = upDomain + '/mkfile/' + fileSize;
+function mkfileReq (
+    upDomain,
+    uploadToken,
+    fileSize,
+    ctxList,
+    key,
+    putExtra,
+    callbackFunc
+) {
+    let requestURI = upDomain + '/mkfile/' + fileSize;
     if (key) {
         requestURI += '/key/' + util.urlsafeBase64Encode(key);
     }
@@ -240,7 +380,7 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
     }
     if (putExtra.params) {
     // putExtra params
-        for (var k in putExtra.params) {
+        for (const k in putExtra.params) {
             if (k.startsWith('x:') && putExtra.params[k]) {
                 requestURI += '/' + k + '/' + util.urlsafeBase64Encode(putExtra.params[
                     k].toString());
@@ -250,7 +390,7 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
 
     // putExtra metadata
     if (putExtra.metadata) {
-        for (var metadataKey in putExtra.metadata) {
+        for (const metadataKey in putExtra.metadata) {
             if (metadataKey.startsWith('x-qn-meta-') && putExtra.metadata[metadataKey]) {
                 requestURI +=
                     '/' + metadataKey + '/' +
@@ -259,26 +399,42 @@ function mkfileReq(upDomain, uploadToken, fileSize, ctxList, key, putExtra,
         }
     }
 
-    var auth = 'UpToken ' + uploadToken;
-    var headers = {
+    const auth = 'UpToken ' + uploadToken;
+    const headers = {
         Authorization: auth,
         'Content-Type': 'application/octet-stream'
     };
-    var postBody = ctxList.join(',');
+    const postBody = ctxList.join(',');
     rpc.post(requestURI, postBody, headers, function (err, ret, info) {
-        if (info.statusCode === 200 || info.statusCode === 701 || info.statusCode === 401) {
+        if (info.statusCode === 200 || info.statusCode === 701) {
             if (putExtra.resumeRecordFile) {
-                fs.unlinkSync(putExtra.resumeRecordFile);
+                try {
+                    fs.unlinkSync(putExtra.resumeRecordFile);
+                } catch (_e) {
+                    // ignore
+                }
             }
         }
         callbackFunc(err, ret, info);
     });
 }
 
-function initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
-                 finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
-    var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads';
-    var headers = {
+function initReq (
+    uploadToken,
+    bucket,
+    encodedObjectName,
+    upDomain,
+    blkStream,
+    finishedEtags,
+    finishedBlock,
+    totalBlockNum,
+    putExtra,
+    rsStreamLen,
+    rsStream,
+    callbackFunc
+) {
+    const requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads';
+    const headers = {
         Authorization: 'UpToken ' + uploadToken,
         'Content-Type': 'application/json'
     };
@@ -288,36 +444,50 @@ function initReq(uploadToken, bucket, encodedObjectName, upDomain, blkStream, is
         }
         finishedEtags.expiredAt = ret.expireAt;
         finishedEtags.uploadId = ret.uploadId;
-        resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock,
+        resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream,
             finishedEtags, finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc);
     });
 }
 
-function resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStream, isSent, readLen, curBlock, finishedEtags,
-                       finishedBlock, totalBlockNum, putExtra, rsStreamLen, rsStream, callbackFunc) {
+function resumeUploadV2 (
+    uploadToken,
+    bucket,
+    encodedObjectName,
+    upDomain,
+    blkStream,
+    finishedEtags,
+    finishedBlock,
+    totalBlockNum,
+    putExtra,
+    rsStreamLen,
+    rsStream,
+    callbackFunc
+) {
+    let isSent = false;
+    let readLen = 0;
+    let curBlock = 0;
     blkStream.on('data', function (chunk) {
-        var partNumber = 0;
+        let partNumber = 0;
         readLen += chunk.length;
         curBlock += 1; // set current block
         if (curBlock > finishedBlock) {
             blkStream.pause();
             partNumber = finishedBlock + 1;
-            var bodyMd5 = util.getMd5(chunk);
-            uploadPart(bucket, upDomain, uploadToken, encodedObjectName, chunk, finishedEtags.uploadId, partNumber,
+            const bodyMd5 = util.getMd5(chunk);
+            uploadPart(bucket, upDomain, uploadToken, encodedObjectName, chunk, finishedEtags.uploadId, partNumber, putExtra,
                 function (respErr, respBody, respInfo) {
                     if (respInfo.statusCode !== 200 || respBody.md5 !== bodyMd5) {
                         callbackFunc(respErr, respBody, respInfo);
                         destroy(rsStream);
                     } else {
                         finishedBlock += 1;
-                        var blkputRet = respBody;
-                        var blockStatus = {
-                            etag: blkputRet.etag,
+                        const blockStatus = {
+                            etag: respBody.etag,
                             partNumber: partNumber
                         };
                         finishedEtags.etags.push(blockStatus);
                         if (putExtra.resumeRecordFile) {
-                            var contents = JSON.stringify(finishedEtags);
+                            const contents = JSON.stringify(finishedEtags);
                             fs.writeFileSync(putExtra.resumeRecordFile, contents, {
                                 encoding: 'utf-8'
                             });
@@ -345,53 +515,75 @@ function resumeUploadV2(uploadToken, bucket, encodedObjectName, upDomain, blkStr
     });
 }
 
-function uploadPart(bucket, upDomain, uploadToken, encodedObjectName, chunk, uploadId, partNumber, callbackFunc) {
-    var headers = {
+function uploadPart (bucket, upDomain, uploadToken, encodedObjectName, chunk, uploadId, partNumber, putExtra, callbackFunc) {
+    const headers = {
         Authorization: 'UpToken ' + uploadToken,
         'Content-Type': 'application/octet-stream',
         'Content-MD5': util.getMd5(chunk)
     };
-    var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + uploadId;
-    requestUrl += '/' + partNumber.toString();
-    rpc.put(requestUrl, chunk, headers, callbackFunc);
-}
-
-function completeParts(upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-    putExtra, callbackFunc) {
-    var headers = {
-        Authorization: 'UpToken ' + uploadToken,
-        'Content-Type': 'application/json'
-    };
-    var sortedParts = finishedEtags.etags.sort(function (a, b) {
-        return a.partNumber - b.partNumber;
-    });
-    var body = {
-        'fname': putExtra.fname,
-        'mimeType': putExtra.mimeType,
-        'customVars': putExtra.params,
-        'metadata': putExtra.metadata,
-        'parts': sortedParts
-    };
-    var requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
-    var requestBody = JSON.stringify(body);
-    rpc.post(requestUrl, requestBody, headers, function (err, ret, info) {
-        if (info.statusCode !== 200) {
+    const requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + uploadId +
+        '/' + partNumber.toString();
+    rpc.put(requestUrl, chunk, headers, function (err, ret, info) {
+        if (info.statusCode === 612) {
             if (putExtra.resumeRecordFile) {
-                fs.unlinkSync(putExtra.resumeRecordFile);
+                try {
+                    fs.unlinkSync(putExtra.resumeRecordFile);
+                } catch (_e) {
+                    // ignore
+                }
             }
         }
         callbackFunc(err, ret, info);
     });
 }
 
-
-ResumeUploader.prototype.putFile = function (uploadToken, key, localFile,
+function completeParts (upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
     putExtra, callbackFunc) {
+    const headers = {
+        Authorization: 'UpToken ' + uploadToken,
+        'Content-Type': 'application/json'
+    };
+    const sortedParts = finishedEtags.etags.sort(function (a, b) {
+        return a.partNumber - b.partNumber;
+    });
+    const body = {
+        fname: putExtra.fname,
+        mimeType: putExtra.mimeType,
+        customVars: putExtra.params,
+        metadata: putExtra.metadata,
+        parts: sortedParts
+    };
+    const requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
+    const requestBody = JSON.stringify(body);
+    rpc.post(requestUrl, requestBody, headers, function (err, ret, info) {
+        if (info.statusCode === 200 || info.statusCode === 612) {
+            if (putExtra.resumeRecordFile) {
+                try {
+                    fs.unlinkSync(putExtra.resumeRecordFile);
+                } catch (_e) {
+                    // ignore
+                }
+            }
+        }
+        callbackFunc(err, ret, info);
+    });
+}
+
+ResumeUploader.prototype.putFile = function (
+    uploadToken,
+    key,
+    localFile,
+    putExtra,
+    callbackFunc
+) {
+    const that = this;
     putExtra = putExtra || new PutExtra();
-    var rsStream = fs.createReadStream(localFile, {
+    const rsStream = fs.createReadStream(localFile, {
         highWaterMark: conf.BLOCK_SIZE
     });
-    var rsStreamLen = fs.statSync(localFile).size;
+    const rsStreamLen = fs.statSync(localFile).size;
+    const isResumeUpload = putExtra.resumeRecordFile &&
+        fs.existsSync(putExtra.resumeRecordFile);
     if (!putExtra.mimeType) {
         putExtra.mimeType = mime.getType(localFile);
     }
@@ -401,7 +593,34 @@ ResumeUploader.prototype.putFile = function (uploadToken, key, localFile,
     }
 
     return this.putStream(uploadToken, key, rsStream, rsStreamLen, putExtra,
-        callbackFunc);
+        callbackWithRetryFunc);
+
+    function callbackWithRetryFunc (err, ret, info) {
+        let needRetry = false;
+        if (putExtra.version === 'v1' &&
+            info.statusCode === 701 &&
+            isResumeUpload
+        ) {
+            needRetry = true;
+        }
+        if (putExtra.version === 'v2' &&
+            info.statusCode === 612 &&
+            isResumeUpload
+        ) {
+            needRetry = true;
+        }
+        if (needRetry) {
+            that.putFile(
+                uploadToken,
+                key,
+                localFile,
+                putExtra,
+                callbackFunc
+            );
+            return;
+        }
+        callbackFunc(err, ret, info);
+    }
 };
 
 ResumeUploader.prototype.putFileWithoutKey = function (uploadToken, localFile,

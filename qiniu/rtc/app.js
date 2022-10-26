@@ -23,7 +23,8 @@ function get(credentials, options, fn) {
             if (res.statusCode != 200) {
                 var result = {
                     code: res.statusCode,
-                    message: res.statusMessage
+                    message: resultObject.error || res.statusMessage,
+                    reqId: res.headers['x-reqid']
                 };
                 fn(result, null);
             } else {
@@ -59,7 +60,8 @@ function post(credentials, options, data, fn) {
             if (res.statusCode != 200) {
                 var result = {
                     code: res.statusCode,
-                    message: res.statusMessage
+                    message: resultObject.error || res.statusMessage,
+                    reqId: res.headers['x-reqid']
                 };
                 fn(result, null);
             } else {

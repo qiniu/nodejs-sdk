@@ -578,6 +578,18 @@ export declare namespace rs {
         delimiter?: string;
     }
 
+    type BucketEventName = 'put'
+        | 'mkfile'
+        | 'delete'
+        | 'copy'
+        | 'move'
+        | 'append'
+        | 'disable'
+        | 'enable'
+        | 'deleteMarkerCreate'
+        | 'predelete'
+        | 'restore:completed';
+
     class BucketManager {
         mac: auth.digest.Mac;
         config: conf.Config;
@@ -866,6 +878,113 @@ export declare namespace rs {
          *  @param callbackFunc - 回调函数
          */
         getBucketLifecycleRule(bucket: string, callbackFunc: callback): void
+
+        /**
+         * 添加事件通知
+         * https://developer.qiniu.com/kodo/8610/dev-event-notification
+         * @param bucket - 空间名
+         * @param options - 配置项
+         * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+         * @param options.event - 事件类型，接受数组设置多个
+         * @param options.callbackUrl - 事件通知回调 URL，接受数组设置多个，失败依次重试
+         * @param options.prefix - 可选，文件配置的前缀
+         * @param options.suffix - 可选，文件配置的后缀
+         * @param options.access_key - 可选，设置的话会对通知请求用对应的ak、sk进行签名
+         * @param options.host - 可选，通知请求的host
+         * @param callbackFunc - 回调函数
+         */
+        putBucketEvent(
+            bucket: string,
+            options: {
+                name: string,
+                event: BucketEventName | BucketEventName[],
+                callbackUrl: string | string[],
+                prefix?: string,
+                suffix?: string,
+                access_key?: string,
+                host?: string,
+            },
+            callbackFunc: callback,
+        ): void
+
+        /**
+         * 更新事件通知
+         * https://developer.qiniu.com/kodo/8610/dev-event-notification
+         * @param bucket - 空间名
+         * @param options - 配置项
+         * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+         * @param options.event - 事件类型，接受数组设置多个
+         * @param options.callbackUrl - 事件通知回调 URL，接受数组设置多个，失败依次重试
+         * @param options.prefix - 可选，文件配置的前缀
+         * @param options.suffix - 可选，文件配置的后缀
+         * @param options.access_key - 可选，设置的话会对通知请求用对应的ak、sk进行签名
+         * @param options.host - 可选，通知请求的host
+         * @param callbackFunc - 回调函数
+         */
+        updateBucketEvent(
+            bucket: string,
+            options: {
+                name: string,
+                event?: BucketEventName | BucketEventName[],
+                callbackUrl?: string | string[],
+                prefix?: string,
+                suffix?: string,
+                access_key?: string,
+                host?: string,
+            },
+            callbackFunc: callback,
+        ): void
+
+        /**
+         * 获取事件通知规则
+         * https://developer.qiniu.com/kodo/8610/dev-event-notification
+         *
+         * @param bucket - 空间名
+         * @param callbackFunc - 回调函数
+         */
+        getBucketEvent(bucket: string, callbackFunc: callback): void
+
+        /**
+         * 删除事件通知规则
+         * https://developer.qiniu.com/kodo/8610/dev-event-notification
+         *
+         * @param bucket - 空间名
+         * @param name - 规则名称
+         * @param callbackFunc - 回调函数
+         */
+        deleteBucketEvent(bucket: string, name: string, callbackFunc: callback): void
+
+        /**
+         * 设置 bucket 的 cors（跨域）规则
+         * https://developer.qiniu.com/kodo/8539/set-the-cross-domain-resource-sharing
+         * @param bucket - 空间名
+         * @param body - 规则配置
+         * @param body[].allowed_origin - 允许的域名
+         * @param body[].allowed_method - 允许的请求方法；大小写不敏感
+         * @param body[].allowed_header - 可选，允许的 header；默认不允许任何 header；大小写不敏感
+         * @param body[].exposed_header - 可选，暴露的 header；默认 X-Log, X-Reqid；大小写不敏感
+         * @param body[].max_age - 可选，结果可以缓存的时间；默认不缓存
+         * @param callbackFunc - 回调函数
+         */
+        putCorsRules(
+            bucket: string,
+            body: {
+                allowed_origin: string[],
+                allowed_method: string[],
+                allowed_header?: string[],
+                exposed_header?: string[],
+                max_age?: number,
+            }[],
+            callbackFunc: callback
+        ): void
+
+        /**
+         * 获取 bucket 的 cors（跨域）规则
+         * https://developer.qiniu.com/kodo/8539/set-the-cross-domain-resource-sharing
+         * @param bucket - 空间名
+         * @param callbackFunc - 回调函数
+         */
+        getCorsRules(bucket: string, callbackFunc: callback): void
     }
 
     /**
