@@ -328,5 +328,47 @@ describe('test util functions', function () {
                 );
             }
         });
+
+        it('test encodedEntry', function () {
+            const caseList = [
+                {
+                    msg: 'normal',
+                    bucket: 'qiniuphotos',
+                    key: 'gogopher.jpg',
+                    expect: 'cWluaXVwaG90b3M6Z29nb3BoZXIuanBn'
+                },
+                {
+                    msg: 'key empty',
+                    bucket: 'qiniuphotos',
+                    key: '',
+                    expect: 'cWluaXVwaG90b3M6'
+                },
+                {
+                    msg: 'key undefined',
+                    bucket: 'qiniuphotos',
+                    key: undefined,
+                    expect: 'cWluaXVwaG90b3M='
+                },
+                {
+                    msg: 'key need replace plus symbol',
+                    bucket: 'qiniuphotos',
+                    key: '012ts>a',
+                    expect: 'cWluaXVwaG90b3M6MDEydHM-YQ=='
+                },
+                {
+                    msg: 'key need replace slash symbol',
+                    bucket: 'qiniuphotos',
+                    key: '012ts?a',
+                    expect: 'cWluaXVwaG90b3M6MDEydHM_YQ=='
+                }
+            ];
+
+            for (let i = 0; i < caseList.length; i++) {
+                const actual = qiniu.util.encodedEntry(caseList[i].bucket, caseList[i].key);
+                const expect = caseList[i].expect;
+                const msg = caseList[i].msg;
+                should.equal(actual, expect, msg);
+            }
+        });
     });
 });

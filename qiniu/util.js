@@ -42,7 +42,11 @@ exports.formatDateUTC = function (date, layout) {
 
 // Encoded Entry
 exports.encodedEntry = function (bucket, key) {
-    return exports.urlsafeBase64Encode(bucket + (key ? ':' + key : ''));
+    let strToEncode = bucket;
+    if (key !== undefined) {
+        strToEncode += ':' + key;
+    }
+    return exports.urlsafeBase64Encode(strToEncode);
 };
 
 // Get accessKey from uptoken
