@@ -707,7 +707,7 @@ export declare namespace rs {
                 }
             },
             callbackFunc: callback
-        )
+        ): void;
 
         /**
          * 解冻归档存储文件
