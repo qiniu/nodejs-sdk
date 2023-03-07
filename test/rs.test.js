@@ -901,4 +901,30 @@ describe('test start bucket manager', function () {
             });
         });
     });
+
+    describe('test bucket image source', function () {
+        it('test set image', function (done) {
+            bucketManager.image(
+                srcBucket,
+                'http://devtools.qiniu.com/',
+                'devtools.qiniu.com',
+                function (err, respBody, respInfo) {
+                    should.not.exist(err, JSON.stringify(respInfo));
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                    done();
+                }
+            );
+        });
+
+        it('test unset image', function (done) {
+            bucketManager.unimage(
+                srcBucket,
+                function (err, respBody, respInfo) {
+                    should.not.exist(err, JSON.stringify(respInfo));
+                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
+                    done();
+                }
+            );
+        });
+    });
 });

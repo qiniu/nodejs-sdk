@@ -373,19 +373,21 @@ function changeTypeReq(mac, config, bucket, key, newType, callbackFunc) {
     );
 }
 
-// 设置空间镜像源
-// @link https://developer.qiniu.com/kodo/api/1370/mirror
-// @param bucket 空间名称
-// @param srcSiteUrl 镜像源地址
-// @param srcHost 镜像Host
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-const PU_HOST = 'http://pu.qbox.me:10200';
+/**
+ * 设置空间镜像源
+ * @link https://developer.qiniu.com/kodo/3966/bucket-image-source
+ * @param {string} bucket 空间名称
+ * @param {string} srcSiteUrl 镜像源地址
+ * @param {string} srcHost 镜像Host
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.image = function (bucket, srcSiteUrl, srcHost,
     callbackFunc) {
-    var encodedSrcSite = util.urlsafeBase64Encode(srcSiteUrl);
-    var requestURI = PU_HOST + '/image/' + bucket + '/from/' + encodedSrcSite;
+    const encodedSrcSite = util.urlsafeBase64Encode(srcSiteUrl);
+    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    let requestURI = scheme + conf.UC_HOST + '/image/' + bucket + '/from/' + encodedSrcSite;
     if (srcHost) {
-        var encodedHost = util.urlsafeBase64Encode(srcHost);
+        const encodedHost = util.urlsafeBase64Encode(srcHost);
         requestURI += '/host/' + encodedHost;
     }
     rpc.postWithOptions(
@@ -398,13 +400,15 @@ BucketManager.prototype.image = function (bucket, srcSiteUrl, srcHost,
     );
 };
 
-// 取消设置空间镜像源
-// @link https://developer.qiniu.com/kodo/api/1370/mirror
-// @param bucket 空间名称
-// @param callbackFunc(err, respBody, respInfo) 回调函数
+/**
+ * 取消设置空间镜像源
+ * @param {string} bucket 空间名称
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.unimage = function (bucket, callbackFunc) {
-    var requestURI = PU_HOST + '/unimage/' + bucket;
-    var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
+    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    const requestURI = scheme + conf.UC_HOST + '/unimage/' + bucket;
+    const digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
