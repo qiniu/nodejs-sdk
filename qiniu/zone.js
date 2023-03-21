@@ -74,7 +74,7 @@ exports.Zone_ap_northeast_1 = new conf.Zone([
 
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
     const apiAddr = util.format(
-        'https://%s/v2/query?ak=%s&bucket=%s',
+        'https://%s/v4/query?ak=%s&bucket=%s',
         conf.UC_HOST,
         accessKey,
         bucket
@@ -92,37 +92,35 @@ exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
             return;
         }
 
-        const zoneData = JSON.parse(respData);
-        const srcUpHosts = [];
-        const cdnUpHosts = [];
+        let zoneData;
+        try {
+            const hosts = JSON.parse(respData).hosts;
+            if (!hosts || !hosts.length) {
+                respErr = new Error('no host available: ' + respData);
+                callbackFunc(respErr, null, null);
+                return;
+            }
+            zoneData = hosts[0];
+        } catch (err) {
+            callbackFunc(err, null, null);
+            return;
+        }
+        let srcUpHosts = [];
+        let cdnUpHosts = [];
         let zoneExpire = 0;
 
         try {
             zoneExpire = zoneData.ttl;
             // read src hosts
-            zoneData.up.src.main.forEach(function (host) {
-                srcUpHosts.push(host);
-            });
-            if (zoneData.up.src.backup) {
-                zoneData.up.src.backup.forEach(function (host) {
-                    srcUpHosts.push(host);
-                });
-            }
+            srcUpHosts = zoneData.up.domains;
 
             // read acc hosts
-            zoneData.up.acc.main.forEach(function (host) {
-                cdnUpHosts.push(host);
-            });
-            if (zoneData.up.acc.backup) {
-                zoneData.up.acc.backup.forEach(function (host) {
-                    cdnUpHosts.push(host);
-                });
-            }
+            cdnUpHosts = zoneData.up.domains;
 
-            const ioHost = zoneData.io.src.main[0];
-            const rsHost = zoneData.rs.acc.main[0];
-            const rsfHost = zoneData.rsf.acc.main[0];
-            const apiHost = zoneData.api.acc.main[0];
+            const ioHost = zoneData.io.domains[0];
+            const rsHost = zoneData.rs.domains[0];
+            const rsfHost = zoneData.rsf.domains[0];
+            const apiHost = zoneData.api.domains[0];
             const zoneInfo = new conf.Zone(
                 srcUpHosts,
                 cdnUpHosts,
