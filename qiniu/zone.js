@@ -74,7 +74,8 @@ exports.Zone_ap_northeast_1 = new conf.Zone([
 
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
     const apiAddr = util.format(
-        'https://uc.qbox.me/v2/query?ak=%s&bucket=%s',
+        'https://%s/v2/query?ak=%s&bucket=%s',
+        conf.UC_HOST,
         accessKey,
         bucket
     );

@@ -332,7 +332,7 @@ exports.prepareZone = function (ctx, accessKey, bucket, callback) {
             }
             // update object
             ctx.config.zone = cZoneInfo;
-            ctx.config.zoneExpire = cZoneExpire + parseInt(Date.now() / 1000);
+            ctx.config.zoneExpire = cZoneExpire + Math.trunc(Date.now() / 1000);
             callback(null, ctx);
         });
     }
