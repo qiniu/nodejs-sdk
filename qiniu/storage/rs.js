@@ -412,16 +412,18 @@ BucketManager.prototype.unimage = function (bucket, callbackFunc) {
     rpc.postWithoutForm(requestURI, digest, callbackFunc);
 };
 
-// 获取指定前缀的文件列表
-// @link https://developer.qiniu.com/kodo/api/1284/list
-//
-// @param bucket 空间名称
-// @param options 列举操作的可选参数
-//                prefix    列举的文件前缀
-//                marker    上一次列举返回的位置标记，作为本次列举的起点信息
-//                limit     每次返回的最大列举文件数量
-//                delimiter 指定目录分隔符
-// @param callbackFunc(err, respBody, respInfo) - 回调函数
+/**
+ * 获取指定前缀的文件列表
+ * @link https://developer.qiniu.com/kodo/api/1284/list
+ *
+ * @param { string } bucket 空间名称
+ * @param { Object } options 列举操作的可选参数
+ * @param { string } options.prefix 列举的文件前缀
+ * @param { string } options.marker 上一次列举返回的位置标记，作为本次列举的起点信息
+ * @param { number } options.limit 每次返回的最大列举文件数量
+ * @param { string } options.delimiter 指定目录分隔符
+ * @param { function } callbackFunc(err, respBody, respInfo) 回调函数
+ */
 BucketManager.prototype.listPrefix = function (bucket, options, callbackFunc) {
     util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
         if (err) {
@@ -432,10 +434,10 @@ BucketManager.prototype.listPrefix = function (bucket, options, callbackFunc) {
     });
 };
 
-function listPrefixReq(mac, config, bucket, options, callbackFunc) {
+function listPrefixReq (mac, config, bucket, options, callbackFunc) {
     options = options || {};
     // 必须参数
-    var reqParams = {
+    const reqParams = {
         bucket: bucket
     };
 
@@ -463,9 +465,9 @@ function listPrefixReq(mac, config, bucket, options, callbackFunc) {
         reqParams.delimiter = '';
     }
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + config.zone.rsfHost + '/list?' + reqSpec;
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = scheme + config.zone.rsfHost + '/list?' + reqSpec;
 
     rpc.postWithOptions(
         requestURI,
@@ -477,15 +479,19 @@ function listPrefixReq(mac, config, bucket, options, callbackFunc) {
     );
 }
 
-// 获取指定前缀的文件列表
-//
-// @param bucket 空间名称
-// @param options 列举操作的可选参数
-//                prefix    列举的文件前缀
-//                marker    上一次列举返回的位置标记，作为本次列举的起点信息
-//                limit     每次返回的最大列举文件数量
-//                delimiter 指定目录分隔符
-// @param callbackFunc(err, respBody, respInfo) - 回调函数
+/**
+ * 获取指定前缀的文件列表 V2
+ *
+ * @deprecated API 可能返回仅包含 marker，不包含 item 或 dir 的项，请使用 {@link listPrefix}
+ *
+ * @param bucket 空间名称
+ * @param { Object } options 列举操作的可选参数
+ * @param { string } options.prefix 列举的文件前缀
+ * @param { string } options.marker 上一次列举返回的位置标记，作为本次列举的起点信息
+ * @param { number } options.limit 每次返回的最大列举文件数量
+ * @param { string } options.delimiter 指定目录分隔符
+ * @param { function } callbackFunc(err, respBody, respInfo) 回调函数
+ */
 BucketManager.prototype.listPrefixV2 = function (bucket, options, callbackFunc) {
     util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
         if (err) {
@@ -496,10 +502,10 @@ BucketManager.prototype.listPrefixV2 = function (bucket, options, callbackFunc) 
     });
 };
 
-function listPrefixReqV2(mac, config, bucket, options, callbackFunc) {
+function listPrefixReqV2 (mac, config, bucket, options, callbackFunc) {
     options = options || {};
     // 必须参数
-    var reqParams = {
+    const reqParams = {
         bucket: bucket
     };
 
@@ -527,9 +533,9 @@ function listPrefixReqV2(mac, config, bucket, options, callbackFunc) {
         reqParams.delimiter = '';
     }
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + config.zone.rsfHost + '/v2/list?' + reqSpec;
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = scheme + config.zone.rsfHost + '/v2/list?' + reqSpec;
 
     rpc.postWithOptions(
         requestURI,
