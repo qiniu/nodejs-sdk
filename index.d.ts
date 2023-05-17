@@ -775,9 +775,20 @@ export declare namespace rs {
          *
          * @param bucket 空间名称
          * @param options 列举操作的可选参数
-         * @param callback
+         * @param callback 回调函数
          */
         listPrefix(bucket: string, options: ListPrefixOptions | null, callback: callback): void;
+
+        /**
+         * 获取制定前缀的文件列表 V2
+         *
+         * @deprecated API 可能返回仅包含 marker，不包含 item 或 dir 的项，请使用 {@link listPrefix}
+         *
+         * @param bucket 空间名称
+         * @param options 列举操作的可选参数
+         * @param callback 回调函数
+         */
+        listPrefixV2(bucket: string, options: ListPrefixOptions | null, callback: callback): void;
 
         /**
          * 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
