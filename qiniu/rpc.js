@@ -1,8 +1,23 @@
-var urllib = require('urllib');
-var conf = require('./conf');
+const urllib = require('urllib');
+
+const pkg = require('../package.json');
+const conf = require('./conf');
 const digest = require('./auth/digest');
 const util = require('./util');
+const client = require('./httpc/client');
+const middleware = require('./httpc/middleware');
 
+let uaMiddleware = new middleware.UserAgentMiddleware(pkg.version);
+uaMiddleware = Object.defineProperty(uaMiddleware, 'userAgent', {
+    get: function () {
+        return conf.USER_AGENT;
+    }
+});
+exports.qnHttpClient = new client.HttpClient({
+    middlewares: [
+        uaMiddleware
+    ]
+});
 exports.get = get;
 exports.post = post;
 exports.put = put;

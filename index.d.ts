@@ -3,7 +3,9 @@
  * @date 2017-06-27
  * @author xialeistudio<xialeistudio@gmail.com>
  */
-import { Callback } from 'urllib';
+import { Callback, RequestOptions } from 'urllib';
+import { Agent as HttpAgent, IncomingMessage} from 'http';
+import { Agent as HttpsAgent } from 'https';
 
 export declare type callback = (e?: Error, respBody?: any, respInfo?: any) => void;
 
@@ -417,6 +419,122 @@ export declare namespace util {
     function isQiniuCallback(mac: auth.digest.Mac, requestURI: string, reqBody: string | null, callbackAuth: string): boolean;
 }
 
+export declare namespace httpc {
+    interface ReqOpts<T = any> {
+        agent?: HttpAgent;
+        httpsAgent?: HttpsAgent;
+        url: string;
+        middlewares: middleware.Middleware[];
+        callback?: Callback<T>;
+        urllibOptions: RequestOptions;
+    }
+
+    interface RespWrapper<T = any> {
+        data: T;
+        resp: IncomingMessage;
+    }
+
+    namespace middleware {
+        interface Middleware {
+            send<T>(
+                request: ReqOpts<T>,
+                next: (reqOpts: ReqOpts<T>) => Promise<RespWrapper<T>>
+            ): Promise<RespWrapper<T>>;
+        }
+
+        /**
+         * 组合中间件为一个调用函数
+         * @param middlewares 中间件列表
+         * @param handler 请求函数
+         */
+        function composeMiddlewares<T>(
+            middlewares: Middleware[],
+            handler: (reqOpts: ReqOpts<T>) => Promise<RespWrapper<T>>
+        );
+
+        /**
+         * 设置 User-Agent 请求头中间件
+         */
+        class UserAgentMiddleware implements Middleware {
+            constructor(sdkVersion: string);
+            send<T>(
+                request: httpc.ReqOpts<T>,
+                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.RespWrapper<T>>
+            ): Promise<httpc.RespWrapper<T>>;
+        }
+
+        interface RetryDomainsMiddlewareOptions {
+            backupDomains: string[];
+            maxRetryTimes: number;
+            retryCondition: () => boolean;
+        }
+
+        class RetryDomainsMiddleware implements Middleware {
+            /**
+             * 备用域名
+             */
+            backupDomains: string[];
+
+            /**
+             * 最大重试次数，包括首次请求
+             */
+            maxRetryTimes: number;
+
+            /**
+             * 是否可以重试，可以通过该函数配置更详细的重试规则
+             */
+            retryCondition: () => boolean;
+
+            /**
+             * 已经重试的次数
+             * @private
+             */
+            private _retriedTimes: number;
+
+            /**
+             * 实例化重试域名中间件
+             * @param retryDomainsOptions
+             */
+            constructor(retryDomainsOptions: RetryDomainsMiddlewareOptions)
+
+            /**
+             * 重试域名中间件逻辑
+             * @param request
+             * @param next
+             */
+            send<T>(
+                request: httpc.ReqOpts<T>,
+                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.RespWrapper<T>>
+            ): Promise<httpc.RespWrapper<T>>;
+
+            /**
+             * 控制重试逻辑，主要为 {@link retryCondition} 服务。若没有设置 retryCondition，默认 2xx 才会终止重试
+             * @param err
+             * @param respWrapper
+             * @param reqOpts
+             * @private
+             */
+            private _shouldRetry<T>(
+                err: Error | null,
+                respWrapper: RespWrapper<T>,
+                reqOpts: ReqOpts<T>
+            ): boolean;
+        }
+    }
+
+    namespace client {
+        interface HttpClientOptions {
+            httpAgent?: HttpAgent;
+            httpsAgent?: HttpsAgent;
+            middlewares?: middleware.Middleware[];
+        }
+        class HttpClient {
+            constructor(options: HttpClientOptions)
+            sendRequest(requestOptions: ReqOpts): Promise<RespWrapper>
+        }
+    }
+}
+
 export declare namespace rpc {
     type Headers = Record<string, string> & {
         'User-Agent'?: string;
@@ -427,6 +545,8 @@ export declare namespace rpc {
         headers: Headers;
         mac: auth.digest.Mac;
     }
+
+    const qnHttpClient: httpc.client.HttpClient;
 
     /**
      *

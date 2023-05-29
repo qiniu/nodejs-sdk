@@ -8,6 +8,10 @@ module.exports = {
     rs: require('./qiniu/storage/rs.js'),
     fop: require('./qiniu/fop.js'),
     conf: require('./qiniu/conf.js'),
+    httpc: {
+        middleware: require('./qiniu/httpc/middleware'),
+        client: require('./qiniu/httpc/client')
+    },
     rpc: require('./qiniu/rpc.js'),
     util: require('./qiniu/util.js'),
     zone: require('./qiniu/zone.js'),
