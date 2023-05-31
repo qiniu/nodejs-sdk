@@ -1,6 +1,6 @@
-const urllib = require('urllib');
-const util = require('util');
 const conf = require('./conf');
+const { RetryDomainsMiddleware } = require('./httpc/middleware');
+const rpc = require('./rpc');
 
 // huadong
 exports.Zone_z0 = new conf.Zone([
@@ -73,65 +73,73 @@ exports.Zone_ap_northeast_1 = new conf.Zone([
 'api-ap-northeast-1.qiniuapi.com');
 
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
-    const apiAddr = util.format(
-        'https://%s/v4/query?ak=%s&bucket=%s',
-        conf.UC_HOST,
-        accessKey,
-        bucket
-    );
-    urllib.request(apiAddr, function (respErr, respData, respInfo) {
-        if (respErr) {
-            callbackFunc(respErr, null, null);
-            return;
-        }
+    const apiAddr = 'https://' + conf.UC_HOST + '/v4/query';
 
-        if (respInfo.statusCode != 200) {
-            // not ok
-            respErr = new Error(respInfo.statusCode + '\n' + respData);
-            callbackFunc(respErr, null, null);
-            return;
-        }
-
-        let zoneData;
-        try {
-            const hosts = JSON.parse(respData).hosts;
-            if (!hosts || !hosts.length) {
-                respErr = new Error('no host available: ' + respData);
+    rpc.qnHttpClient.get({
+        url: apiAddr,
+        params: {
+            ak: accessKey,
+            bucket: bucket
+        },
+        middlewares: [
+            new RetryDomainsMiddleware({
+                backupDomains: conf.UC_BACKUP_HOSTS
+            })
+        ],
+        callback: function (respErr, respData, respInfo) {
+            if (respErr) {
                 callbackFunc(respErr, null, null);
                 return;
             }
-            zoneData = hosts[0];
-        } catch (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        let srcUpHosts = [];
-        let cdnUpHosts = [];
-        let zoneExpire = 0;
 
-        try {
-            zoneExpire = zoneData.ttl;
-            // read src hosts
-            srcUpHosts = zoneData.up.domains;
+            if (respInfo.statusCode !== 200) {
+                // not ok
+                respErr = new Error(respInfo.statusCode + '\n' + respData);
+                callbackFunc(respErr, null, null);
+                return;
+            }
 
-            // read acc hosts
-            cdnUpHosts = zoneData.up.domains;
+            let zoneData;
+            try {
+                const hosts = JSON.parse(respData).hosts;
+                if (!hosts || !hosts.length) {
+                    respErr = new Error('no host available: ' + respData);
+                    callbackFunc(respErr, null, null);
+                    return;
+                }
+                zoneData = hosts[0];
+            } catch (err) {
+                callbackFunc(err, null, null);
+                return;
+            }
+            let srcUpHosts = [];
+            let cdnUpHosts = [];
+            let zoneExpire = 0;
 
-            const ioHost = zoneData.io.domains[0];
-            const rsHost = zoneData.rs.domains[0];
-            const rsfHost = zoneData.rsf.domains[0];
-            const apiHost = zoneData.api.domains[0];
-            const zoneInfo = new conf.Zone(
-                srcUpHosts,
-                cdnUpHosts,
-                ioHost,
-                rsHost,
-                rsfHost,
-                apiHost
-            );
-            callbackFunc(null, zoneInfo, zoneExpire);
-        } catch (e) {
-            callbackFunc(e, null, null);
+            try {
+                zoneExpire = zoneData.ttl;
+                // read src hosts
+                srcUpHosts = zoneData.up.domains;
+
+                // read acc hosts
+                cdnUpHosts = zoneData.up.domains;
+
+                const ioHost = zoneData.io.domains[0];
+                const rsHost = zoneData.rs.domains[0];
+                const rsfHost = zoneData.rsf.domains[0];
+                const apiHost = zoneData.api.domains[0];
+                const zoneInfo = new conf.Zone(
+                    srcUpHosts,
+                    cdnUpHosts,
+                    ioHost,
+                    rsHost,
+                    rsfHost,
+                    apiHost
+                );
+                callbackFunc(null, zoneInfo, zoneExpire);
+            } catch (e) {
+                callbackFunc(e, null, null);
+            }
         }
     });
 };

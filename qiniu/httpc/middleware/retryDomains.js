@@ -33,9 +33,7 @@ RetryDomainsMiddleware.prototype._shouldRetry = function (err, respWrapper, reqO
         return this.retryCondition(err, respWrapper, reqOpts);
     }
 
-    return !respWrapper ||
-        !respWrapper.resp ||
-        Math.floor(respWrapper.resp.statusCode / 100) !== 2;
+    return !respWrapper || respWrapper.needRetry();
 };
 
 /**

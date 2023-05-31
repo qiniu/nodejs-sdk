@@ -26,15 +26,27 @@ ResponseWrapper.prototype.needRetry = function () {
     }
 
     const statusCode = this.resp.statusCode;
-    if ([612, 631].includes(statusCode)) {
-        return false;
-    }
 
-    const statusFirstDigit = Math.floor(statusCode / 100);
-    if ([5].includes(statusFirstDigit)) {
+    // 需要重试的特例
+    if ([996].includes(statusCode)) {
         return true;
     }
 
+    // 不需要重试的特例
+    // 579 上传成功，回调失败
+    // 612 app/AK 不存在
+    // 631 bucket 不存在
+    if ([579, 612, 631].includes(statusCode)) {
+        return false;
+    }
+
+    // 需要重试的状态码
+    const statusFirstDigit = Math.floor(statusCode / 100);
+    if ([5, 6].includes(statusFirstDigit)) {
+        return true;
+    }
+
+    // 不需要重试的状态码
     if ([4].includes(statusFirstDigit)) {
         return false;
     }
