@@ -6,6 +6,7 @@
 import { Callback, RequestOptions } from 'urllib';
 import { Agent as HttpAgent, IncomingMessage} from 'http';
 import { Agent as HttpsAgent } from 'https';
+import { Readable } from "stream";
 
 export declare type callback = (e?: Error, respBody?: any, respInfo?: any) => void;
 
@@ -429,9 +430,17 @@ export declare namespace httpc {
         urllibOptions: RequestOptions;
     }
 
-    interface RespWrapper<T = any> {
+    interface RespWrapperOptions<T = any> {
         data: T;
         resp: IncomingMessage;
+    }
+
+    class RespWrapper<T = any> {
+        data: T;
+        resp: IncomingMessage;
+        constructor(options: RespWrapperOptions);
+        ok(): boolean;
+        needRetry(): boolean;
     }
 
     namespace middleware {
@@ -522,16 +531,36 @@ export declare namespace httpc {
         }
     }
 
-    namespace client {
-        interface HttpClientOptions {
-            httpAgent?: HttpAgent;
-            httpsAgent?: HttpsAgent;
-            middlewares?: middleware.Middleware[];
-        }
-        class HttpClient {
-            constructor(options: HttpClientOptions)
-            sendRequest(requestOptions: ReqOpts): Promise<RespWrapper>
-        }
+    interface HttpClientOptions {
+        httpAgent?: HttpAgent;
+        httpsAgent?: HttpsAgent;
+        middlewares?: middleware.Middleware[];
+    }
+
+    interface GetOptions<T = any> extends ReqOpts<T> {
+        params: Record<string, string>;
+        headers: Record<string, string>;
+    }
+
+    interface PostOptions<T = any> extends ReqOpts<T> {
+        data: string | Buffer | Readable;
+        headers: Record<string, string>;
+    }
+
+    interface PutOptions<T = any> extends ReqOpts<T> {
+        data: string | Buffer | Readable;
+        headers: Record<string, string>
+    }
+
+    class HttpClient {
+        httpAgent: HttpAgent;
+        httpsAgent: HttpsAgent;
+        middlewares: middleware.Middleware[];
+        constructor(options: HttpClientOptions)
+        sendRequest(requestOptions: ReqOpts): Promise<RespWrapper>
+        get(getOptions: GetOptions): Promise<RespWrapper>
+        post(postOptions: PostOptions): Promise<RespWrapper>
+        put(putOptions: PutOptions): Promise<RespWrapper>
     }
 }
 
@@ -546,7 +575,7 @@ export declare namespace rpc {
         mac: auth.digest.Mac;
     }
 
-    const qnHttpClient: httpc.client.HttpClient;
+    const qnHttpClient: httpc.HttpClient;
 
     /**
      *

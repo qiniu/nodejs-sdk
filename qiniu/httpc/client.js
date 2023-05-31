@@ -4,6 +4,7 @@ const https = require('https');
 const urllib = require('urllib');
 
 const middleware = require('./middleware');
+const { ResponseWrapper } = require('./responseWrapper');
 
 /**
  *
@@ -29,7 +30,7 @@ HttpClient.prototype._handleRequest = function (req) {
                     reject(err);
                     return;
                 }
-                resolve({ data, resp });
+                resolve(new ResponseWrapper({ data, resp }));
             });
         } catch (e) {
             reject(e);
@@ -89,6 +90,152 @@ HttpClient.prototype.sendRequest = function (requestOptions) {
     }
 
     return resPromise;
+};
+
+/**
+ * @param {Object} reqOptions
+ * @param {string} reqOptions.url
+ * @param {http.Agent} [reqOptions.agent]
+ * @param {https.Agent} [reqOptions.httpsAgent]
+ * @param {Object} [reqOptions.params]
+ * @param {Object} [reqOptions.headers]
+ * @param {middleware.Middleware[]} [reqOptions.middlewares]
+ * @param {urllib.RequestOptions} [urllibOptions]
+ * @return {Promise<RespWrapper>}
+ */
+HttpClient.prototype.get = function (reqOptions, urllibOptions) {
+    const {
+        url,
+        params,
+        headers,
+        middlewares,
+        agent,
+        httpsAgent,
+        callback
+    } = reqOptions;
+
+    urllibOptions = urllibOptions || {};
+    urllibOptions.method = 'GET';
+    urllibOptions.headers = Object.assign(
+        {
+            Connection: 'keep-alive'
+        },
+        headers,
+        urllibOptions.headers || {}
+    );
+    urllibOptions.data = params;
+    urllibOptions.followRedirect = true;
+
+    return this.sendRequest({
+        url: url,
+        middlewares: middlewares || [],
+        agent: agent,
+        httpsAgent: httpsAgent,
+        callback: callback,
+        urllibOptions: urllibOptions
+    });
+};
+
+/**
+ * @param {Object} reqOptions
+ * @param {string} reqOptions.url
+ * @param {http.Agent} [reqOptions.agent]
+ * @param {https.Agent} [reqOptions.httpsAgent]
+ * @param {string | Buffer | Readable} [reqOptions.data]
+ * @param {Object} [reqOptions.headers]
+ * @param {middleware.Middleware[]} [reqOptions.middlewares]
+ * @param {urllib.RequestOptions} [urllibOptions]
+ * @return {Promise<RespWrapper>}
+ */
+HttpClient.prototype.post = function (reqOptions, urllibOptions) {
+    const {
+        url,
+        data,
+        headers,
+        middlewares,
+        agent,
+        httpsAgent,
+        callback
+    } = reqOptions;
+
+    urllibOptions = urllibOptions || {};
+    urllibOptions.method = 'POST';
+    urllibOptions.headers = Object.assign(
+        {
+            Connection: 'keep-alive'
+        },
+        headers,
+        urllibOptions.headers || {}
+    );
+    urllibOptions.gzip = true;
+
+    if (Buffer.isBuffer(data) || typeof data === 'string') {
+        urllibOptions.content = data;
+    } else if (data) {
+        urllibOptions.stream = data;
+    } else {
+        urllibOptions.headers['Content-Length'] = '0';
+    }
+
+    return this.sendRequest({
+        url: url,
+        middlewares: middlewares || [],
+        agent: agent,
+        httpsAgent: httpsAgent,
+        callback: callback,
+        urllibOptions: urllibOptions
+    });
+};
+
+/**
+ * @param {Object} reqOptions
+ * @param {string} reqOptions.url
+ * @param {http.Agent} [reqOptions.agent]
+ * @param {https.Agent} [reqOptions.httpsAgent]
+ * @param {string | Buffer | ReadableStream} [reqOptions.data]
+ * @param {Object} [reqOptions.headers]
+ * @param {middleware.Middleware[]} [reqOptions.middlewares]
+ * @param {urllib.RequestOptions} [urllibOptions]
+ * @return {Promise<RespWrapper>}
+ */
+HttpClient.prototype.put = function (reqOptions, urllibOptions) {
+    const {
+        url,
+        data,
+        headers,
+        middlewares,
+        agent,
+        httpsAgent,
+        callback
+    } = reqOptions;
+
+    urllibOptions = urllibOptions || {};
+    urllibOptions.method = 'PUT';
+    urllibOptions.headers = Object.assign(
+        {
+            Connection: 'keep-alive'
+        },
+        headers,
+        urllibOptions.headers || {}
+    );
+    urllibOptions.gzip = true;
+
+    if (Buffer.isBuffer(data) || typeof data === 'string') {
+        urllibOptions.content = data;
+    } else if (data) {
+        urllibOptions.stream = data;
+    } else {
+        urllibOptions.headers['Content-Length'] = '0';
+    }
+
+    return this.sendRequest({
+        url: url,
+        middlewares: middlewares || [],
+        agent: agent,
+        httpsAgent: httpsAgent,
+        callback: callback,
+        urllibOptions: urllibOptions
+    });
 };
 
 exports.HttpClient = HttpClient;

@@ -10,7 +10,8 @@ module.exports = {
     conf: require('./qiniu/conf.js'),
     httpc: {
         middleware: require('./qiniu/httpc/middleware'),
-        client: require('./qiniu/httpc/client')
+        client: require('./qiniu/httpc/client'),
+        responseWrapper: require('./qiniu/httpc/responseWrapper')
     },
     rpc: require('./qiniu/rpc.js'),
     util: require('./qiniu/util.js'),
