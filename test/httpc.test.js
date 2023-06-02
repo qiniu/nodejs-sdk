@@ -8,6 +8,59 @@ const {
 } = qiniu.httpc.middleware;
 
 describe('test http module', function () {
+    describe('test http ResponseWrapper', function () {
+        const { ResponseWrapper } = qiniu.httpc;
+
+        it('needRetry', function () {
+            const rule = [
+                ['-1', true],
+                ['100,499', false],
+                ['500,578', true],
+                ['579', false],
+                ['580,599', true],
+                ['600,611', true],
+                ['612', false],
+                ['613,630', true],
+                ['631', false],
+                ['632,699', true]
+            ];
+            const cases = [];
+            for (const [codeRange, shouldRetry] of rule) {
+                let [start, end] = codeRange.split(',');
+                start = parseInt(start);
+                end = parseInt(end);
+                if (!end) {
+                    cases.push({
+                        code: start,
+                        shouldRetry
+                    });
+                } else {
+                    for (let i = start; i <= end; i++) {
+                        cases.push({
+                            code: i,
+                            shouldRetry
+                        });
+                    }
+                }
+            }
+
+            const mockedResponseWrapper = new ResponseWrapper({
+                data: [],
+                resp: {
+                    statusCode: 200
+                }
+            });
+
+            for (const item of cases) {
+                mockedResponseWrapper.resp.statusCode = item.code;
+                mockedResponseWrapper.needRetry().should.eql(
+                    item.shouldRetry,
+                    `${item.code} need${item.shouldRetry ? '' : ' NOT'} retry`
+                );
+            }
+        });
+    });
+
     class OrderRecordMiddleware extends Middleware {
         /**
          *

@@ -17,12 +17,12 @@ ResponseWrapper.prototype.ok = function () {
  * @return {boolean}
  */
 ResponseWrapper.prototype.needRetry = function () {
-    if (!this.resp || !this.resp.statusCode) {
-        return true;
-    }
-
     if (this.ok()) {
         return false;
+    }
+
+    if (!this.resp || !this.resp.statusCode || this.resp.statusCode < 0) {
+        return true;
     }
 
     const statusCode = this.resp.statusCode;
