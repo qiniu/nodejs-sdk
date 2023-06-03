@@ -81,15 +81,9 @@ describe('test http module', function () {
          */
         send (request, next) {
             this.record.push(`bef_${this.label}${this.record.length}`);
-            return next(request).then(({
-                data,
-                resp
-            }) => {
+            return next(request).then((respWrapper) => {
                 this.record.push(`aft_${this.label}${this.record.length}`);
-                return {
-                    data,
-                    resp
-                };
+                return respWrapper;
             });
         }
     }
