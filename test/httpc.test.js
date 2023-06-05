@@ -12,37 +12,32 @@ describe('test http module', function () {
         const { ResponseWrapper } = qiniu.httpc;
 
         it('needRetry', function () {
-            const rule = [
-                ['-1', true],
-                ['100,499', false],
-                ['500,578', true],
-                ['579', false],
-                ['580,599', true],
-                ['600,611', true],
-                ['612', false],
-                ['613,630', true],
-                ['631', false],
-                ['632,699', true]
-            ];
-            const cases = [];
-            for (const [codeRange, shouldRetry] of rule) {
-                let [start, end] = codeRange.split(',');
-                start = parseInt(start);
-                end = parseInt(end);
-                if (!end) {
-                    cases.push({
-                        code: start,
-                        shouldRetry
-                    });
-                } else {
-                    for (let i = start; i <= end; i++) {
-                        cases.push({
-                            code: i,
-                            shouldRetry
-                        });
-                    }
+            const cases = Array.from({
+                length: 800
+            }, (_, i) => {
+                if (i > 0 && i < 500) {
+                    return {
+                        code: i,
+                        shouldRetry: false
+                    };
                 }
-            }
+                if ([
+                    501, 509, 573, 579, 608, 612, 614, 616, 618, 630, 631, 632, 640, 701
+                ].includes(i)) {
+                    return {
+                        code: i,
+                        shouldRetry: false
+                    };
+                }
+                return {
+                    code: i,
+                    shouldRetry: true
+                };
+            });
+            cases.unshift({
+                code: -1,
+                shouldRetry: true
+            });
 
             const mockedResponseWrapper = new ResponseWrapper({
                 data: [],
