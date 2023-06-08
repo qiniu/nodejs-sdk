@@ -1,9 +1,6 @@
 name: NodeJS CI with NPM
 
-on:
-  push:
-    paths-ignore:
-      - '**.md'
+on: [push]
 
 jobs:
   build:
