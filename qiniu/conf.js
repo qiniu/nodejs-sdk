@@ -18,13 +18,30 @@ exports.FormMimeJson = 'application/json';
 exports.FormMimeRaw = 'application/octet-stream';
 exports.RS_HOST = 'rs.qiniu.com';
 exports.RPC_TIMEOUT = 600000; // 600s
-exports.UC_HOST = 'uc.qbox.me';
+let UC_BACKUP_HOSTS = [
+    'kodo-config.qiniuapi.com',
+    'api.qiniu.com'
+];
+Object.defineProperty(exports, 'UC_BACKUP_HOSTS', {
+    get: () => UC_BACKUP_HOSTS,
+    set: v => {
+        UC_BACKUP_HOSTS = v;
+    }
+});
+let UC_HOST = 'uc.qbox.me';
+Object.defineProperty(exports, 'UC_HOST', {
+    get: () => UC_HOST,
+    set: v => {
+        UC_HOST = v;
+        UC_BACKUP_HOSTS = [];
+    }
+});
 
 // proxy
 exports.RPC_HTTP_AGENT = null;
 exports.RPC_HTTPS_AGENT = null;
 
-exports.Config = function Config(options) {
+exports.Config = function Config (options) {
     options = options || {};
     // use http or https protocol
     this.useHttpsDomain = !!(options.useHttpsDomain || false);

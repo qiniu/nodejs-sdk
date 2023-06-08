@@ -74,6 +74,30 @@ describe('test util functions', function () {
             });
         });
 
+        it('test prepareZone with backup domains', function (done) {
+            before(function () {
+                qiniu.conf.UC_HOST = 'fake-uc.nodejssdk.qiniu.com';
+                qiniu.conf.UC_BACKUP_HOSTS = [
+                    'unavailable-uc.nodejssdk.qiniu.com',
+                    'uc.qbox.me'
+                ];
+            });
+
+            after(function () {
+                qiniu.conf.UC_HOST = 'uc.qbox.me';
+                qiniu.conf.UC_BACKUP_HOSTS = [
+                    'kodo-config.qiniuapi.com',
+                    'api.qiniu.com'
+                ];
+            });
+
+            qiniu.util.prepareZone(bucketManager, bucketManager.mac.accessKey, bucket, function (err, ctx) {
+                should.not.exist(err);
+                should.equal(bucketManager, ctx);
+                done();
+            });
+        });
+
         it('test formatDateUTC', function () {
             const caseList = [
                 {

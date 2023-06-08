@@ -1,8 +1,21 @@
-var urllib = require('urllib');
-var conf = require('./conf');
+const pkg = require('../package.json');
+const conf = require('./conf');
 const digest = require('./auth/digest');
 const util = require('./util');
+const client = require('./httpc/client');
+const middleware = require('./httpc/middleware');
 
+let uaMiddleware = new middleware.UserAgentMiddleware(pkg.version);
+uaMiddleware = Object.defineProperty(uaMiddleware, 'userAgent', {
+    get: function () {
+        return conf.USER_AGENT;
+    }
+});
+exports.qnHttpClient = new client.HttpClient({
+    middlewares: [
+        uaMiddleware
+    ]
+});
 exports.get = get;
 exports.post = post;
 exports.put = put;
@@ -93,12 +106,12 @@ function postWithOptions (requestURI, requestForm, options, callbackFunc) {
     return post(requestURI, requestForm, headers, callbackFunc);
 }
 
-function postMultipart(requestURI, requestForm, callbackFunc) {
+function postMultipart (requestURI, requestForm, callbackFunc) {
     return post(requestURI, requestForm, requestForm.headers(), callbackFunc);
 }
 
-function postWithForm(requestURI, requestForm, token, callbackFunc) {
-    var headers = {
+function postWithForm (requestURI, requestForm, token, callbackFunc) {
+    const headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
     };
     if (token) {
@@ -107,8 +120,8 @@ function postWithForm(requestURI, requestForm, token, callbackFunc) {
     return post(requestURI, requestForm, headers, callbackFunc);
 }
 
-function postWithoutForm(requestURI, token, callbackFunc) {
-    var headers = {
+function postWithoutForm (requestURI, token, callbackFunc) {
+    const headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
     };
     if (token) {
@@ -118,16 +131,9 @@ function postWithoutForm(requestURI, token, callbackFunc) {
 }
 
 function get (requestUrl, headers, callbackFunc) {
-    headers = headers || {};
-    headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
-    headers.Connection = 'keep-alive';
-
     const data = {
-        method: 'GET',
-        headers: headers,
         dataType: 'json',
-        timeout: conf.RPC_TIMEOUT,
-        gzip: true
+        timeout: conf.RPC_TIMEOUT
     };
 
     if (conf.RPC_HTTP_AGENT) {
@@ -138,22 +144,16 @@ function get (requestUrl, headers, callbackFunc) {
         data.httpsAgent = conf.RPC_HTTPS_AGENT;
     }
 
-    return urllib.request(
-        requestUrl,
-        data,
-        callbackFunc
-    );
+    return exports.qnHttpClient.get({
+        url: requestUrl,
+        headers: headers,
+        callback: callbackFunc
+    }, data);
 }
 
-function post(requestURI, requestForm, headers, callbackFunc) {
+function post (requestURL, requestForm, headers, callbackFunc) {
     // var start = parseInt(Date.now() / 1000);
-    headers = headers || {};
-    headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
-    headers.Connection = 'keep-alive';
-
-    var data = {
-        headers: headers,
-        method: 'POST',
+    const data = {
         dataType: 'json',
         timeout: conf.RPC_TIMEOUT,
         gzip: true
@@ -168,31 +168,17 @@ function post(requestURI, requestForm, headers, callbackFunc) {
         data.httpsAgent = conf.RPC_HTTPS_AGENT;
     }
 
-    if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
-        data.content = requestForm;
-    } else if (requestForm) {
-        data.stream = requestForm;
-    } else {
-        data.headers['Content-Length'] = 0;
-    }
-
-    var req = urllib.request(requestURI, data, function (respErr, respBody,
-                                                         respInfo) {
-        callbackFunc(respErr, respBody, respInfo);
-    });
-
-    return req;
+    return exports.qnHttpClient.post({
+        url: requestURL,
+        data: requestForm,
+        headers: headers,
+        callback: callbackFunc
+    }, data);
 }
 
-function put(requestURL, requestForm, headers, callbackFunc) {
+function put (requestURL, requestForm, headers, callbackFunc) {
     // var start = parseInt(Date.now() / 1000);
-    headers = headers || {};
-    headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
-    headers.Connection = 'keep-alive';
-
-    var data = {
-        headers: headers,
-        method: 'PUT',
+    const data = {
         dataType: 'json',
         timeout: conf.RPC_TIMEOUT,
         gzip: true
@@ -207,17 +193,10 @@ function put(requestURL, requestForm, headers, callbackFunc) {
         data.httpsAgent = conf.RPC_HTTPS_AGENT;
     }
 
-    if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
-        data.content = requestForm;
-    } else if (requestForm) {
-        data.stream = requestForm;
-    } else {
-        data.headers['Content-Length'] = 0;
-    }
-
-    var req = urllib.request(requestURL, data, function (err, ret, info) {
-        callbackFunc(err, ret, info);
-    });
-
-    return req;
+    return exports.qnHttpClient.put({
+        url: requestURL,
+        data: requestForm,
+        headers: headers,
+        callback: callbackFunc
+    }, data);
 }
