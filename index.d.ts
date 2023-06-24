@@ -656,6 +656,8 @@ export declare namespace rpc {
 export declare namespace zone {
     //huadong
     const Zone_z0: conf.Zone;
+    //huadong2
+    const Zone_cn_east_2: conf.Zone;
     //huabei
     const Zone_z1: conf.Zone;
     //huanan

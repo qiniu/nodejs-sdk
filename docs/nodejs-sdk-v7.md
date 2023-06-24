@@ -245,12 +245,13 @@ config.zone = qiniu.zone.Zone_z0;
 
 其中关于`Zone`对象和机房的关系如下：
 
-|机房|Zone对象|
-|---|-----|
-|华东|`qiniu.zone.Zone_z0`|
-|华北|`qiniu.zone.Zone_z1`|
-|华南|`qiniu.zone.Zone_z2`|
-|北美|`qiniu.zone.Zone_na0`|
+| 机房  |Zone对象|
+|-----|-----|
+| 华东  |`qiniu.zone.Zone_z0`|
+| 华东2 |`qiniu.zone.Zone_cn_east_2`|
+| 华北  |`qiniu.zone.Zone_z1`|
+| 华南  |`qiniu.zone.Zone_z2`|
+| 北美  |`qiniu.zone.Zone_na0`|
 
 <a id="form-upload-file"></a>
 #### 文件上传（表单方式）
