@@ -1,7 +1,7 @@
 <a id="intro"></a>
 # 简介
 
-此 SDK 适用于 Node.js v4 及以上版本。使用此 SDK 构建您的网络应用程序，能让您以非常便捷的方式将数据安全地存储到七牛云上。无论您的网络应用是一个网站程序，还是包括从云端（服务端程序）到终端（手持设备应用）的架构服务和应用，通过七牛云及其 SDK，都能让您应用程序的终端用户高速上传和下载，同时也让您的服务端更加轻盈。
+此 SDK 适用于 Node.js v6 及以上版本。使用此 SDK 构建您的网络应用程序，能让您以非常便捷的方式将数据安全地存储到七牛云上。无论您的网络应用是一个网站程序，还是包括从云端（服务端程序）到终端（手持设备应用）的架构服务和应用，通过七牛云及其 SDK，都能让您应用程序的终端用户高速上传和下载，同时也让您的服务端更加轻盈。
 
 Node.js SDK 属于七牛服务端SDK之一，主要有如下功能：
 
@@ -16,7 +16,7 @@ Node.js SDK 属于七牛服务端SDK之一，主要有如下功能：
 
 - [Node.js SDK 项目地址](https://github.com/qiniu/nodejs-sdk)
 - [Node.js SDK 发布地址](https://github.com/qiniu/nodejs-sdk/releases)
-- [Node.js SDK 历史文档](/kodo/sdk/nodejs-sdk-6)
+- [Node.js SDK 历史文档](https://developer.qiniu.com/kodo/3828/node-js-v6)
 
 <a id="install"></a>
 # 安装
@@ -58,7 +58,7 @@ $ npm install qiniu
 <a id="upload-flow"></a>
 ### 上传流程
 
-七牛文件上传分为客户端上传（主要是指网页端和移动端等面向终端用户的场景）和服务端上传两种场景，具体可以参考文档[七牛业务流程](/kodo/manual/programming-model)。
+七牛文件上传分为客户端上传（主要是指网页端和移动端等面向终端用户的场景）和服务端上传两种场景，具体可以参考文档[七牛业务流程](https://developer.qiniu.com/kodo/1205/programming-model)。
 
 服务端SDK在上传方面主要提供两种功能，一种是生成客户端上传所需要的上传凭证，另外一种是直接上传文件到云端。
 
@@ -89,7 +89,7 @@ var putPolicy = new qiniu.rs.PutPolicy(options);
 var uploadToken=putPolicy.uploadToken(mac);
 ```
 
-默认情况下，在不指定上传凭证的有效时间情况下，默认有效期为1个小时。也可以自行指定上传凭证的有效期，例如：
+默认情况下，在不指定上传凭证的有效时间情况下，默认有效期为 1 个小时。也可以自行指定上传凭证的有效期，例如：
 
 ```
 //自定义凭证有效期（示例2小时，expires单位为秒，为上传凭证的有效时间）
@@ -124,7 +124,7 @@ var uploadToken=putPolicy.uploadToken(mac);
 {"hash":"Ftgm-CkWePC9fzMBTRNmPMhGBcSV","key":"qiniu.jpg"}
 ```
 
-有时候我们希望能自定义这个返回的JSON格式的内容，可以通过设置`returnBody`参数来实现，在`returnBody`中，我们可以使用七牛支持的[魔法变量](/kodo/manual/vars#magicvar)和[自定义变量](/kodo/manual/vars#xvar)。
+有时候我们希望能自定义这个返回的JSON格式的内容，可以通过设置`returnBody`参数来实现，在`returnBody`中，我们可以使用七牛支持的[魔法变量](https://developer.qiniu.com/kodo/1235/vars#magicvar)和[自定义变量](https://developer.qiniu.com/kodo/1235/vars#xvar)。
 
 ```
 var options = {
@@ -194,7 +194,7 @@ var putPolicy = new qiniu.rs.PutPolicy(options);
 var uploadToken=putPolicy.uploadToken(mac);
 ```
 
-队列 pipeline 请参阅[创建私有队列](https://portal.qiniu.com/dora/create-mps)；转码操作具体参数请参阅[音视频转码](/dora/api/audio-and-video-transcoding-avthumb)；saveas 请参阅[处理结果另存](/dora/api/processing-results-save-saveas)。
+队列 pipeline 请参阅[创建私有队列](https://portal.qiniu.com/dora/create-mps)；转码操作具体参数请参阅[音视频转码](https://developer.qiniu.com/dora/1248/audio-and-video-transcoding-avthumb)；saveas 请参阅[处理结果另存](https://developer.qiniu.com/dora/1305/processing-results-save-saveas)。
 
 <a id="param-uptoken"></a>
 #### 带自定义参数的凭证
@@ -243,14 +243,16 @@ config.zone = qiniu.zone.Zone_z0;
 ```
 
 
-其中关于`Zone`对象和机房的关系如下：
+其中关于`Zone`对象和区域的关系如下：
 
-|机房|Zone对象|
-|---|-----|
-|华东|`qiniu.zone.Zone_z0`|
-|华北|`qiniu.zone.Zone_z1`|
-|华南|`qiniu.zone.Zone_z2`|
-|北美|`qiniu.zone.Zone_na0`|
+| 区域           | Zone 对象                     |
+|--------------|-----------------------------|
+| 华东-浙江        | `qiniu.zone.Zone_z0`        |
+| 华东-浙江2       | `qiniu.zone.Zone_cn_east_2` |
+| 华北-河北        | `qiniu.zone.Zone_z1`        |
+| 华南-广东        | `qiniu.zone.Zone_z2`        |
+| 北美-洛杉矶       | `qiniu.zone.Zone_na0`       |
+| 亚太-新加坡（原东南亚） | `qiniu.zone.Zone_as0`       |
 
 <a id="form-upload-file"></a>
 #### 文件上传（表单方式）
@@ -408,7 +410,7 @@ console.log(publicDownloadUrl);
 
 <a id="private-get"></a>
 ### 私有空间
-对于私有空间，首先需要按照公开空间的文件访问方式构建对应的公开空间访问链接，然后再对这个链接进行私有授权签名。
+对于私有空间，其访问链接需要进行签名才能访问，且有访问日期限制。因此需要额外传入过期时间戳。
 
 ```
 var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
@@ -1347,9 +1349,9 @@ console.log(finalUrl);
 <a id="api-references"></a>
 # API 参考
 
-- [存储 API 参考](/kodo)
-- [融合CDN API 参考](/fusion)
-- [官方数据处理 API 参考](/dora)
+- [存储 API 参考](https://developer.qiniu.com/kodo)
+- [融合CDN API 参考](https://developer.qiniu.com/fusion)
+- [官方数据处理 API 参考](https://developer.qiniu.com/dora)
 
 <a id="faq"></a>
 # 常见问题
@@ -1362,7 +1364,7 @@ console.log(finalUrl);
 
 如果您有任何关于我们文档或产品的建议和想法，欢迎您通过以下方式与我们互动讨论：
 
-* [技术论坛](http://segmentfault.com/qiniu) - 在这里您可以和其他开发者愉快的讨论如何更好的使用七牛云服务
+* [技术论坛](https://segmentfault.com/qiniu) - 在这里您可以和其他开发者愉快的讨论如何更好的使用七牛云服务
 * [提交工单](https://support.qiniu.com/tickets/new) - 如果您的问题不适合在论坛讨论或希望及时解决，您也可以提交一个工单，我们的技术支持人员会第一时间回复您
 * [博客](http://blog.qiniu.com) - 这里会持续更新发布市场活动和技术分享文章
 * [微博](http://weibo.com/qiniutek)
