@@ -62,16 +62,6 @@ exports.Zone_as0 = new conf.Zone([
 'rsf-as0.qbox.me',
 'api-as0.qiniuapi.com');
 
-// seoul
-exports.Zone_ap_northeast_1 = new conf.Zone([
-    'up-ap-northeast-1.qiniup.com'
-], [
-    'upload-ap-northeast-1.qiniup.com'
-], 'iovip-ap-northeast-1.qiniuio.com',
-'rs-ap-northeast-1.qiniuapi.com',
-'rsf-ap-northeast-1.qiniuapi.com',
-'api-ap-northeast-1.qiniuapi.com');
-
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
     const apiAddr = 'https://' + conf.UC_HOST + '/v4/query';
 
