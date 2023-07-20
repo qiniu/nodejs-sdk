@@ -22,11 +22,11 @@ RetryDomainsMiddleware.prototype.constructor = RetryDomainsMiddleware;
 
 /**
  * @memberOf RetryDomainsMiddleware
+ * @private
  * @param {Error || null} err
  * @param {RespWrapper || null} respWrapper
  * @param {ReqOpts} reqOpts
  * @return {boolean}
- * @private
  */
 RetryDomainsMiddleware.prototype._shouldRetry = function (err, respWrapper, reqOpts) {
     if (typeof this.retryCondition === 'function') {

@@ -1,5 +1,6 @@
 const querystring = require('querystring');
 const encodeUrl = require('encodeurl');
+const { RetryDomainsMiddleware } = require('../httpc/middleware');
 const rpc = require('../rpc');
 const conf = require('../conf');
 const digest = require('../auth/digest');
@@ -8,7 +9,39 @@ const util = require('../util');
 exports.BucketManager = BucketManager;
 exports.PutPolicy = PutPolicy;
 
-function BucketManager(mac, config) {
+/**
+ * @private
+ * @param {string} path 请求地址
+ * @param {string | Buffer | null} body 请求体
+ * @param {Object} options 其他选项，方便未来扩展
+ * @param {boolean} options.usingHttps 是否使用 https
+ * @param {digest.Mac} options.mac 含有 AK SK 等信息
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
+function ucPost (path, body, options, callbackFunc) {
+    const scheme = options.usingHttps ? 'https://' : 'http://';
+    const url = scheme + conf.UC_HOST + path;
+    rpc.postWithOptions(
+        url,
+        body,
+        {
+            middlewares: [
+                new RetryDomainsMiddleware({
+                    backupDomains: conf.UC_BACKUP_HOSTS
+                })
+            ],
+            mac: options.mac
+        },
+        callbackFunc
+    );
+}
+
+/**
+ * @param {digest.Mac} mac
+ * @param {conf.Config} config
+ * @constructor
+ */
+function BucketManager (mac, config) {
     this.mac = mac || new digest.Mac();
     this.config = config || new conf.Config();
 }
@@ -384,16 +417,16 @@ function changeTypeReq(mac, config, bucket, key, newType, callbackFunc) {
 BucketManager.prototype.image = function (bucket, srcSiteUrl, srcHost,
     callbackFunc) {
     const encodedSrcSite = util.urlsafeBase64Encode(srcSiteUrl);
-    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    let requestURI = scheme + conf.UC_HOST + '/image/' + bucket + '/from/' + encodedSrcSite;
+    let requestURI = '/image/' + bucket + '/from/' + encodedSrcSite;
     if (srcHost) {
         const encodedHost = util.urlsafeBase64Encode(srcHost);
         requestURI += '/host/' + encodedHost;
     }
-    rpc.postWithOptions(
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
@@ -406,10 +439,16 @@ BucketManager.prototype.image = function (bucket, srcSiteUrl, srcHost,
  * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
  */
 BucketManager.prototype.unimage = function (bucket, callbackFunc) {
-    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    const requestURI = scheme + conf.UC_HOST + '/unimage/' + bucket;
-    const digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
-    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+    const requestURI = '/unimage/' + bucket;
+    ucPost(
+        requestURI,
+        null,
+        {
+            usingHttps: this.config.useHttpsDomain,
+            mac: this.mac
+        },
+        callbackFunc
+    );
 };
 
 /**
@@ -727,16 +766,17 @@ BucketManager.prototype.listBucket = function (callbackFunc) {
     );
 };
 
-// 获取bucket信息
-// @param bucket 空间名
-// @param callbackFunc(err, respBody, respInfo) 回调函数
+/* 获取bucket信息
+ * @param {string} bucket 空间名
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/v2/bucketInfo?bucket=' + bucket;
-    rpc.postWithOptions(
+    const requestURI = '/v2/bucketInfo?bucket=' + bucket;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
@@ -764,9 +804,9 @@ BucketManager.prototype.putBucketLifecycleRule = function (bucket, options,
     PutBucketLifecycleRule(this.mac, this.config, bucket, options, callbackFunc);
 };
 
-function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
+function PutBucketLifecycleRule (mac, config, bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: options.name
     };
@@ -813,13 +853,13 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
         reqParams.history_to_line_after_days = 0;
     }
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/rules/add?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/rules/add?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: config.useHttpsDomain,
             mac: mac
         },
         callbackFunc
@@ -829,19 +869,20 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
 /** rules/delete 删除 bucket 规则
  * @param { string } bucket 空间名
  * @param { string } name: 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+ * @param { function(err: error, respBody: object, respInfo: object) } callbackFunc 回调函数
  */
 BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, callbackFunc) {
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: name
     };
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/rules/delete?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/rules/delete?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
@@ -861,11 +902,11 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
  * @param { number } options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
  * @param { number } options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
  *
- * @param { function } callbackFunc - 回调函数
+ * @param { function(err: error, respBody: object, respInfo: object) } callbackFunc - 回调函数
  */
 BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: options.name
     };
@@ -898,13 +939,13 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
         reqParams.history_to_line_after_days = options.history_to_line_after_days;
     }
 
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/rules/update?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/rules/update?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
@@ -913,28 +954,41 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
 
 /** rules/get - 获取 bucket 规则
  *  @param { string } bucket - 空间名
- *  @param { function } callbackFunc - 回调函数
+ *  @param { function(err: error, respBody: object, respInfo: object) } callbackFunc - 回调函数
  */
 BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/rules/get?bucket=' + bucket;
-    rpc.getWithOptions(
+    const requestURI = '/rules/get?bucket=' + bucket;
+    ucPost(
         requestURI,
+        null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
     );
 };
 
-// events/add 增加事件通知规则
+/**
+ * events/add 增加事件通知规则
+ * @param {string} bucket
+ * @param {Object} options
+ * @param {string} options.name 事件通知的名字
+ * @param {string} options.event 事件名字
+ * @param {string} options.callbackURL 回调 URL
+ * @param {string} options.prefix 前缀匹配
+ * @param {string} options.suffix 后缀匹配
+ * @param {string} options.access_key
+ * @param {string} options.host
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc
+ */
 BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc) {
     PutBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
 };
 
-function PutBucketEvent(mac, config, options, bucket, callbackFunc) {
+function PutBucketEvent (mac, config, options, bucket, callbackFunc) {
     options = options || {};
-    var reqParams = { // 必填参数
+    const reqParams = { // 必填参数
         bucket: bucket,
         name: options.name,
         event: options.event,
@@ -965,27 +1019,39 @@ function PutBucketEvent(mac, config, options, bucket, callbackFunc) {
         reqParams.host = '';
     }
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/events/add?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/events/add?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: config.useHttpsDomain,
             mac: mac
         },
         callbackFunc
     );
 }
 
-// events/get 更新事件通知规则
+/**
+ * events/get 更新事件通知规则
+ * @param {string} bucket bucket 名字
+ * @param {Object} options
+ * @param {string} options.name 事件通知的名字
+ * @param {string} options.event 事件名字
+ * @param {string} options.callbackURL 回调 URL
+ * @param {string} options.prefix 前缀匹配
+ * @param {string} options.suffix 后缀匹配
+ * @param {string} options.access_key
+ * @param {string} options.host
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackFunc) {
     UpdateBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
 };
 
-function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
+function UpdateBucketEvent (mac, config, options, bucket, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: options.name
     };
@@ -1014,66 +1080,86 @@ function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
         reqParams.host = options.host;
     }
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/events/update?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/events/update?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: config.useHttpsDomain,
             mac: mac
         },
         callbackFunc
     );
 }
 
-// events/get 获取事件通知规则
+/**
+ * events/get 获取事件通知规则
+ * @param {string} bucket
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc
+ */
 BucketManager.prototype.getBucketEvent = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/events/get?bucket=' + bucket;
-    rpc.postWithOptions(
+    const requestURI = '/events/get?bucket=' + bucket;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
     );
 };
 
-// events/delete 删除事件通知规则
+/**
+ * events/delete 删除事件通知规则
+ * @param {string} bucket
+ * @param {string} name
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc
+ */
 BucketManager.prototype.deleteBucketEvent = function (bucket, name, callbackFunc) {
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: name
     };
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/events/delete?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/events/delete?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
     );
 };
 
-// 设置防盗链
-// @param bucket: bucket 名
-// @param mode 0: 表示关闭Referer; 1: 表示设置Referer白名单; 2: 表示设置Referer黑名单
-// @param norefer 0: 表示不允许空 Refer 访问; 1: 表示允许空 Refer 访问
-// @param pattern  一种为空主机头域名, 比如 foo.com; 一种是泛域名, 比如 *.bar.com;
-//          一种是完全通配符, 即一个 *; 多个规则之间用;隔开
-// @param source_enabled=: 源站是否支持，默认为0只给CDN配置, 设置为1表示开启源站防盗链
+/**
+ * 设置防盗链
+ * @param {string} bucket
+ * @param {Object} options
+ * @param {number} options.mode
+ *      0：表示关闭 Referer；
+ *      1：表示设置 Referer 白名单；
+ *      2：表示设置 Referer 黑名单。
+ * @param {number} options.norefer 0：表示不允许空 Refer 访问; 1：表示允许空 Refer 访问
+ * @param {string} options.pattern
+ *      一种为空主机头域名, 比如 foo.com; 一种是泛域名, 比如 *.bar.com;
+ *      一种是完全通配符, 即一个 *；
+ *      多个规则之间用 ; 隔开。
+ * @param {number} options.source_enabled
+ *      0：只给 CDN 配置（默认）；
+ *      1：开启源站防盗链。
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc
+ */
 BucketManager.prototype.putReferAntiLeech = function (bucket, options, callbackFunc) {
     PutReferAntiLeech(this.mac, this.config, bucket, options, callbackFunc);
 };
 
-function PutReferAntiLeech(mac, config, bucket, options, callbackFunc) {
+function PutReferAntiLeech (mac, config, bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket
     };
 
@@ -1101,50 +1187,59 @@ function PutReferAntiLeech(mac, config, bucket, options, callbackFunc) {
         reqParams.source_enabled = 0;
     }
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/referAntiLeech?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/referAntiLeech?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: config.useHttpsDomain,
             mac: mac
         },
         callbackFunc
     );
 }
 
-/// corsRules/set 设置bucket的cors（跨域）规则
+/**
+ * corsRules/set 设置bucket的cors（跨域）规则
+ * @param {string} bucket
+ * @param {Object} body
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.putCorsRules = function (bucket, body, callbackFunc) {
     PutCorsRules(this.mac, this.config, bucket, body, callbackFunc);
 };
 
-function PutCorsRules(mac, config, bucket, body, callbackFunc) {
-    var reqBody = JSON.stringify(body);
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/corsRules/set/' + bucket;
-    rpc.postWithOptions(
+function PutCorsRules (mac, config, bucket, body, callbackFunc) {
+    const reqBody = JSON.stringify(body);
+    const requestURI = '/corsRules/set/' + bucket;
+    ucPost(
         requestURI,
         reqBody,
         {
+            usingHttps: config.useHttpsDomain,
             mac: mac
         },
         callbackFunc
     );
 }
 
-/// corsRules/get 获取bucket跨域
+/**
+ * corsRules/get 获取bucket跨域
+ * @param {string} bucket
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
     GetCorsRules(this.mac, this.config, bucket, callbackFunc);
 };
 
-function GetCorsRules(mac, config, bucket, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/corsRules/get/' + bucket;
-    rpc.postWithOptions(
+function GetCorsRules (mac, config, bucket, callbackFunc) {
+    const requestURI = '/corsRules/get/' + bucket;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: config.useHttpsDomain,
             mac: mac
         },
         callbackFunc
@@ -1160,51 +1255,69 @@ function GetCorsRules(mac, config, bucket, callbackFunc) {
 //     rpc.postWithForm(requestURI, reqBody,digest, callbackFunc);
 // }
 
-// 原图保护
-// @param bucket 空间名称
-// @param mode 为1表示开启原图保护，0表示关闭
+/**
+ * 原图保护
+ * @param {string} bucket
+ * @param {number} mode
+ *      1：开启原图保护；
+ *      0：关闭原图保护。
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.putBucketAccessStyleMode = function (bucket, mode, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/accessMode/' + bucket + '/mode/' + mode;
-    rpc.postWithOptions(
+    const requestURI = '/accessMode/' + bucket + '/mode/' + mode;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
     );
 };
 
-// 设置Bucket的cache-control: max-age属性
-// @param maxAge:为0或者负数表示为默认值（31536000）
+/**
+ * 设置Bucket的cache-control: max-age属性
+ * @param bucket
+ * @param {Object} options
+ * @param {number} options.maxAge 为 0 或者负数表示为默认值（31536000）
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.putBucketMaxAge = function (bucket, options, callbackFunc) {
-    var maxAge = options.maxAge;
+    let maxAge = options.maxAge;
     if (maxAge <= 0) {
         maxAge = 31536000;
     }
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         maxAge: maxAge
     };
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/maxAge?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/maxAge?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
     );
 };
 
-// 设置Bucket私有属性
 // @param private为0表示公开，为1表示私有
+/**
+ * 设置Bucket私有属性
+ * @param {string} bucket
+ * @param {Object} options
+ * @param {number} options.private
+ *      0：公开
+ *      1：私有
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket
     };
 
@@ -1214,13 +1327,13 @@ BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbac
         reqParams.private = 0;
     }
 
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/private?' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = '/private?' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
@@ -1228,12 +1341,19 @@ BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbac
 };
 
 // 设置配额
-// @param bucket: 空间名称，不支持授权空间
 // @param size: 空间存储量配额,参数传入0或不传表示不更改当前配置，传入-1表示取消限额，新创建的空间默认没有限额。
 // @param count: 空间文件数配额，参数含义同<size>
+/**
+ * 设置配额
+ * @param {string} bucket 空间名称，不支持授权空间
+ * @param {Object} options
+ * @param {number} options.size 空间存储量配额,参数传入 0 或不传表示不更改当前配置，传入 -1 表示取消限额，新创建的空间默认没有限额。
+ * @param {number} options.count 空间文件数配额，参数含义同<size>
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket
     };
 
@@ -1249,43 +1369,49 @@ BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc
         reqParams.count = 0;
     }
 
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = `${reqParams.bucket}/size/${reqParams.size}/count/${reqParams.count}`;
-    var requestURI = scheme + conf.UC_HOST + '/setbucketquota/' + reqSpec;
-    rpc.postWithOptions(
+    const reqSpec = `${reqParams.bucket}/size/${reqParams.size}/count/${reqParams.count}`;
+    const requestURI = '/setbucketquota/' + reqSpec;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
     );
 };
 
-// 获取配额
-// @param bucket: 空间名称，不支持授权空间
+/**
+ * 获取配额
+ * @param {string} bucket 空间名称，不支持授权空间
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ */
 BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/getbucketquota/' + bucket;
-    rpc.postWithOptions(
+    const requestURI = '/getbucketquota/' + bucket;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc
     );
 };
 
-// 获得Bucket的所有域名
-// @param bucket:bucketName
+/**
+ * 获取 Bucket 的所有域名
+ * @param {string} bucket
+ * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc
+ */
 BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/v3/domains?tbl=' + bucket;
-    rpc.postWithOptions(
+    const requestURI = '/v3/domains?tbl=' + bucket;
+    ucPost(
         requestURI,
         null,
         {
+            usingHttps: this.config.useHttpsDomain,
             mac: this.mac
         },
         callbackFunc

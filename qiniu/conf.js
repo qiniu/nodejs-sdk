@@ -18,9 +18,17 @@ exports.FormMimeJson = 'application/json';
 exports.FormMimeRaw = 'application/octet-stream';
 exports.RS_HOST = 'rs.qiniu.com';
 exports.RPC_TIMEOUT = 600000; // 600s
-let UC_BACKUP_HOSTS = [
-    'kodo-config.qiniuapi.com',
+let QUERY_REGION_BACKUP_HOSTS = [
     'api.qiniu.com'
+];
+Object.defineProperty(exports, 'QUERY_REGION_BACKUP_HOSTS', {
+    get: () => QUERY_REGION_BACKUP_HOSTS,
+    set: v => {
+        QUERY_REGION_BACKUP_HOSTS = v;
+    }
+});
+let UC_BACKUP_HOSTS = [
+    'uc.qbox.me'
 ];
 Object.defineProperty(exports, 'UC_BACKUP_HOSTS', {
     get: () => UC_BACKUP_HOSTS,
@@ -28,12 +36,13 @@ Object.defineProperty(exports, 'UC_BACKUP_HOSTS', {
         UC_BACKUP_HOSTS = v;
     }
 });
-let UC_HOST = 'uc.qbox.me';
+let UC_HOST = 'kodo-config.qiniuapi.com';
 Object.defineProperty(exports, 'UC_HOST', {
     get: () => UC_HOST,
     set: v => {
         UC_HOST = v;
         UC_BACKUP_HOSTS = [];
+        QUERY_REGION_BACKUP_HOSTS = [];
     }
 });
 

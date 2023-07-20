@@ -303,14 +303,33 @@ describe('test start bucket manager', function () {
         });
     });
 
-    // eslint-disable-next-line no-undef
-    describe('test bucketinfo', function () {
-        // eslint-disable-next-line no-undef
-        it('test bucketinfo', function (done) {
-            var bucket = srcBucket;
-
-            bucketManager.getBucketInfo(bucket, function (err,
+    describe('test getBucketInfo', function () {
+        it('test getBucketInfo', function (done) {
+            bucketManager.getBucketInfo(srcBucket, function (err,
                 respBody, respInfo) {
+                should.not.exist(err);
+                should.equal(respInfo.status, 200, JSON.stringify(respInfo));
+                done();
+            });
+        });
+
+        it('test getBucketInfo with backup domains', function (done) {
+            after(function () {
+                qiniu.conf.UC_HOST = 'kodo-config.qiniuapi.com';
+                qiniu.conf.UC_BACKUP_HOSTS = [
+                    'uc.qbox.me'
+                ];
+                qiniu.conf.QUERY_REGION_BACKUP_HOSTS = [
+                    'api.qiniu.com'
+                ];
+            });
+
+            qiniu.conf.UC_HOST = 'fake-uc.nodejssdk.qiniu.com';
+            qiniu.conf.UC_BACKUP_HOSTS = [
+                'kodo-config.qiniuapi.com'
+            ];
+
+            bucketManager.getBucketInfo(srcBucket, function (err, respBody, respInfo) {
                 should.not.exist(err);
                 should.equal(respInfo.status, 200, JSON.stringify(respInfo));
                 done();

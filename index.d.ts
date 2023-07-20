@@ -571,8 +571,9 @@ export declare namespace rpc {
     }
 
     interface RequestOptions {
-        headers: Headers;
-        mac: auth.digest.Mac;
+        headers?: Headers;
+        mac?: auth.digest.Mac;
+        middlewares?: httpc.middleware.Middleware[];
     }
 
     const qnHttpClient: httpc.HttpClient;

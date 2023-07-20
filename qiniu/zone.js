@@ -73,7 +73,7 @@ exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
         },
         middlewares: [
             new RetryDomainsMiddleware({
-                backupDomains: conf.UC_BACKUP_HOSTS
+                backupDomains: conf.UC_BACKUP_HOSTS.concat(conf.QUERY_REGION_BACKUP_HOSTS)
             })
         ],
         callback: function (respErr, respData, respInfo) {

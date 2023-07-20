@@ -1,9 +1,9 @@
 const pkg = require('../package.json');
 const conf = require('./conf');
 const digest = require('./auth/digest');
-const util = require('./util');
 const client = require('./httpc/client');
 const middleware = require('./httpc/middleware');
+const { AuthMiddleware } = require('./httpc/middleware/auth');
 
 let uaMiddleware = new middleware.UserAgentMiddleware(pkg.version);
 uaMiddleware = Object.defineProperty(uaMiddleware, 'userAgent', {
@@ -26,47 +26,42 @@ exports.postMultipart = postMultipart;
 exports.postWithForm = postWithForm;
 exports.postWithoutForm = postWithoutForm;
 
-function addAuthHeaders (headers, mac) {
-    const xQiniuDate = util.formatDateUTC(new Date(), 'YYYYMMDDTHHmmssZ');
-    if (mac.options.disableQiniuTimestampSignature !== null) {
-        if (!mac.options.disableQiniuTimestampSignature) {
-            headers['X-Qiniu-Date'] = xQiniuDate;
-        }
-    } else if (process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE) {
-        if (process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE.toLowerCase() !== 'true') {
-            headers['X-Qiniu-Date'] = xQiniuDate;
-        }
-    } else {
-        headers['X-Qiniu-Date'] = xQiniuDate;
-    }
-    return headers;
-}
-
 function getWithOptions (requestURI, options, callbackFunc) {
-    let headers = options.headers || {};
+    const headers = options.headers || {};
     const mac = options.mac || new digest.Mac();
+    let middlewares = options.middlewares || [];
 
     if (!headers['Content-Type']) {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
     }
 
-    headers = addAuthHeaders(headers, mac);
+    // add build-in middlewares
+    middlewares = middlewares.concat([
+        new AuthMiddleware({
+            mac: mac
+        })
+    ]);
 
-    // if there are V3, V4 token generator in the future, extends options with signVersion
-    const token = util.generateAccessTokenV2(
-        mac,
-        requestURI,
-        'GET',
-        headers['Content-Type'],
-        null,
-        headers
-    );
+    // urllib options
+    const urllibOptions = {
+        dataType: 'json',
+        timeout: conf.RPC_TIMEOUT
+    };
 
-    if (mac.accessKey) {
-        headers.Authorization = token;
+    if (conf.RPC_HTTP_AGENT) {
+        urllibOptions.agent = conf.RPC_HTTP_AGENT;
     }
 
-    return get(requestURI, headers, callbackFunc);
+    if (conf.RPC_HTTPS_AGENT) {
+        urllibOptions.httpsAgent = conf.RPC_HTTPS_AGENT;
+    }
+
+    return exports.qnHttpClient.get({
+        url: requestURI,
+        headers: headers,
+        middlewares: middlewares,
+        callback: callbackFunc
+    }, urllibOptions);
 }
 
 function getWithToken (requestUrl, token, callbackFunc) {
@@ -80,30 +75,44 @@ function getWithToken (requestUrl, token, callbackFunc) {
 }
 
 function postWithOptions (requestURI, requestForm, options, callbackFunc) {
-    let headers = options.headers || {};
+    const headers = options.headers || {};
     const mac = options.mac || new digest.Mac();
+    let middlewares = options.middlewares || [];
 
     if (!headers['Content-Type']) {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
     }
 
-    headers = addAuthHeaders(headers, mac);
+    // add build-in middlewares
+    middlewares = middlewares.concat([
+        new AuthMiddleware({
+            mac: mac
+        })
+    ]);
 
-    // if there are V3, V4 token generator in the future, extends options with signVersion
-    const token = util.generateAccessTokenV2(
-        mac,
-        requestURI,
-        'POST',
-        headers['Content-Type'],
-        requestForm,
-        headers
-    );
+    // urllib options
+    const urllibOptions = {
+        dataType: 'json',
+        timeout: conf.RPC_TIMEOUT,
+        gzip: true
+    };
 
-    if (mac.accessKey) {
-        headers.Authorization = token;
+    if (conf.RPC_HTTP_AGENT) {
+        urllibOptions.agent = conf.RPC_HTTP_AGENT;
     }
 
-    return post(requestURI, requestForm, headers, callbackFunc);
+    if (conf.RPC_HTTPS_AGENT) {
+        urllibOptions.httpsAgent = conf.RPC_HTTPS_AGENT;
+    }
+
+    // result
+    return exports.qnHttpClient.post({
+        url: requestURI,
+        data: requestForm,
+        headers: headers,
+        middlewares: middlewares,
+        callback: callbackFunc
+    }, urllibOptions);
 }
 
 function postMultipart (requestURI, requestForm, callbackFunc) {
