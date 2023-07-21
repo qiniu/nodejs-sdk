@@ -63,7 +63,7 @@ exports.Zone_as0 = new conf.Zone([
 'api-as0.qiniuapi.com');
 
 exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
-    const apiAddr = 'https://' + conf.UC_HOST + '/v4/query';
+    const apiAddr = 'https://' + conf.QUERY_REGION_HOST + '/v4/query';
 
     rpc.qnHttpClient.get({
         url: apiAddr,
@@ -73,7 +73,7 @@ exports.getZoneInfo = function (accessKey, bucket, callbackFunc) {
         },
         middlewares: [
             new RetryDomainsMiddleware({
-                backupDomains: conf.UC_BACKUP_HOSTS
+                backupDomains: conf.QUERY_REGION_BACKUP_HOSTS
             })
         ],
         callback: function (respErr, respData, respInfo) {
