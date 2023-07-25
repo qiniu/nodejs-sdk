@@ -375,11 +375,12 @@ describe('test util functions', function () {
     describe('test prepareZone with change hosts config', function () {
         let bucketManagerNoCtxCache = new qiniu.rs.BucketManager(mac, config);
 
-        before(function () {
-            bucketManagerNoCtxCache = new qiniu.rs.BucketManager(mac, config);
+        beforeEach(function () {
+            const noCacheConfig = new qiniu.conf.Config();
+            bucketManagerNoCtxCache = new qiniu.rs.BucketManager(mac, noCacheConfig);
         });
 
-        after(function () {
+        afterEach(function () {
             qiniu.conf.UC_HOST = 'uc.qbox.me';
             qiniu.conf.QUERY_REGION_HOST = 'kodo-config.qiniuapi.com';
             qiniu.conf.QUERY_REGION_BACKUP_HOSTS = [
