@@ -74,30 +74,6 @@ describe('test util functions', function () {
             });
         });
 
-        it('test prepareZone with backup domains', function (done) {
-            before(function () {
-                qiniu.conf.UC_HOST = 'fake-uc.nodejssdk.qiniu.com';
-                qiniu.conf.UC_BACKUP_HOSTS = [
-                    'unavailable-uc.nodejssdk.qiniu.com',
-                    'uc.qbox.me'
-                ];
-            });
-
-            after(function () {
-                qiniu.conf.UC_HOST = 'uc.qbox.me';
-                qiniu.conf.UC_BACKUP_HOSTS = [
-                    'kodo-config.qiniuapi.com',
-                    'api.qiniu.com'
-                ];
-            });
-
-            qiniu.util.prepareZone(bucketManager, bucketManager.mac.accessKey, bucket, function (err, ctx) {
-                should.not.exist(err);
-                should.equal(bucketManager, ctx);
-                done();
-            });
-        });
-
         it('test formatDateUTC', function () {
             const caseList = [
                 {
@@ -393,6 +369,68 @@ describe('test util functions', function () {
                 const msg = caseList[i].msg;
                 should.equal(actual, expect, msg);
             }
+        });
+    });
+
+    describe('test prepareZone with change hosts config', function () {
+        let bucketManagerNoCtxCache = new qiniu.rs.BucketManager(mac, config);
+
+        beforeEach(function () {
+            const noCacheConfig = new qiniu.conf.Config();
+            bucketManagerNoCtxCache = new qiniu.rs.BucketManager(mac, noCacheConfig);
+        });
+
+        afterEach(function () {
+            qiniu.conf.UC_HOST = 'uc.qbox.me';
+            qiniu.conf.QUERY_REGION_HOST = 'kodo-config.qiniuapi.com';
+            qiniu.conf.QUERY_REGION_BACKUP_HOSTS = [
+                'uc.qbox.me',
+                'api.qiniu.com'
+            ];
+        });
+
+        it('test prepareZone with custom query domain', function (done) {
+            should.not.exist(bucketManagerNoCtxCache.config.zone);
+
+            qiniu.conf.QUERY_REGION_HOST = 'uc.qbox.me';
+
+            qiniu.util.prepareZone(bucketManagerNoCtxCache, bucketManagerNoCtxCache.mac.accessKey, bucket, function (err, ctx) {
+                should.not.exist(err);
+                should.exist(ctx.config.zone);
+                done();
+            });
+        });
+
+        it('test prepareZone with backup domain', function (done) {
+            should.not.exist(bucketManagerNoCtxCache.config.zone);
+
+            qiniu.conf.QUERY_REGION_HOST = 'fake-uc.csharp.qiniu.com';
+            qiniu.conf.QUERY_REGION_BACKUP_HOSTS = [
+                'unavailable-uc.csharp.qiniu.com',
+                'uc.qbox.me'
+            ];
+
+            qiniu.util.prepareZone(bucketManagerNoCtxCache, bucketManagerNoCtxCache.mac.accessKey, bucket, function (err, ctx) {
+                should.not.exist(err);
+                should.exist(ctx.config.zone);
+                done();
+            });
+        });
+
+        it('test prepareZone with uc and backup domains', function (done) {
+            should.not.exist(bucketManagerNoCtxCache.config.zone);
+
+            qiniu.conf.UC_HOST = 'fake-uc.csharp.qiniu.com';
+            qiniu.conf.QUERY_REGION_BACKUP_HOSTS = [
+                'unavailable-uc.csharp.qiniu.com',
+                'uc.qbox.me'
+            ];
+
+            qiniu.util.prepareZone(bucketManagerNoCtxCache, bucketManagerNoCtxCache.mac.accessKey, bucket, function (err, ctx) {
+                should.not.exist(err);
+                should.exist(ctx.config.zone);
+                done();
+            });
         });
     });
 });

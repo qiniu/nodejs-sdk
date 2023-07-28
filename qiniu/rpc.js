@@ -1,3 +1,5 @@
+const urllib = require('urllib');
+
 const pkg = require('../package.json');
 const conf = require('./conf');
 const digest = require('./auth/digest');
@@ -131,9 +133,16 @@ function postWithoutForm (requestURI, token, callbackFunc) {
 }
 
 function get (requestUrl, headers, callbackFunc) {
+    headers = headers || {};
+    headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
+    headers.Connection = 'keep-alive';
+
     const data = {
+        method: 'GET',
+        headers: headers,
         dataType: 'json',
-        timeout: conf.RPC_TIMEOUT
+        timeout: conf.RPC_TIMEOUT,
+        gzip: true
     };
 
     if (conf.RPC_HTTP_AGENT) {
@@ -144,16 +153,22 @@ function get (requestUrl, headers, callbackFunc) {
         data.httpsAgent = conf.RPC_HTTPS_AGENT;
     }
 
-    return exports.qnHttpClient.get({
-        url: requestUrl,
-        headers: headers,
-        callback: callbackFunc
-    }, data);
+    return urllib.request(
+        requestUrl,
+        data,
+        callbackFunc
+    );
 }
 
-function post (requestURL, requestForm, headers, callbackFunc) {
+function post (requestUrl, requestForm, headers, callbackFunc) {
     // var start = parseInt(Date.now() / 1000);
+    headers = headers || {};
+    headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
+    headers.Connection = 'keep-alive';
+
     const data = {
+        headers: headers,
+        method: 'POST',
         dataType: 'json',
         timeout: conf.RPC_TIMEOUT,
         gzip: true
@@ -168,17 +183,30 @@ function post (requestURL, requestForm, headers, callbackFunc) {
         data.httpsAgent = conf.RPC_HTTPS_AGENT;
     }
 
-    return exports.qnHttpClient.post({
-        url: requestURL,
-        data: requestForm,
-        headers: headers,
-        callback: callbackFunc
-    }, data);
+    if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
+        data.content = requestForm;
+    } else if (requestForm) {
+        data.stream = requestForm;
+    } else {
+        data.headers['Content-Length'] = 0;
+    }
+
+    return urllib.request(
+        requestUrl,
+        data,
+        callbackFunc
+    );
 }
 
-function put (requestURL, requestForm, headers, callbackFunc) {
+function put (requestUrl, requestForm, headers, callbackFunc) {
     // var start = parseInt(Date.now() / 1000);
+    headers = headers || {};
+    headers['User-Agent'] = headers['User-Agent'] || conf.USER_AGENT;
+    headers.Connection = 'keep-alive';
+
     const data = {
+        headers: headers,
+        method: 'PUT',
         dataType: 'json',
         timeout: conf.RPC_TIMEOUT,
         gzip: true
@@ -193,10 +221,17 @@ function put (requestURL, requestForm, headers, callbackFunc) {
         data.httpsAgent = conf.RPC_HTTPS_AGENT;
     }
 
-    return exports.qnHttpClient.put({
-        url: requestURL,
-        data: requestForm,
-        headers: headers,
-        callback: callbackFunc
-    }, data);
+    if (Buffer.isBuffer(requestForm) || typeof requestForm === 'string') {
+        data.content = requestForm;
+    } else if (requestForm) {
+        data.stream = requestForm;
+    } else {
+        data.headers['Content-Length'] = 0;
+    }
+
+    return urllib.request(
+        requestUrl,
+        data,
+        callbackFunc
+    );
 }
