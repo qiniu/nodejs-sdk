@@ -50,13 +50,6 @@ HttpClient.prototype._handleRequest = function (req) {
  */
 
 /**
- * Wrapped result of request
- * @typedef {Object} RespWrapper
- * @property {*} data
- * @property {http.IncomingMessage} resp
- */
-
-/**
  *
  * @param {ReqOpts} requestOptions
  * @return {Promise<RespWrapper>}

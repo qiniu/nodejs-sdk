@@ -60,6 +60,7 @@ describe('test form up', function () {
                 ret.code.should.be.eql(
                     200,
                     JSON.stringify({
+                        deleteOps: deleteOps[i],
                         key: keysToDelete[i],
                         ret: ret
                     })
@@ -80,7 +81,7 @@ describe('test form up', function () {
     // eslint-disable-next-line no-undef
     describe('test form up#putStreamWithoutKey', function () {
         // eslint-disable-next-line no-undef
-        it('test form up#putStreamWithoutKey', function (done) {
+        it('test form up#putStreamWithoutKey', function () {
             var key = null;
             var rs = fs.createReadStream(testFilePath_1);
             formUploader.putStream(uploadToken, key, rs, putExtra,
@@ -89,7 +90,6 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 });
         });
     });
@@ -97,16 +97,15 @@ describe('test form up', function () {
     // eslint-disable-next-line no-undef
     describe('test form up#putStream', function () {
         // eslint-disable-next-line no-undef
-        it('test form up#putStream', function (done) {
+        it('test form up#putStream', function () {
             var key = 'storage_putStream_test' + Math.random(1000);
             var rs = fs.createReadStream(testFilePath_1);
-            formUploader.putStream(uploadToken, key, rs, putExtra,
+            return formUploader.putStream(uploadToken, key, rs, putExtra,
                 function (respErr, respBody, respInfo) {
                     console.log(respBody, respInfo);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 });
         });
     });
@@ -114,16 +113,15 @@ describe('test form up', function () {
     // eslint-disable-next-line no-undef
     describe('test form up#put', function () {
         // eslint-disable-next-line no-undef
-        it('test form up#put', function (done) {
+        it('test form up#put', function () {
             var key = 'storage_put_test' + Math.random(1000);
-            formUploader.put(uploadToken, key, 'hello world', putExtra,
+            return formUploader.put(uploadToken, key, 'hello world', putExtra,
                 function (respErr,
                     respBody) {
                     // console.log(respBody);
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 });
         });
     });
@@ -131,8 +129,8 @@ describe('test form up', function () {
     // eslint-disable-next-line no-undef
     describe('test form up#putWithoutKey', function () {
         // eslint-disable-next-line no-undef
-        it('test form up#putWithoutKey', function (done) {
-            formUploader.putWithoutKey(uploadToken, 'hello world',
+        it('test form up#putWithoutKey', function () {
+            return formUploader.putWithoutKey(uploadToken, 'hello world',
                 putExtra,
                 function (respErr,
                     respBody) {
@@ -140,7 +138,6 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 });
         });
     });
@@ -148,9 +145,9 @@ describe('test form up', function () {
     // eslint-disable-next-line no-undef
     describe('test form up#putFile', function () {
         // eslint-disable-next-line no-undef
-        it('test form up#putFile', function (done) {
+        it('test form up#putFile', function () {
             var key = 'storage_putFile_test' + Math.random(1000);
-            formUploader.putFile(uploadToken, key, testFilePath_2,
+            return formUploader.putFile(uploadToken, key, testFilePath_2,
                 putExtra,
                 function (
                     respErr,
@@ -159,7 +156,6 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 });
         });
     });
@@ -167,8 +163,8 @@ describe('test form up', function () {
     // eslint-disable-next-line no-undef
     describe('test form up#putFileWithoutKey', function () {
         // eslint-disable-next-line no-undef
-        it('test form up#putFileWithoutKey', function (done) {
-            formUploader.putFileWithoutKey(uploadToken, testFilePath_2,
+        it('test form up#putFileWithoutKey', function () {
+            return formUploader.putFileWithoutKey(uploadToken, testFilePath_2,
                 putExtra,
                 function (
                     respErr,
@@ -177,19 +173,18 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 });
         });
     });
 
     describe('test form up#putFileWithFileType', function () {
-        it('test form up#putFileWithFileType IA', function (done) {
+        it('test form up#putFileWithFileType IA', function () {
             const key = 'storage_put_test_with_file_type' + Math.random();
             const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
                 fileType: 1
             }));
             const uploadToken = putPolicy.uploadToken(mac);
-            formUploader.putFile(
+            return formUploader.putFile(
                 uploadToken,
                 key,
                 testFilePath_2,
@@ -201,18 +196,17 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 }
             );
         });
 
-        it('test form up#putFileWithFileType Archive', function (done) {
+        it('test form up#putFileWithFileType Archive', function () {
             const key = 'storage_put_test_with_file_type' + Math.random();
             const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
                 fileType: 2
             }));
             const uploadToken = putPolicy.uploadToken(mac);
-            formUploader.putFile(
+            return formUploader.putFile(
                 uploadToken,
                 key,
                 testFilePath_2,
@@ -224,18 +218,17 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 }
             );
         });
 
-        it('test form up#putFileWithFileType DeepArchive', function (done) {
+        it('test form up#putFileWithFileType DeepArchive', function () {
             const key = 'storage_put_test_with_file_type' + Math.random();
             const putPolicy = new qiniu.rs.PutPolicy(Object.assign(options, {
                 fileType: 3
             }));
             const uploadToken = putPolicy.uploadToken(mac);
-            formUploader.putFile(
+            return formUploader.putFile(
                 uploadToken,
                 key,
                 testFilePath_2,
@@ -247,7 +240,6 @@ describe('test form up', function () {
                     should.not.exist(respErr);
                     respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
-                    done();
                 }
             );
         });
@@ -257,7 +249,7 @@ describe('test form up', function () {
     describe('test form up#putFileWithParams', function () {
         // eslint-disable-next-line no-undef
         it('test form up#putFileWithMetadata', function (done) {
-            const key = 'storage_put_test_with_metadata';
+            const key = 'storage_put_test_with_metadata' + Math.random();
             var putExtra = new qiniu.form_up.PutExtra();
             putExtra.metadata = {
                 'x-qn-meta-name': 'qiniu',
@@ -274,33 +266,38 @@ describe('test form up', function () {
                     bucketManager.stat(bucket, key, function (
                         err,
                         respBody,
-                        respInfo) {
-                        should.not.exist(err);
-                        respBody.should.have.keys('x-qn-meta');
-                        respBody['x-qn-meta'].name.should.eql('qiniu');
-                        respBody['x-qn-meta'].age.should.eql('18');
-                        done();
+                        respInfo
+                    ) {
+                        try {
+                            should.not.exist(err);
+                            respBody.should.have.keys('x-qn-meta');
+                            respBody['x-qn-meta'].name.should.eql('qiniu');
+                            respBody['x-qn-meta'].age.should.eql('18');
+                            done();
+                        } catch (e) {
+                            done(e);
+                        }
                     });
                 });
         });
 
         // eslint-disable-next-line no-undef
-        it('test form up#putFileWithCustomerData', function (done) {
+        it('test form up#putFileWithCustomerData', function () {
             const key = 'storage_put_test_with_customer_data';
             var putExtra = new qiniu.form_up.PutExtra();
             putExtra.params = {
                 'x:location': 'shanghai',
                 'x:price': 1500
             };
-            formUploader.putFile(uploadToken, key, testFilePath_2,
+            return formUploader.putFile(uploadToken, key, testFilePath_2,
                 putExtra,
                 function (
                     respErr,
                     respBody) {
                     should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
                     keysToDelete.push(respBody.key);
                     respBody.should.have.keys('x:location', 'x:price');
-                    done();
                 });
         });
     });

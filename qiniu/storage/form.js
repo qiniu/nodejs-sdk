@@ -1,28 +1,53 @@
+const fs = require('fs');
+const path = require('path');
+const Readable = require('stream').Readable;
+
+const getCrc32 = require('crc32');
+const mime = require('mime');
+const formstream = require('formstream');
+
 const conf = require('../conf');
 const util = require('../util');
 const rpc = require('../rpc');
-const fs = require('fs');
-const getCrc32 = require('crc32');
-const path = require('path');
-const mime = require('mime');
-const Readable = require('stream').Readable;
-const formstream = require('formstream');
+
+const {
+    prepareRegionsProvider,
+    doWorkWithRetry,
+    ChangeEndpointRetryPolicy,
+    ChangeRegionRetryPolicy
+} = require('./internal');
 
 exports.FormUploader = FormUploader;
 exports.PutExtra = PutExtra;
 
 function FormUploader (config) {
     this.config = config || new conf.Config();
+
+    // RetryPolicy API sign isn't stable not export to user
+    // Internal usage only
+    this.retryPolicies = [
+        new ChangeEndpointRetryPolicy(),
+        new ChangeRegionRetryPolicy()
+    ];
 }
 
-// 上传可选参数
-// @params fname   请求体中的文件的名称
-// @params params  额外参数设置，参数名称必须以x:开头
-// @param mimeType 指定文件的mimeType
-// @param crc32    指定文件的crc32值
-// @param checkCrc 指定是否检测文件的crc32值
-// @param metadata 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
-function PutExtra (fname, params, mimeType, crc32, checkCrc, metadata) {
+/**
+ * 上传可选参数
+ * @param {string} [fname] 请求体中的文件的名称
+ * @param {Object} [params] 额外参数设置，参数名称必须以x:开头
+ * @param {string} [mimeType] 指定文件的mimeType
+ * @param {string} [crc32] 指定文件的crc32值
+ * @param {boolean} [checkCrc] 指定是否检测文件的crc32值
+ * @param {Object} [metadata] 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+ */
+function PutExtra (
+    fname,
+    params,
+    mimeType,
+    crc32,
+    checkCrc,
+    metadata
+) {
     this.fname = fname || '';
     this.params = params || {};
     this.mimeType = mimeType || null;
@@ -31,132 +56,207 @@ function PutExtra (fname, params, mimeType, crc32, checkCrc, metadata) {
     this.metadata = metadata || {};
 }
 
-FormUploader.prototype.putStream = function (uploadToken, key, fsStream,
-    putExtra, callbackFunc) {
-    putExtra = putExtra || new PutExtra();
-    if (!putExtra.mimeType) {
-        putExtra.mimeType = 'application/octet-stream';
-    }
+FormUploader.prototype.putStream = function (
+    uploadToken,
+    key,
+    fsStream,
+    putExtra,
+    callbackFunc
+) {
+    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const isValidCallback = typeof callbackFunc === 'function';
 
-    if (!putExtra.fname) {
-        putExtra.fname = key || 'fname';
-    }
+    // PutExtra
+    putExtra = getDefaultPutExtra(
+        putExtra,
+        {
+            key
+        }
+    );
 
     fsStream.on('error', function (err) {
-    // callbackFunc
         callbackFunc(err, null, null);
     });
 
-    var accessKey = util.getAKFromUptoken(uploadToken);
-    var bucket = util.getBucketFromUptoken(uploadToken);
-
-    util.prepareZone(this, accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        createMultipartForm(uploadToken, key, fsStream, putExtra, function (postForm) {
-            putReq(ctx.config, postForm, callbackFunc);
-        });
+    // RegionsProvider
+    const regionsProvider = prepareRegionsProvider({
+        config: this.config,
+        bucketName: util.getBucketFromUptoken(uploadToken),
+        accessKey: util.getAKFromUptoken(uploadToken)
     });
-};
 
-function putReq (config, postForm, callbackFunc) {
-    // set up hosts order
-    var upHosts = [];
+    return doWorkWithRetry({
+        workFn: sendPutReq,
 
-    if (config.useCdnDomain) {
-        if (config.zone.cdnUpHosts) {
-            config.zone.cdnUpHosts.forEach(function (host) {
-                upHosts.push(host);
-            });
-        }
-        config.zone.srcUpHosts.forEach(function (host) {
-            upHosts.push(host);
+        isValidCallback,
+        callbackFunc,
+        regionsProvider,
+        // stream not support retry
+        retryPolicies: []
+    });
+
+    function sendPutReq (endpoint) {
+        const endpointValue = endpoint.getValue({
+            scheme: preferScheme
         });
-    } else {
-        config.zone.srcUpHosts.forEach(function (host) {
-            upHosts.push(host);
-        });
-        config.zone.cdnUpHosts.forEach(function (host) {
-            upHosts.push(host);
+
+        const postForm = createMultipartForm(
+            uploadToken,
+            key,
+            fsStream,
+            putExtra
+        );
+        return new Promise(resolve => {
+            putReq(
+                endpointValue,
+                postForm,
+                (err, ret, info) => resolve({ err, ret, info })
+            );
         });
     }
+};
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var upDomain = scheme + upHosts[0];
+function putReq (upDomain, postForm, callbackFunc) {
     rpc.postMultipart(upDomain, postForm, callbackFunc);
 }
 
 // 上传字节
-//
-FormUploader.prototype.put = function (uploadToken, key, body, putExtra,
-    callbackFunc) {
-    var fsStream = new Readable();
-    fsStream.push(body);
-    fsStream.push(null);
+FormUploader.prototype.put = function (
+    uploadToken,
+    key,
+    body,
+    putExtra,
+    callbackFunc
+) {
+    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const isValidCallback = typeof callbackFunc === 'function';
 
-    putExtra = putExtra || new PutExtra();
-    return this.putStream(uploadToken, key, fsStream, putExtra, callbackFunc);
+    // initial PutExtra
+    putExtra = getDefaultPutExtra(
+        putExtra,
+        {
+            key
+        }
+    );
+
+    // initial RegionsProvider
+    const regionsProvider = prepareRegionsProvider({
+        config: this.config,
+        bucketName: util.getBucketFromUptoken(uploadToken),
+        accessKey: util.getAKFromUptoken(uploadToken)
+    });
+
+    return doWorkWithRetry({
+        workFn: sendPutReq,
+
+        isValidCallback,
+        callbackFunc,
+        regionsProvider,
+        retryPolicies: this.retryPolicies
+    });
+
+    function sendPutReq (endpoint) {
+        const fsStream = new Readable();
+        fsStream.push(body);
+        fsStream.push(null);
+
+        const endpointValue = endpoint.getValue({
+            scheme: preferScheme
+        });
+
+        const postForm = createMultipartForm(
+            uploadToken,
+            key,
+            fsStream,
+            putExtra
+        );
+
+        return new Promise(resolve => {
+            putReq(
+                endpointValue,
+                postForm,
+                (err, ret, info) => {
+                    resolve({ err, ret, info });
+                }
+            );
+        });
+    }
 };
 
-FormUploader.prototype.putWithoutKey = function (uploadToken, body, putExtra,
-    callbackFunc) {
+FormUploader.prototype.putWithoutKey = function (
+    uploadToken,
+    body,
+    putExtra,
+    callbackFunc
+) {
     return this.put(uploadToken, null, body, putExtra, callbackFunc);
 };
 
-function createMultipartForm (uploadToken, key, fsStream, putExtra, callbackFunc) {
-    var postForm = formstream();
+function createMultipartForm (uploadToken, key, fsStream, putExtra) {
+    const postForm = formstream();
     postForm.field('token', uploadToken);
     if (key != null) {
         postForm.field('key', key);
     }
-    postForm.stream('file', fsStream, putExtra.fname, putExtra.mimeType);
+    postForm.stream(
+        'file',
+        fsStream,
+        putExtra.fname,
+        putExtra.mimeType
+    );
 
     // putExtra params
-    for (var k in putExtra.params) {
+    for (const k in putExtra.params) {
         if (k.startsWith('x:')) {
             postForm.field(k, putExtra.params[k].toString());
         }
     }
 
     // putExtra metadata
-    for (var metadataKey in putExtra.metadata) {
+    for (const metadataKey in putExtra.metadata) {
         if (metadataKey.startsWith('x-qn-meta-')) {
             postForm.field(metadataKey, putExtra.metadata[metadataKey].toString());
         }
     }
 
-    var fileBody = [];
+    let fileBody = [];
     fsStream.on('data', function (data) {
         fileBody.push(data);
     });
 
-    fsStream.on('end', function() {
+    fsStream.on('end', function () {
         if (putExtra.checkCrc) {
             if (putExtra.crc32 == null) {
                 fileBody = Buffer.concat(fileBody);
-                var bodyCrc32 = parseInt('0x' + getCrc32(fileBody));
-                postForm.field('crc32', bodyCrc32);
+                const bodyCrc32 = parseInt('0x' + getCrc32(fileBody));
+                postForm.field('crc32', bodyCrc32.toString());
             } else {
                 postForm.field('crc32', putExtra.crc32);
             }
         }
     });
-    callbackFunc(postForm);
+
+    return postForm;
 }
 
 // 上传本地文件
-// @params uploadToken 上传凭证
+// @param uploadToken 上传凭证
 // @param key 目标文件名
 // @param localFile 本地文件路径
 // @param putExtra 额外选项
 // @param callbackFunc 回调函数
-FormUploader.prototype.putFile = function (uploadToken, key, localFile, putExtra,
-    callbackFunc) {
-    putExtra = putExtra || new PutExtra();
-    var fsStream = fs.createReadStream(localFile);
+FormUploader.prototype.putFile = function (
+    uploadToken,
+    key,
+    localFile,
+    putExtra,
+    callbackFunc
+) {
+    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const isValidCallback = typeof callbackFunc === 'function';
 
+    // initial PutExtra
+    putExtra = putExtra || new PutExtra();
     if (!putExtra.mimeType) {
         putExtra.mimeType = mime.getType(localFile);
     }
@@ -165,10 +265,76 @@ FormUploader.prototype.putFile = function (uploadToken, key, localFile, putExtra
         putExtra.fname = path.basename(localFile);
     }
 
-    return this.putStream(uploadToken, key, fsStream, putExtra, callbackFunc);
+    putExtra = getDefaultPutExtra(
+        putExtra,
+        {
+            key
+        }
+    );
+
+    // initial RegionsProvider
+    const regionsProvider = prepareRegionsProvider({
+        config: this.config,
+        bucketName: util.getBucketFromUptoken(uploadToken),
+        accessKey: util.getAKFromUptoken(uploadToken)
+    });
+
+    return doWorkWithRetry({
+        workFn: sendPutReq,
+
+        isValidCallback,
+        callbackFunc,
+        regionsProvider,
+        retryPolicies: this.retryPolicies
+    });
+
+    function sendPutReq (endpoint) {
+        const fsStream = fs.createReadStream(localFile);
+        const endpointValue = endpoint.getValue({
+            scheme: preferScheme
+        });
+        const postForm = createMultipartForm(
+            uploadToken,
+            key,
+            fsStream,
+            putExtra
+        );
+        return new Promise(resolve => {
+            putReq(
+                endpointValue,
+                postForm,
+                (err, ret, info) => {
+                    resolve({ err, ret, info });
+                }
+            );
+        });
+    }
 };
 
-FormUploader.prototype.putFileWithoutKey = function (uploadToken, localFile,
-    putExtra, callbackFunc) {
+FormUploader.prototype.putFileWithoutKey = function (
+    uploadToken,
+    localFile,
+    putExtra,
+    callbackFunc
+) {
     return this.putFile(uploadToken, null, localFile, putExtra, callbackFunc);
 };
+
+/**
+ * @param {PutExtra} putExtra
+ * @param {Object} options
+ * @param {string} options.key
+ * @return {PutExtra}
+ */
+function getDefaultPutExtra (putExtra, options) {
+    putExtra = putExtra || new PutExtra();
+    if (!putExtra.mimeType) {
+        putExtra.mimeType = 'application/octet-stream';
+    }
+
+    if (!putExtra.fname) {
+        putExtra.fname = options.key || 'fname';
+    }
+
+    return putExtra;
+}

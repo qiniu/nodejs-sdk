@@ -1,5 +1,7 @@
 const middleware = require('./base');
 
+const URL = require('url').URL;
+
 /**
  * @class
  * @extends middleware.Middleware
