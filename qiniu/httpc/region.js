@@ -54,7 +54,7 @@ function Region (options) {
  * NOTE: The Region instance obtained using this method
  *  can only be used for the following services: up, io, rs, rsf, api.
  *  Because the Zone not support other services.
- * @param {Zone} zone
+ * @param {conf.Zone} zone
  * @param {Object} [options]
  * @param {number} [options.ttl]
  * @param {boolean} [options.isPreferCdnHost]
@@ -299,14 +299,6 @@ Object.defineProperty(Region.prototype, 'isLive', {
     enumerable: false,
     configurable: true
 });
-
-// Object.defineProperty(Region.prototype, 'isCoolDown', {
-//     get: function () {
-//         return new Date() < this.coolDownBefore;
-//     },
-//     enumerable: false,
-//     configurable: true
-// });
 
 Object.defineProperty(Region.prototype, 'persistInfo', {
     /**

@@ -21,6 +21,10 @@ const {
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
 
+/**
+ * @param {conf.Config} [config]
+ * @constructor
+ */
 function ResumeUploader (config) {
     this.config = config || new conf.Config();
 
@@ -38,28 +42,28 @@ function ResumeUploader (config) {
 /**
  * @callback reqCallback
  *
- * @param { Error } err
- * @param { Object } ret
- * @param { http.IncomingMessage } info
+ * @param {Error} err
+ * @param {Object} ret
+ * @param {http.IncomingMessage} info
  */
 
 /**
  * @callback progressCallback
  *
- * @param { number } uploadBytes
- * @param { number } totalBytes
+ * @param {number} uploadBytes
+ * @param {number} totalBytes
  */
 
 /**
  * 上传可选参数
- * @param { string } [fname]                      请求体中的文件的名称
- * @param { Object } [params]                     额外参数设置，参数名称必须以x:开头
- * @param { string | null } [mimeType]            指定文件的mimeType
- * @param { string | null } [resumeRecordFile]    断点续传的已上传的部分信息记录文件路径
- * @param { progressCallback } [progressCallback] 上传进度回调，回调参数为 (uploadBytes, totalBytes)
- * @param { number } [partSize]                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
- * @param { 'v1' | 'v2' } [version]               分片上传版本 目前支持v1/v2版本 默认v1
- * @param { Object } [metadata]                   元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+ * @param {string} [fname]                      请求体中的文件的名称
+ * @param {Object} [params]                     额外参数设置，参数名称必须以x:开头
+ * @param {string | null} [mimeType]            指定文件的mimeType
+ * @param {string | null} [resumeRecordFile]    断点续传的已上传的部分信息记录文件路径
+ * @param {function(number, number):void} [progressCallback] 上传进度回调，回调参数为 (uploadBytes, totalBytes)
+ * @param {number} [partSize]                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
+ * @param {'v1' | 'v2'} [version]               分片上传版本 目前支持v1/v2版本 默认v1
+ * @param {Object} [metadata]                   元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
  */
 function PutExtra (
     fname,
@@ -81,6 +85,21 @@ function PutExtra (
     this.metadata = metadata || {};
 }
 
+/**
+ * @typedef UploadResult
+ * @property {any} data
+ * @property {http.IncomingMessage} resp
+ */
+
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {stream.Readable} rsStream
+ * @param {number} rsStreamLen
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ * @return {Promise<UploadResult>}
+ */
 ResumeUploader.prototype.putStream = function (
     uploadToken,
     key,
@@ -114,7 +133,6 @@ ResumeUploader.prototype.putStream = function (
     return doWorkWithRetry({
         workFn: sendPutReq,
 
-        isValidCallback,
         callbackFunc,
         regionsProvider,
         // stream not support retry
@@ -141,7 +159,7 @@ ResumeUploader.prototype.putStream = function (
 /**
  * @param {string} upDomain
  * @param {string} uploadToken
- * @param {string} key
+ * @param {string | null} key
  * @param {ReadableStream} rsStream
  * @param {number} rsStreamLen
  * @param {PutExtra} putExtra
@@ -227,16 +245,17 @@ function putReq (
 
 /**
  * @typedef UploadOptions
- * @property { string } key
+ * @property { string | null } key
  * @property { string } upDomain
  * @property { string } uploadToken
  * @property { PutExtra } putExtra
  */
 
 /**
- * @param { SourceOptions } sourceOptions
- * @param { UploadOptions } uploadOptions
- * @param { reqCallback } callbackFunc
+ * @param {SourceOptions} sourceOptions
+ * @param {UploadOptions} uploadOptions
+ * @param {reqCallback} callbackFunc
+ * @returns { Promise<UploadResult> }
  */
 function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     const {
@@ -248,15 +267,17 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     let blkputRets = sourceOptions.blkputRets;
     const {
         key,
-        upDomain,
         uploadToken,
         putExtra
     } = uploadOptions;
 
+    // use resume upDomain firstly
+    const upDomain = (blkputRets && blkputRets.upDomain) || uploadOptions.upDomain;
+
     // initial state
     const finishedCtxList = [];
     const finishedBlkPutRets = {
-        upDomain: (blkputRets && blkputRets.upDomain) || upDomain,
+        upDomain: upDomain,
         parts: []
     };
 
@@ -342,9 +363,10 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
 }
 
 /**
- * @param { SourceOptions } sourceOptions
- * @param { UploadOptions } uploadOptions
- * @param { reqCallback } callbackFunc
+ * @param {SourceOptions} sourceOptions
+ * @param {UploadOptions} uploadOptions
+ * @param {reqCallback} callbackFunc
+ * @returns { Promise<UploadResult> }
  */
 function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     const {
@@ -357,9 +379,10 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     const {
         uploadToken,
         key,
-        upDomain,
         putExtra
     } = uploadOptions;
+
+    const upDomain = (blkputRets && blkputRets.upDomain) || uploadOptions.upDomain;
 
     // try resume upload blocks
     let finishedBlock = 0;
@@ -376,7 +399,7 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
             finishedEtags.etags = blkputRets.etags;
             finishedEtags.uploadId = blkputRets.uploadId;
             // TODO: Perhaps should restart instead of restore?
-            finishedEtags.upDomain = blkputRets.upDomain || upDomain;
+            finishedEtags.upDomain = upDomain;
             finishedEtags.expiredAt = blkputRets.expiredAt;
             finishedBlock = finishedEtags.etags.length;
         }
@@ -400,6 +423,12 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     }
 }
 
+/**
+ * @param {string} upDomain
+ * @param {string} uploadToken
+ * @param {Buffer | string} blkData
+ * @param {reqCallback} callbackFunc
+ */
 function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
     const requestURI = upDomain + '/mkblk/' + blkData.length;
     const auth = 'UpToken ' + uploadToken;
@@ -410,6 +439,15 @@ function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
     rpc.post(requestURI, blkData, headers, callbackFunc);
 }
 
+/**
+ * @param {string} upDomain
+ * @param {string} uploadToken
+ * @param {number} fileSize
+ * @param {string[]} ctxList
+ * @param {string | null} key
+ * @param putExtra
+ * @param callbackFunc
+ */
 function mkfileReq (
     upDomain,
     uploadToken,
@@ -459,6 +497,27 @@ function mkfileReq (
     rpc.post(requestURI, postBody, headers, callbackFunc);
 }
 
+/**
+ * @typedef FinishedEtags
+ * @property {{etag: string, partNumber: number}[]}etags
+ * @property {string} uploadId
+ * @property {number} expiredAt
+ */
+
+/**
+ * @param {string} uploadToken
+ * @param {string} bucket
+ * @param {string} encodedObjectName
+ * @param {string} upDomain
+ * @param {BlockStream} blkStream
+ * @param {FinishedEtags} finishedEtags
+ * @param {number} finishedBlock
+ * @param {number} totalBlockNum
+ * @param {PutExtra} putExtra
+ * @param {number} rsStreamLen
+ * @param {stream.Readable} rsStream
+ * @param {reqCallback} callbackFunc
+ */
 function initReq (
     uploadToken,
     bucket,
@@ -489,6 +548,20 @@ function initReq (
     });
 }
 
+/**
+ * @param {string} uploadToken
+ * @param {string} bucket
+ * @param {string} encodedObjectName
+ * @param {string} upDomain
+ * @param {BlockStream} blkStream
+ * @param {FinishedEtags} finishedEtags
+ * @param {number} finishedBlock
+ * @param {number} totalBlockNum
+ * @param {PutExtra} putExtra
+ * @param {number} rsStreamLen
+ * @param {stream.Readable} rsStream
+ * @param {reqCallback} callbackFunc
+ */
 function resumeUploadV2 (
     uploadToken,
     bucket,
@@ -555,6 +628,17 @@ function resumeUploadV2 (
     });
 }
 
+/**
+ * @param {string} bucket
+ * @param {string} upDomain
+ * @param {string} uploadToken
+ * @param {string} encodedObjectName
+ * @param {Buffer | string} chunk
+ * @param {string} uploadId
+ * @param {number} partNumber
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ */
 function uploadPart (bucket, upDomain, uploadToken, encodedObjectName, chunk, uploadId, partNumber, putExtra, callbackFunc) {
     const headers = {
         Authorization: 'UpToken ' + uploadToken,
@@ -566,6 +650,15 @@ function uploadPart (bucket, upDomain, uploadToken, encodedObjectName, chunk, up
     rpc.put(requestUrl, chunk, headers, callbackFunc);
 }
 
+/**
+ * @param {string} upDomain
+ * @param {string} bucket
+ * @param {string} encodedObjectName
+ * @param {string} uploadToken
+ * @param {FinishedEtags} finishedEtags
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ */
 function completeParts (
     upDomain,
     bucket,
@@ -599,6 +692,14 @@ function completeParts (
     );
 }
 
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {string} localFile
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ * @returns {Promise<UploadResult>}
+ */
 ResumeUploader.prototype.putFile = function (
     uploadToken,
     key,
@@ -607,7 +708,6 @@ ResumeUploader.prototype.putFile = function (
     callbackFunc
 ) {
     const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
-    const isValidCallback = typeof callbackFunc === 'function';
 
     // PutExtra
     putExtra = putExtra || new PutExtra();
@@ -636,7 +736,6 @@ ResumeUploader.prototype.putFile = function (
     return doWorkWithRetry({
         workFn: sendPutReq,
 
-        isValidCallback,
         callbackFunc,
         regionsProvider,
         retryPolicies: this.retryPolicies,
@@ -669,6 +768,13 @@ ResumeUploader.prototype.putFile = function (
     }
 };
 
+/**
+ * @param {string} uploadToken
+ * @param {string} localFile
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ * @returns {Promise<UploadResult>}
+ */
 ResumeUploader.prototype.putFileWithoutKey = function (
     uploadToken,
     localFile,
@@ -681,10 +787,12 @@ ResumeUploader.prototype.putFileWithoutKey = function (
 /**
  * @param {PutExtra} putExtra
  * @param {Object} options
- * @param {string} options.key
+ * @param {string | null} [options.key]
  * @return {PutExtra}
  */
 function getDefaultPutExtra (putExtra, options) {
+    options = options || {};
+
     putExtra = putExtra || new PutExtra();
     if (!putExtra.mimeType) {
         putExtra.mimeType = 'application/octet-stream';

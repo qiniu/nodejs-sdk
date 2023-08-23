@@ -1,29 +1,9 @@
 const fs = require('fs');
 const readline = require('readline');
 const os = require('os');
+const path = require('path');
 
 const { Region } = require('./region');
-
-/**
- * @interface Shrink
- * @property {Date} lastShrinkAt
- * @property {number} shrinkInterval
- */
-
-/**
- * @function
- * @name Shrink#shrink
- * @param {boolean} [force]
- * @returns {Promise<boolean>}
- */
-
-/**
- * @typedef {Object} ShrinkOptions
- * @property {Date} [lastShrinkAt]
- * @property {number} [shrinkInterval]
- */
-
-// --- could split to files if migrate to typescript --- //
 
 /**
  * @interface RegionsProvider
@@ -74,19 +54,13 @@ StaticRegionsProvider.prototype.setRegions = function (regions) {
 let memoCachedRegions = new Map();
 
 /**
- * @typedef {Object} CachedRegionsProviderOptionsType
- * @property {string} [persistPath]
- *
- * use `extends ShrinkOptions` if migrate to typescript
- * @typedef {ShrinkOptions & CachedRegionsProviderOptionsType} CachedRegionsProviderOptions
- */
-
-/**
  * @class
  * @implements RegionsProvider
- * @implements Shrink
  * @param {string} cacheKey
- * @param {CachedRegionsProviderOptions} [options]
+ * @param {Object} [options]
+ * @param {Date} [options.lastShrinkAt]
+ * @param {number} [options.shrinkInterval]
+ * @param {string} [options.persistPath]
  * @constructor
  */
 function CachedRegionsProvider (
@@ -94,12 +68,19 @@ function CachedRegionsProvider (
     options
 ) {
     this.cacheKey = cacheKey;
+    options = options || {};
 
     this.lastShrinkAt = options.lastShrinkAt || new Date(0);
-    this.shrinkInterval = options.shrinkInterval || 86400;
-    this.persistPath = options.persistPath;
+    this.shrinkInterval = options.shrinkInterval || 86400 * 1000;
+    // TODO: tmpdir or workspace dir, which better?
+    this.persistPath = options.persistPath || path.join(os.tmpdir(), 'qn-regions-cache.txt');
 }
 
+/**
+ * the returns value means if shrunk.
+ * @param {boolean} force
+ * @returns {Promise<boolean>}
+ */
 CachedRegionsProvider.prototype.shrink = function (force) {
     const shouldShrink = force || this.lastShrinkAt.getTime() + this.shrinkInterval < Date.now();
     if (!shouldShrink) {
@@ -175,6 +156,9 @@ CachedRegionsProvider.prototype.shrink = function (force) {
         });
 };
 
+/**
+ * @returns {Region[]}
+ */
 CachedRegionsProvider.prototype.getRegions = function () {
     /** @type Region[] */
     this.shrink();
@@ -199,6 +183,10 @@ CachedRegionsProvider.prototype.getRegions = function () {
         });
 };
 
+/**
+ * @param {Region[]} regions
+ * @returns {Promise<void>}
+ */
 CachedRegionsProvider.prototype.setRegions = function (regions) {
     memoCachedRegions.set(this.cacheKey, regions);
     return new Promise((resolve, reject) => {
@@ -274,18 +262,24 @@ CachedRegionsProvider.prototype.walkFileCache = function (fn, options) {
 
 /**
  * @private
+ * @returns Promise<void>
  */
 CachedRegionsProvider.prototype.flushFileCacheToMemo = function () {
     return this.walkFileCache(({ cacheKey, regions }) => {
-        // TODO: flush all cache from file to memo, should it?
-        memoCachedRegions.set(cacheKey, regions);
+        // TODO: flush all valid cache from file to memo, should it?
+        const validRegions = regions
+            .map(r => Region.fromPersistInfo(r))
+            .filter(r => r.isLive);
+        if (validRegions.length) {
+            memoCachedRegions.set(cacheKey, validRegions);
+        }
     });
 };
 
 /**
  * @typedef CachedPersistedRegions
  * @property {string} cacheKey
- * @property {Region[]} regions
+ * @property {RegionPersistInfo} regions
  */
 
 /**
@@ -385,6 +379,10 @@ QueryRegionsProvider.prototype.getRegions = function () {
         });
 };
 
+/**
+ * @param _regions
+ * @returns {Promise<void>}
+ */
 QueryRegionsProvider.prototype.setRegions = function (_regions) {
     return Promise.reject(new Error('QueryRegionsProvider not support setRegions'));
 };

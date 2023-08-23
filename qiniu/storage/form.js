@@ -20,6 +20,11 @@ const {
 exports.FormUploader = FormUploader;
 exports.PutExtra = PutExtra;
 
+/**
+ * @class
+ * @param {conf.Config} [config]
+ * @constructor
+ */
 function FormUploader (config) {
     this.config = config || new conf.Config();
 
@@ -37,7 +42,7 @@ function FormUploader (config) {
  * @param {Object} [params] 额外参数设置，参数名称必须以x:开头
  * @param {string} [mimeType] 指定文件的mimeType
  * @param {string} [crc32] 指定文件的crc32值
- * @param {boolean} [checkCrc] 指定是否检测文件的crc32值
+ * @param {number | boolean} [checkCrc] 指定是否检测文件的crc32值
  * @param {Object} [metadata] 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
  */
 function PutExtra (
@@ -56,6 +61,28 @@ function PutExtra (
     this.metadata = metadata || {};
 }
 
+/**
+ * @callback reqCallback
+ *
+ * @param { Error } err
+ * @param { Object } ret
+ * @param { http.IncomingMessage } info
+ */
+
+/**
+ * @typedef UploadResult
+ * @property {any} data
+ * @property {http.IncomingMessage} resp
+ */
+
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {stream.Readable} fsStream
+ * @param {PutExtra | null} putExtra
+ * @param {reqCallback} callbackFunc
+ * @returns {Promise<UploadResult>}
+ */
 FormUploader.prototype.putStream = function (
     uploadToken,
     key,
@@ -64,7 +91,6 @@ FormUploader.prototype.putStream = function (
     callbackFunc
 ) {
     const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
-    const isValidCallback = typeof callbackFunc === 'function';
 
     // PutExtra
     putExtra = getDefaultPutExtra(
@@ -88,7 +114,6 @@ FormUploader.prototype.putStream = function (
     return doWorkWithRetry({
         workFn: sendPutReq,
 
-        isValidCallback,
         callbackFunc,
         regionsProvider,
         // stream not support retry
@@ -116,11 +141,24 @@ FormUploader.prototype.putStream = function (
     }
 };
 
+/**
+ * @param {string} upDomain
+ * @param {formstream} postForm
+ * @param {reqCallback} callbackFunc
+ */
 function putReq (upDomain, postForm, callbackFunc) {
     rpc.postMultipart(upDomain, postForm, callbackFunc);
 }
 
-// 上传字节
+/**
+ * 上传字节
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {any} body
+ * @param {PutExtra | null} putExtra
+ * @param {reqCallback} callbackFunc
+ * @returns {Promise<UploadResult>}
+ */
 FormUploader.prototype.put = function (
     uploadToken,
     key,
@@ -129,7 +167,6 @@ FormUploader.prototype.put = function (
     callbackFunc
 ) {
     const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
-    const isValidCallback = typeof callbackFunc === 'function';
 
     // initial PutExtra
     putExtra = getDefaultPutExtra(
@@ -149,7 +186,6 @@ FormUploader.prototype.put = function (
     return doWorkWithRetry({
         workFn: sendPutReq,
 
-        isValidCallback,
         callbackFunc,
         regionsProvider,
         retryPolicies: this.retryPolicies
@@ -183,6 +219,13 @@ FormUploader.prototype.put = function (
     }
 };
 
+/**
+ * @param {string} uploadToken
+ * @param {any} body
+ * @param {PutExtra | null} putExtra
+ * @param {reqCallback} callbackFunc
+ * @returns {Promise<UploadResult>}
+ */
 FormUploader.prototype.putWithoutKey = function (
     uploadToken,
     body,
@@ -192,6 +235,13 @@ FormUploader.prototype.putWithoutKey = function (
     return this.put(uploadToken, null, body, putExtra, callbackFunc);
 };
 
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {stream.Readable} fsStream
+ * @param {PutExtra | null} putExtra
+ * @returns {formstream}
+ */
 function createMultipartForm (uploadToken, key, fsStream, putExtra) {
     const postForm = formstream();
     postForm.field('token', uploadToken);
@@ -239,12 +289,14 @@ function createMultipartForm (uploadToken, key, fsStream, putExtra) {
     return postForm;
 }
 
-// 上传本地文件
-// @param uploadToken 上传凭证
-// @param key 目标文件名
-// @param localFile 本地文件路径
-// @param putExtra 额外选项
-// @param callbackFunc 回调函数
+/** 上传本地文件
+ * @param {string} uploadToken 上传凭证
+ * @param {string | null} key 目标文件名
+ * @param {string} localFile 本地文件路径
+ * @param {PutExtra | null} putExtra 额外选项
+ * @param callbackFunc 回调函数
+ * @returns {Promise<UploadResult>}
+ */
 FormUploader.prototype.putFile = function (
     uploadToken,
     key,
@@ -253,7 +305,6 @@ FormUploader.prototype.putFile = function (
     callbackFunc
 ) {
     const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
-    const isValidCallback = typeof callbackFunc === 'function';
 
     // initial PutExtra
     putExtra = putExtra || new PutExtra();
@@ -282,7 +333,6 @@ FormUploader.prototype.putFile = function (
     return doWorkWithRetry({
         workFn: sendPutReq,
 
-        isValidCallback,
         callbackFunc,
         regionsProvider,
         retryPolicies: this.retryPolicies
@@ -311,6 +361,13 @@ FormUploader.prototype.putFile = function (
     }
 };
 
+/** 上传本地文件
+ * @param {string} uploadToken 上传凭证
+ * @param {string} localFile 本地文件路径
+ * @param {PutExtra | null} putExtra 额外选项
+ * @param callbackFunc 回调函数
+ * @returns {Promise<UploadResult>}
+ */
 FormUploader.prototype.putFileWithoutKey = function (
     uploadToken,
     localFile,

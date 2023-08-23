@@ -60,6 +60,7 @@ exports.Config = function Config (options) {
     // z0 huadong, z1 huabei, z2 huanan, na0 beimei
     this.zone = options.zone || null;
     this.zoneExpire = options.zoneExpire || -1;
+    // only available with upload for now
     this.regionsProvider = options.regionsProvider || null;
 };
 

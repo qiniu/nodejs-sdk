@@ -3,7 +3,6 @@
 // Because its API may make broken change for internal usage.
 
 const conf = require('../conf');
-const os = require('os');
 const fs = require('fs');
 
 const {
@@ -21,6 +20,7 @@ const {
 const {
     StaticEndpointsProvider
 } = require('../httpc/endpointsProvider');
+const { ResponseWrapper } = require('../httpc/responseWrapper');
 
 exports.prepareRegionsProvider = prepareRegionsProvider;
 exports.doWorkWithRetry = doWorkWithRetry;
@@ -57,11 +57,7 @@ function getDefaultRegionsProvider (options) {
 
     return new ChainedRegionsProvider([
         new CachedRegionsProvider(
-            cacheKey,
-            {
-                // TODO: tmpdir or workspace dir, which better?
-                persistPath: os.tmpdir() + '/qn-regions-cache.txt'
-            }
+            cacheKey
         ),
         new QueryRegionsProvider({
             accessKey: options.accessKey,
@@ -122,10 +118,16 @@ function prepareRegionsProvider (options) {
  */
 
 /**
+ * @typedef RetryRet
+ * @property {any} data
+ * @property {IncomingMessage} resp
+ */
+
+/**
  * @function
  * @name RetryPolicy#prepareRetry
  * @param {Object} context
- * @param {any} ret
+ * @param {RetryRet} ret
  * @returns {Promise<boolean>}
  */
 
@@ -144,6 +146,10 @@ function TokenExpiredRetryPolicy (options) {
     this.maxRetryTimes = options.maxRetryTimes || 1;
 }
 
+/**
+ * @param {string} resumeRecordFilePath
+ * @returns {boolean}
+ */
 TokenExpiredRetryPolicy.prototype.isResumedUpload = function (resumeRecordFilePath) {
     if (!resumeRecordFilePath) {
         return false;
@@ -153,6 +159,7 @@ TokenExpiredRetryPolicy.prototype.isResumedUpload = function (resumeRecordFilePa
 
 /**
  * @param {Object} context
+ * @returns {Promise<void>}
  */
 TokenExpiredRetryPolicy.prototype.initContext = function (context) {
     context[this.id] = {
@@ -162,8 +169,8 @@ TokenExpiredRetryPolicy.prototype.initContext = function (context) {
 };
 
 /**
- * @param context
- * @param ret
+ * @param {Object} context
+ * @param {RetryRet} ret
  * @return {boolean}
  */
 TokenExpiredRetryPolicy.prototype.shouldRetry = function (context, ret) {
@@ -200,7 +207,9 @@ TokenExpiredRetryPolicy.prototype.shouldRetry = function (context, ret) {
 };
 
 /**
- * @returns {Promise<void>}
+ * @param {Object} context
+ * @param {RetryRet} ret
+ * @returns {Promise<boolean>}
  */
 TokenExpiredRetryPolicy.prototype.prepareRetry = function (context, ret) {
     if (!this.shouldRetry(context, ret)) {
@@ -226,14 +235,18 @@ TokenExpiredRetryPolicy.prototype.prepareRetry = function (context, ret) {
 function ChangeEndpointRetryPolicy () {
 }
 
+/**
+ * @param {Object} context
+ * @returns {Promise<void>}
+ */
 ChangeEndpointRetryPolicy.prototype.initContext = function (context) {
     context.alternativeEndpoints = context.alternativeEndpoints || [];
     return Promise.resolve();
 };
 
 /**
- * @param context
- * @param _ret
+ * @param {Object} context
+ * @param {RetryRet} _ret
  * @return {boolean}
  */
 ChangeEndpointRetryPolicy.prototype.shouldRetry = function (context, _ret) {
@@ -241,7 +254,9 @@ ChangeEndpointRetryPolicy.prototype.shouldRetry = function (context, _ret) {
 };
 
 /**
- * @return {Promise<void>}
+ * @param {Object} context
+ * @param {RetryRet} ret
+ * @return {Promise<boolean>}
  */
 ChangeEndpointRetryPolicy.prototype.prepareRetry = function (context, ret) {
     if (!this.shouldRetry(context, ret)) {
@@ -259,15 +274,29 @@ ChangeEndpointRetryPolicy.prototype.prepareRetry = function (context, ret) {
 function ChangeRegionRetryPolicy () {
 }
 
+/**
+ * @param {Object} context
+ * @returns {Promise<void>}
+ */
 ChangeRegionRetryPolicy.prototype.initContext = function (context) {
     context.alternativeRegions = context.alternativeRegions || [];
     return Promise.resolve();
 };
 
+/**
+ * @param {Object} context
+ * @param {RetryRet} _ret
+ * @returns {boolean}
+ */
 ChangeRegionRetryPolicy.prototype.shouldRetry = function (context, _ret) {
     return context.alternativeRegions.length > 0;
 };
 
+/**
+ * @param {Object} context
+ * @param {RetryRet} ret
+ * @returns {Promise<boolean>}
+ */
 ChangeRegionRetryPolicy.prototype.prepareRetry = function (context, ret) {
     if (!this.shouldRetry(context, ret)) {
         return Promise.resolve(false);
@@ -299,9 +328,10 @@ ChangeRegionRetryPolicy.prototype.prepareRetry = function (context, ret) {
         serviceName
     )
         .getEndpoints()
-        .then(([endpoint, alternativeEndpoints]) => {
+        .then(([endpoint, ...alternativeEndpoints]) => {
             context.endpoint = endpoint;
             context.alternativeEndpoints = alternativeEndpoints;
+            return Promise.resolve(true);
         });
 };
 
@@ -311,8 +341,8 @@ ChangeRegionRetryPolicy.prototype.prepareRetry = function (context, ret) {
  * @param {Object} options
  * @param {RetryPolicy[]} [options.retryPolicies]
  * @param {string} [options.resumeRecordFilePath]
- * @param {RegionsProvider} [options.regionsProvider]
- * @param {'v1' | 'v2'} [options.uploadApiVersion]
+ * @param {RegionsProvider} options.regionsProvider
+ * @param {'v1' | 'v2' | string} options.uploadApiVersion
  */
 function UploadState (options) {
     this.retryPolicies = options.retryPolicies || [];
@@ -324,7 +354,14 @@ function UploadState (options) {
     };
 }
 
+/**
+ * @returns {Promise<void>}
+ */
 UploadState.prototype.init = function () {
+    /**
+     * loop regions try to find the first region with at least one endpoint
+     * @returns {Promise<Endpoint[]>}
+     */
     const loopRegions = () => {
         const endpointProvider = StaticEndpointsProvider.fromRegion(
             this.context.region,
@@ -358,15 +395,20 @@ UploadState.prototype.init = function () {
             return loopRegions();
         })
         .then(() => {
+            // initial all retry policies
             return this.retryPolicies.reduce(
                 (promiseChain, retrier) => {
-                    return promiseChain.then(retrier.initContext(this.context));
+                    return promiseChain.then(() => retrier.initContext(this.context));
                 },
                 Promise.resolve()
             );
         });
 };
 
+/**
+ * @param {RetryRet} ret
+ * @returns {Promise<boolean>}
+ */
 UploadState.prototype.prepareRetry = function (ret) {
     let [retryPolicy, ...alternativeRetryPolicies] = this.retryPolicies;
     const loopRetryPolicies = () => {
@@ -388,13 +430,37 @@ UploadState.prototype.prepareRetry = function (ret) {
     return loopRetryPolicies();
 };
 
+/**
+ * @callback WorkFn
+ * @param {Endpoint} endpoint
+ * @returns {Promise<{ err: Error, ret: any, info: IncomingMessage }>}
+ */
+
+/**
+ * @callback ReqcallbackFunc
+ * @param {Error} err
+ * @param {any} ret
+ * @param {http.IncomingMessage} info
+ */
+
+/**
+ * @param options
+ * @param {WorkFn} options.workFn
+ * @param {boolean} options.isValidCallback // TODO: remove
+ * @param {ReqcallbackFunc} options.callbackFunc
+ * @param {RegionsProvider} options.regionsProvider
+ * @param {RetryPolicy[]} [options.retryPolicies]
+ * @param {'v1' | 'v2' | string} [options.uploadApiVersion]
+ * @param {string} [options.resumeRecordFilePath]
+ * @returns {Promise<RetryRet>}
+ */
 function doWorkWithRetry (options) {
     const workFn = options.workFn;
 
-    const isValidCallback = options.isValidCallback;
     const callbackFunc = options.callbackFunc;
+    const isValidCallback = typeof callbackFunc === 'function';
     const regionsProvider = options.regionsProvider;
-    const retryPolicies = options.retryPolicies;
+    const retryPolicies = options.retryPolicies || [];
     const uploadApiVersion = options.uploadApiVersion;
     const resumeRecordFilePath = options.resumeRecordFilePath;
 
@@ -405,6 +471,7 @@ function doWorkWithRetry (options) {
         resumeRecordFilePath
     });
 
+    // the workFn helper used for recursive calling to retry
     const workFnWithRetry = () => {
         return workFn(uploadState.context.endpoint)
             .then(resp => {
@@ -413,7 +480,11 @@ function doWorkWithRetry (options) {
                     ret,
                     info
                 } = resp;
-                if (!err && resp.statusCode >= 200 && resp.statusCode <= 299) {
+                const respWrapper = new ResponseWrapper({
+                    data: ret,
+                    resp: info
+                });
+                if (err || !respWrapper.needRetry()) {
                     return resp;
                 }
                 return uploadState.prepareRetry({ data: ret, resp: info })

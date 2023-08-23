@@ -1,3 +1,10 @@
+/**
+ * @class
+ * @param {string} host
+ * @param {Object} [options]
+ * @param {string} [options.defaultScheme]
+ * @constructor
+ */
 function Endpoint (host, options) {
     options = options || {};
 

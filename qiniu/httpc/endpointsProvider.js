@@ -52,17 +52,4 @@ StaticEndpointsProvider.prototype.setEndpoints = function (endpoints) {
     return Promise.resolve();
 };
 
-/**
- * @param {RegionsProvider} regionsProvider
- * @param {string} serviceName
- * @returns {Promise<EndpointsProvider[]>}
- */
-function getEndpointsProvidersFromRegionsProvider (regionsProvider, serviceName) {
-    return regionsProvider.getRegions()
-        .then(regions => {
-            return regions.map(r => StaticEndpointsProvider.fromRegion(r, serviceName));
-        });
-}
-
 exports.StaticEndpointsProvider = StaticEndpointsProvider;
-exports.getEndpointsProvidersFromRegionsProvider = getEndpointsProvidersFromRegionsProvider;
