@@ -71,8 +71,8 @@ describe('test http module', function () {
         /**
          *
          * @param {ReqOpts} request
-         * @param {function(ReqOpts):Promise<RespWrapper>} next
-         * @return {Promise<RespWrapper>}
+         * @param {function(ReqOpts):Promise<ResponseWrapper>} next
+         * @return {Promise<ResponseWrapper>}
          */
         send (request, next) {
             this.record.push(`bef_${this.label}${this.record.length}`);

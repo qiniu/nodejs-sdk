@@ -491,16 +491,16 @@ export declare namespace httpc {
         urllibOptions: RequestOptions;
     }
 
-    interface RespWrapperOptions<T = any> {
+    interface ResponseWrapperOptions<T = any> {
         data: T;
         resp: IncomingMessage;
     }
 
     // responseWrapper.js
-    class RespWrapper<T = any> {
+    class ResponseWrapper<T = any> {
         data: T;
         resp: IncomingMessage;
-        constructor(options: RespWrapperOptions);
+        constructor(options: ResponseWrapperOptions);
         ok(): boolean;
         needRetry(): boolean;
     }
@@ -510,8 +510,8 @@ export declare namespace httpc {
         interface Middleware {
             send<T>(
                 request: ReqOpts<T>,
-                next: (reqOpts: ReqOpts<T>) => Promise<RespWrapper<T>>
-            ): Promise<RespWrapper<T>>;
+                next: (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>
+            ): Promise<ResponseWrapper<T>>;
         }
 
         /**
@@ -521,7 +521,7 @@ export declare namespace httpc {
          */
         function composeMiddlewares<T>(
             middlewares: Middleware[],
-            handler: (reqOpts: ReqOpts<T>) => Promise<RespWrapper<T>>
+            handler: (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>
         );
 
         /**
@@ -531,8 +531,8 @@ export declare namespace httpc {
             constructor(sdkVersion: string);
             send<T>(
                 request: httpc.ReqOpts<T>,
-                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.RespWrapper<T>>
-            ): Promise<httpc.RespWrapper<T>>;
+                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.ResponseWrapper<T>>
+            ): Promise<httpc.ResponseWrapper<T>>;
         }
 
         interface RetryDomainsMiddlewareOptions {
@@ -576,8 +576,8 @@ export declare namespace httpc {
              */
             send<T>(
                 request: httpc.ReqOpts<T>,
-                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.RespWrapper<T>>
-            ): Promise<httpc.RespWrapper<T>>;
+                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.ResponseWrapper<T>>
+            ): Promise<httpc.ResponseWrapper<T>>;
 
             /**
              * 控制重试逻辑，主要为 {@link retryCondition} 服务。若没有设置 retryCondition，默认 2xx 才会终止重试
@@ -588,7 +588,7 @@ export declare namespace httpc {
              */
             private _shouldRetry<T>(
                 err: Error | null,
-                respWrapper: RespWrapper<T>,
+                respWrapper: ResponseWrapper<T>,
                 reqOpts: ReqOpts<T>
             ): boolean;
         }
@@ -621,10 +621,10 @@ export declare namespace httpc {
         httpsAgent: HttpsAgent;
         middlewares: middleware.Middleware[];
         constructor(options: HttpClientOptions)
-        sendRequest(requestOptions: ReqOpts): Promise<RespWrapper>
-        get(getOptions: GetOptions): Promise<RespWrapper>
-        post(postOptions: PostOptions): Promise<RespWrapper>
-        put(putOptions: PutOptions): Promise<RespWrapper>
+        sendRequest(requestOptions: ReqOpts): Promise<ResponseWrapper>
+        get(getOptions: GetOptions): Promise<ResponseWrapper>
+        post(postOptions: PostOptions): Promise<ResponseWrapper>
+        put(putOptions: PutOptions): Promise<ResponseWrapper>
     }
 
     // endpoint.js

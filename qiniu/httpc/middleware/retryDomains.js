@@ -8,7 +8,7 @@ const URL = require('url').URL;
  * @param {Object} retryDomainsOptions
  * @param {string[]} retryDomainsOptions.backupDomains
  * @param {number} [retryDomainsOptions.maxRetryTimes]
- * @param {function(Error || null, RespWrapper || null, ReqOpts):boolean} [retryDomainsOptions.retryCondition]
+ * @param {function(Error || null, ResponseWrapper || null, ReqOpts):boolean} [retryDomainsOptions.retryCondition]
  * @constructor
  */
 function RetryDomainsMiddleware (retryDomainsOptions) {
@@ -25,7 +25,7 @@ RetryDomainsMiddleware.prototype.constructor = RetryDomainsMiddleware;
 /**
  * @memberOf RetryDomainsMiddleware
  * @param {Error || null} err
- * @param {RespWrapper || null} respWrapper
+ * @param {ResponseWrapper || null} respWrapper
  * @param {ReqOpts} reqOpts
  * @return {boolean}
  * @private
@@ -41,7 +41,7 @@ RetryDomainsMiddleware.prototype._shouldRetry = function (err, respWrapper, reqO
 /**
  * @memberOf RetryDomainsMiddleware
  * @param {ReqOpts} reqOpts
- * @param {function(ReqOpts):Promise<RespWrapper>} next
+ * @param {function(ReqOpts):Promise<ResponseWrapper>} next
  * @return {Promise<RespWrapper>}
  */
 RetryDomainsMiddleware.prototype.send = function (reqOpts, next) {
