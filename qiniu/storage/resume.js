@@ -283,10 +283,9 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
 
     // backward compatibility with ≤ 7.9.0
     if (Array.isArray(blkputRets)) {
-        // TODO: Perhaps should restart instead of restore?
         blkputRets = {
             upDomain: upDomain,
-            parts: blkputRets
+            parts: []
         };
     }
 
@@ -382,24 +381,25 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
         putExtra
     } = uploadOptions;
 
-    const upDomain = (blkputRets && blkputRets.upDomain) || uploadOptions.upDomain;
+    let upDomain = uploadOptions.upDomain;
 
     // try resume upload blocks
     let finishedBlock = 0;
     const finishedEtags = {
+        upDomain,
         etags: [],
         uploadId: '',
         expiredAt: 0
     };
-    if (blkputRets !== null) {
+    if (blkputRets !== null && blkputRets.upDomain) {
         // check etag expired or not
         const expiredAt = blkputRets.expiredAt;
         const timeNow = Date.now() / 1000;
         if (expiredAt > timeNow && blkputRets.uploadId !== '') {
+            upDomain = blkputRets.upDomain;
+            finishedEtags.upDomain = blkputRets.upDomain;
             finishedEtags.etags = blkputRets.etags;
             finishedEtags.uploadId = blkputRets.uploadId;
-            // TODO: Perhaps should restart instead of restore?
-            finishedEtags.upDomain = upDomain;
             finishedEtags.expiredAt = blkputRets.expiredAt;
             finishedBlock = finishedEtags.etags.length;
         }
