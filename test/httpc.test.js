@@ -312,7 +312,6 @@ describe('test http module', function () {
             const rsfHosts = regionZ0.services[SERVICE_NAME.RSF].map(endpoint => endpoint.host);
             const apiHosts = regionZ0.services[SERVICE_NAME.API].map(endpoint => endpoint.host);
 
-            should.equal(regionZ0.regionId, 'z0');
             should.equal(regionZ0.ttl, -1);
             should.deepEqual(cdnUpHosts, Zone_z0.cdnUpHosts);
             should.deepEqual(srcUpHosts, Zone_z0.srcUpHosts);

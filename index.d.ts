@@ -662,7 +662,7 @@ export declare namespace httpc {
     }
 
     interface RegionOptions {
-        regionId: string;
+        regionId?: string;
         s3RegionId?: string;
         services?: Record<string, Endpoint[]>;
         ttl?: number;
@@ -671,6 +671,8 @@ export declare namespace httpc {
     }
 
     interface RegionFromZoneOptions {
+        regionId?: string;
+        s3RegionId?: string;
         ttl?: number;
         isPreferCdnHost?: boolean;
     }
@@ -683,8 +685,8 @@ export declare namespace httpc {
     }
 
     interface RegionPersistInfo {
-        regionId: string;
-        s3RegionId: string;
+        regionId?: string;
+        s3RegionId?: string;
         services: Record<SERVICE_NAME | string, EndpointPersistInfo[]>;
         ttl: number;
         createTime: number;
@@ -724,8 +726,9 @@ export declare namespace httpc {
         static fromPersistInfo(persistInfo: RegionPersistInfo): Region;
         static fromQueryData(data: QueryRegionsRespData): Region;
 
-        regionId: string;
-        s3RegionId: string;
+        // non-unique
+        regionId?: string;
+        s3RegionId?: string;
         services: Record<SERVICE_NAME | string, Endpoint[]>
 
         ttl: number;

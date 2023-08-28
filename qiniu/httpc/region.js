@@ -22,7 +22,7 @@ const SERVICE_NAME = {
 
 /**
  * @param {Object} options
- * @param {string} options.regionId
+ * @param {string} [options.regionId]
  * @param {string} [options.s3RegionId]
  * @param {Object.<ServiceKey, Endpoint[]>} [options.services]
  * @param {number} [options.ttl] seconds. default 1 day.
@@ -56,6 +56,8 @@ function Region (options) {
  *  Because the Zone not support other services.
  * @param {conf.Zone} zone
  * @param {Object} [options]
+ * @param {string} [options.regionId]
+ * @param {string} [options.s3RegionId]
  * @param {number} [options.ttl]
  * @param {boolean} [options.isPreferCdnHost]
  */
@@ -63,19 +65,21 @@ Region.fromZone = function (zone, options) {
     options = options || {};
     options.ttl = options.ttl || -1;
 
-    const regionId = (() => {
-        // This `regionId` determine method is inspected by the constructor of `Zone`
-        const firstDotIndex = zone.ioHost.indexOf('.');
-        if (firstDotIndex < 0) {
-            // TODO: should we return a random id?
-            return 'z0';
-        }
-        const firstDashIndex = zone.ioHost.substring(0, firstDotIndex).indexOf('-');
-        if (firstDashIndex < 0) {
-            return 'z0';
-        }
-        return zone.ioHost.substring(firstDashIndex + 1, firstDotIndex);
-    })();
+    let regionId = options.regionId;
+    if (!regionId) {
+        regionId = (() => {
+            // This `regionId` determine method is inspected by the constructor of `Zone`
+            const firstDotIndex = zone.ioHost.indexOf('.');
+            if (firstDotIndex < 0) {
+                return;
+            }
+            const firstDashIndex = zone.ioHost.substring(0, firstDotIndex).indexOf('-');
+            if (firstDashIndex < 0) {
+                return;
+            }
+            return zone.ioHost.substring(firstDashIndex + 1, firstDotIndex);
+        })();
+    }
 
     const upHosts = options.isPreferCdnHost
         ? zone.cdnUpHosts.concat(zone.srcUpHosts)
@@ -102,7 +106,7 @@ Region.fromZone = function (zone, options) {
 
     return new Region({
         regionId: regionId,
-        s3RegionId: regionId,
+        s3RegionId: options.s3RegionId || regionId,
         services: services,
         ttl: options.ttl
     });
@@ -179,7 +183,7 @@ Region.fromRegionId = function (regionId, options) {
 
 /**
  * @typedef RegionPersistInfo
- * @property {string} regionId
+ * @property {string} [regionId]
  * @property {string} s3RegionId
  * @property {Object.<string, EndpointPersistInfo[]>} services
  * @property {number} ttl
