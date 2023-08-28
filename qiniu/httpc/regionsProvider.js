@@ -1,7 +1,8 @@
 const fs = require('fs');
-const readline = require('readline');
 const os = require('os');
 const path = require('path');
+const readline = require('readline');
+const stream = require('stream');
 
 const { Region } = require('./region');
 
@@ -76,7 +77,6 @@ function CachedRegionsProvider (
     this.persistPath = options.persistPath;
     // allow disable persist
     if (!this.persistPath && this.persistPath !== null) {
-        // TODO: tmpdir or workspace dir, which better?
         this.persistPath = path.join(os.tmpdir(), 'qn-regions-cache.jsonl');
     }
 }
@@ -124,27 +124,52 @@ CachedRegionsProvider.prototype.shrink = function (force) {
     })
         .then(() => {
             // parse useless data
-            return this.walkFileCache(({ cacheKey, regions }) => {
+            return this.walkFileCache(({
+                cacheKey,
+                regions
+            }) => {
                 const validRegions = regions.filter(r => r.isLive);
-                if (validRegions.length) {
-                    // TODO: should merge data if the cacheKey are same?
-                    shrunkCache.set(cacheKey, validRegions);
+                if (!validRegions.length) {
+                    return;
                 }
+
+                if (!shrunkCache.has(cacheKey)) {
+                    shrunkCache.set(cacheKey, validRegions);
+                    return;
+                }
+
+                const shrunkRegions = shrunkCache.get(cacheKey);
+                shrunkCache.set(
+                    cacheKey,
+                    CachedRegionsProvider.mergeRegions(shrunkRegions, validRegions)
+                );
             });
         })
         .then(() => {
-            // write and close
+            // write to file
+            const shrunkCacheIterator = shrunkCache.entries();
+            const cacheReadStream = new stream.Readable({
+                read: function () {
+                    const nextEntry = shrunkCacheIterator.next();
+                    if (nextEntry.done) {
+                        this.push(null);
+                    } else {
+                        const [cacheKey, regions] = nextEntry.value;
+                        this.push(
+                            CachedRegionsProvider.stringifyPersistedRegions(
+                                cacheKey,
+                                regions
+                            ) + os.EOL
+                        );
+                    }
+                }
+            });
             const writeStream = fs.createWriteStream(shrinkPath);
-            for (const [cacheKey, regions] of shrunkCache.entries()) {
-                writeStream.write(
-                    CachedRegionsProvider.stringifyPersistedRegions(
-                        cacheKey,
-                        regions
-                    ) + os.EOL,
-                    'utf-8'
-                );
-            }
-            writeStream.close();
+            return new Promise((resolve, reject) => {
+                const pipeline = cacheReadStream.pipe(writeStream);
+                pipeline.on('close', resolve);
+                pipeline.on('error', reject);
+            });
         })
         .then(() => {
             return new Promise(resolve => {
@@ -279,22 +304,32 @@ CachedRegionsProvider.prototype.walkFileCache = function (fn, options) {
  * @returns Promise<void>
  */
 CachedRegionsProvider.prototype.flushFileCacheToMemo = function () {
-    return this.walkFileCache(({ cacheKey, regions }) => {
-        // TODO: flush all valid cache from file to memo, should it?
-        const validRegions = regions
-            .map(r => Region.fromPersistInfo(r))
-            .filter(r => r.isLive);
-        if (validRegions.length) {
-            // TODO: should merge data if the cacheKey are same?
-            this._memoCache.set(cacheKey, validRegions);
+    return this.walkFileCache(({
+        cacheKey,
+        regions
+    }) => {
+        const validRegions = regions.filter(r => r.isLive);
+        if (!validRegions.length) {
+            return;
         }
+
+        if (!this._memoCache.has(cacheKey)) {
+            this._memoCache.set(cacheKey, validRegions);
+            return;
+        }
+
+        const memoRegions = this._memoCache.get(cacheKey);
+        this._memoCache.set(
+            cacheKey,
+            CachedRegionsProvider.mergeRegions(memoRegions, validRegions)
+        );
     });
 };
 
 /**
  * @typedef CachedPersistedRegions
  * @property {string} cacheKey
- * @property {RegionPersistInfo} regions
+ * @property {Region[]} regions
  */
 
 /**
@@ -321,6 +356,60 @@ CachedRegionsProvider.stringifyPersistedRegions = function (cacheKey, regions) {
         cacheKey,
         regions: regions.map(r => r.persistInfo)
     });
+};
+
+/**
+ * merge two regions by region id.
+ * if the same region id, the last create region will be keep.
+ * @param {Region[]} regionsA
+ * @param {Region[]} regionsB
+ * @returns {Region[]}
+ */
+CachedRegionsProvider.mergeRegions = function (regionsA, regionsB) {
+    if (!regionsA.length) {
+        return regionsB;
+    }
+    if (!regionsB.length) {
+        return regionsA;
+    }
+
+    const convertRegionsToMap = (regions) => regions.reduce((m, r) => {
+        if (
+            m[r.regionId] &&
+            m[r.regionId].createTime > r.createTime
+        ) {
+            return m;
+        }
+        m[r.regionId] = r;
+        return m;
+    }, {});
+
+    const regionsMapA = convertRegionsToMap(regionsA);
+    const regionsMapB = convertRegionsToMap(regionsB);
+
+    // union region ids
+    const regionIds = new Set();
+    Object.keys(regionsMapA).forEach(rid => regionIds.add(rid));
+    Object.keys(regionsMapB).forEach(rid => regionIds.add(rid));
+
+    // merge
+    const result = [];
+    for (const regionId of regionIds) {
+        if (regionsMapA[regionId] && regionsMapB[regionId]) {
+            if (regionsMapA[regionId].createTime > regionsMapB[regionId].createTime) {
+                result.push(regionsMapA[regionId]);
+            } else {
+                result.push(regionsMapB[regionId]);
+            }
+        } else {
+            if (regionsMapA[regionId]) {
+                result.push(regionsMapA[regionId]);
+            } else if (regionsMapB[regionId]) {
+                result.push(regionsMapB[regionId]);
+            }
+        }
+    }
+    return result;
 };
 
 // --- could split to files if migrate to typescript --- //

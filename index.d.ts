@@ -812,7 +812,7 @@ export declare namespace httpc {
         private getRegionsFromMemo(): Region[];
 
         private walkFileCache(
-            fn: () => void,
+            fn: (persistedRegions: CachedPersistedRegions) => void,
             options?: WalkFileCacheOptions
         ): Promise<void>;
 
@@ -820,6 +820,7 @@ export declare namespace httpc {
 
         private static parsePersistedRegions(persistedRegions: string): CachedPersistedRegions;
         private static stringifyPersistedRegions(cacheKey: string, regions: Region[]): string;
+        private static mergeRegions(regionsA: Region[], regionsB: Region[]): Region[];
     }
 
     // QueryRegionsProvider

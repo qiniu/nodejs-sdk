@@ -693,6 +693,32 @@ describe('test http module', function () {
                     });
             });
 
+            it('test CachedRegionsProvider getter with expired file cache', function () {
+                const cachedRegionsProvider = getCachedRegionsProvider();
+                const rZ0 = Region.fromRegionId('z0');
+                const mockCreateTime = new Date();
+                mockCreateTime.setMinutes(1, 2, 3);
+                rZ0.createTime = mockCreateTime;
+
+                const rZ0Expired = Region.fromRegionId('z0');
+                rZ0Expired.createTime = new Date(0);
+
+                fs.writeFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [rZ0Expired.persistInfo]
+                    })
+                );
+                cachedRegionsProvider._memoCache.set(cachedRegionsProvider.cacheKey, [rZ0]);
+                return cachedRegionsProvider.getRegions()
+                    .then(regions => {
+                        should.equal(regions.length, 1);
+                        const [actualRegion] = regions;
+                        should.equal(actualRegion.createTime, mockCreateTime);
+                    });
+            });
+
             it('test CachedRegionsProvider disable persist', function () {
                 const rZ0 = Region.fromRegionId('z0');
                 const rZ1 = Region.fromRegionId('z1');
@@ -864,6 +890,51 @@ describe('test http module', function () {
                         // use finally when min version of Node.js update to ≥ v10.3.0
                         fs.unlinkSync(lockFilePath);
                         return Promise.reject(err);
+                    });
+            });
+
+            it('test CachedRegionsProvider merge shrunk', function () {
+                const cachedRegionsProvider = getCachedRegionsProvider();
+
+                const rZ0 = Region.fromRegionId('z0');
+                const rZ1 = Region.fromRegionId('z1');
+                const mockDate = new Date();
+                mockDate.setMinutes(1, 2, 3);
+                rZ1.createTime = mockDate;
+                const rZ1Old = Region.fromRegionId('z1');
+                rZ1Old.createTime = new Date(0);
+                const rZ2 = Region.fromRegionId('z2');
+
+                fs.appendFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [rZ0, rZ1].map(r => r.persistInfo)
+                    }) + os.EOL
+                );
+                fs.appendFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [rZ1Old, rZ2].map(r => r.persistInfo)
+                    }) + os.EOL
+                );
+
+                return cachedRegionsProvider.shrink()
+                    .then(isShrunk => {
+                        should.ok(isShrunk);
+                        const content = fs.readFileSync(cachedRegionsProvider.persistPath);
+                        const jsonl = content.toString().split(os.EOL).filter(l => l.length > 0);
+                        should.equal(jsonl.length, 1);
+
+                        const [persistedCache] = jsonl;
+                        const { cacheKey, regions } = JSON.parse(persistedCache);
+                        should.equal(cacheKey, cachedRegionsProvider.cacheKey);
+                        should.equal(regions.length, 3);
+                        regions.every(r => ['z0', 'z1', 'z2'].includes(r.regionId));
+                        const actualRZ1 = regions.find(r => r.regionId === 'z1');
+                        should.exists(actualRZ1);
+                        should.equal(actualRZ1.createTime, mockDate.getTime());
                     });
             });
         });
