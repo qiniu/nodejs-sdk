@@ -331,11 +331,6 @@ ChangeRegionRetryPolicy.prototype.prepareRetry = function (context, ret) {
     }
 
     // normal change region
-    const coolDownDuration = Math.min(
-        Math.trunc(context.region.ttl / 10) * 1000,
-        3600 * 1000
-    );
-    context.region.coolDownBefore = new Date(Date.now() + coolDownDuration);
     context.region = context.alternativeRegions.shift();
     return StaticEndpointsProvider.fromRegion(
         context.region,

@@ -667,7 +667,6 @@ export declare namespace httpc {
         services?: Record<string, Endpoint[]>;
         ttl?: number;
         createTime?: Date;
-        coolDownBefore?: Date;
     }
 
     interface RegionFromZoneOptions {
@@ -690,7 +689,6 @@ export declare namespace httpc {
         services: Record<SERVICE_NAME | string, EndpointPersistInfo[]>;
         ttl: number;
         createTime: number;
-        coolDownBefore: number;
     }
 
     interface QueryRegionsRespData {
@@ -733,8 +731,6 @@ export declare namespace httpc {
 
         ttl: number;
         createTime: Date;
-
-        coolDownBefore: Date;
 
         constructor(options: RegionOptions);
 

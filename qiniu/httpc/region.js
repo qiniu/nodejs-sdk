@@ -27,7 +27,6 @@ const SERVICE_NAME = {
  * @param {Object.<ServiceKey, Endpoint[]>} [options.services]
  * @param {number} [options.ttl] seconds. default 1 day.
  * @param {Date} [options.createTime]
- * @param {Date} [options.coolDownBefore]
  * @constructor
  */
 function Region (options) {
@@ -45,7 +44,6 @@ function Region (options) {
 
     this.ttl = options.ttl || 86400;
     this.createTime = options.createTime || new Date();
-    this.coolDownBefore = options.coolDownBefore || new Date(0);
 }
 
 /**
@@ -188,7 +186,6 @@ Region.fromRegionId = function (regionId, options) {
  * @property {Object.<string, EndpointPersistInfo[]>} services
  * @property {number} ttl
  * @property {number} createTime
- * @property {number} coolDownBefore
  */
 
 /**
@@ -223,8 +220,7 @@ Region.fromPersistInfo = function (persistInfo) {
         s3RegionId: persistInfo.s3RegionId,
         services: services,
         ttl: persistInfo.ttl,
-        createTime: new Date(persistInfo.createTime),
-        coolDownBefore: new Date(persistInfo.coolDownBefore)
+        createTime: new Date(persistInfo.createTime)
     });
 };
 
@@ -324,8 +320,7 @@ Object.defineProperty(Region.prototype, 'persistInfo', {
             s3RegionId: this.s3RegionId,
             services: persistedServices,
             ttl: this.ttl,
-            createTime: this.createTime.getTime(),
-            coolDownBefore: this.coolDownBefore.getTime()
+            createTime: this.createTime.getTime()
         };
     },
     enumerable: false,

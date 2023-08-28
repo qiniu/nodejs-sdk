@@ -270,7 +270,6 @@ describe('test http module', function () {
             should.ok(Date.now() - region.createTime.getTime() < 1000);
             should.equal(region.ttl, 86400);
             should.ok(region.isLive);
-            should.equal(region.coolDownBefore.getTime(), 0);
         });
 
         it('test options', function () {
@@ -299,7 +298,6 @@ describe('test http module', function () {
             should.ok(new Date(Date.now() - 86400 * 1000).getTime() - region.createTime.getTime() < 1000);
             should.equal(region.ttl, 3600);
             should.ok(!region.isLive);
-            should.equal(region.coolDownBefore.getTime(), 0);
         });
 
         it('test fromZone', function () {
@@ -498,8 +496,7 @@ describe('test http module', function () {
                     ]
                 },
                 ttl: 86400,
-                createTime: now.getTime(),
-                coolDownBefore: 0
+                createTime: now.getTime()
             };
             should.deepEqual(regionZ0.persistInfo, expectedResult);
         });
@@ -559,8 +556,7 @@ describe('test http module', function () {
                     ]
                 },
                 ttl: 86400,
-                createTime: now.getTime(),
-                coolDownBefore: 0
+                createTime: now.getTime()
             };
 
             const region = Region.fromPersistInfo(persistInfo);
@@ -569,7 +565,6 @@ describe('test http module', function () {
             should.equal(region.s3RegionId, 'z0');
             should.equal(region.ttl, 86400);
             should.equal(region.createTime.getTime(), now.getTime());
-            should.equal(region.coolDownBefore.getTime(), 0);
 
             // use Object.entries when min version of Node.js update to ≥ v7.5.0
             for (const serviceName of Object.keys(persistInfo.services)) {

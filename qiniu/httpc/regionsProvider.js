@@ -254,8 +254,6 @@ CachedRegionsProvider.prototype.getRegionsFromMemo = function () {
     const regions = this._memoCache.get(this.cacheKey);
 
     if (Array.isArray(regions) && regions.length) {
-        // TODO: or filter r => r.coolDownBefore < new Date()?
-        regions.sort((r1, r2) => r1.coolDownBefore - r2.coolDownBefore);
         return regions;
     }
 
