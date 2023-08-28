@@ -18,6 +18,7 @@ module.exports = {
         Region: require('./qiniu/httpc/region').Region,
         StaticRegionsProvider: require('./qiniu/httpc/regionsProvider').StaticRegionsProvider,
         CachedRegionsProvider: require('./qiniu/httpc/regionsProvider').CachedRegionsProvider,
+        QueryRegionsProvider: require('./qiniu/httpc/regionsProvider').QueryRegionsProvider,
         ChainedRegionsProvider: require('./qiniu/httpc/regionsProvider').ChainedRegionsProvider
     },
     rpc: require('./qiniu/rpc.js'),

@@ -27,7 +27,6 @@ exports.doWorkWithRetry = doWorkWithRetry;
 exports.ChangeEndpointRetryPolicy = ChangeEndpointRetryPolicy;
 exports.ChangeRegionRetryPolicy = ChangeRegionRetryPolicy;
 exports.TokenExpiredRetryPolicy = TokenExpiredRetryPolicy;
-exports.UploadState = UploadState;
 
 /**
  * @returns {StaticEndpointsProvider}
@@ -83,23 +82,36 @@ function prepareRegionsProvider (options) {
 
     // prepare RegionsProvider
     let regionsProvider = config.regionsProvider;
+    if (regionsProvider) {
+        return regionsProvider;
+    }
 
     // backward compatibility with zone
-    const zoneTtl = config.zoneExpire - Math.trunc(Date.now() / 1000);
-    const isConfigZoneLive = config.zone && zoneTtl > 0;
-    if (!regionsProvider && isConfigZoneLive) {
+    let zoneTtl;
+    let shouldUseZone;
+    if (config.zoneExpire > 0) {
+        zoneTtl = config.zoneExpire - Math.trunc(Date.now() / 1000);
+        shouldUseZone = config.zone && zoneTtl > 0;
+    } else {
+        zoneTtl = -1;
+        shouldUseZone = Boolean(config.zone);
+    }
+    if (shouldUseZone) {
         regionsProvider = new StaticRegionsProvider([
-            Region.fromZone(config.zone)
+            Region.fromZone(config.zone, {
+                ttl: zoneTtl,
+                isPreferCdnHost: config.useCdnDomain
+            })
         ]);
     }
-
-    if (!regionsProvider) {
-        regionsProvider = getDefaultRegionsProvider({
-            accessKey,
-            bucketName
-        });
+    if (regionsProvider) {
+        return regionsProvider;
     }
 
+    regionsProvider = getDefaultRegionsProvider({
+        accessKey,
+        bucketName
+    });
     return regionsProvider;
 }
 
@@ -183,7 +195,9 @@ TokenExpiredRetryPolicy.prototype.shouldRetry = function (context, ret) {
     } = context[this.id];
 
     if (
-        retriedTimes >= this.maxRetryTimes || !this.isResumedUpload(resumeRecordFilePath)) {
+        retriedTimes >= this.maxRetryTimes ||
+        !this.isResumedUpload(resumeRecordFilePath)
+    ) {
         return false;
     }
 
@@ -446,8 +460,7 @@ UploadState.prototype.prepareRetry = function (ret) {
 /**
  * @param options
  * @param {WorkFn} options.workFn
- * @param {boolean} options.isValidCallback // TODO: remove
- * @param {ReqcallbackFunc} options.callbackFunc
+ * @param {ReqcallbackFunc} [options.callbackFunc]
  * @param {RegionsProvider} options.regionsProvider
  * @param {RetryPolicy[]} [options.retryPolicies]
  * @param {'v1' | 'v2' | string} [options.uploadApiVersion]

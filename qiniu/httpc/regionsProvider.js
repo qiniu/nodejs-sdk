@@ -25,8 +25,6 @@ const { Region } = require('./region');
 // --- could split to files if migrate to typescript --- //
 
 /**
- * NOTE: This Regions Provider will ignore the ttl in Region.
- *
  * @class
  * @implements RegionsProvider
  * @param {Region[]} regions
@@ -51,7 +49,7 @@ StaticRegionsProvider.prototype.setRegions = function (regions) {
  * @private DO NOT export this.
  * @type {Map<string, Region[]>}
  */
-let memoCachedRegions = new Map();
+const memoCachedRegions = new Map();
 
 /**
  * @class
@@ -67,37 +65,48 @@ function CachedRegionsProvider (
     cacheKey,
     options
 ) {
+    // only used for testing
+    this._memoCache = memoCachedRegions;
+
     this.cacheKey = cacheKey;
     options = options || {};
 
     this.lastShrinkAt = options.lastShrinkAt || new Date(0);
     this.shrinkInterval = options.shrinkInterval || 86400 * 1000;
-    // TODO: tmpdir or workspace dir, which better?
-    this.persistPath = options.persistPath || path.join(os.tmpdir(), 'qn-regions-cache.txt');
+    this.persistPath = options.persistPath;
+    // allow disable persist
+    if (!this.persistPath && this.persistPath !== null) {
+        // TODO: tmpdir or workspace dir, which better?
+        this.persistPath = path.join(os.tmpdir(), 'qn-regions-cache.jsonl');
+    }
 }
 
 /**
- * the returns value means if shrunk.
- * @param {boolean} force
+ * the returns value means if shrunk or not.
+ * @param {boolean} [force]
  * @returns {Promise<boolean>}
  */
 CachedRegionsProvider.prototype.shrink = function (force) {
-    const shouldShrink = force || this.lastShrinkAt.getTime() + this.shrinkInterval < Date.now();
+    const now = new Date();
+    const shouldShrink = force || this.lastShrinkAt.getTime() + this.shrinkInterval < now.getTime();
     if (!shouldShrink) {
         return Promise.resolve(false);
     }
+    this.lastShrinkAt = now;
 
     // shrink memory cache
-    /** @type {Map<string, Region[]>} */
-    const cache = new Map();
-    for (const [key, regions] of memoCachedRegions.entries()) {
+    for (const [key, regions] of this._memoCache.entries()) {
         const liveRegions = regions.filter(r => r.isLive);
         if (liveRegions.length) {
-            cache.set(key, liveRegions);
+            this._memoCache.set(key, liveRegions);
+        } else {
+            this._memoCache.delete(key);
         }
     }
-    memoCachedRegions = cache;
 
+    if (!this.persistPath) {
+        return Promise.resolve(true);
+    }
     // shrink file cache
     const shrunkCache = new Map();
     const shrinkPath = this.persistPath + '.shrink';
@@ -118,6 +127,7 @@ CachedRegionsProvider.prototype.shrink = function (force) {
             return this.walkFileCache(({ cacheKey, regions }) => {
                 const validRegions = regions.filter(r => r.isLive);
                 if (validRegions.length) {
+                    // TODO: should merge data if the cacheKey are same?
                     shrunkCache.set(cacheKey, validRegions);
                 }
             });
@@ -143,12 +153,13 @@ CachedRegionsProvider.prototype.shrink = function (force) {
         })
         .then(() => {
             fs.unlink(lockPath, () => {});
+            return Promise.resolve(true);
         })
         .catch(err => {
             // if exist
             if (err.code === 'EEXIST' && err.path === lockPath) {
                 // ignore file shrinking err
-                return Promise.resolve(true);
+                return Promise.resolve(false);
             }
             // use finally when min version of Node.js update to ≥ v10.3.0
             fs.unlink(lockPath, () => {});
@@ -157,7 +168,7 @@ CachedRegionsProvider.prototype.shrink = function (force) {
 };
 
 /**
- * @returns {Region[]}
+ * @returns {Promise<Region[]>}
  */
 CachedRegionsProvider.prototype.getRegions = function () {
     /** @type Region[] */
@@ -188,7 +199,10 @@ CachedRegionsProvider.prototype.getRegions = function () {
  * @returns {Promise<void>}
  */
 CachedRegionsProvider.prototype.setRegions = function (regions) {
-    memoCachedRegions.set(this.cacheKey, regions);
+    this._memoCache.set(this.cacheKey, regions);
+    if (!this.persistPath) {
+        return Promise.resolve();
+    }
     return new Promise((resolve, reject) => {
         fs.appendFile(
             this.persistPath,
@@ -212,7 +226,7 @@ CachedRegionsProvider.prototype.setRegions = function (regions) {
  * @returns {Region[]}
  */
 CachedRegionsProvider.prototype.getRegionsFromMemo = function () {
-    const regions = memoCachedRegions.get(this.cacheKey);
+    const regions = this._memoCache.get(this.cacheKey);
 
     if (Array.isArray(regions) && regions.length) {
         // TODO: or filter r => r.coolDownBefore < new Date()?
@@ -271,7 +285,8 @@ CachedRegionsProvider.prototype.flushFileCacheToMemo = function () {
             .map(r => Region.fromPersistInfo(r))
             .filter(r => r.isLive);
         if (validRegions.length) {
-            memoCachedRegions.set(cacheKey, validRegions);
+            // TODO: should merge data if the cacheKey are same?
+            this._memoCache.set(cacheKey, validRegions);
         }
     });
 };
@@ -427,8 +442,8 @@ ChainedRegionsProvider.prototype.getRegions = function () {
 
     return tryGetRegions()
         .then(regions => {
-            // `+1` to exclude `currentProvider`
-            const endIndex = this.providers.length - alternativeProviders.length + 1;
+            // `-1` to exclude `currentProvider`
+            const endIndex = this.providers.length - alternativeProviders.length - 1;
             const providersToFresh = this.providers.slice(0, endIndex);
             for (const p of providersToFresh) {
                 p.setRegions(regions)

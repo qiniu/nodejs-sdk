@@ -101,10 +101,11 @@ describe('test resume up', function () {
                             statRespBody.should.have.keys('x-qn-meta');
                             statRespBody['x-qn-meta'].name.should.eql('qiniu');
                             statRespBody['x-qn-meta'].age.should.eql('18');
-                            done();
                         } catch (e) {
                             done(e);
+                            return;
                         }
+                        done();
                     });
                 });
         });
@@ -141,10 +142,11 @@ describe('test resume up', function () {
                             statRespBody.should.have.keys('x-qn-meta');
                             statRespBody['x-qn-meta'].name.should.eql('qiniu');
                             statRespBody['x-qn-meta'].age.should.eql('18');
-                            done();
                         } catch (e) {
                             done(e);
+                            return;
                         }
+                        done();
                     });
                 });
         });
@@ -193,10 +195,11 @@ describe('test resume up', function () {
                         .then(function ([expectedMd5, actualMd5]) {
                             try {
                                 actualMd5.should.eql(expectedMd5);
-                                done();
                             } catch (e) {
                                 done(e);
+                                return;
                             }
+                            done();
                         });
                 });
         });
@@ -243,10 +246,11 @@ describe('test resume up', function () {
                         .then(function ([expectedMd5, actualMd5]) {
                             try {
                                 actualMd5.should.eql(expectedMd5);
-                                done();
                             } catch (e) {
                                 done(e);
+                                return;
                             }
+                            done();
                         });
                 });
         });
@@ -288,10 +292,11 @@ describe('test resume up', function () {
                                 try {
                                     var actualMd5 = actualMd5Crypto.digest('hex');
                                     should(actualMd5).eql(expectedMd5);
-                                    done();
                                 } catch (e) {
                                     done(e);
+                                    return;
                                 }
+                                done();
                             });
                         }
                     });
@@ -337,10 +342,11 @@ describe('test resume up', function () {
                                 try {
                                     var actualMd5 = actualMd5Crypto.digest('hex');
                                     should(actualMd5).eql(expectedMd5);
-                                    done();
                                 } catch (e) {
-                                    doen(e);
+                                    done(e);
+                                    return;
                                 }
+                                done();
                             });
                         }
                     });
@@ -383,10 +389,11 @@ describe('test resume up', function () {
                         should.not.exist(respErr);
                         respBody.should.have.keys('key', 'hash');
                         keysToDelete.push(respBody.key);
-                        done();
                     } catch (e) {
                         done(e);
+                        return;
                     }
+                    done();
                 });
         });
 
@@ -432,11 +439,12 @@ describe('test resume up', function () {
                             respBody.should.have.keys('key', 'hash');
                             keysToDelete.push(respBody.key);
                             num++;
-                            if (num === blkCnt.length) {
-                                done();
-                            }
                         } catch (e) {
                             done(e);
+                            return;
+                        }
+                        if (num === blkCnt.length) {
+                            done();
                         }
                     });
             });
