@@ -58,7 +58,10 @@ RetryDomainsMiddleware.prototype.send = function (reqOpts, next) {
 
         if (domains.length) {
             this._retriedTimes = 0;
-            url.hostname = domains.shift();
+            const domain = domains.shift();
+            const [hostname, port] = domain.split(':');
+            url.hostname = hostname;
+            url.port = port || url.port;
             reqOpts.url = url.toString();
             return true;
         }

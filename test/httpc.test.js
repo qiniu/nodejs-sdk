@@ -1,8 +1,9 @@
 const should = require('should');
 
-const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
+const path = require('path');
 
 const qiniu = require('../index');
 
@@ -114,10 +115,24 @@ describe('test http module', function () {
     }
 
     describe('test http middleware', function () {
+        let mockServer;
+        before(function (done) {
+            mockServer = http.createServer((req, res) => {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'text/plain');
+                res.end('Hello, Qiniu!\n');
+            });
+            mockServer.listen(9000, '127.0.0.1', done);
+        });
+
+        after(function () {
+            mockServer.close();
+        });
+
         it('test middleware', function (done) {
             const recordList = [];
             qiniu.rpc.qnHttpClient.sendRequest({
-                url: 'https://qiniu.com/index.html',
+                url: 'http://127.0.0.1:9000/',
                 urllibOptions: {
                     method: 'GET',
                     followRedirect: true
@@ -143,7 +158,7 @@ describe('test http module', function () {
         it('test retry domains', function (done) {
             const recordList = [];
             qiniu.rpc.qnHttpClient.sendRequest({
-                url: 'https://fake.nodesdk.qiniu.com/index.html',
+                url: 'http://fake.nodesdk.qiniu.com/',
                 // url: 'https://qiniu.com/index.html',
                 urllibOptions: {
                     method: 'GET',
@@ -153,7 +168,7 @@ describe('test http module', function () {
                     new RetryDomainsMiddleware({
                         backupDomains: [
                             'unavailable.pysdk.qiniu.com',
-                            'qiniu.com'
+                            '127.0.0.1:9000'
                         ],
                         maxRetryTimes: 3
                     }),
@@ -187,7 +202,7 @@ describe('test http module', function () {
         it('test retry domains fail fast', function (done) {
             const recordList = [];
             qiniu.rpc.qnHttpClient.sendRequest({
-                url: 'https://fake.nodesdk.qiniu.com/index.html',
+                url: 'http://fake.nodesdk.qiniu.com/',
                 // url: 'https://qiniu.com/index.html',
                 urllibOptions: {
                     method: 'GET',
@@ -197,7 +212,7 @@ describe('test http module', function () {
                     new RetryDomainsMiddleware({
                         backupDomains: [
                             'unavailable.pysdk.qiniu.com',
-                            'qiniu.com'
+                            '127.0.0.1:9000'
                         ],
                         retryCondition: () => false
                     }),
