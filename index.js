@@ -31,11 +31,3 @@ module.exports = {
         message: require('./qiniu/sms/message.js')
     }
 };
-
-// TODO: is this warning message ok in here?
-console.warn(
-    'WARNING:\n' +
-    'qiniu SDK will migrate API to Promise style gradually.\n' +
-    'The callback style will not be removed for now,\n' +
-    'but you should catch your error in your callback function itself'
-);

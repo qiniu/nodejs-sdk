@@ -514,12 +514,34 @@ function doWorkWithRetry (options) {
             if (err) {
                 return Promise.reject(err);
             }
-            isValidCallback && callbackFunc(null, ret, info);
+            try {
+                isValidCallback && callbackFunc(null, ret, info);
+            } catch (e) {
+                warningCallbackError(e);
+            }
             return Promise.resolve({ data: ret, resp: info });
         })
         .catch(err => {
-            // `info` doesn't pass to callback, could be improved in the future.
+            // `info` doesn't pass to callback by legacy, could be improved in the future.
+            try {
+                isValidCallback && callbackFunc(err, null, null);
+            } catch (e) {
+                warningCallbackError(e);
+            }
             isValidCallback && callbackFunc(err, null, null);
             return Promise.reject(err);
         });
+}
+
+/**
+ * @param {Error} e
+ */
+function warningCallbackError (e) {
+    console.warn(
+        'WARNING:\n' +
+        'qiniu SDK will migrate API to Promise style gradually.\n' +
+        'The callback style will not be removed for now,\n' +
+        'but you should catch your error in your callback function itself'
+    );
+    console.error(e);
 }

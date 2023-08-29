@@ -138,15 +138,12 @@ Region.fromRegionId = function (regionId, options) {
         [SERVICE_NAME.UP]: isZ0
             ? [
                 new Endpoint('upload.qiniup.com'),
-                // TODO: source upload domain as alternate?
                 new Endpoint('up.qiniup.com')
             ]
             : [
                 new Endpoint('upload-' + regionId + '.qiniup.com'),
-                // TODO: source upload domain as alternate?
                 new Endpoint('up-' + regionId + '.qiniup.com')
             ],
-        // TODO: add alternative domains for below services
         [SERVICE_NAME.IO]: isZ0
             ? [
                 new Endpoint('iovip.qiniuio.com')
