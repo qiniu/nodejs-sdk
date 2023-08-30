@@ -63,22 +63,6 @@ Region.fromZone = function (zone, options) {
     options = options || {};
     options.ttl = options.ttl || -1;
 
-    let regionId = options.regionId;
-    if (!regionId) {
-        regionId = (() => {
-            // This `regionId` determine method is inspected by the constructor of `Zone`
-            const firstDotIndex = zone.ioHost.indexOf('.');
-            if (firstDotIndex < 0) {
-                return;
-            }
-            const firstDashIndex = zone.ioHost.substring(0, firstDotIndex).indexOf('-');
-            if (firstDashIndex < 0) {
-                return;
-            }
-            return zone.ioHost.substring(firstDashIndex + 1, firstDotIndex);
-        })();
-    }
-
     const upHosts = options.isPreferCdnHost
         ? zone.cdnUpHosts.concat(zone.srcUpHosts)
         : zone.srcUpHosts.concat(zone.cdnUpHosts);
@@ -103,8 +87,8 @@ Region.fromZone = function (zone, options) {
     };
 
     return new Region({
-        regionId: regionId,
-        s3RegionId: options.s3RegionId || regionId,
+        regionId: options.regionId,
+        s3RegionId: options.s3RegionId || options.regionId,
         services: services,
         ttl: options.ttl
     });

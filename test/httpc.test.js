@@ -347,7 +347,7 @@ describe('test http module', function () {
             const rsfHosts = regionZ1.services[SERVICE_NAME.RSF].map(endpoint => endpoint.host);
             const apiHosts = regionZ1.services[SERVICE_NAME.API].map(endpoint => endpoint.host);
 
-            should.equal(regionZ1.regionId, 'z1');
+            should.not.exist(regionZ1.regionId);
             should.equal(regionZ1.ttl, 84600);
             should.deepEqual(cdnUpHosts, Zone_z1.cdnUpHosts);
             should.deepEqual(srcUpHosts, Zone_z1.srcUpHosts);
@@ -609,36 +609,40 @@ describe('test http module', function () {
 
     describe('test regions provider', function () {
         describe('test StaticRegionsProvider', function () {
-            const staticRegionsProvider = new StaticRegionsProvider([
-                Region.fromRegionId('z0'),
-                Region.fromRegionId('cn-east-2')
-            ]);
+            it('test StaticRegionsProvider get', function () {
+                const staticRegionsProvider = new StaticRegionsProvider([
+                    Region.fromRegionId('z0'),
+                    Region.fromRegionId('cn-east-2')
+                ]);
 
-            return staticRegionsProvider.getRegions()
-                .then(regions => {
-                    return regions.map(r => StaticEndpointsProvider.fromRegion(r, SERVICE_NAME.UP));
-                })
-                .then(endpointsProviders => {
-                    return Promise.all(endpointsProviders.map(e => e.getEndpoints()));
-                })
-                .then(regionsEndpoints => {
-                    // use `Array.prototype.flat` if migrate to node v11.15
-                    const regionsEndpointValues = regionsEndpoints.map(
-                        endpoints =>
-                            endpoints.map(e => e.getValue())
-                    );
+                return staticRegionsProvider.getRegions()
+                    .then(regions => {
+                        return regions.map(r => StaticEndpointsProvider.fromRegion(r, SERVICE_NAME.UP));
+                    })
+                    .then(endpointsProviders => {
+                        return Promise.all(endpointsProviders.map(e => e.getEndpoints()));
+                    })
+                    .then(regionsEndpoints => {
+                        // use `Array.prototype.flat` if migrate to node v11.15
+                        const regionsEndpointValues = regionsEndpoints.map(
+                            endpoints =>
+                                endpoints.map(e => e.getValue())
+                        );
 
-                    should.deepEqual(regionsEndpointValues, [
-                        [
-                            'https://upload.qiniup.com',
-                            'https://up.qiniup.com'
-                        ],
-                        [
-                            'https://upload-cn-east-2.qiniup.com',
-                            'https://up-cn-east-2.qiniup.com'
-                        ]
-                    ]);
-                });
+                        should.deepEqual(regionsEndpointValues, [
+                            [
+                                'https://upload.qiniup.com',
+                                'https://up.qiniup.com',
+                                'https://up.qbox.me'
+                            ],
+                            [
+                                'https://upload-cn-east-2.qiniup.com',
+                                'https://up-cn-east-2.qiniup.com',
+                                'https://up-cn-east-2.qbox.me'
+                            ]
+                        ]);
+                    });
+            });
         });
 
         describe('test CachedRegionsProvider', function () {

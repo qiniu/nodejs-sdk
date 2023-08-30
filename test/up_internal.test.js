@@ -267,7 +267,22 @@ describe('test upload internal module', function () {
                     .then(regions => {
                         should.equal(regions.length, 1);
                         const [r] = regions;
-                        should.equal(r.regionId, 'z1');
+                        should.not.exist(r.regionId);
+                        const actualServiceHost = Object.keys(r.services)
+                            .reduce((services, serviceKey) => {
+                                services[serviceKey] = r.services[serviceKey].map(e => e.host);
+                                return services;
+                            }, {});
+                        const expectServiceHost = {
+                            [SERVICE_NAME.UP]: Zone_z1.srcUpHosts.concat(Zone_z1.cdnUpHosts),
+                            [SERVICE_NAME.IO]: [Zone_z1.ioHost],
+                            [SERVICE_NAME.RS]: [Zone_z1.rsHost],
+                            [SERVICE_NAME.RSF]: [Zone_z1.rsfHost],
+                            [SERVICE_NAME.API]: [Zone_z1.apiHost],
+                            [SERVICE_NAME.UC]: [],
+                            [SERVICE_NAME.S3]: []
+                        };
+                        should.deepEqual(actualServiceHost, expectServiceHost);
                     });
             });
         });
