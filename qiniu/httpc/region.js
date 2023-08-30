@@ -138,27 +138,34 @@ Region.fromRegionId = function (regionId, options) {
         [SERVICE_NAME.UP]: isZ0
             ? [
                 new Endpoint('upload.qiniup.com'),
-                new Endpoint('up.qiniup.com')
+                new Endpoint('up.qiniup.com'),
+                new Endpoint('up.qbox.me')
             ]
             : [
                 new Endpoint('upload-' + regionId + '.qiniup.com'),
-                new Endpoint('up-' + regionId + '.qiniup.com')
+                new Endpoint('up-' + regionId + '.qiniup.com'),
+                new Endpoint('up-' + regionId + '.qbox.me')
             ],
         [SERVICE_NAME.IO]: isZ0
             ? [
-                new Endpoint('iovip.qiniuio.com')
+                new Endpoint('iovip.qiniuio.com'),
+                new Endpoint('iovip.qbox.me')
             ]
             : [
-                new Endpoint('iovip-' + regionId + '.qiniuio.com')
+                new Endpoint('iovip-' + regionId + '.qiniuio.com'),
+                new Endpoint('iovip-' + regionId + '.qbox.me')
             ],
         [SERVICE_NAME.RS]: [
-            new Endpoint('rs-' + regionId + '.qiniuapi.com')
+            new Endpoint('rs-' + regionId + '.qiniuapi.com'),
+            new Endpoint('rs-' + regionId + '.qbox.me')
         ],
         [SERVICE_NAME.RSF]: [
-            new Endpoint('rsf-' + regionId + '.qiniuapi.com')
+            new Endpoint('rsf-' + regionId + '.qiniuapi.com'),
+            new Endpoint('rsf-' + regionId + '.qbox.me')
         ],
         [SERVICE_NAME.API]: [
-            new Endpoint('api.qiniuapi.com')
+            new Endpoint('api-' + regionId + '.qiniuapi.com'),
+            new Endpoint('api-' + regionId + '.qbox.me')
         ],
         [SERVICE_NAME.S3]: [
             new Endpoint('s3.' + s3RegionId + '.qiniucs.com')

@@ -373,19 +373,24 @@ describe('test http module', function () {
                 ],
                 [SERVICE_NAME.UP]: [
                     'https://upload.qiniup.com',
-                    'https://up.qiniup.com'
+                    'https://up.qiniup.com',
+                    'https://up.qbox.me'
                 ],
                 [SERVICE_NAME.IO]: [
-                    'https://iovip.qiniuio.com'
+                    'https://iovip.qiniuio.com',
+                    'https://iovip.qbox.me'
                 ],
                 [SERVICE_NAME.RS]: [
-                    'https://rs-z0.qiniuapi.com'
+                    'https://rs-z0.qiniuapi.com',
+                    'https://rs-z0.qbox.me'
                 ],
                 [SERVICE_NAME.RSF]: [
-                    'https://rsf-z0.qiniuapi.com'
+                    'https://rsf-z0.qiniuapi.com',
+                    'https://rsf-z0.qbox.me'
                 ],
                 [SERVICE_NAME.API]: [
-                    'https://api.qiniuapi.com'
+                    'https://api-z0.qiniuapi.com',
+                    'https://api-z0.qbox.me'
                 ],
                 [SERVICE_NAME.S3]: [
                     'https://s3.z0.qiniucs.com'
@@ -423,19 +428,24 @@ describe('test http module', function () {
                 ],
                 [SERVICE_NAME.UP]: [
                     'https://upload-z1.qiniup.com',
-                    'https://up-z1.qiniup.com'
+                    'https://up-z1.qiniup.com',
+                    'https://up-z1.qbox.me'
                 ],
                 [SERVICE_NAME.IO]: [
-                    'https://iovip-z1.qiniuio.com'
+                    'https://iovip-z1.qiniuio.com',
+                    'https://iovip-z1.qbox.me'
                 ],
                 [SERVICE_NAME.RS]: [
-                    'https://rs-z1.qiniuapi.com'
+                    'https://rs-z1.qiniuapi.com',
+                    'https://rs-z1.qbox.me'
                 ],
                 [SERVICE_NAME.RSF]: [
-                    'https://rsf-z1.qiniuapi.com'
+                    'https://rsf-z1.qiniuapi.com',
+                    'https://rsf-z1.qbox.me'
                 ],
                 [SERVICE_NAME.API]: [
-                    'https://api.qiniuapi.com'
+                    'https://api-z1.qiniuapi.com',
+                    'https://api-z1.qbox.me'
                 ],
                 [SERVICE_NAME.S3]: [
                     'https://s3.mock-z1.qiniucs.com'
@@ -460,56 +470,17 @@ describe('test http module', function () {
             );
 
             const expectedResult = {
-                regionId: 'z0',
-                s3RegionId: 'z0',
-                services: {
-                    uc: [
-                        {
-                            defaultScheme: 'https',
-                            host: 'uc.qiniuapi.com'
-                        }
-                    ],
-                    up: [
-                        {
-                            defaultScheme: 'https',
-                            host: 'upload.qiniup.com'
-                        },
-                        {
-                            defaultScheme: 'https',
-                            host: 'up.qiniup.com'
-                        }
-                    ],
-                    io: [
-                        {
-                            defaultScheme: 'https',
-                            host: 'iovip.qiniuio.com'
-                        }
-                    ],
-                    rs: [
-                        {
-                            defaultScheme: 'https',
-                            host: 'rs-z0.qiniuapi.com'
-                        }
-                    ],
-                    rsf: [
-                        {
-                            defaultScheme: 'https',
-                            host: 'rsf-z0.qiniuapi.com'
-                        }
-                    ],
-                    api: [
-                        {
-                            defaultScheme: 'https',
-                            host: 'api.qiniuapi.com'
-                        }
-                    ],
-                    s3: [
-                        {
-                            defaultScheme: 'https',
-                            host: 's3.z0.qiniucs.com'
-                        }
-                    ]
-                },
+                regionId: regionZ0.regionId,
+                s3RegionId: regionZ0.s3RegionId,
+                services: Object.keys(regionZ0.services)
+                    .reduce((services, serviceKey) => {
+                        const service = regionZ0.services[serviceKey];
+                        services[serviceKey] = service.map(s => ({
+                            defaultScheme: s.defaultScheme,
+                            host: s.host
+                        }));
+                        return services;
+                    }, {}),
                 ttl: 86400,
                 createTime: now.getTime()
             };
@@ -537,30 +508,50 @@ describe('test http module', function () {
                         {
                             defaultScheme: 'https',
                             host: 'up.qiniup.com'
+                        },
+                        {
+                            defaultScheme: 'https',
+                            host: 'up.qbox.me'
                         }
                     ],
                     io: [
                         {
                             defaultScheme: 'https',
                             host: 'iovip.qiniuio.com'
+                        },
+                        {
+                            defaultScheme: 'https',
+                            host: 'iovip.qbox.me'
                         }
                     ],
                     rs: [
                         {
                             defaultScheme: 'https',
                             host: 'rs-z0.qiniuapi.com'
+                        },
+                        {
+                            defaultScheme: 'https',
+                            host: 'rs-z0.qbox.me'
                         }
                     ],
                     rsf: [
                         {
                             defaultScheme: 'https',
                             host: 'rsf-z0.qiniuapi.com'
+                        },
+                        {
+                            defaultScheme: 'https',
+                            host: 'rsf-z0.qbox.me'
                         }
                     ],
                     api: [
                         {
                             defaultScheme: 'https',
-                            host: 'api.qiniuapi.com'
+                            host: 'api-z0.qiniuapi.com'
+                        },
+                        {
+                            defaultScheme: 'https',
+                            host: 'api-z0.qbox.me'
                         }
                     ],
                     s3: [
@@ -584,8 +575,14 @@ describe('test http module', function () {
             // use Object.entries when min version of Node.js update to ≥ v7.5.0
             for (const serviceName of Object.keys(persistInfo.services)) {
                 const persistEndpoints = persistInfo.services[serviceName];
-                const endpointValues = region.services[serviceName].map(e => e.getValue());
-                const expectedEndpointValues = persistEndpoints.map(e => e.defaultScheme + '://' + e.host);
+                const endpointValues = region.services[serviceName].map(e => ({
+                    defaultScheme: e.defaultScheme,
+                    host: e.host
+                }));
+                const expectedEndpointValues = persistEndpoints.map(e => ({
+                    defaultScheme: e.defaultScheme,
+                    host: e.host
+                }));
                 should.deepEqual(endpointValues, expectedEndpointValues);
             }
         });
@@ -603,7 +600,8 @@ describe('test http module', function () {
                     const endpointValues = endpoints.map(e => e.getValue());
                     should.deepEqual(endpointValues, [
                         'https://upload.qiniup.com',
-                        'https://up.qiniup.com'
+                        'https://up.qiniup.com',
+                        'https://up.qbox.me'
                     ]);
                 });
         });
