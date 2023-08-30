@@ -10,7 +10,6 @@ const {
 } = require('../httpc/region');
 const {
     CachedRegionsProvider,
-    ChainedRegionsProvider,
     QueryRegionsProvider,
     StaticRegionsProvider
 } = require('../httpc/regionsProvider');
@@ -45,7 +44,7 @@ function getDefaultQueryRegionEndpointsProvider () {
  * @param {string} options.accessKey
  * @param {string} options.bucketName
  * @param {EndpointsProvider} [options.queryRegionsEndpointProvider]
- * @returns {ChainedRegionsProvider}
+ * @returns {CachedRegionsProvider}
  */
 function getDefaultRegionsProvider (options) {
     const cacheKey = options.accessKey + ':' + options.bucketName;
@@ -54,16 +53,14 @@ function getDefaultRegionsProvider (options) {
         queryRegionsEndpointProvider = getDefaultQueryRegionEndpointsProvider();
     }
 
-    return new ChainedRegionsProvider([
-        new CachedRegionsProvider(
-            cacheKey
-        ),
-        new QueryRegionsProvider({
+    return new CachedRegionsProvider({
+        cacheKey,
+        baseRegionsProvider: new QueryRegionsProvider({
             accessKey: options.accessKey,
             bucketName: options.bucketName,
             endpointsProvider: queryRegionsEndpointProvider
         })
-    ]);
+    });
 }
 
 /**

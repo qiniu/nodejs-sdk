@@ -51,28 +51,28 @@ StaticRegionsProvider.prototype.setRegions = function (regions) {
  * @type {Map<string, Region[]>}
  */
 const memoCachedRegions = new Map();
+const lastShrinkAt = new Date();
 
 /**
  * @class
  * @implements RegionsProvider
- * @param {string} cacheKey
  * @param {Object} [options]
- * @param {Date} [options.lastShrinkAt]
+ * @param {string} options.cacheKey
+ * @param {RegionsProvider} options.baseRegionsProvider
  * @param {number} [options.shrinkInterval]
  * @param {string} [options.persistPath]
  * @constructor
  */
 function CachedRegionsProvider (
-    cacheKey,
     options
 ) {
     // only used for testing
     this._memoCache = memoCachedRegions;
 
-    this.cacheKey = cacheKey;
-    options = options || {};
+    this.cacheKey = options.cacheKey;
+    this.baseRegionsProvider = options.baseRegionsProvider;
 
-    this.lastShrinkAt = options.lastShrinkAt || new Date(0);
+    this.lastShrinkAt = lastShrinkAt;
     this.shrinkInterval = options.shrinkInterval || 86400 * 1000;
     this.persistPath = options.persistPath;
     // allow disable persist
@@ -197,15 +197,70 @@ CachedRegionsProvider.prototype.shrink = function (force) {
  */
 CachedRegionsProvider.prototype.getRegions = function () {
     /** @type Region[] */
-    this.shrink();
+    return this.shrink()
+        .then(() => {
+            const getRegionsFns = [
+                this.getRegionsFromMemo,
+                this.getRegionsFromFile,
+                this.getRegionsFromBaseProvider
+            ];
 
-    // read from memo
-    const regions = this.getRegionsFromMemo();
-    if (regions.length) {
+            return getRegionsFns.reduce((promiseChain, getRegionsFn, i) => {
+                return promiseChain.then(regions => {
+                    if (regions.length) {
+                        return regions;
+                    }
+                    return getRegionsFn.call(this);
+                });
+            }, Promise.resolve([]));
+        });
+};
+
+/**
+ * @param {Region[]} regions
+ * @returns {Promise<void>}
+ */
+CachedRegionsProvider.prototype.setRegions = function (regions) {
+    this._memoCache.set(this.cacheKey, regions);
+    if (!this.persistPath) {
+        return Promise.resolve();
+    }
+    return new Promise(resolve => {
+        fs.appendFile(
+            this.persistPath,
+            CachedRegionsProvider.stringifyPersistedRegions(
+                this.cacheKey,
+                regions
+            ) + os.EOL,
+            err => {
+                if (err) {
+                    resolve();
+                    return;
+                }
+                resolve();
+            }
+        );
+    });
+};
+
+/**
+ * @private
+ * @returns {Promise<Region[]>}
+ */
+CachedRegionsProvider.prototype.getRegionsFromMemo = function () {
+    const regions = this._memoCache.get(this.cacheKey);
+
+    if (Array.isArray(regions) && regions.length) {
         return Promise.resolve(regions);
     }
 
-    // read from file
+    return Promise.resolve([]);
+};
+
+/**
+ * @returns {Promise<Region[]>}
+ */
+CachedRegionsProvider.prototype.getRegionsFromFile = function () {
     if (!this.persistPath) {
         return Promise.resolve([]);
     }
@@ -220,44 +275,19 @@ CachedRegionsProvider.prototype.getRegions = function () {
 };
 
 /**
- * @param {Region[]} regions
- * @returns {Promise<void>}
+ * @returns {Promise<Region[]>}
  */
-CachedRegionsProvider.prototype.setRegions = function (regions) {
-    this._memoCache.set(this.cacheKey, regions);
-    if (!this.persistPath) {
-        return Promise.resolve();
-    }
-    return new Promise((resolve, reject) => {
-        fs.appendFile(
-            this.persistPath,
-            CachedRegionsProvider.stringifyPersistedRegions(
-                this.cacheKey,
-                regions
-            ) + os.EOL,
-            err => {
-                if (err) {
-                    reject(err);
-                    return;
-                }
-                resolve();
+CachedRegionsProvider.prototype.getRegionsFromBaseProvider = function () {
+    return this.baseRegionsProvider.getRegions()
+        .then(regions => {
+            if (regions.length) {
+                return this.setRegions(regions);
             }
-        );
-    });
-};
-
-/**
- * @private
- * @returns {Region[]}
- */
-CachedRegionsProvider.prototype.getRegionsFromMemo = function () {
-    const regions = this._memoCache.get(this.cacheKey);
-
-    if (Array.isArray(regions) && regions.length) {
-        return regions;
-    }
-
-    return [];
+            return Promise.resolve();
+        })
+        .then(() => {
+            return this.getRegionsFromMemo();
+        });
 };
 
 /**
@@ -489,65 +519,6 @@ QueryRegionsProvider.prototype.setRegions = function (_regions) {
     return Promise.reject(new Error('QueryRegionsProvider not support setRegions'));
 };
 
-// --- could split to files if migrate to typescript --- //
-
-/**
- * @class
- * @implements RegionsProvider
- * @constructor
- * @param {RegionsProvider[]} providers
- */
-function ChainedRegionsProvider (providers) {
-    this.providers = providers;
-}
-
-ChainedRegionsProvider.prototype.getRegions = function () {
-    let [currentProvider, ...alternativeProviders] = this.providers;
-
-    if (!currentProvider) {
-        return Promise.reject(new Error('There isn\'t available provider to get regions'));
-    }
-
-    const tryGetRegions = () => {
-        return currentProvider.getRegions()
-            .then(regions => {
-                if (!regions.length && alternativeProviders.length) {
-                    currentProvider = alternativeProviders.shift();
-                    return tryGetRegions();
-                }
-                return regions;
-            })
-            .catch(err => {
-                if (alternativeProviders.length) {
-                    currentProvider = alternativeProviders.shift();
-                    return tryGetRegions();
-                }
-
-                return Promise.reject(err);
-            });
-    };
-
-    return tryGetRegions()
-        .then(regions => {
-            // `-1` to exclude `currentProvider`
-            const endIndex = this.providers.length - alternativeProviders.length - 1;
-            const providersToFresh = this.providers.slice(0, endIndex);
-            for (const p of providersToFresh) {
-                p.setRegions(regions)
-                    .catch(() => {
-                        // ignore set error, because of cache usage
-                    });
-            }
-
-            return regions;
-        });
-};
-
-ChainedRegionsProvider.prototype.setRegions = function (_regions) {
-    return Promise.reject(new Error('ChainedRegionsProvider not support setRegions'));
-};
-
 exports.StaticRegionsProvider = StaticRegionsProvider;
 exports.CachedRegionsProvider = CachedRegionsProvider;
 exports.QueryRegionsProvider = QueryRegionsProvider;
-exports.ChainedRegionsProvider = ChainedRegionsProvider;

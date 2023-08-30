@@ -770,13 +770,11 @@ export declare namespace httpc {
     }
 
     // CachedRegionsProviderOptions
-    interface ShrinkOptions {
-        lastShrinkAt: Date;
-        shrinkInterval: number; // ms
-    }
-
-    interface CachedRegionsProviderOptions extends Partial<ShrinkOptions> {
-        persistPath?: string
+    interface CachedRegionsProviderOptions {
+        cacheKey: string;
+        baseRegionsProvider: RegionsProvider;
+        persistPath?: string;
+        shrinkInterval?: number; // ms
     }
 
     interface CachedPersistedRegions {
@@ -788,14 +786,14 @@ export declare namespace httpc {
         ignoreParseError?: boolean
     }
 
-    class CachedRegionsProvider implements RegionsProvider, ShrinkOptions {
+    class CachedRegionsProvider implements RegionsProvider {
         cacheKey: string;
+        baseRegionsProvider: RegionsProvider;
 
         lastShrinkAt: Date;
         shrinkInterval: number;
 
         constructor(
-            cacheKey: string,
             options: CachedRegionsProviderOptions
         );
 
@@ -804,19 +802,6 @@ export declare namespace httpc {
         setRegions(regions: Region[]): Promise<void>;
 
         getRegions(): Promise<Region[]>;
-
-        private getRegionsFromMemo(): Region[];
-
-        private walkFileCache(
-            fn: (persistedRegions: CachedPersistedRegions) => void,
-            options?: WalkFileCacheOptions
-        ): Promise<void>;
-
-        private flushFileCacheToMemo(): Promise<void>;
-
-        private static parsePersistedRegions(persistedRegions: string): CachedPersistedRegions;
-        private static stringifyPersistedRegions(cacheKey: string, regions: Region[]): string;
-        private static mergeRegions(regionsA: Region[], regionsB: Region[]): Region[];
     }
 
     // QueryRegionsProvider
@@ -832,14 +817,6 @@ export declare namespace httpc {
         endpointsProvider: EndpointsProvider;
 
         constructor(options: QueryRegionsProviderOptions);
-
-        getRegions(): Promise<Region[]>;
-        setRegions(regions: Region[]): Promise<void>;
-    }
-
-    // ChainedRegionsProvider
-    class ChainedRegionsProvider implements RegionsProvider {
-        constructor(providers: RegionsProvider[]);
 
         getRegions(): Promise<Region[]>;
         setRegions(regions: Region[]): Promise<void>;

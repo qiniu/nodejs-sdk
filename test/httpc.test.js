@@ -24,8 +24,7 @@ const {
     Region,
     StaticRegionsProvider,
     CachedRegionsProvider,
-    QueryRegionsProvider,
-    ChainedRegionsProvider
+    QueryRegionsProvider
 } = qiniu.httpc;
 const {
     // eslint-disable-next-line camelcase
@@ -652,13 +651,13 @@ describe('test http module', function () {
             function getCachedRegionsProvider () {
                 const persistPath = path.join(process.cwd(), 'regions-cache-test' + cacheFilesToDelete.length + '.jsonl');
                 cacheFilesToDelete.push(persistPath);
-                const result = new CachedRegionsProvider(
+                const result = new CachedRegionsProvider({
                     cacheKey,
-                    {
-                        persistPath
-                    }
-                );
+                    baseRegionsProvider: new StaticRegionsProvider([]),
+                    persistPath
+                });
                 result._memoCache = new Map();
+                result.lastShrinkAt = new Date(0);
                 return result;
             }
 
@@ -802,7 +801,7 @@ describe('test http module', function () {
                 const rZ1 = Region.fromRegionId('z1');
                 rZ0.createTime = new Date(0);
                 should.ok(!rZ0.isLive);
-                cachedRegionsProvider.setRegions([
+                return cachedRegionsProvider.setRegions([
                     rZ0,
                     rZ1
                 ])
@@ -949,6 +948,23 @@ describe('test http module', function () {
                         should.equal(actualRZ1.createTime, mockDate.getTime());
                     });
             });
+
+            it('test CachedRegionsProvider with baseRegionsProvider', function () {
+                const cachedRegionsProvider = getCachedRegionsProvider();
+                const expectRegions = [
+                    Region.fromRegionId('z0')
+                ];
+                cachedRegionsProvider.baseRegionsProvider = new StaticRegionsProvider(expectRegions);
+
+                return cachedRegionsProvider.getRegions()
+                    .then(regions => {
+                        should.deepEqual(regions.map(r => r.regionId), ['z0']);
+                        should.equal(cachedRegionsProvider._memoCache.size, 1);
+                        const content = fs.readFileSync(cachedRegionsProvider.persistPath);
+                        const jsonl = content.toString().split(os.EOL).filter(l => l.length);
+                        should.equal(jsonl.length, 1);
+                    });
+            });
         });
 
         describe('test QueryRegionsProvider', function () {
@@ -1040,49 +1056,6 @@ describe('test http module', function () {
                 return queryRegionsProvider.getRegions()
                     .then(regions => {
                         should.ok(regions.length > 0, 'regions length should great than 0');
-                    });
-            });
-        });
-
-        describe('test ChainedRegionsProvider', function () {
-            it('test ChainedRegionsProvider get early', function () {
-                const z0Provider = new StaticRegionsProvider([
-                    Region.fromRegionId('z0')
-                ]);
-                const z1Provider = new StaticRegionsProvider([
-                    Region.fromRegionId('z1')
-                ]);
-                const chainedRegionsProvider = new ChainedRegionsProvider([
-                    z0Provider,
-                    z1Provider
-                ]);
-                return chainedRegionsProvider.getRegions()
-                    .then(regions => {
-                        should.deepEqual(regions.map(r => r.regionId), ['z0']);
-                        return z1Provider.getRegions();
-                    })
-                    .then(regions => {
-                        should.deepEqual(regions.map(r => r.regionId), ['z1']);
-                    });
-            });
-
-            it('test ChainedRegionsProvider get and set', function () {
-                const emptyProvider = new StaticRegionsProvider([
-                ]);
-                const z1Provider = new StaticRegionsProvider([
-                    Region.fromRegionId('z1')
-                ]);
-                const chainedRegionsProvider = new ChainedRegionsProvider([
-                    emptyProvider,
-                    z1Provider
-                ]);
-                return chainedRegionsProvider.getRegions()
-                    .then(regions => {
-                        should.deepEqual(regions.map(r => r.regionId), ['z1']);
-                        return emptyProvider.getRegions();
-                    })
-                    .then(regions => {
-                        should.deepEqual(regions.map(r => r.regionId), ['z1']);
                     });
             });
         });
