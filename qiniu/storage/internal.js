@@ -20,6 +20,7 @@ const {
     StaticEndpointsProvider
 } = require('../httpc/endpointsProvider');
 const { ResponseWrapper } = require('../httpc/responseWrapper');
+const crypto = require('crypto');
 
 exports.prepareRegionsProvider = prepareRegionsProvider;
 exports.doWorkWithRetry = doWorkWithRetry;
@@ -44,23 +45,38 @@ function getDefaultQueryRegionEndpointsProvider () {
  * @param {string} options.accessKey
  * @param {string} options.bucketName
  * @param {EndpointsProvider} [options.queryRegionsEndpointProvider]
- * @returns {CachedRegionsProvider}
+ * @returns {Promise<CachedRegionsProvider>}
  */
 function getDefaultRegionsProvider (options) {
-    const cacheKey = options.accessKey + ':' + options.bucketName;
     let queryRegionsEndpointProvider = options.queryRegionsEndpointProvider;
     if (!queryRegionsEndpointProvider) {
         queryRegionsEndpointProvider = getDefaultQueryRegionEndpointsProvider();
     }
 
-    return new CachedRegionsProvider({
-        cacheKey,
-        baseRegionsProvider: new QueryRegionsProvider({
-            accessKey: options.accessKey,
-            bucketName: options.bucketName,
-            endpointsProvider: queryRegionsEndpointProvider
-        })
-    });
+    return queryRegionsEndpointProvider.getEndpoints()
+        .then(endpoints => {
+            const endpointsMd5 = endpoints
+                .map(e => e.host)
+                .sort()
+                .reduce(
+                    (hash, host) => hash.update(host),
+                    crypto.createHash('md5')
+                )
+                .digest('hex');
+            const cacheKey = [
+                endpointsMd5,
+                options.accessKey,
+                options.bucketName
+            ].join(':');
+            return new CachedRegionsProvider({
+                cacheKey,
+                baseRegionsProvider: new QueryRegionsProvider({
+                    accessKey: options.accessKey,
+                    bucketName: options.bucketName,
+                    endpointsProvider: new StaticEndpointsProvider(endpoints)
+                })
+            });
+        });
 }
 
 /**
@@ -68,7 +84,7 @@ function getDefaultRegionsProvider (options) {
  * @param {conf.Config} options.config
  * @param {string} options.bucketName
  * @param {string} options.accessKey
- * @returns {RegionsProvider}
+ * @returns {Promise<RegionsProvider>}
  */
 function prepareRegionsProvider (options) {
     const {
@@ -80,7 +96,7 @@ function prepareRegionsProvider (options) {
     // prepare RegionsProvider
     let regionsProvider = config.regionsProvider;
     if (regionsProvider) {
-        return regionsProvider;
+        return Promise.resolve(regionsProvider);
     }
 
     // backward compatibility with zone
@@ -102,14 +118,13 @@ function prepareRegionsProvider (options) {
         ]);
     }
     if (regionsProvider) {
-        return regionsProvider;
+        return Promise.resolve(regionsProvider);
     }
 
-    regionsProvider = getDefaultRegionsProvider({
+    return getDefaultRegionsProvider({
         accessKey,
         bucketName
     });
-    return regionsProvider;
 }
 
 // --- split to files --- //

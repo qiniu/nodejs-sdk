@@ -105,20 +105,21 @@ FormUploader.prototype.putStream = function (
     });
 
     // RegionsProvider
-    const regionsProvider = prepareRegionsProvider({
+    return prepareRegionsProvider({
         config: this.config,
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
-    });
+    })
+        .then(regionsProvider => {
+            return doWorkWithRetry({
+                workFn: sendPutReq,
 
-    return doWorkWithRetry({
-        workFn: sendPutReq,
-
-        callbackFunc,
-        regionsProvider,
-        // stream not support retry
-        retryPolicies: []
-    });
+                callbackFunc,
+                regionsProvider,
+                // stream not support retry
+                retryPolicies: []
+            });
+        });
 
     function sendPutReq (endpoint) {
         const endpointValue = endpoint.getValue({
@@ -177,19 +178,20 @@ FormUploader.prototype.put = function (
     );
 
     // initial RegionsProvider
-    const regionsProvider = prepareRegionsProvider({
+    return prepareRegionsProvider({
         config: this.config,
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
-    });
+    })
+        .then(regionsProvider => {
+            return doWorkWithRetry({
+                workFn: sendPutReq,
 
-    return doWorkWithRetry({
-        workFn: sendPutReq,
-
-        callbackFunc,
-        regionsProvider,
-        retryPolicies: this.retryPolicies
-    });
+                callbackFunc,
+                regionsProvider,
+                retryPolicies: this.retryPolicies
+            });
+        });
 
     function sendPutReq (endpoint) {
         const fsStream = new Readable();
@@ -324,19 +326,20 @@ FormUploader.prototype.putFile = function (
     );
 
     // initial RegionsProvider
-    const regionsProvider = prepareRegionsProvider({
+    return prepareRegionsProvider({
         config: this.config,
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
-    });
+    })
+        .then(regionsProvider => {
+            return doWorkWithRetry({
+                workFn: sendPutReq,
 
-    return doWorkWithRetry({
-        workFn: sendPutReq,
-
-        callbackFunc,
-        regionsProvider,
-        retryPolicies: this.retryPolicies
-    });
+                callbackFunc,
+                regionsProvider,
+                retryPolicies: this.retryPolicies
+            });
+        });
 
     function sendPutReq (endpoint) {
         const fsStream = fs.createReadStream(localFile);

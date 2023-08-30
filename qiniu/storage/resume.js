@@ -124,20 +124,21 @@ ResumeUploader.prototype.putStream = function (
         destroy(rsStream);
     });
 
-    const regionsProvider = prepareRegionsProvider({
+    return prepareRegionsProvider({
         config: this.config,
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
-    });
+    })
+        .then(regionsProvider => {
+            return doWorkWithRetry({
+                workFn: sendPutReq,
 
-    return doWorkWithRetry({
-        workFn: sendPutReq,
-
-        callbackFunc,
-        regionsProvider,
-        // stream not support retry
-        retryPolicies: []
-    });
+                callbackFunc,
+                regionsProvider,
+                // stream not support retry
+                retryPolicies: []
+            });
+        });
 
     function sendPutReq (endpoint) {
         const endpointValue = endpoint.getValue({
@@ -727,21 +728,22 @@ ResumeUploader.prototype.putFile = function (
     );
 
     // regions
-    const regionsProvider = prepareRegionsProvider({
+    return prepareRegionsProvider({
         config: this.config,
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
-    });
+    })
+        .then(regionsProvider => {
+            return doWorkWithRetry({
+                workFn: sendPutReq,
 
-    return doWorkWithRetry({
-        workFn: sendPutReq,
-
-        callbackFunc,
-        regionsProvider,
-        retryPolicies: this.retryPolicies,
-        uploadApiVersion: putExtra.version,
-        resumeRecordFilePath: putExtra.resumeRecordFile
-    });
+                callbackFunc,
+                regionsProvider,
+                retryPolicies: this.retryPolicies,
+                uploadApiVersion: putExtra.version,
+                resumeRecordFilePath: putExtra.resumeRecordFile
+            });
+        });
 
     function sendPutReq (endpoint) {
         const rsStream = fs.createReadStream(localFile, {

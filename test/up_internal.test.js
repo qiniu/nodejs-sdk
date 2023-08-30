@@ -243,12 +243,14 @@ describe('test upload internal module', function () {
                     regionsProvider: staticRegionsProvider
                 });
 
-                const regionsProvider = prepareRegionsProvider({
+                return prepareRegionsProvider({
                     config,
                     bucketName: 'mock-bucket',
                     accessKey: 'mock-ak'
-                });
-                should.ok(regionsProvider === staticRegionsProvider);
+                })
+                    .then(regionsProvider => {
+                        should.equal(regionsProvider, staticRegionsProvider);
+                    });
             });
 
             it('test prepareRegionsProvider with config zone', function () {
@@ -256,14 +258,15 @@ describe('test upload internal module', function () {
                     zone: Zone_z1
                 });
 
-                const regionsProvider = prepareRegionsProvider({
+                return prepareRegionsProvider({
                     config,
                     bucketName: 'mock-bucket',
                     accessKey: 'mock-ak'
-                });
-                should.ok(regionsProvider instanceof StaticRegionsProvider);
-
-                return regionsProvider.getRegions()
+                })
+                    .then(regionsProvider => {
+                        should.ok(regionsProvider instanceof StaticRegionsProvider);
+                        return regionsProvider.getRegions();
+                    })
                     .then(regions => {
                         should.equal(regions.length, 1);
                         const [r] = regions;
