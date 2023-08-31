@@ -740,8 +740,11 @@ export declare namespace httpc {
 
     // endpointProvider.js
     interface EndpointsProvider {
-        setEndpoints(endpoints: Endpoint[]): Promise<void>
         getEndpoints(): Promise<Endpoint[]>
+    }
+
+    interface MutableEndpointsProvider extends EndpointsProvider {
+        setEndpoints(endpoints: Endpoint[]): Promise<void>
     }
 
     class StaticEndpointsProvider implements EndpointsProvider {
@@ -749,14 +752,16 @@ export declare namespace httpc {
 
         constructor(endpoints: Endpoint[]);
 
-        setEndpoints(endpoints: Endpoint[]): Promise<void>;
         getEndpoints(): Promise<Endpoint[]>;
     }
 
     // regionsProvider.js
     interface RegionsProvider {
         getRegions(): Promise<Region[]>
-        setRegions(regions: Region[]): Promise<void>
+    }
+
+    interface MutableRegionsProvider extends RegionsProvider {
+       setRegions(regions: Region[]): Promise<void>
     }
 
     // StaticRegionsProvider
@@ -766,7 +771,6 @@ export declare namespace httpc {
         constructor(regions: Region[]);
 
         getRegions(): Promise<Region[]>;
-        setRegions(regions: Region[]): Promise<void>;
     }
 
     // CachedRegionsProviderOptions
@@ -777,16 +781,7 @@ export declare namespace httpc {
         shrinkInterval?: number; // ms
     }
 
-    interface CachedPersistedRegions {
-        cacheKey: string;
-        regions: RegionPersistInfo[];
-    }
-
-    interface WalkFileCacheOptions {
-        ignoreParseError?: boolean
-    }
-
-    class CachedRegionsProvider implements RegionsProvider {
+    class CachedRegionsProvider implements MutableRegionsProvider {
         cacheKey: string;
         baseRegionsProvider: RegionsProvider;
 
@@ -819,7 +814,6 @@ export declare namespace httpc {
         constructor(options: QueryRegionsProviderOptions);
 
         getRegions(): Promise<Region[]>;
-        setRegions(regions: Region[]): Promise<void>;
     }
 }
 

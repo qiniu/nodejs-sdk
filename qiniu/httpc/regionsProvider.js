@@ -17,8 +17,13 @@ const { Region } = require('./region');
  */
 
 /**
+ * @interface MutableRegionsProvider
+ * @extends RegionsProvider
+ */
+
+/**
  * @function
- * @name RegionsProvider#setRegions
+ * @name MutableRegionsProvider#setRegions
  * @param {Region[]} regions
  * @returns {Promise<void>}
  */
@@ -39,11 +44,6 @@ StaticRegionsProvider.prototype.getRegions = function () {
     return Promise.resolve(this.regions);
 };
 
-StaticRegionsProvider.prototype.setRegions = function (regions) {
-    this.regions = regions;
-    return Promise.resolve();
-};
-
 // --- could split to files if migrate to typescript --- //
 const CachedRegionsProvider = (function () {
     /**
@@ -56,7 +56,7 @@ const CachedRegionsProvider = (function () {
 
     /**
      * @class
-     * @implements RegionsProvider
+     * @implements MutableRegionsProvider
      * @param {Object} [options]
      * @param {string} options.cacheKey
      * @param {RegionsProvider} options.baseRegionsProvider
@@ -524,14 +524,6 @@ QueryRegionsProvider.prototype.getRegions = function () {
                 );
             }
         });
-};
-
-/**
- * @param _regions
- * @returns {Promise<void>}
- */
-QueryRegionsProvider.prototype.setRegions = function (_regions) {
-    return Promise.reject(new Error('QueryRegionsProvider not support setRegions'));
 };
 
 exports.StaticRegionsProvider = StaticRegionsProvider;

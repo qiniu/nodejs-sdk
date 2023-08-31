@@ -984,19 +984,6 @@ describe('test http module', function () {
                 )
             });
 
-            it('test QueryRegionsProvider setter', function () {
-                return queryRegionsProvider.setRegions([])
-                    .then(
-                        () => {
-                            should.not.exist('setter should be fail');
-                        },
-                        (err) => {
-                            should.exist(err);
-                            return Promise.resolve();
-                        }
-                    );
-            });
-
             it('test QueryRegionsProvider getter', function () {
                 return queryRegionsProvider.getRegions()
                     .then(regions => {

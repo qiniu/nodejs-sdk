@@ -4,15 +4,20 @@
 
 /**
  * @function
- * @name EndpointsProvider#setEndpoints
- * @param {endpoints: Endpoint[]} endpoints
- * @returns {Promise<void>}
+ * @name EndpointsProvider#getEndpoints
+ * @returns {Promise<Endpoint[]>}
+ */
+
+/**
+ * @interface MutableEndpointsProvider
+ * @extends EndpointsProvider
  */
 
 /**
  * @function
- * @name EndpointsProvider#getEndpoints
- * @returns {Promise<Endpoint[]>}
+ * @name MutableEndpointsProvider#setEndpoints
+ * @param {endpoints: Endpoint[]} endpoints
+ * @returns {Promise<void>}
  */
 
 // --- could split to files if migrate to typescript --- //
@@ -41,15 +46,6 @@ StaticEndpointsProvider.fromRegion = function (region, serviceName) {
  */
 StaticEndpointsProvider.prototype.getEndpoints = function () {
     return Promise.resolve(this.endpoints);
-};
-
-/**
- * @param {Endpoint[]} endpoints
- * @returns {Promise<void>}
- */
-StaticEndpointsProvider.prototype.setEndpoints = function (endpoints) {
-    this.endpoints = endpoints;
-    return Promise.resolve();
 };
 
 exports.StaticEndpointsProvider = StaticEndpointsProvider;
