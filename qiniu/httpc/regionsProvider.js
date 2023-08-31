@@ -112,6 +112,15 @@ const CachedRegionsProvider = (function () {
         const shrunkCache = new Map();
         const shrinkPath = this.persistPath + '.shrink';
         const lockPath = this.persistPath + '.shrink.lock';
+        const unlockShrink = () => {
+            try {
+                fs.unlinkSync(lockPath);
+            } catch (err) {
+                if (err.code !== 'ENOENT') {
+                    console.error(err);
+                }
+            }
+        };
         return new Promise((resolve, reject) => {
             // lock to shrink
             fs.open(lockPath, 'wx', (err, fd) => {
@@ -122,6 +131,8 @@ const CachedRegionsProvider = (function () {
                 fs.closeSync(fd);
                 resolve();
             });
+            // prevent deadlock if exit unexpectedly when shrinking
+            process.on('exit', unlockShrink);
         })
             .then(() => {
                 // parse useless data
@@ -178,7 +189,8 @@ const CachedRegionsProvider = (function () {
                 });
             })
             .then(() => {
-                fs.unlink(lockPath, () => {});
+                unlockShrink();
+                process.removeListener('exit', unlockShrink);
                 return Promise.resolve(true);
             })
             .catch(err => {
@@ -188,7 +200,8 @@ const CachedRegionsProvider = (function () {
                     return Promise.resolve(false);
                 }
                 // use finally when min version of Node.js update to ≥ v10.3.0
-                fs.unlink(lockPath, () => {});
+                unlockShrink();
+                process.removeListener('exit', unlockShrink);
                 return Promise.reject(err);
             });
     };
