@@ -4,7 +4,8 @@ const path = require('path');
 const readline = require('readline');
 const stream = require('stream');
 
-const { Region } = require('./region');
+const { Endpoint } = require('./endpoint');
+const { Region, SERVICE_NAME } = require('./region');
 
 /**
  * @interface RegionsProvider
@@ -83,13 +84,64 @@ const CachedRegionsProvider = (function () {
     }
 
     /**
+     * @returns {Promise<Region[]>}
+     */
+    CachedRegionsProvider.prototype.getRegions = function () {
+        /** @type Region[] */
+        return shrinkCache.call(this)
+            .then(() => {
+                const getRegionsFns = [
+                    getRegionsFromMemo,
+                    getRegionsFromFile,
+                    getRegionsFromBaseProvider
+                ];
+
+                return getRegionsFns.reduce((promiseChain, getRegionsFn) => {
+                    return promiseChain.then(regions => {
+                        if (regions.length) {
+                            return regions;
+                        }
+                        return getRegionsFn.call(this);
+                    });
+                }, Promise.resolve([]));
+            });
+    };
+
+    /**
+     * @param {Region[]} regions
+     * @returns {Promise<void>}
+     */
+    CachedRegionsProvider.prototype.setRegions = function (regions) {
+        this._memoCache.set(this.cacheKey, regions);
+        if (!this.persistPath) {
+            return Promise.resolve();
+        }
+        return new Promise(resolve => {
+            fs.appendFile(
+                this.persistPath,
+                stringifyPersistedRegions(
+                    this.cacheKey,
+                    regions
+                ) + os.EOL,
+                err => {
+                    if (err) {
+                        resolve();
+                        return;
+                    }
+                    resolve();
+                }
+            );
+        });
+    };
+
+    /**
      * the returns value means if shrunk or not.
-     * @param {boolean} [force]
+     * @private
      * @returns {Promise<boolean>}
      */
-    CachedRegionsProvider.prototype.shrink = function (force) {
+    function shrinkCache () {
         const now = new Date();
-        const shouldShrink = force || this.lastShrinkAt.getTime() + this.shrinkInterval < now.getTime();
+        const shouldShrink = this.lastShrinkAt.getTime() + this.shrinkInterval < now.getTime();
         if (!shouldShrink) {
             return Promise.resolve(false);
         }
@@ -204,58 +256,7 @@ const CachedRegionsProvider = (function () {
                 process.removeListener('exit', unlockShrink);
                 return Promise.reject(err);
             });
-    };
-
-    /**
-     * @returns {Promise<Region[]>}
-     */
-    CachedRegionsProvider.prototype.getRegions = function () {
-        /** @type Region[] */
-        return this.shrink()
-            .then(() => {
-                const getRegionsFns = [
-                    getRegionsFromMemo,
-                    getRegionsFromFile,
-                    getRegionsFromBaseProvider
-                ];
-
-                return getRegionsFns.reduce((promiseChain, getRegionsFn) => {
-                    return promiseChain.then(regions => {
-                        if (regions.length) {
-                            return regions;
-                        }
-                        return getRegionsFn.call(this);
-                    });
-                }, Promise.resolve([]));
-            });
-    };
-
-    /**
-     * @param {Region[]} regions
-     * @returns {Promise<void>}
-     */
-    CachedRegionsProvider.prototype.setRegions = function (regions) {
-        this._memoCache.set(this.cacheKey, regions);
-        if (!this.persistPath) {
-            return Promise.resolve();
-        }
-        return new Promise(resolve => {
-            fs.appendFile(
-                this.persistPath,
-                stringifyPersistedRegions(
-                    this.cacheKey,
-                    regions
-                ) + os.EOL,
-                err => {
-                    if (err) {
-                        resolve();
-                        return;
-                    }
-                    resolve();
-                }
-            );
-        });
-    };
+    }
 
     /**
      * @private
@@ -367,6 +368,104 @@ const CachedRegionsProvider = (function () {
         });
     }
 
+    // --- serializers ---
+
+    /**
+     * @typedef EndpointPersistInfo
+     * @property {string} host
+     * @property {string} defaultScheme
+     */
+
+    /**
+     * @param {Endpoint} endpoint
+     * @returns {EndpointPersistInfo}
+     */
+    function persistEndpoint (endpoint) {
+        return {
+            defaultScheme: endpoint.defaultScheme,
+            host: endpoint.host
+        };
+    }
+
+    /**
+     * @param {EndpointPersistInfo} persistInfo
+     * @returns {Endpoint}
+     */
+    function getEndpointFromPersisted (persistInfo) {
+        return new Endpoint(persistInfo.host, {
+            defaultScheme: persistInfo.defaultScheme
+        });
+    }
+
+    /**
+     * @typedef RegionPersistInfo
+     * @property {string} [regionId]
+     * @property {string} s3RegionId
+     * @property {Object.<string, EndpointPersistInfo[]>} services
+     * @property {number} ttl
+     * @property {number} createTime
+     */
+
+    /**
+     * @param {Region} region
+     * @returns {RegionPersistInfo}
+     */
+    function persistRegion (region) {
+        /**
+         * @type {Object.<string, EndpointPersistInfo[]>}
+         */
+        const persistedServices = {};
+        // use Object.entries when min version of Node.js update to ≥ v7.5.0
+        for (const k of Object.keys(region.services)) {
+            const v = region.services[k];
+            persistedServices[k] = v.map(persistEndpoint);
+        }
+
+        return {
+            regionId: region.regionId,
+            s3RegionId: region.s3RegionId,
+            services: persistedServices,
+            ttl: region.ttl,
+            createTime: region.createTime.getTime()
+        };
+    }
+
+    /**
+     * @param {RegionPersistInfo} persistInfo
+     * @returns {Region}
+     */
+    function getRegionFromPersisted (persistInfo) {
+        /**
+         * @param {EndpointPersistInfo[]} servicePersistEndpoint
+         * @returns {Endpoint[]}
+         */
+        const convertToEndpoints = (servicePersistEndpoint) => {
+            // The `persistInfo` is from disk that may be broken.
+            if (!Array.isArray(servicePersistEndpoint)) {
+                return [];
+            }
+
+            return servicePersistEndpoint.map(getEndpointFromPersisted);
+        };
+
+        /**
+         * @type {Object.<ServiceKey, Endpoint[]>}
+         */
+        const services = {};
+        for (const serviceName of Object.keys(persistInfo.services)) {
+            const endpointPersistInfos = persistInfo.services[serviceName];
+            services[serviceName] = convertToEndpoints(endpointPersistInfos);
+        }
+
+        return new Region({
+            regionId: persistInfo.regionId,
+            s3RegionId: persistInfo.s3RegionId,
+            services: services,
+            ttl: persistInfo.ttl,
+            createTime: new Date(persistInfo.createTime)
+        });
+    }
+
     /**
      * @typedef CachedPersistedRegions
      * @property {string} cacheKey
@@ -382,7 +481,7 @@ const CachedRegionsProvider = (function () {
         const { cacheKey, regions } = JSON.parse(persistedRegions);
         return {
             cacheKey,
-            regions: regions.map(r => Region.fromPersistInfo(r))
+            regions: regions.map(getRegionFromPersisted)
         };
     }
 
@@ -395,7 +494,7 @@ const CachedRegionsProvider = (function () {
     function stringifyPersistedRegions (cacheKey, regions) {
         return JSON.stringify({
             cacheKey,
-            regions: regions.map(r => r.persistInfo)
+            regions: regions.map(persistRegion)
         });
     }
 
@@ -459,72 +558,139 @@ const CachedRegionsProvider = (function () {
 const { RetryDomainsMiddleware } = require('../httpc/middleware');
 const rpc = require('../rpc');
 
-/**
- * @class
- * @implements RegionsProvider
- * @param {Object} options
- * @param {string} options.accessKey
- * @param {string} options.bucketName
- * @param {EndpointsProvider} options.endpointsProvider
- * @constructor
- */
-function QueryRegionsProvider (options) {
-    this.accessKey = options.accessKey;
-    this.bucketName = options.bucketName;
-    this.endpintsProvider = options.endpointsProvider;
-}
+const QueryRegionsProvider = (function () {
+    /**
+     * @class
+     * @implements RegionsProvider
+     * @param {Object} options
+     * @param {string} options.accessKey
+     * @param {string} options.bucketName
+     * @param {EndpointsProvider} options.endpointsProvider
+     * @constructor
+     */
+    function QueryRegionsProvider (options) {
+        this.accessKey = options.accessKey;
+        this.bucketName = options.bucketName;
+        this.endpintsProvider = options.endpointsProvider;
+    }
 
-/**
- * @return {Promise<Endpoint[]>}
- */
-QueryRegionsProvider.prototype.getRegions = function () {
-    return this.endpintsProvider.getEndpoints()
-        .then(endpoints => {
-            const [preferredEndpoint, ...alternativeEndpoints] = endpoints;
+    /**
+     * @return {Promise<Endpoint[]>}
+     */
+    QueryRegionsProvider.prototype.getRegions = function () {
+        return this.endpintsProvider.getEndpoints()
+            .then(endpoints => {
+                const [preferredEndpoint, ...alternativeEndpoints] = endpoints;
 
-            if (!preferredEndpoint) {
-                return Promise.reject(new Error('There isn\'t available endpoints to query regions'));
-            }
+                if (!preferredEndpoint) {
+                    return Promise.reject(new Error('There isn\'t available endpoints to query regions'));
+                }
 
-            const middlewares = [];
-            if (alternativeEndpoints.length) {
-                middlewares.push(
-                    new RetryDomainsMiddleware({
-                        backupDomains: alternativeEndpoints.map(e => e.host)
-                    })
-                );
-            }
+                const middlewares = [];
+                if (alternativeEndpoints.length) {
+                    middlewares.push(
+                        new RetryDomainsMiddleware({
+                            backupDomains: alternativeEndpoints.map(e => e.host)
+                        })
+                    );
+                }
 
-            const url = preferredEndpoint.getValue() + '/v4/query';
+                const url = preferredEndpoint.getValue() + '/v4/query';
 
-            // send request;
-            return rpc.qnHttpClient.get({
-                url: url,
-                params: {
-                    ak: this.accessKey,
-                    bucket: this.bucketName
-                },
-                middlewares: middlewares
+                // send request;
+                return rpc.qnHttpClient.get({
+                    url: url,
+                    params: {
+                        ak: this.accessKey,
+                        bucket: this.bucketName
+                    },
+                    middlewares: middlewares
+                });
+            })
+            .then(respWrapper => {
+                if (!respWrapper.ok()) {
+                    return Promise.reject(
+                        new Error('Query regions failed with HTTP Status Code' + respWrapper.resp.statusCode)
+                    );
+                }
+                try {
+                    const hosts = JSON.parse(respWrapper.data).hosts;
+                    return hosts.map(getRegionFromQuery);
+                } catch (err) {
+                    return Promise.reject(
+                        new Error('There isn\'t available hosts in query result', {
+                            cause: err
+                        })
+                    );
+                }
             });
-        })
-        .then(respWrapper => {
-            if (!respWrapper.ok()) {
-                return Promise.reject(
-                    new Error('Query regions failed with HTTP Status Code' + respWrapper.resp.statusCode)
-                );
+    };
+
+    /**
+     * @param {Object} data
+     * @param {string} data.region
+     * @param {Object} data.s3
+     * @param {string[]} data.s3.domains
+     * @param {string} data.s3.region_alias
+     * @param {Object} data.uc
+     * @param {string[]} data.uc.domains
+     * @param {Object} data.up
+     * @param {string[]} data.up.domains
+     * @param {Object} data.io
+     * @param {string[]} data.io.domains
+     * @param {Object} data.rs
+     * @param {string[]} data.rs.domains
+     * @param {Object} data.rsf
+     * @param {string[]} data.rsf.domains
+     * @param {Object} data.api
+     * @param {string[]} data.api.domains
+     * @param {number} data.ttl
+     * @returns {Region}
+     */
+    function getRegionFromQuery (data) {
+        /**
+         * @param {string[]} domains
+         * @returns {Endpoint[]}
+         */
+        const convertToEndpoints = (domains) => {
+            if (!Array.isArray(domains)) {
+                return [];
             }
-            try {
-                const hosts = JSON.parse(respWrapper.data).hosts;
-                return hosts.map(r => Region.fromQueryData(r));
-            } catch (err) {
-                return Promise.reject(
-                    new Error('There isn\'t available hosts in query result', {
-                        cause: err
-                    })
-                );
-            }
+            return domains.map(d => new Endpoint(d));
+        };
+
+        let services = {
+            [SERVICE_NAME.UC]: convertToEndpoints(data.uc.domains),
+            [SERVICE_NAME.UP]: convertToEndpoints(data.up.domains),
+            [SERVICE_NAME.IO]: convertToEndpoints(data.io.domains),
+            [SERVICE_NAME.RS]: convertToEndpoints(data.rs.domains),
+            [SERVICE_NAME.RSF]: convertToEndpoints(data.rsf.domains),
+            [SERVICE_NAME.API]: convertToEndpoints(data.api.domains),
+            [SERVICE_NAME.S3]: convertToEndpoints(data.s3.domains)
+        };
+
+        // forward compatibility with new services
+        services = Object.keys(data)
+            // use Object.entries when min version of Node.js update to ≥ v7.5.0
+            .map(k => ([k, data[k]]))
+            .reduce((s, [k, v]) => {
+                if (v && Array.isArray(v.domains) && !(k in s)) {
+                    s[k] = convertToEndpoints(v.domains);
+                }
+                return s;
+            }, services);
+
+        return new Region({
+            regionId: data.region,
+            s3RegionId: data.s3.region_alias,
+            services: services,
+            ttl: data.ttl,
+            createTime: new Date()
         });
-};
+    }
+
+    return QueryRegionsProvider;
+})();
 
 exports.StaticRegionsProvider = StaticRegionsProvider;
 exports.CachedRegionsProvider = CachedRegionsProvider;

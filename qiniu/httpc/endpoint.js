@@ -13,22 +13,6 @@ function Endpoint (host, options) {
 }
 
 /**
- * @typedef EndpointPersistInfo
- * @property {string} host
- * @property {string} defaultScheme
- */
-
-/**
- * @param {EndpointPersistInfo} persistInfo
- * @returns {Endpoint}
- */
-Endpoint.fromPersistInfo = function (persistInfo) {
-    return new Endpoint(persistInfo.host, {
-        defaultScheme: persistInfo.defaultScheme
-    });
-};
-
-/**
  * @param {Object} [options]
  * @param {string} [options.scheme]
  */
@@ -40,19 +24,5 @@ Endpoint.prototype.getValue = function (options) {
 
     return scheme + '://' + host;
 };
-
-Object.defineProperty(Endpoint.prototype, 'persistInfo', {
-    /**
-     * @returns {EndpointPersistInfo}
-     */
-    get: function () {
-        return {
-            defaultScheme: this.defaultScheme,
-            host: this.host
-        };
-    },
-    enumerable: false,
-    configurable: true
-});
 
 exports.Endpoint = Endpoint;
