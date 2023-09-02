@@ -2,7 +2,7 @@
 
 [![@qiniu on weibo](http://img.shields.io/badge/weibo-%40qiniutek-blue.svg)](http://weibo.com/qiniutek)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE.md)
-[![Build Status](https://api.travis-ci.org/qiniu/nodejs-sdk.svg?branch=master)](https://travis-ci.org/qiniu/nodejs-sdk)
+[![NodeJS CI](https://github.com/qiniu/nodejs-sdk/actions/workflows/ci-test.yml/badge.svg?branch=master)](https://github.com/qiniu/nodejs-sdk/actions/workflows/ci-test.yml)
 [![GitHub release](https://img.shields.io/github/v/tag/qiniu/nodejs-sdk.svg?label=release)](https://github.com/qiniu/nodejs-sdk/releases)
 [![Code Climate](https://codeclimate.com/github/qiniu/nodejs-sdk.svg)](https://codeclimate.com/github/qiniu/nodejs-sdk)
 [![Coverage Status](https://codecov.io/gh/qiniu/nodejs-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/qiniu/nodejs-sdk)
@@ -30,14 +30,14 @@ $ npm install qiniu
 
 ## 使用
 
-参考文档：[七牛云存储 Node.js SDK 使用指南](http://developer.qiniu.com/kodo/sdk/nodejs)  
+参考文档：[七牛云存储 Node.js SDK 使用指南](http://developer.qiniu.com/kodo/sdk/nodejs)
 
 ## 测试
-```    
-$ cd ./test/  
-$ source test-env.sh  
+```
+$ cd ./test/
+$ source test-env.sh
 $ mocha --grep 'bucketinfo'
-```   
+```
 
 ## 贡献代码
 
