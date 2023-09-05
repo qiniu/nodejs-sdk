@@ -29,15 +29,18 @@ exports.ChangeRegionRetryPolicy = ChangeRegionRetryPolicy;
 exports.TokenExpiredRetryPolicy = TokenExpiredRetryPolicy;
 
 /**
+ * @param {string} [defaultScheme]
  * @returns {StaticEndpointsProvider}
  */
-function getDefaultQueryRegionEndpointsProvider () {
+function getDefaultQueryRegionEndpointsProvider (defaultScheme) {
+    defaultScheme = defaultScheme || 'https';
+
     /**
      * @type {string[]}
      */
     const queryRegionHosts = [conf.QUERY_REGION_HOST].concat(conf.QUERY_REGION_BACKUP_HOSTS);
 
-    return new StaticEndpointsProvider(queryRegionHosts.map(h => new Endpoint(h)));
+    return new StaticEndpointsProvider(queryRegionHosts.map(h => new Endpoint(h, { defaultScheme })));
 }
 
 /**
@@ -45,12 +48,13 @@ function getDefaultQueryRegionEndpointsProvider () {
  * @param {string} options.accessKey
  * @param {string} options.bucketName
  * @param {EndpointsProvider} [options.queryRegionsEndpointProvider]
+ * @param {string} [options.defaultScheme]
  * @returns {Promise<CachedRegionsProvider>}
  */
 function getDefaultRegionsProvider (options) {
     let queryRegionsEndpointProvider = options.queryRegionsEndpointProvider;
     if (!queryRegionsEndpointProvider) {
-        queryRegionsEndpointProvider = getDefaultQueryRegionEndpointsProvider();
+        queryRegionsEndpointProvider = getDefaultQueryRegionEndpointsProvider(options.defaultScheme);
     }
 
     return queryRegionsEndpointProvider.getEndpoints()
@@ -123,7 +127,8 @@ function prepareRegionsProvider (options) {
 
     return getDefaultRegionsProvider({
         accessKey,
-        bucketName
+        bucketName,
+        defaultScheme: config.useHttpsDomain ? 'https' : 'http'
     });
 }
 
