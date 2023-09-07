@@ -369,10 +369,12 @@ ChangeRegionRetryPolicy.prototype.prepareRetry = function (context, ret) {
  * @param {string} [options.resumeRecordFilePath]
  * @param {RegionsProvider} options.regionsProvider
  * @param {'v1' | 'v2' | string} options.uploadApiVersion
+ * @param {EndpointsProvider} [options.preferredEndpointsProvider]
  */
 function UploadState (options) {
     this.retryPolicies = options.retryPolicies || [];
     this.regionsProvider = options.regionsProvider;
+    this.preferredEndpointsProvider = options.preferredEndpointsProvider;
     this.context = {
         serviceName: SERVICE_NAME.UP,
         uploadApiVersion: options.uploadApiVersion,
@@ -411,9 +413,42 @@ UploadState.prototype.init = function () {
                 return loopRegions();
             });
     };
-    return this.regionsProvider.getRegions()
+    let preferredEndpoints;
+    return Promise.resolve()
+        .then(() => {
+            if (this.preferredEndpointsProvider) {
+                return this.preferredEndpointsProvider.getEndpoints();
+            }
+            return [];
+        })
+        .then(endpoints => {
+            preferredEndpoints = endpoints;
+            return this.regionsProvider.getRegions();
+        })
         .then(regions => {
-            [this.context.region, ...this.context.alternativeRegions] = regions;
+            regions = regions.slice();
+            // find preferred region by preferred endpoints
+            let preferredRegionIndex = -1;
+            if (preferredEndpoints.length) {
+                preferredRegionIndex = regions.findIndex(r =>
+                    r.services[this.context.serviceName].some(e =>
+                        preferredEndpoints.map(pe => pe.host).includes(e.host)
+                    )
+                );
+            }
+            // preferred endpoints is not a region, then make all regions alternative
+            if (preferredEndpoints.length && preferredRegionIndex < 0) {
+                [this.context.endpoint, ...this.context.alternativeEndpoints] = preferredEndpoints;
+                this.context.alternativeRegions = regions;
+                return Promise.resolve();
+            }
+            // preferred endpoints is a region, then reorder the regions
+            if (preferredEndpoints.length && preferredRegionIndex > 0) {
+                [this.context.region] = regions.splice(preferredRegionIndex, 1);
+                this.context.alternativeRegions = regions;
+            } else {
+                [this.context.region, ...this.context.alternativeRegions] = regions;
+            }
             // check region available
             if (!this.context.region) {
                 return Promise.reject(new Error('There isn\'t available region'));
@@ -477,6 +512,7 @@ UploadState.prototype.prepareRetry = function (ret) {
  * @param {RetryPolicy[]} [options.retryPolicies]
  * @param {'v1' | 'v2' | string} [options.uploadApiVersion]
  * @param {string} [options.resumeRecordFilePath]
+ * @param {EndpointsProvider} [options.preferredEndpointsProvider]
  * @returns {Promise<RetryRet>}
  */
 function doWorkWithRetry (options) {
@@ -488,12 +524,14 @@ function doWorkWithRetry (options) {
     const retryPolicies = options.retryPolicies || [];
     const uploadApiVersion = options.uploadApiVersion;
     const resumeRecordFilePath = options.resumeRecordFilePath;
+    const preferredEndpointsProvider = options.preferredEndpointsProvider;
 
     const uploadState = new UploadState({
         retryPolicies,
         regionsProvider,
         uploadApiVersion,
-        resumeRecordFilePath
+        resumeRecordFilePath,
+        preferredEndpointsProvider
     });
 
     // the workFn helper used for recursive calling to retry

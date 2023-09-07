@@ -373,7 +373,7 @@ describe('test resume up', function () {
                 if (len === total) {
                     var content = fs.readFileSync(tmpfile);
                     var data = JSON.parse(content);
-                    data.upDomain.should.not.empty();
+                    data.upDomains.should.not.empty();
                     data.parts.forEach(function (item) {
                         item.should.have.keys('ctx', 'expired_at', 'crc32');
                     });

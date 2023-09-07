@@ -17,6 +17,8 @@ const {
     ChangeEndpointRetryPolicy,
     ChangeRegionRetryPolicy
 } = require('./internal');
+const { StaticEndpointsProvider } = require('../httpc/endpointsProvider');
+const { Endpoint } = require('../httpc/endpoint');
 
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
@@ -130,23 +132,31 @@ ResumeUploader.prototype.putStream = function (
         accessKey: util.getAKFromUptoken(uploadToken)
     })
         .then(regionsProvider => {
+            const resumeInfo = getResumeRecordInfo(putExtra.resumeRecordFile);
+            let preferredEndpointsProvider;
+            if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
+                preferredEndpointsProvider = new StaticEndpointsProvider(
+                    resumeInfo.upDomains.map(d => new Endpoint(d, { defaultScheme: preferScheme }))
+                );
+            }
             return doWorkWithRetry({
                 workFn: sendPutReq,
 
                 callbackFunc,
                 regionsProvider,
+                // use resume upDomain firstly
+                preferredEndpointsProvider: preferredEndpointsProvider,
                 // stream not support retry
                 retryPolicies: []
             });
         });
 
     function sendPutReq (endpoint) {
-        const endpointValue = endpoint.getValue({
-            scheme: preferScheme
-        });
+        endpoint = Object.create(endpoint);
+        endpoint.defaultScheme = preferScheme;
         return new Promise(resolve => {
             putReq(
-                endpointValue,
+                endpoint,
                 uploadToken,
                 key,
                 rsStream,
@@ -158,7 +168,26 @@ ResumeUploader.prototype.putStream = function (
 };
 
 /**
- * @param {string} upDomain
+ * @param {string} resumeRecordFilePath
+ * @returns {undefined | Object.<string, any>}
+ */
+function getResumeRecordInfo (resumeRecordFilePath) {
+    // get resume record info
+    let result;
+    // read resumeRecordFile
+    if (resumeRecordFilePath) {
+        try {
+            const resumeRecords = fs.readFileSync(resumeRecordFilePath).toString();
+            result = JSON.parse(resumeRecords);
+        } catch (e) {
+            e.code !== 'ENOENT' && console.error(e);
+        }
+    }
+    return result;
+}
+
+/**
+ * @param {Endpoint} upEndpoint
  * @param {string} uploadToken
  * @param {string | null} key
  * @param {ReadableStream} rsStream
@@ -167,7 +196,7 @@ ResumeUploader.prototype.putStream = function (
  * @param {reqCallback} callbackFunc
  */
 function putReq (
-    upDomain,
+    upEndpoint,
     uploadToken,
     key,
     rsStream,
@@ -182,17 +211,8 @@ function putReq (
     }));
 
     // get resume record info
-    let blkputRets = null;
+    const blkputRets = getResumeRecordInfo(putExtra.resumeRecordFile);
     const totalBlockNum = Math.ceil(rsStreamLen / putExtra.partSize);
-    // read resumeRecordFile
-    if (putExtra.resumeRecordFile) {
-        try {
-            const resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
-            blkputRets = JSON.parse(resumeRecords);
-        } catch (e) {
-            console.error(e);
-        }
-    }
 
     // select upload version
     /**
@@ -217,7 +237,7 @@ function putReq (
             totalBlockNum
         },
         {
-            upDomain,
+            upEndpoint,
             uploadToken,
             key,
             putExtra
@@ -237,7 +257,7 @@ function putReq (
 
 /**
  * @typedef SourceOptions
- * @property { Object[] | null } blkputRets
+ * @property { Object.<string, any> | undefined } blkputRets
  * @property { ReadableStream } rsStream
  * @property { BlockStream } blkStream
  * @property { number } rsStreamLen
@@ -247,7 +267,7 @@ function putReq (
 /**
  * @typedef UploadOptions
  * @property { string | null } key
- * @property { string } upDomain
+ * @property { Endpoint } upEndpoint
  * @property { string } uploadToken
  * @property { PutExtra } putExtra
  */
@@ -267,30 +287,32 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     } = sourceOptions;
     let blkputRets = sourceOptions.blkputRets;
     const {
+        upEndpoint,
         key,
         uploadToken,
         putExtra
     } = uploadOptions;
 
-    // use resume upDomain firstly
-    const upDomain = (blkputRets && blkputRets.upDomain) || uploadOptions.upDomain;
-
     // initial state
     const finishedCtxList = [];
     const finishedBlkPutRets = {
-        upDomain: upDomain,
+        upDomains: [],
         parts: []
     };
-
     // backward compatibility with ≤ 7.9.0
     if (Array.isArray(blkputRets)) {
         blkputRets = {
-            upDomain: upDomain,
+            upDomains: [],
             parts: []
         };
     }
+    if (blkputRets && Array.isArray(blkputRets.upDomains)) {
+        finishedBlkPutRets.upDomains = blkputRets.upDomains;
+    }
+    finishedBlkPutRets.upDomains.push(upEndpoint.host);
 
     // upload parts
+    const upDomains = upEndpoint.getValue();
     let readLen = 0;
     let curBlock = 0;
     let isSent = false;
@@ -319,7 +341,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
         if (needUploadBlk) {
             blkStream.pause();
             mkblkReq(
-                upDomain,
+                upDomains,
                 uploadToken,
                 chunk,
                 function (
@@ -346,7 +368,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
                         }
                         blkStream.resume();
                         if (finishedCtxList.length === totalBlockNum) {
-                            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+                            mkfileReq(upDomains, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
                             isSent = true;
                         }
                     }
@@ -356,7 +378,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
 
     blkStream.on('end', function () {
         if (!isSent && rsStreamLen === 0) {
-            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+            mkfileReq(upDomains, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
         }
         destroy(rsStream);
     });
@@ -377,35 +399,35 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
         rsStream
     } = sourceOptions;
     const {
+        upEndpoint,
         uploadToken,
         key,
         putExtra
     } = uploadOptions;
 
-    let upDomain = uploadOptions.upDomain;
-
     // try resume upload blocks
     let finishedBlock = 0;
     const finishedEtags = {
-        upDomain,
+        upDomains: [],
         etags: [],
         uploadId: '',
         expiredAt: 0
     };
-    if (blkputRets !== null && blkputRets.upDomain) {
+    if (blkputRets && Array.isArray(blkputRets.upDomains)) {
         // check etag expired or not
         const expiredAt = blkputRets.expiredAt;
         const timeNow = Date.now() / 1000;
-        if (expiredAt > timeNow && blkputRets.uploadId !== '') {
-            upDomain = blkputRets.upDomain;
-            finishedEtags.upDomain = blkputRets.upDomain;
+        if (expiredAt > timeNow && blkputRets.uploadId) {
+            finishedEtags.upDomains = blkputRets.upDomains;
             finishedEtags.etags = blkputRets.etags;
             finishedEtags.uploadId = blkputRets.uploadId;
             finishedEtags.expiredAt = blkputRets.expiredAt;
             finishedBlock = finishedEtags.etags.length;
         }
     }
+    finishedEtags.upDomains.push(upEndpoint.host);
 
+    const upDomain = upEndpoint.getValue();
     const bucket = util.getBucketFromUptoken(uploadToken);
     const encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
     if (finishedEtags.uploadId) {
@@ -734,28 +756,36 @@ ResumeUploader.prototype.putFile = function (
         accessKey: util.getAKFromUptoken(uploadToken)
     })
         .then(regionsProvider => {
+            const resumeInfo = getResumeRecordInfo(putExtra.resumeRecordFile);
+            let preferredEndpointsProvider;
+            if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
+                preferredEndpointsProvider = new StaticEndpointsProvider(
+                    resumeInfo.upDomains.map(d => new Endpoint(d, { defaultScheme: preferScheme }))
+                );
+            }
             return doWorkWithRetry({
                 workFn: sendPutReq,
 
                 callbackFunc,
                 regionsProvider,
-                retryPolicies: this.retryPolicies,
                 uploadApiVersion: putExtra.version,
-                resumeRecordFilePath: putExtra.resumeRecordFile
+                // use resume upDomain firstly
+                preferredEndpointsProvider: preferredEndpointsProvider,
+                resumeRecordFilePath: putExtra.resumeRecordFile,
+                retryPolicies: this.retryPolicies
             });
         });
 
     function sendPutReq (endpoint) {
+        endpoint = Object.create(endpoint);
+        endpoint.defaultScheme = preferScheme;
         const rsStream = fs.createReadStream(localFile, {
             highWaterMark: conf.BLOCK_SIZE
         });
         const rsStreamLen = fs.statSync(localFile).size;
-        const endpointValue = endpoint.getValue({
-            scheme: preferScheme
-        });
         return new Promise((resolve) => {
             putReq(
-                endpointValue,
+                endpoint,
                 uploadToken,
                 key,
                 rsStream,
