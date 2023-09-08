@@ -563,6 +563,7 @@ function initReq (
     rpc.post(requestUrl, '', headers, function (err, ret, info) {
         if (info.statusCode !== 200) {
             callbackFunc(err, ret, info);
+            return;
         }
         finishedEtags.expiredAt = ret.expireAt;
         finishedEtags.uploadId = ret.uploadId;
