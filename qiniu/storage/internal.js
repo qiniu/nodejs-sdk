@@ -539,7 +539,6 @@ function doWorkWithRetry (options) {
         return workFn(uploadState.context.endpoint)
             .then(resp => {
                 const {
-                    err,
                     ret,
                     info
                 } = resp;
@@ -547,7 +546,7 @@ function doWorkWithRetry (options) {
                     data: ret,
                     resp: info
                 });
-                if (err || !respWrapper.needRetry()) {
+                if (!respWrapper.needRetry()) {
                     return resp;
                 }
                 return uploadState.prepareRetry({ data: ret, resp: info })
@@ -583,7 +582,6 @@ function doWorkWithRetry (options) {
             } catch (e) {
                 warningCallbackError(e);
             }
-            isValidCallback && callbackFunc(err, null, null);
             return Promise.reject(err);
         });
 }
