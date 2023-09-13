@@ -792,8 +792,6 @@ export declare namespace httpc {
             options: CachedRegionsProviderOptions
         );
 
-        shrink(force?: boolean): Promise<boolean>;
-
         setRegions(regions: Region[]): Promise<void>;
 
         getRegions(): Promise<Region[]>;

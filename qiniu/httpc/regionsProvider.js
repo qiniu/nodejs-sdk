@@ -53,7 +53,7 @@ const CachedRegionsProvider = (function () {
      * @type {Map<string, Region[]>}
      */
     const memoCachedRegions = new Map();
-    const lastShrinkAt = new Date();
+    const lastShrinkAt = new Date(0);
 
     /**
      * @class
