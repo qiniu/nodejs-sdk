@@ -19,8 +19,8 @@ exports.Middleware = Middleware;
 
 /**
  * @param {Middleware[]} middlewares
- * @param {function(ReqOpts):Promise<RespWrapper>} handler
- * @return {function(ReqOpts):Promise<RespWrapper>}
+ * @param {function(ReqOpts):Promise<ResponseWrapper>} handler
+ * @return {function(ReqOpts):Promise<ResponseWrapper>}
  */
 exports.composeMiddlewares = function (middlewares, handler) {
     return middlewares.reverse()

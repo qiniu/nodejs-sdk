@@ -54,12 +54,14 @@ exports.Config = function Config (options) {
     options = options || {};
     // use http or https protocol
     this.useHttpsDomain = !!(options.useHttpsDomain || false);
-    // use cdn accerlated domains
+    // use cdn accerlated domains, this is not work with auto query region
     this.useCdnDomain = !!(options.useCdnDomain && true);
     // zone of the bucket
     // z0 huadong, z1 huabei, z2 huanan, na0 beimei
     this.zone = options.zone || null;
     this.zoneExpire = options.zoneExpire || -1;
+    // only available with upload for now
+    this.regionsProvider = options.regionsProvider || null;
 };
 
 exports.Zone = function (

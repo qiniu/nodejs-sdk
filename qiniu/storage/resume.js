@@ -1,46 +1,72 @@
-const conf = require('../conf');
-const util = require('../util');
-const rpc = require('../rpc');
-const path = require('path');
-const mime = require('mime');
 const fs = require('fs');
+const path = require('path');
+
+const mime = require('mime');
 const getCrc32 = require('crc32');
 const destroy = require('destroy');
 const BlockStream = require('block-stream2');
 
+const conf = require('../conf');
+const util = require('../util');
+const rpc = require('../rpc');
+
+const {
+    prepareRegionsProvider,
+    doWorkWithRetry,
+    TokenExpiredRetryPolicy,
+    ChangeEndpointRetryPolicy,
+    ChangeRegionRetryPolicy
+} = require('./internal');
+const { StaticEndpointsProvider } = require('../httpc/endpointsProvider');
+const { Endpoint } = require('../httpc/endpoint');
+
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
 
+/**
+ * @param {conf.Config} [config]
+ * @constructor
+ */
 function ResumeUploader (config) {
     this.config = config || new conf.Config();
+
+    /**
+     * Internal usage only for now.
+     * @readonly
+     */
+    this.retryPolicies = [
+        new TokenExpiredRetryPolicy(),
+        new ChangeEndpointRetryPolicy(),
+        new ChangeRegionRetryPolicy()
+    ];
 }
 
 /**
  * @callback reqCallback
  *
- * @param { Error } err
- * @param { Object } ret
- * @param { http.IncomingMessage } info
+ * @param {Error} err
+ * @param {Object} ret
+ * @param {http.IncomingMessage} info
  */
 
 /**
  * @callback progressCallback
  *
- * @param { number } uploadBytes
- * @param { number } totalBytes
+ * @param {number} uploadBytes
+ * @param {number} totalBytes
  */
 
 /**
-  * 上传可选参数
-  * @param { string } fname                      请求体中的文件的名称
-  * @param { Object } params                     额外参数设置，参数名称必须以x:开头
-  * @param { string | null } mimeType            指定文件的mimeType
-  * @param { string | null } resumeRecordFile    断点续传的已上传的部分信息记录文件路径
-  * @param { progressCallback } progressCallback 上传进度回调，回调参数为 (uploadBytes, totalBytes)
-  * @param { number } partSize                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
-  * @param { 'v1' | 'v2' } version               分片上传版本 目前支持v1/v2版本 默认v1
-  * @param { Object } metadata                   元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
-  */
+ * 上传可选参数
+ * @param {string} [fname]                      请求体中的文件的名称
+ * @param {Object} [params]                     额外参数设置，参数名称必须以x:开头
+ * @param {string | null} [mimeType]            指定文件的mimeType
+ * @param {string | null} [resumeRecordFile]    断点续传的已上传的部分信息记录文件路径
+ * @param {function(number, number):void} [progressCallback] 上传进度回调，回调参数为 (uploadBytes, totalBytes)
+ * @param {number} [partSize]                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
+ * @param {'v1' | 'v2'} [version]               分片上传版本 目前支持v1/v2版本 默认v1
+ * @param {Object} [metadata]                   元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+ */
 function PutExtra (
     fname,
     params,
@@ -61,6 +87,21 @@ function PutExtra (
     this.metadata = metadata || {};
 }
 
+/**
+ * @typedef UploadResult
+ * @property {any} data
+ * @property {http.IncomingMessage} resp
+ */
+
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {stream.Readable} rsStream
+ * @param {number} rsStreamLen
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ * @return {Promise<UploadResult>}
+ */
 ResumeUploader.prototype.putStream = function (
     uploadToken,
     key,
@@ -69,61 +110,100 @@ ResumeUploader.prototype.putStream = function (
     putExtra,
     callbackFunc
 ) {
-    putExtra = putExtra || new PutExtra();
-    if (!putExtra.mimeType) {
-        putExtra.mimeType = 'application/octet-stream';
-    }
+    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const isValidCallback = typeof callbackFunc === 'function';
 
-    if (!putExtra.fname) {
-        putExtra.fname = key || '?';
-    }
-
-    if (!putExtra.version) {
-        putExtra.version = 'v1';
-    }
+    putExtra = getDefaultPutExtra(
+        putExtra,
+        {
+            key
+        }
+    );
 
     rsStream.on('error', function (err) {
-    // callbackFunc
-        callbackFunc(err, null, null);
+        // callbackFunc
+        isValidCallback && callbackFunc(err, null, null);
         destroy(rsStream);
     });
 
-    const accessKey = util.getAKFromUptoken(uploadToken);
-    const bucket = util.getBucketFromUptoken(uploadToken);
+    return prepareRegionsProvider({
+        config: this.config,
+        bucketName: util.getBucketFromUptoken(uploadToken),
+        accessKey: util.getAKFromUptoken(uploadToken)
+    })
+        .then(regionsProvider => {
+            const resumeInfo = getResumeRecordInfo(putExtra.resumeRecordFile);
+            let preferredEndpointsProvider;
+            if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
+                preferredEndpointsProvider = new StaticEndpointsProvider(
+                    resumeInfo.upDomains.map(d => new Endpoint(d, { defaultScheme: preferScheme }))
+                );
+            }
+            return doWorkWithRetry({
+                workFn: sendPutReq,
 
-    util.prepareZone(this, accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            destroy(rsStream);
-            return;
-        }
-        putReq(ctx.config, uploadToken, key, rsStream, rsStreamLen, putExtra, callbackFunc);
-    });
-};
-
-function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, callbackFunc) {
-    // set up hosts order
-    const upHosts = [];
-    if (config.useCdnDomain) {
-        if (config.zone.cdnUpHosts) {
-            config.zone.cdnUpHosts.forEach(function (host) {
-                upHosts.push(host);
+                callbackFunc,
+                regionsProvider,
+                // use resume upDomain firstly
+                preferredEndpointsProvider: preferredEndpointsProvider,
+                // stream not support retry
+                retryPolicies: []
             });
-        }
-        config.zone.srcUpHosts.forEach(function (host) {
-            upHosts.push(host);
         });
-    } else {
-        config.zone.srcUpHosts.forEach(function (host) {
-            upHosts.push(host);
-        });
-        config.zone.cdnUpHosts.forEach(function (host) {
-            upHosts.push(host);
+
+    function sendPutReq (endpoint) {
+        endpoint = Object.create(endpoint);
+        endpoint.defaultScheme = preferScheme;
+        return new Promise(resolve => {
+            putReq(
+                endpoint,
+                uploadToken,
+                key,
+                rsStream,
+                rsStreamLen,
+                putExtra,
+                (err, ret, info) => resolve({ err, ret, info }));
         });
     }
-    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    const upDomain = scheme + upHosts[0];
+};
 
+/**
+ * @param {string} resumeRecordFilePath
+ * @returns {undefined | Object.<string, any>}
+ */
+function getResumeRecordInfo (resumeRecordFilePath) {
+    // get resume record info
+    let result;
+    // read resumeRecordFile
+    if (resumeRecordFilePath) {
+        try {
+            const resumeRecords = fs.readFileSync(resumeRecordFilePath).toString();
+            result = JSON.parse(resumeRecords);
+        } catch (e) {
+            e.code !== 'ENOENT' && console.error(e);
+        }
+    }
+    return result;
+}
+
+/**
+ * @param {Endpoint} upEndpoint
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {ReadableStream} rsStream
+ * @param {number} rsStreamLen
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ */
+function putReq (
+    upEndpoint,
+    uploadToken,
+    key,
+    rsStream,
+    rsStreamLen,
+    putExtra,
+    callbackFunc
+) {
     // make block stream
     const blkStream = rsStream.pipe(new BlockStream({
         size: putExtra.partSize,
@@ -131,92 +211,108 @@ function putReq (config, uploadToken, key, rsStream, rsStreamLen, putExtra, call
     }));
 
     // get resume record info
-    let blkputRets = null;
+    const blkputRets = getResumeRecordInfo(putExtra.resumeRecordFile);
     const totalBlockNum = Math.ceil(rsStreamLen / putExtra.partSize);
-    // read resumeRecordFile
-    if (putExtra.resumeRecordFile) {
-        try {
-            const resumeRecords = fs.readFileSync(putExtra.resumeRecordFile).toString();
-            blkputRets = JSON.parse(resumeRecords);
-        } catch (e) {
-            console.error(e);
-        }
-    }
 
-    // upload parts
+    // select upload version
+    /**
+     * @type {function(SourceOptions, UploadOptions, reqCallback)}
+     */
+    let doPutReq;
     if (putExtra.version === 'v1') {
-        putReqV1(
-            {
-                blkputRets,
-                rsStream,
-                rsStreamLen,
-                blkStream,
-                totalBlockNum
-            },
-            {
-                key,
-                upDomain,
-                uploadToken,
-                putExtra
-            },
-            callbackFunc
-        );
+        doPutReq = putReqV1;
     } else if (putExtra.version === 'v2') {
-        putReqV2(
-            {
-                blkputRets,
-                blkStream,
-                totalBlockNum,
-                rsStreamLen,
-                rsStream
-            },
-            {
-                upDomain,
-                uploadToken,
-                key,
-                putExtra
-            },
-            callbackFunc
-        );
+        doPutReq = putReqV2;
     } else {
         throw new Error('part upload version number error');
     }
+
+    // upload parts
+    doPutReq(
+        {
+            blkputRets,
+            rsStream,
+            rsStreamLen,
+            blkStream,
+            totalBlockNum
+        },
+        {
+            upEndpoint,
+            uploadToken,
+            key,
+            putExtra
+        },
+        function (err, ret, info) {
+            if (info.statusCode === 200 && putExtra.resumeRecordFile) {
+                try {
+                    fs.unlinkSync(putExtra.resumeRecordFile);
+                } catch (_e) {
+                    // ignore
+                }
+            }
+            callbackFunc(err, ret, info);
+        }
+    );
 }
 
 /**
- * @param { Object } sourceOptions
- * @param { Object[] | null } sourceOptions.blkputRets
- * @param { ReadableStream } sourceOptions.rsStream
- * @param { BlockStream } sourceOptions.blkStream
- * @param { number } sourceOptions.rsStreamLen
- * @param { number } sourceOptions.totalBlockNum
- * @param { Object } uploadOptions
- * @param { string } uploadOptions.key
- * @param { string } uploadOptions.upDomain
- * @param { string } uploadOptions.uploadToken
- * @param { PutExtra } uploadOptions.putExtra
- * @param { reqCallback } callbackFunc
+ * @typedef SourceOptions
+ * @property { Object.<string, any> | undefined } blkputRets
+ * @property { ReadableStream } rsStream
+ * @property { BlockStream } blkStream
+ * @property { number } rsStreamLen
+ * @property { number } totalBlockNum
+ */
+
+/**
+ * @typedef UploadOptions
+ * @property { string | null } key
+ * @property { Endpoint } upEndpoint
+ * @property { string } uploadToken
+ * @property { PutExtra } putExtra
+ */
+
+/**
+ * @param {SourceOptions} sourceOptions
+ * @param {UploadOptions} uploadOptions
+ * @param {reqCallback} callbackFunc
+ * @returns { Promise<UploadResult> }
  */
 function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     const {
-        blkputRets,
         rsStream,
         blkStream,
         rsStreamLen,
         totalBlockNum
     } = sourceOptions;
+    let blkputRets = sourceOptions.blkputRets;
     const {
+        upEndpoint,
         key,
-        upDomain,
         uploadToken,
         putExtra
     } = uploadOptions;
 
     // initial state
     const finishedCtxList = [];
-    const finishedBlkPutRets = [];
+    const finishedBlkPutRets = {
+        upDomains: [],
+        parts: []
+    };
+    // backward compatibility with ≤ 7.9.0
+    if (Array.isArray(blkputRets)) {
+        blkputRets = {
+            upDomains: [],
+            parts: []
+        };
+    }
+    if (blkputRets && Array.isArray(blkputRets.upDomains)) {
+        finishedBlkPutRets.upDomains = blkputRets.upDomains;
+    }
+    finishedBlkPutRets.upDomains.push(upEndpoint.host);
 
     // upload parts
+    const upDomains = upEndpoint.getValue();
     let readLen = 0;
     let curBlock = 0;
     let isSent = false;
@@ -224,15 +320,20 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
         readLen += chunk.length;
         let needUploadBlk = true;
         // check uploaded parts
-        if (blkputRets && blkputRets.length > 0 && blkputRets[curBlock]) {
-            const blkputRet = blkputRets[curBlock];
+        if (
+            blkputRets &&
+            blkputRets.parts &&
+            blkputRets.parts.length > 0 &&
+            blkputRets.parts[curBlock]
+        ) {
+            const blkputRet = blkputRets.parts[curBlock];
             let expiredAt = blkputRet.expired_at;
             // make sure the ctx at least has one day expiration
             expiredAt += 3600 * 24;
             if (!util.isTimestampExpired(expiredAt)) {
                 needUploadBlk = false;
                 finishedCtxList.push(blkputRet.ctx);
-                finishedBlkPutRets.push(blkputRet);
+                finishedBlkPutRets.parts.push(blkputRet);
             }
         }
 
@@ -240,7 +341,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
         if (needUploadBlk) {
             blkStream.pause();
             mkblkReq(
-                upDomain,
+                upDomains,
                 uploadToken,
                 chunk,
                 function (
@@ -255,7 +356,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
                     } else {
                         const blkputRet = respBody;
                         finishedCtxList.push(blkputRet.ctx);
-                        finishedBlkPutRets.push(blkputRet);
+                        finishedBlkPutRets.parts.push(blkputRet);
                         if (putExtra.resumeRecordFile) {
                             const contents = JSON.stringify(finishedBlkPutRets);
                             fs.writeFileSync(putExtra.resumeRecordFile, contents, {
@@ -267,7 +368,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
                         }
                         blkStream.resume();
                         if (finishedCtxList.length === totalBlockNum) {
-                            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+                            mkfileReq(upDomains, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
                             isSent = true;
                         }
                     }
@@ -277,25 +378,17 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
 
     blkStream.on('end', function () {
         if (!isSent && rsStreamLen === 0) {
-            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+            mkfileReq(upDomains, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
         }
         destroy(rsStream);
     });
 }
 
 /**
- * @param { Object } sourceOptions
- * @param { Object | null } sourceOptions.blkputRets
- * @param { ReadableStream } sourceOptions.rsStream
- * @param { BlockStream } sourceOptions.blkStream
- * @param { number } sourceOptions.rsStreamLen
- * @param { number } sourceOptions.totalBlockNum
- * @param { Object } uploadOptions
- * @param { string } uploadOptions.key
- * @param { string } uploadOptions.upDomain
- * @param { string } uploadOptions.uploadToken
- * @param { PutExtra } uploadOptions.putExtra
- * @param { reqCallback } callbackFunc
+ * @param {SourceOptions} sourceOptions
+ * @param {UploadOptions} uploadOptions
+ * @param {reqCallback} callbackFunc
+ * @returns { Promise<UploadResult> }
  */
 function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     const {
@@ -306,31 +399,35 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
         rsStream
     } = sourceOptions;
     const {
+        upEndpoint,
         uploadToken,
         key,
-        upDomain,
         putExtra
     } = uploadOptions;
 
     // try resume upload blocks
     let finishedBlock = 0;
     const finishedEtags = {
+        upDomains: [],
         etags: [],
         uploadId: '',
         expiredAt: 0
     };
-    if (blkputRets !== null) {
+    if (blkputRets && Array.isArray(blkputRets.upDomains)) {
         // check etag expired or not
         const expiredAt = blkputRets.expiredAt;
         const timeNow = Date.now() / 1000;
-        if (expiredAt > timeNow && blkputRets.uploadId !== '') {
+        if (expiredAt > timeNow && blkputRets.uploadId) {
+            finishedEtags.upDomains = blkputRets.upDomains;
             finishedEtags.etags = blkputRets.etags;
             finishedEtags.uploadId = blkputRets.uploadId;
             finishedEtags.expiredAt = blkputRets.expiredAt;
             finishedBlock = finishedEtags.etags.length;
         }
     }
+    finishedEtags.upDomains.push(upEndpoint.host);
 
+    const upDomain = upEndpoint.getValue();
     const bucket = util.getBucketFromUptoken(uploadToken);
     const encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
     if (finishedEtags.uploadId) {
@@ -349,6 +446,12 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     }
 }
 
+/**
+ * @param {string} upDomain
+ * @param {string} uploadToken
+ * @param {Buffer | string} blkData
+ * @param {reqCallback} callbackFunc
+ */
 function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
     const requestURI = upDomain + '/mkblk/' + blkData.length;
     const auth = 'UpToken ' + uploadToken;
@@ -359,6 +462,15 @@ function mkblkReq (upDomain, uploadToken, blkData, callbackFunc) {
     rpc.post(requestURI, blkData, headers, callbackFunc);
 }
 
+/**
+ * @param {string} upDomain
+ * @param {string} uploadToken
+ * @param {number} fileSize
+ * @param {string[]} ctxList
+ * @param {string | null} key
+ * @param putExtra
+ * @param callbackFunc
+ */
 function mkfileReq (
     upDomain,
     uploadToken,
@@ -379,7 +491,7 @@ function mkfileReq (
         requestURI += '/fname/' + util.urlsafeBase64Encode(putExtra.fname);
     }
     if (putExtra.params) {
-    // putExtra params
+        // putExtra params
         for (const k in putExtra.params) {
             if (k.startsWith('x:') && putExtra.params[k]) {
                 requestURI += '/' + k + '/' + util.urlsafeBase64Encode(putExtra.params[
@@ -405,20 +517,30 @@ function mkfileReq (
         'Content-Type': 'application/octet-stream'
     };
     const postBody = ctxList.join(',');
-    rpc.post(requestURI, postBody, headers, function (err, ret, info) {
-        if (info.statusCode === 200 || info.statusCode === 701) {
-            if (putExtra.resumeRecordFile) {
-                try {
-                    fs.unlinkSync(putExtra.resumeRecordFile);
-                } catch (_e) {
-                    // ignore
-                }
-            }
-        }
-        callbackFunc(err, ret, info);
-    });
+    rpc.post(requestURI, postBody, headers, callbackFunc);
 }
 
+/**
+ * @typedef FinishedEtags
+ * @property {{etag: string, partNumber: number}[]}etags
+ * @property {string} uploadId
+ * @property {number} expiredAt
+ */
+
+/**
+ * @param {string} uploadToken
+ * @param {string} bucket
+ * @param {string} encodedObjectName
+ * @param {string} upDomain
+ * @param {BlockStream} blkStream
+ * @param {FinishedEtags} finishedEtags
+ * @param {number} finishedBlock
+ * @param {number} totalBlockNum
+ * @param {PutExtra} putExtra
+ * @param {number} rsStreamLen
+ * @param {stream.Readable} rsStream
+ * @param {reqCallback} callbackFunc
+ */
 function initReq (
     uploadToken,
     bucket,
@@ -441,6 +563,7 @@ function initReq (
     rpc.post(requestUrl, '', headers, function (err, ret, info) {
         if (info.statusCode !== 200) {
             callbackFunc(err, ret, info);
+            return;
         }
         finishedEtags.expiredAt = ret.expireAt;
         finishedEtags.uploadId = ret.uploadId;
@@ -449,6 +572,20 @@ function initReq (
     });
 }
 
+/**
+ * @param {string} uploadToken
+ * @param {string} bucket
+ * @param {string} encodedObjectName
+ * @param {string} upDomain
+ * @param {BlockStream} blkStream
+ * @param {FinishedEtags} finishedEtags
+ * @param {number} finishedBlock
+ * @param {number} totalBlockNum
+ * @param {PutExtra} putExtra
+ * @param {number} rsStreamLen
+ * @param {stream.Readable} rsStream
+ * @param {reqCallback} callbackFunc
+ */
 function resumeUploadV2 (
     uploadToken,
     bucket,
@@ -515,6 +652,17 @@ function resumeUploadV2 (
     });
 }
 
+/**
+ * @param {string} bucket
+ * @param {string} upDomain
+ * @param {string} uploadToken
+ * @param {string} encodedObjectName
+ * @param {Buffer | string} chunk
+ * @param {string} uploadId
+ * @param {number} partNumber
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ */
 function uploadPart (bucket, upDomain, uploadToken, encodedObjectName, chunk, uploadId, partNumber, putExtra, callbackFunc) {
     const headers = {
         Authorization: 'UpToken ' + uploadToken,
@@ -523,22 +671,27 @@ function uploadPart (bucket, upDomain, uploadToken, encodedObjectName, chunk, up
     };
     const requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + uploadId +
         '/' + partNumber.toString();
-    rpc.put(requestUrl, chunk, headers, function (err, ret, info) {
-        if (info.statusCode === 612) {
-            if (putExtra.resumeRecordFile) {
-                try {
-                    fs.unlinkSync(putExtra.resumeRecordFile);
-                } catch (_e) {
-                    // ignore
-                }
-            }
-        }
-        callbackFunc(err, ret, info);
-    });
+    rpc.put(requestUrl, chunk, headers, callbackFunc);
 }
 
-function completeParts (upDomain, bucket, encodedObjectName, uploadToken, finishedEtags,
-    putExtra, callbackFunc) {
+/**
+ * @param {string} upDomain
+ * @param {string} bucket
+ * @param {string} encodedObjectName
+ * @param {string} uploadToken
+ * @param {FinishedEtags} finishedEtags
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ */
+function completeParts (
+    upDomain,
+    bucket,
+    encodedObjectName,
+    uploadToken,
+    finishedEtags,
+    putExtra,
+    callbackFunc
+) {
     const headers = {
         Authorization: 'UpToken ' + uploadToken,
         'Content-Type': 'application/json'
@@ -555,20 +708,22 @@ function completeParts (upDomain, bucket, encodedObjectName, uploadToken, finish
     };
     const requestUrl = upDomain + '/buckets/' + bucket + '/objects/' + encodedObjectName + '/uploads/' + finishedEtags.uploadId;
     const requestBody = JSON.stringify(body);
-    rpc.post(requestUrl, requestBody, headers, function (err, ret, info) {
-        if (info.statusCode === 200 || info.statusCode === 612) {
-            if (putExtra.resumeRecordFile) {
-                try {
-                    fs.unlinkSync(putExtra.resumeRecordFile);
-                } catch (_e) {
-                    // ignore
-                }
-            }
-        }
-        callbackFunc(err, ret, info);
-    });
+    rpc.post(
+        requestUrl,
+        requestBody,
+        headers,
+        callbackFunc
+    );
 }
 
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {string} localFile
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ * @returns {Promise<UploadResult>}
+ */
 ResumeUploader.prototype.putFile = function (
     uploadToken,
     key,
@@ -576,14 +731,10 @@ ResumeUploader.prototype.putFile = function (
     putExtra,
     callbackFunc
 ) {
-    const that = this;
+    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+
+    // PutExtra
     putExtra = putExtra || new PutExtra();
-    const rsStream = fs.createReadStream(localFile, {
-        highWaterMark: conf.BLOCK_SIZE
-    });
-    const rsStreamLen = fs.statSync(localFile).size;
-    const isResumeUpload = putExtra.resumeRecordFile &&
-        fs.existsSync(putExtra.resumeRecordFile);
     if (!putExtra.mimeType) {
         putExtra.mimeType = mime.getType(localFile);
     }
@@ -592,38 +743,101 @@ ResumeUploader.prototype.putFile = function (
         putExtra.fname = path.basename(localFile);
     }
 
-    return this.putStream(uploadToken, key, rsStream, rsStreamLen, putExtra,
-        callbackWithRetryFunc);
+    putExtra = getDefaultPutExtra(
+        putExtra,
+        {
+            key
+        }
+    );
 
-    function callbackWithRetryFunc (err, ret, info) {
-        let needRetry = false;
-        if (putExtra.version === 'v1' &&
-            info.statusCode === 701 &&
-            isResumeUpload
-        ) {
-            needRetry = true;
-        }
-        if (putExtra.version === 'v2' &&
-            info.statusCode === 612 &&
-            isResumeUpload
-        ) {
-            needRetry = true;
-        }
-        if (needRetry) {
-            that.putFile(
+    // regions
+    return prepareRegionsProvider({
+        config: this.config,
+        bucketName: util.getBucketFromUptoken(uploadToken),
+        accessKey: util.getAKFromUptoken(uploadToken)
+    })
+        .then(regionsProvider => {
+            const resumeInfo = getResumeRecordInfo(putExtra.resumeRecordFile);
+            let preferredEndpointsProvider;
+            if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
+                preferredEndpointsProvider = new StaticEndpointsProvider(
+                    resumeInfo.upDomains.map(d => new Endpoint(d, { defaultScheme: preferScheme }))
+                );
+            }
+            return doWorkWithRetry({
+                workFn: sendPutReq,
+
+                callbackFunc,
+                regionsProvider,
+                uploadApiVersion: putExtra.version,
+                // use resume upDomain firstly
+                preferredEndpointsProvider: preferredEndpointsProvider,
+                resumeRecordFilePath: putExtra.resumeRecordFile,
+                retryPolicies: this.retryPolicies
+            });
+        });
+
+    function sendPutReq (endpoint) {
+        endpoint = Object.create(endpoint);
+        endpoint.defaultScheme = preferScheme;
+        const rsStream = fs.createReadStream(localFile, {
+            highWaterMark: conf.BLOCK_SIZE
+        });
+        const rsStreamLen = fs.statSync(localFile).size;
+        return new Promise((resolve) => {
+            putReq(
+                endpoint,
                 uploadToken,
                 key,
-                localFile,
+                rsStream,
+                rsStreamLen,
                 putExtra,
-                callbackFunc
+                (err, ret, info) => {
+                    destroy(rsStream);
+                    resolve({ err, ret, info });
+                }
             );
-            return;
-        }
-        callbackFunc(err, ret, info);
+        });
     }
 };
 
-ResumeUploader.prototype.putFileWithoutKey = function (uploadToken, localFile,
-    putExtra, callbackFunc) {
+/**
+ * @param {string} uploadToken
+ * @param {string} localFile
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} callbackFunc
+ * @returns {Promise<UploadResult>}
+ */
+ResumeUploader.prototype.putFileWithoutKey = function (
+    uploadToken,
+    localFile,
+    putExtra,
+    callbackFunc
+) {
     return this.putFile(uploadToken, null, localFile, putExtra, callbackFunc);
 };
+
+/**
+ * @param {PutExtra} putExtra
+ * @param {Object} options
+ * @param {string | null} [options.key]
+ * @return {PutExtra}
+ */
+function getDefaultPutExtra (putExtra, options) {
+    options = options || {};
+
+    putExtra = putExtra || new PutExtra();
+    if (!putExtra.mimeType) {
+        putExtra.mimeType = 'application/octet-stream';
+    }
+
+    if (!putExtra.fname) {
+        putExtra.fname = options.key || '?';
+    }
+
+    if (!putExtra.version) {
+        putExtra.version = 'v1';
+    }
+
+    return putExtra;
+}

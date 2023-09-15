@@ -143,6 +143,11 @@ export declare namespace conf {
          * @default -1
          */
         zoneExpire?: number;
+
+        /**
+         * @default null
+         */
+        regionsProvider?: httpc.RegionsProvider;
     }
     class Config implements ConfigOptions {
         constructor(options?: ConfigOptions);
@@ -161,6 +166,11 @@ export declare namespace conf {
 }
 
 export declare namespace form_up {
+    type UploadResult = {
+        data: any;
+        resp: IncomingMessage;
+    }
+
     class FormUploader {
         conf: conf.Config;
 
@@ -170,11 +180,17 @@ export declare namespace form_up {
          *
          * @param uploadToken
          * @param key
-         * @param rsStream
+         * @param fsStream
          * @param putExtra
          * @param callback
          */
-        putStream(uploadToken: string, key: string | null, rsStream: NodeJS.ReadableStream, putExtra: PutExtra | null, callback: callback): void;
+        putStream(
+            uploadToken: string,
+            key: string | null,
+            fsStream: NodeJS.ReadableStream,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
 
         /**
          *
@@ -184,7 +200,13 @@ export declare namespace form_up {
          * @param putExtra
          * @param callback
          */
-        put(uploadToken: string, key: string | null, body: any, putExtra: PutExtra | null, callback: callback): void;
+        put(
+            uploadToken: string,
+            key: string | null,
+            body: any,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
 
         /**
          *
@@ -193,7 +215,12 @@ export declare namespace form_up {
          * @param putExtra
          * @param callback
          */
-        putWithoutKey(uploadToken: string, body: any, putExtra: PutExtra | null, callback: callback): void;
+        putWithoutKey(
+            uploadToken: string,
+            body: any,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
 
         /**
          * 上传本地文件
@@ -203,7 +230,13 @@ export declare namespace form_up {
          * @param putExtra 额外选项
          * @param callback
          */
-        putFile(uploadToken: string, key: string | null, localFile: string, putExtra: PutExtra | null, callback: callback): void;
+        putFile(
+            uploadToken: string,
+            key: string | null,
+            localFile: string,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
 
         /**
          *
@@ -212,7 +245,12 @@ export declare namespace form_up {
          * @param putExtra
          * @param callback
          */
-        putFileWithoutKey(uploadToken: string, localFile: string, putExtra: PutExtra | null, callback: callback): void;
+        putFileWithoutKey(
+            uploadToken: string,
+            localFile: string,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
     }
 
     class PutExtra {
@@ -224,7 +262,7 @@ export declare namespace form_up {
         /**
          * @default {}
          */
-        params: any;
+        params: Record<string, string>;
 
         /**
          * @default null
@@ -260,6 +298,11 @@ export declare namespace form_up {
 }
 
 export declare namespace resume_up {
+    type UploadResult = {
+        data: any;
+        resp: IncomingMessage;
+    }
+
     class ResumeUploader {
         config: conf.Config;
 
@@ -274,7 +317,14 @@ export declare namespace resume_up {
          * @param putExtra
          * @param callback
          */
-        putStream(uploadToken: string, key: string | null, rsStream: NodeJS.ReadableStream, rsStreamLen: number, putExtra: PutExtra | null, callback: callback): void;
+        putStream(
+            uploadToken: string,
+            key: string | null,
+            rsStream: NodeJS.ReadableStream,
+            rsStreamLen: number,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
 
         /**
          *
@@ -284,7 +334,13 @@ export declare namespace resume_up {
          * @param putExtra
          * @param callback
          */
-        putFile(uploadToken: string, key: string | null, localFile: string, putExtra: PutExtra | null, callback: callback): void;
+        putFile(
+            uploadToken: string,
+            key: string | null,
+            localFile: string,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
 
         /**
          *
@@ -293,7 +349,12 @@ export declare namespace resume_up {
          * @param putExtra
          * @param callback
          */
-        putFileWithoutKey(uploadToken: string, localFile: string, putExtra: PutExtra | null, callback: callback): void;
+        putFileWithoutKey(
+            uploadToken: string,
+            localFile: string,
+            putExtra: PutExtra | null,
+            callback: callback
+        ): Promise<UploadResult>;
     }
 
     class PutExtra {
@@ -430,25 +491,27 @@ export declare namespace httpc {
         urllibOptions: RequestOptions;
     }
 
-    interface RespWrapperOptions<T = any> {
+    interface ResponseWrapperOptions<T = any> {
         data: T;
         resp: IncomingMessage;
     }
 
-    class RespWrapper<T = any> {
+    // responseWrapper.js
+    class ResponseWrapper<T = any> {
         data: T;
         resp: IncomingMessage;
-        constructor(options: RespWrapperOptions);
+        constructor(options: ResponseWrapperOptions);
         ok(): boolean;
         needRetry(): boolean;
     }
 
+    // middleware package
     namespace middleware {
         interface Middleware {
             send<T>(
                 request: ReqOpts<T>,
-                next: (reqOpts: ReqOpts<T>) => Promise<RespWrapper<T>>
-            ): Promise<RespWrapper<T>>;
+                next: (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>
+            ): Promise<ResponseWrapper<T>>;
         }
 
         /**
@@ -458,7 +521,7 @@ export declare namespace httpc {
          */
         function composeMiddlewares<T>(
             middlewares: Middleware[],
-            handler: (reqOpts: ReqOpts<T>) => Promise<RespWrapper<T>>
+            handler: (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>
         );
 
         /**
@@ -468,8 +531,8 @@ export declare namespace httpc {
             constructor(sdkVersion: string);
             send<T>(
                 request: httpc.ReqOpts<T>,
-                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.RespWrapper<T>>
-            ): Promise<httpc.RespWrapper<T>>;
+                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.ResponseWrapper<T>>
+            ): Promise<httpc.ResponseWrapper<T>>;
         }
 
         interface RetryDomainsMiddlewareOptions {
@@ -513,8 +576,8 @@ export declare namespace httpc {
              */
             send<T>(
                 request: httpc.ReqOpts<T>,
-                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.RespWrapper<T>>
-            ): Promise<httpc.RespWrapper<T>>;
+                next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.ResponseWrapper<T>>
+            ): Promise<httpc.ResponseWrapper<T>>;
 
             /**
              * 控制重试逻辑，主要为 {@link retryCondition} 服务。若没有设置 retryCondition，默认 2xx 才会终止重试
@@ -525,12 +588,13 @@ export declare namespace httpc {
              */
             private _shouldRetry<T>(
                 err: Error | null,
-                respWrapper: RespWrapper<T>,
+                respWrapper: ResponseWrapper<T>,
                 reqOpts: ReqOpts<T>
             ): boolean;
         }
     }
 
+    // client.js
     interface HttpClientOptions {
         httpAgent?: HttpAgent;
         httpsAgent?: HttpsAgent;
@@ -557,10 +621,197 @@ export declare namespace httpc {
         httpsAgent: HttpsAgent;
         middlewares: middleware.Middleware[];
         constructor(options: HttpClientOptions)
-        sendRequest(requestOptions: ReqOpts): Promise<RespWrapper>
-        get(getOptions: GetOptions): Promise<RespWrapper>
-        post(postOptions: PostOptions): Promise<RespWrapper>
-        put(putOptions: PutOptions): Promise<RespWrapper>
+        sendRequest(requestOptions: ReqOpts): Promise<ResponseWrapper>
+        get(getOptions: GetOptions): Promise<ResponseWrapper>
+        post(postOptions: PostOptions): Promise<ResponseWrapper>
+        put(putOptions: PutOptions): Promise<ResponseWrapper>
+    }
+
+    // endpoint.js
+    interface EndpointOptions {
+        defaultScheme?: string;
+    }
+
+    interface EndpointPersistInfo {
+        host: string;
+        defaultScheme: string;
+    }
+
+    class Endpoint {
+        static fromPersistInfo(persistInfo: EndpointPersistInfo): Endpoint;
+
+        host: string;
+        defaultScheme: string;
+
+        constructor(host: string, options?: EndpointOptions);
+
+        getValue(options?: {scheme?: string}): string;
+
+        get persistInfo(): EndpointPersistInfo;
+    }
+
+    // region.js
+    enum SERVICE_NAME {
+        UC = 'uc',
+        UP = 'up',
+        IO = 'io',
+        RS = 'rs',
+        RSF = 'rsf',
+        API = 'api',
+        S3 = 's3'
+    }
+
+    interface RegionOptions {
+        regionId?: string;
+        s3RegionId?: string;
+        services?: Record<string, Endpoint[]>;
+        ttl?: number;
+        createTime?: Date;
+    }
+
+    interface RegionFromZoneOptions {
+        regionId?: string;
+        s3RegionId?: string;
+        ttl?: number;
+        isPreferCdnHost?: boolean;
+    }
+
+    interface RegionFromRegionIdOptions {
+        s3RegionId?: string;
+        ttl?: number;
+        createTime?: Date;
+        extendedServices?: Record<SERVICE_NAME | string, Endpoint[]>
+    }
+
+    interface RegionPersistInfo {
+        regionId?: string;
+        s3RegionId?: string;
+        services: Record<SERVICE_NAME | string, EndpointPersistInfo[]>;
+        ttl: number;
+        createTime: number;
+    }
+
+    interface QueryRegionsRespData {
+        region: string;
+        ttl: number;
+        s3: {
+            domains: string[];
+            region_alias: string;
+        };
+        uc: {
+            domains: string[];
+        };
+        up: {
+            domains: string[];
+        };
+        io: {
+            domains: string[];
+        };
+        rs: {
+            domains: string[];
+        };
+        rsf: {
+            domains: string[];
+        };
+        api: {
+            domains: string[];
+        };
+    }
+
+    class Region {
+        static fromZone(zone: conf.Zone, options?: RegionFromZoneOptions): Region;
+        static fromRegionId(regionId: string, options?: RegionFromRegionIdOptions): Region;
+        static fromPersistInfo(persistInfo: RegionPersistInfo): Region;
+        static fromQueryData(data: QueryRegionsRespData): Region;
+
+        // non-unique
+        regionId?: string;
+        s3RegionId?: string;
+        services: Record<SERVICE_NAME | string, Endpoint[]>
+
+        ttl: number;
+        createTime: Date;
+
+        constructor(options: RegionOptions);
+
+        get isLive(): boolean;
+        get persistInfo(): RegionPersistInfo;
+    }
+
+    // endpointProvider.js
+    interface EndpointsProvider {
+        getEndpoints(): Promise<Endpoint[]>
+    }
+
+    interface MutableEndpointsProvider extends EndpointsProvider {
+        setEndpoints(endpoints: Endpoint[]): Promise<void>
+    }
+
+    class StaticEndpointsProvider implements EndpointsProvider {
+        static fromRegion(region: Region, serviceName: SERVICE_NAME | string): StaticEndpointsProvider;
+
+        constructor(endpoints: Endpoint[]);
+
+        getEndpoints(): Promise<Endpoint[]>;
+    }
+
+    // regionsProvider.js
+    interface RegionsProvider {
+        getRegions(): Promise<Region[]>
+    }
+
+    interface MutableRegionsProvider extends RegionsProvider {
+       setRegions(regions: Region[]): Promise<void>
+    }
+
+    // StaticRegionsProvider
+    class StaticRegionsProvider implements RegionsProvider {
+        regions: Region[];
+
+        constructor(regions: Region[]);
+
+        getRegions(): Promise<Region[]>;
+    }
+
+    // CachedRegionsProviderOptions
+    interface CachedRegionsProviderOptions {
+        cacheKey: string;
+        baseRegionsProvider: RegionsProvider;
+        persistPath?: string;
+        shrinkInterval?: number; // ms
+    }
+
+    class CachedRegionsProvider implements MutableRegionsProvider {
+        cacheKey: string;
+        baseRegionsProvider: RegionsProvider;
+
+        lastShrinkAt: Date;
+        shrinkInterval: number;
+
+        constructor(
+            options: CachedRegionsProviderOptions
+        );
+
+        setRegions(regions: Region[]): Promise<void>;
+
+        getRegions(): Promise<Region[]>;
+    }
+
+    // QueryRegionsProvider
+    interface QueryRegionsProviderOptions {
+        accessKey: string;
+        bucketName: string;
+        endpointsProvider: EndpointsProvider;
+    }
+
+    class QueryRegionsProvider implements RegionsProvider {
+        accessKey: string;
+        bucketName: string;
+        endpointsProvider: EndpointsProvider;
+
+        constructor(options: QueryRegionsProviderOptions);
+
+        getRegions(): Promise<Region[]>;
     }
 }
 

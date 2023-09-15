@@ -94,11 +94,17 @@ describe('test resume up', function () {
                     bucketManager.stat(bucket, respBody.key, function (
                         err,
                         statRespBody,
-                        respInfo) {
-                        should.not.exist(err);
-                        statRespBody.should.have.keys('x-qn-meta');
-                        statRespBody['x-qn-meta'].name.should.eql('qiniu');
-                        statRespBody['x-qn-meta'].age.should.eql('18');
+                        respInfo
+                    ) {
+                        try {
+                            should.not.exist(err);
+                            statRespBody.should.have.keys('x-qn-meta');
+                            statRespBody['x-qn-meta'].name.should.eql('qiniu');
+                            statRespBody['x-qn-meta'].age.should.eql('18');
+                        } catch (e) {
+                            done(e);
+                            return;
+                        }
                         done();
                     });
                 });
@@ -129,11 +135,17 @@ describe('test resume up', function () {
                     bucketManager.stat(bucket, respBody.key, function (
                         err,
                         statRespBody,
-                        respInfo) {
-                        should.not.exist(err);
-                        statRespBody.should.have.keys('x-qn-meta');
-                        statRespBody['x-qn-meta'].name.should.eql('qiniu');
-                        statRespBody['x-qn-meta'].age.should.eql('18');
+                        respInfo
+                    ) {
+                        try {
+                            should.not.exist(err);
+                            statRespBody.should.have.keys('x-qn-meta');
+                            statRespBody['x-qn-meta'].name.should.eql('qiniu');
+                            statRespBody['x-qn-meta'].age.should.eql('18');
+                        } catch (e) {
+                            done(e);
+                            return;
+                        }
                         done();
                     });
                 });
@@ -181,7 +193,12 @@ describe('test resume up', function () {
 
                     Promise.all([localFileMd5Promise, remoteFileMd5Promise])
                         .then(function ([expectedMd5, actualMd5]) {
-                            actualMd5.should.eql(expectedMd5);
+                            try {
+                                actualMd5.should.eql(expectedMd5);
+                            } catch (e) {
+                                done(e);
+                                return;
+                            }
                             done();
                         });
                 });
@@ -227,7 +244,12 @@ describe('test resume up', function () {
 
                     Promise.all([localFileMd5Promise, remoteFileMd5Promise])
                         .then(function ([expectedMd5, actualMd5]) {
-                            actualMd5.should.eql(expectedMd5);
+                            try {
+                                actualMd5.should.eql(expectedMd5);
+                            } catch (e) {
+                                done(e);
+                                return;
+                            }
                             done();
                         });
                 });
@@ -267,8 +289,13 @@ describe('test resume up', function () {
                                 actualMd5Crypto.update(data);
                             });
                             response.on('end', function () {
-                                var actualMd5 = actualMd5Crypto.digest('hex');
-                                should(actualMd5).eql(expectedMd5);
+                                try {
+                                    var actualMd5 = actualMd5Crypto.digest('hex');
+                                    should(actualMd5).eql(expectedMd5);
+                                } catch (e) {
+                                    done(e);
+                                    return;
+                                }
                                 done();
                             });
                         }
@@ -312,8 +339,13 @@ describe('test resume up', function () {
                                 actualMd5Crypto.update(data);
                             });
                             response.on('end', function () {
-                                var actualMd5 = actualMd5Crypto.digest('hex');
-                                should(actualMd5).eql(expectedMd5);
+                                try {
+                                    var actualMd5 = actualMd5Crypto.digest('hex');
+                                    should(actualMd5).eql(expectedMd5);
+                                } catch (e) {
+                                    done(e);
+                                    return;
+                                }
                                 done();
                             });
                         }
@@ -341,7 +373,8 @@ describe('test resume up', function () {
                 if (len === total) {
                     var content = fs.readFileSync(tmpfile);
                     var data = JSON.parse(content);
-                    data.forEach(function (item) {
+                    data.upDomains.should.not.empty();
+                    data.parts.forEach(function (item) {
                         item.should.have.keys('ctx', 'expired_at', 'crc32');
                     });
                 }
@@ -349,11 +382,17 @@ describe('test resume up', function () {
             resumeUploader.putStream(uploadToken, key, stream, blkCnt * blkSize, putExtra,
                 function (
                     respErr,
-                    respBody, respInfo) {
-                    console.log(respBody, respInfo);
-                    should.not.exist(respErr);
-                    respBody.should.have.keys('key', 'hash');
-                    keysToDelete.push(respBody.key);
+                    respBody, respInfo
+                ) {
+                    try {
+                        console.log(respBody, respInfo);
+                        should.not.exist(respErr);
+                        respBody.should.have.keys('key', 'hash');
+                        keysToDelete.push(respBody.key);
+                    } catch (e) {
+                        done(e);
+                        return;
+                    }
                     done();
                 });
         });
@@ -391,17 +430,24 @@ describe('test resume up', function () {
                 resumeUploader.putStream(uploadToken, key, stream, i * blkSize, putExtra,
                     function (
                         respErr,
-                        respBody, respInfo) {
-                        console.log(respBody, respInfo);
-                        should.not.exist(respErr);
-                        respBody.should.have.keys('key', 'hash');
-                        keysToDelete.push(respBody.key);
-                        num++;
+                        respBody,
+                        respInfo
+                    ) {
+                        try {
+                            console.log(respBody, respInfo);
+                            should.not.exist(respErr);
+                            respBody.should.have.keys('key', 'hash');
+                            keysToDelete.push(respBody.key);
+                            num++;
+                        } catch (e) {
+                            done(e);
+                            return;
+                        }
                         if (num === blkCnt.length) {
                             done();
                         }
                     });
             });
         });
-    })
+    });
 });
