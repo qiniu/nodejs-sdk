@@ -59,7 +59,7 @@
     "mime": "^2.4.4",
     "mockdate": "^3.0.5",
     "tunnel-agent": "^0.6.0",
-    "urllib": "^2.34.1"
+    "urllib": "^2.41.0"
   },
   "devDependencies": {
     "@types/node": "^8.0.3",
