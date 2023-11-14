@@ -250,10 +250,15 @@ function createMultipartForm (uploadToken, key, fsStream, putExtra) {
     if (key != null) {
         postForm.field('key', key);
     }
+    // fix the bug of formstream
+    // https://html.spec.whatwg.org/#multipart-form-data
+    const escapeFname = putExtra.fname.replace(/"/g, '%22')
+        .replace(/\r/g, '%0D')
+        .replace(/\n/g, '%0A');
     postForm.stream(
         'file',
         fsStream,
-        putExtra.fname,
+        escapeFname,
         putExtra.mimeType
     );
 
