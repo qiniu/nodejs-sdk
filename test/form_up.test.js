@@ -160,6 +160,24 @@ describe('test form up', function () {
         });
     });
 
+    describe('test form up#putFile with double quotes', function () {
+        it('test form up#putFile with double quotes', function () {
+            const key = 'storage_putFile_"test"' + Math.ceil(1000 * Math.random());
+            const putExtra = new qiniu.form_up.PutExtra();
+            putExtra.fname = key;
+            return formUploader.putFile(uploadToken, key, testFilePath_2,
+                putExtra,
+                function (
+                    respErr,
+                    respBody) {
+                    // console.log(respBody);
+                    should.not.exist(respErr);
+                    respBody.should.have.keys('key', 'hash');
+                    keysToDelete.push(respBody.key);
+                });
+        });
+    });
+
     // eslint-disable-next-line no-undef
     describe('test form up#putFileWithoutKey', function () {
         // eslint-disable-next-line no-undef
