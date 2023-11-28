@@ -243,6 +243,7 @@ function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
  * @param { Object } options - 配置项
  * @param { number } options.toIaAfterDays - 多少天后将文件转为低频存储，设置为 -1 表示取消已设置的转低频存储的生命周期规则， 0 表示不修改转低频生命周期规则。
  * @param { number } options.toArchiveAfterDays - 多少天后将文件转为归档存储，设置为 -1 表示取消已设置的转归档存储的生命周期规则， 0 表示不修改转归档生命周期规则。
+ * @param { number } options.toArchiveIRAfterDays - 多少天后将文件转为归档直读存储，设置为 -1 表示取消已设置的转归档直读存储的生命周期规则， 0 表示不修改转归档直读生命周期规则。
  * @param { number } options.toDeepArchiveAfterDays - 多少天后将文件转为深度归档存储，设置为 -1 表示取消已设置的转深度归档存储的生命周期规则， 0 表示不修改转深度归档生命周期规则。
  * @param { number } options.deleteAfterDays - 多少天后将文件删除，设置为 -1 表示取消已设置的删除存储的生命周期规则， 0 表示不修改删除存储的生命周期规则。
  * @param { Object } options.cond - 匹配条件，只有条件匹配才会设置成功
@@ -583,6 +584,7 @@ exports.setObjectLifecycleOp = function (bucket, key, options) {
     const encodedEntry = util.encodedEntry(bucket, key);
     let result = '/lifecycle/' + encodedEntry +
         '/toIAAfterDays/' + (options.toIaAfterDays || 0) +
+        '/toArchiveIRAfterDays/' + (options.toArchiveIRAfterDays || 0) +
         '/toArchiveAfterDays/' + (options.toArchiveAfterDays || 0) +
         '/toDeepArchiveAfterDays/' + (options.toDeepArchiveAfterDays || 0) +
         '/deleteAfterDays/' + (options.deleteAfterDays || 0);
@@ -751,6 +753,7 @@ BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
  * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
  * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
  * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
+ * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读，小于0表示上传的文件立即变归档直读
  * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
  * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
  * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
@@ -764,9 +767,9 @@ BucketManager.prototype.putBucketLifecycleRule = function (bucket, options,
     PutBucketLifecycleRule(this.mac, this.config, bucket, options, callbackFunc);
 };
 
-function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
+function PutBucketLifecycleRule (mac, config, bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: options.name
     };
@@ -781,6 +784,12 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
         reqParams.to_line_after_days = options.to_line_after_days;
     } else {
         reqParams.to_line_after_days = 0;
+    }
+
+    if (options.to_archive_ir_after_days) {
+        reqParams.to_archive_ir_after_days = options.to_archive_ir_after_days;
+    } else {
+        reqParams.to_archive_ir_after_days = 0;
     }
 
     if (options.to_archive_after_days) {
@@ -813,9 +822,9 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
         reqParams.history_to_line_after_days = 0;
     }
 
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/rules/add?' + reqSpec;
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = scheme + conf.UC_HOST + '/rules/add?' + reqSpec;
     rpc.postWithOptions(
         requestURI,
         null,
@@ -827,17 +836,18 @@ function PutBucketLifecycleRule(mac, config, bucket, options, callbackFunc) {
 }
 
 /** rules/delete 删除 bucket 规则
- * @param { string } bucket 空间名
- * @param { string } name: 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+ * @param { string } bucket - 空间名
+ * @param { string } name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+ * @param { function } callbackFunc - 回调函数
  */
 BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, callbackFunc) {
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: name
     };
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/rules/delete?' + reqSpec;
+    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = scheme + conf.UC_HOST + '/rules/delete?' + reqSpec;
     rpc.postWithOptions(
         requestURI,
         null,
@@ -855,6 +865,7 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
  * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线:
  * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
  * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
+ * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读存储，小于0表示上传的文件立即变归档直读存储
  * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
  * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
  * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
@@ -865,7 +876,7 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
  */
 BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: options.name
     };
@@ -876,6 +887,10 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
 
     if (options.to_line_after_days) {
         reqParams.to_line_after_days = options.to_line_after_days;
+    }
+
+    if (options.to_archive_ir_after_days) {
+        reqParams.to_archive_ir_after_days = options.to_archive_ir_after_days;
     }
 
     if (options.to_archive_after_days) {
@@ -898,9 +913,9 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
         reqParams.history_to_line_after_days = options.history_to_line_after_days;
     }
 
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/rules/update?' + reqSpec;
+    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    const reqSpec = querystring.stringify(reqParams);
+    const requestURI = scheme + conf.UC_HOST + '/rules/update?' + reqSpec;
     rpc.postWithOptions(
         requestURI,
         null,
