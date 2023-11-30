@@ -752,10 +752,10 @@ BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
  * @param { Object } options - 配置项
  * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
  * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
- * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
- * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读，小于0表示上传的文件立即变归档直读
- * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
- * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+ * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
+ * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读
+ * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
+ * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
  * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
  * @param { number } options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
  * @param { number } options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
@@ -864,10 +864,10 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
  * @param { Object } options - 配置项
  * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线:
  * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
- * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
- * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读存储，小于0表示上传的文件立即变归档直读存储
- * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
- * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+ * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
+ * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读存储
+ * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
+ * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
  * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
  * @param { number } options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
  * @param { number } options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储

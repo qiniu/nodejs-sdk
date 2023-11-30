@@ -428,7 +428,7 @@ describe('test start bucket manager', function () {
             const options = {
                 name: ruleName,
                 prefix: 'update_prefix',
-                to_line_after_days: 0,
+                to_line_after_days: 30,
                 to_archive_ir_after_days: 40,
                 to_archive_after_days: 50,
                 to_deep_archive_after_days: 60,
