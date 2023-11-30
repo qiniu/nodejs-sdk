@@ -399,7 +399,7 @@ describe('test start bucket manager', function () {
                 name: ruleName,
                 prefix: 'test',
                 to_line_after_days: 30,
-                to_archive_ir_after_days: 35,
+                // to_archive_ir_after_days: 35,
                 to_archive_after_days: 40,
                 to_deep_archive_after_days: 50,
                 delete_after_days: 65
@@ -413,7 +413,7 @@ describe('test start bucket manager', function () {
                     testGet({
                         prefix: 'test',
                         to_line_after_days: 30,
-                        to_archive_ir_after_days: 35,
+                        // to_archive_ir_after_days: 35,
                         to_archive_after_days: 40,
                         to_deep_archive_after_days: 50,
                         delete_after_days: 65,
@@ -429,7 +429,7 @@ describe('test start bucket manager', function () {
                 name: ruleName,
                 prefix: 'update_prefix',
                 to_line_after_days: 30,
-                to_archive_ir_after_days: 40,
+                // to_archive_ir_after_days: 40,
                 to_archive_after_days: 50,
                 to_deep_archive_after_days: 60,
                 delete_after_days: 65
@@ -444,7 +444,7 @@ describe('test start bucket manager', function () {
                     testGet({
                         prefix: 'update_prefix',
                         to_line_after_days: 30,
-                        to_archive_ir_after_days: 40,
+                        // to_archive_ir_after_days: 40,
                         to_archive_after_days: 50,
                         to_deep_archive_after_days: 60,
                         delete_after_days: 65,
@@ -478,7 +478,7 @@ describe('test start bucket manager', function () {
                     key,
                     {
                         toIaAfterDays: 10,
-                        toArchiveIRAfterDays: 15,
+                        // toArchiveIRAfterDays: 15,
                         toArchiveAfterDays: 20,
                         toDeepArchiveAfterDays: 30,
                         deleteAfterDays: 40
@@ -504,7 +504,7 @@ describe('test start bucket manager', function () {
                         key,
                         {
                             toIaAfterDays: 10,
-                            toArchiveIRAfterDays: 15,
+                            // toArchiveIRAfterDays: 15,
                             toArchiveAfterDays: 20,
                             toDeepArchiveAfterDays: 30,
                             deleteAfterDays: 40,
