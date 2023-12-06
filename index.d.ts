@@ -1083,6 +1083,7 @@ export declare namespace rs {
          * @param { string } key - 文件名称
          * @param { Object } options - 配置项
          * @param { number } options.toIaAfterDays - 多少天后将文件转为低频存储，设置为 -1 表示取消已设置的转低频存储的生命周期规则， 0 表示不修改转低频生命周期规则。
+         * @param { number } options.toArchiveIRAfterDays - 多少天后将文件转为归档直读存储，设置为 -1 表示取消已设置的转归档直读存储的生命周期规则， 0 表示不修改转归档直读生命周期规则。
          * @param { number } options.toArchiveAfterDays - 多少天后将文件转为归档存储，设置为 -1 表示取消已设置的转归档存储的生命周期规则， 0 表示不修改转归档生命周期规则。
          * @param { number } options.toDeepArchiveAfterDays - 多少天后将文件转为深度归档存储，设置为 -1 表示取消已设置的转深度归档存储的生命周期规则， 0 表示不修改转深度归档生命周期规则。
          * @param { number } options.deleteAfterDays - 多少天后将文件删除，设置为 -1 表示取消已设置的删除存储的生命周期规则， 0 表示不修改删除存储的生命周期规则。
@@ -1098,6 +1099,7 @@ export declare namespace rs {
             key: string,
             options: {
                 toIaAfterDays?: number,
+                toArchiveIRAfterDays?: number,
                 toArchiveAfterDays?: number,
                 toDeepArchiveAfterDays?: number,
                 deleteAfterDays?: number
@@ -1109,7 +1111,7 @@ export declare namespace rs {
                 }
             },
             callbackFunc: callback
-        )
+        ): void;
 
         /**
          * 解冻归档存储文件
@@ -1222,9 +1224,10 @@ export declare namespace rs {
          * @param options - 配置项
          * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
          * @param options.prefix - 同一个 bucket 里面前缀不能重复
-         * @param options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
-         * @param options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
-         * @param options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+         * @param options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
+         * @param options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读存储
+         * @param options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
+         * @param options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
          * @param options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
          * @param options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
          * @param options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
@@ -1237,6 +1240,7 @@ export declare namespace rs {
                 name: string,
                 prefix?: string,
                 to_line_after_days?: number,
+                to_archive_ir_after_days?: number,
                 to_archive_after_days?: number,
                 to_deep_archive_after_days?: number,
                 delete_after_days?: number,
@@ -1261,9 +1265,10 @@ export declare namespace rs {
          * @param options - 配置项
          * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
          * @param options.prefix - 同一个 bucket 里面前缀不能重复
-         * @param options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储，小于0表示上传的文件立即变低频存储
-         * @param options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储，小于0表示上传的文件立即变归档存储
-         * @param options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储，小于0表示上传的文件立即变深度归档存储
+         * @param options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
+         * @param options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读存储
+         * @param options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
+         * @param options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
          * @param options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
          * @param options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
          * @param options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
@@ -1276,6 +1281,7 @@ export declare namespace rs {
                 name: string,
                 prefix?: string,
                 to_line_after_days?: number,
+                to_archive_ir_after_days?: number,
                 to_archive_after_days?: number,
                 to_deep_archive_after_days?: number,
                 delete_after_days?: number,
