@@ -549,21 +549,51 @@ function listPrefixReqV2 (mac, config, bucket, options, callbackFunc) {
 
 // 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
 BucketManager.prototype.batch = function (operations, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.RS_HOST + '/batch';
-    var reqParams = {
+    if (!operations.length) {
+        callbackFunc(new Error('Empty operations'), null, null)
+    }
+
+    let bucket;
+    for (const op of operations) {
+        const [, , entry] = op.split('/');
+        if (!entry) {
+            continue;
+        }
+        [bucket] = util.decodedEntry(entry);
+        if (bucket) {
+            break;
+        }
+    }
+    if (!bucket) {
+        callbackFunc(new Error('Empty bucket'));
+        return;
+    }
+
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
+        }
+        batchReq(ctx.mac, ctx.config, operations, callbackFunc);
+    });
+};
+
+function batchReq (mac, config, operations, callbackFunc) {
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const requestURI = scheme + config.zone.rsHost + '/batch';
+    const reqParams = {
         op: operations
     };
-    var reqBody = querystring.stringify(reqParams);
+    const reqBody = querystring.stringify(reqParams);
     rpc.postWithOptions(
         requestURI,
         reqBody,
         {
-            mac: this.mac
+            mac: mac
         },
         callbackFunc
     );
-};
+}
 
 // 批量操作支持的指令构造器
 exports.statOp = function (bucket, key) {
@@ -1294,17 +1324,28 @@ BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
 
 // 解冻归档存储文件
 BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.RS_HOST + '/restoreAr/' + util.urlsafeBase64Encode(entry) + '/freezeAfterDays/' + freezeAfterDays;
+    const [bucket] = entry.split(':');
+    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
+        if (err) {
+            callbackFunc(err, null, null);
+            return;
+        }
+        restoreArReq(ctx.mac, ctx.config, entry, freezeAfterDays, callbackFunc);
+    });
+};
+
+function restoreArReq (mac, config, entry, freezeAfterDays, callbackFunc) {
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const requestURI = scheme + config.zone.rsHost + '/restoreAr/' + util.urlsafeBase64Encode(entry) + '/freezeAfterDays/' + freezeAfterDays;
     rpc.postWithOptions(
         requestURI,
         null,
         {
-            mac: this.mac
+            mac: mac
         },
         callbackFunc
     );
-};
+}
 
 // 上传策略
 // @link https://developer.qiniu.com/kodo/manual/1206/put-policy

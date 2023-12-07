@@ -370,6 +370,61 @@ describe('test util functions', function () {
                 should.equal(actual, expect, msg);
             }
         });
+
+        it('test decodedEntry', function () {
+            const caseList = [
+                {
+                    msg: 'normal',
+                    expect: {
+                        bucket: 'qiniuphotos',
+                        key: 'gogopher.jpg'
+                    },
+                    entry: 'cWluaXVwaG90b3M6Z29nb3BoZXIuanBn'
+                },
+                {
+                    msg: 'key empty',
+                    expect: {
+                        bucket: 'qiniuphotos',
+                        key: ''
+                    },
+                    entry: 'cWluaXVwaG90b3M6'
+                },
+                {
+                    msg: 'key undefined',
+                    expect: {
+                        bucket: 'qiniuphotos',
+                        key: undefined
+                    },
+                    entry: 'cWluaXVwaG90b3M='
+                },
+                {
+                    msg: 'key need replace plus symbol',
+                    expect: {
+                        bucket: 'qiniuphotos',
+                        key: '012ts>a'
+                    },
+                    entry: 'cWluaXVwaG90b3M6MDEydHM-YQ=='
+                },
+                {
+                    msg: 'key need replace slash symbol',
+                    expect: {
+                        bucket: 'qiniuphotos',
+                        key: '012ts?a'
+                    },
+                    entry: 'cWluaXVwaG90b3M6MDEydHM_YQ=='
+                }
+            ];
+
+            for (let i = 0; i < caseList.length; i++) {
+                const [actualBucket, actualKey] = qiniu.util.decodedEntry(caseList[i].entry);
+                const expect = caseList[i].expect;
+                const msg = caseList[i].msg;
+                should.deepEqual({
+                    bucket: actualBucket,
+                    key: actualKey
+                }, expect, msg);
+            }
+        });
     });
 
     describe('test prepareZone with change hosts config', function () {
