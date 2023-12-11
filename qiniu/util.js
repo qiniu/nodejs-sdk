@@ -49,6 +49,11 @@ exports.encodedEntry = function (bucket, key) {
     return exports.urlsafeBase64Encode(strToEncode);
 };
 
+exports.decodedEntry = function (entry) {
+    const [bucket, key] = exports.urlSafeBase64Decode(entry).split(':');
+    return [bucket, key];
+};
+
 // Get accessKey from uptoken
 exports.getAKFromUptoken = function (uploadToken) {
     var sepIndex = uploadToken.indexOf(':');
