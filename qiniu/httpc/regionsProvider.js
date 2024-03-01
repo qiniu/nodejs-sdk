@@ -8,30 +8,6 @@ const { Endpoint } = require('./endpoint');
 const { Region, SERVICE_NAME } = require('./region');
 
 /**
- * @interface RegionsProvider
- */
-
-/**
- * @function
- * @name RegionsProvider#getRegions
- * @returns {Promise<Region[]>}
- */
-
-/**
- * @interface MutableRegionsProvider
- * @extends RegionsProvider
- */
-
-/**
- * @function
- * @name MutableRegionsProvider#setRegions
- * @param {Region[]} regions
- * @returns {Promise<void>}
- */
-
-// --- could split to files if migrate to typescript --- //
-
-/**
  * @class
  * @implements RegionsProvider
  * @param {Region[]} regions
@@ -53,6 +29,12 @@ const CachedRegionsProvider = (function () {
      * @type {Map<string, Region[]>}
      */
     const memoCachedRegions = new Map();
+    /**
+     * cache region query promises in memory for single flight.
+     * @private DO NOT export this.
+     * @type {Map<string, Promise<Region[]>>}
+     */
+    const cachedRegionsQuery = new Map();
     const lastShrinkAt = new Date(0);
 
     /**
@@ -293,7 +275,11 @@ const CachedRegionsProvider = (function () {
      * @returns {Promise<Region[]>}
      */
     function getRegionsFromBaseProvider () {
-        return this.baseRegionsProvider.getRegions()
+        let result = cachedRegionsQuery.get(this.cacheKey);
+        if (result) {
+            return result;
+        }
+        result = this.baseRegionsProvider.getRegions()
             .then(regions => {
                 if (regions.length) {
                     return this.setRegions(regions);
@@ -303,6 +289,11 @@ const CachedRegionsProvider = (function () {
             .then(() => {
                 return getRegionsFromMemo.call(this);
             });
+        cachedRegionsQuery.set(this.cacheKey, result);
+        result.then(() => {
+            cachedRegionsQuery.delete(this.cacheKey);
+        });
+        return result;
     }
 
     /**
@@ -566,16 +557,18 @@ const QueryRegionsProvider = (function () {
      * @param {string} options.accessKey
      * @param {string} options.bucketName
      * @param {EndpointsProvider} options.endpointsProvider
+     * @param {string} [options.preferredScheme]
      * @constructor
      */
     function QueryRegionsProvider (options) {
         this.accessKey = options.accessKey;
         this.bucketName = options.bucketName;
         this.endpintsProvider = options.endpointsProvider;
+        this.preferredScheme = options.preferredScheme;
     }
 
     /**
-     * @return {Promise<Endpoint[]>}
+     * @returns {Promise<Region[]>}
      */
     QueryRegionsProvider.prototype.getRegions = function () {
         return this.endpintsProvider.getEndpoints()
@@ -610,17 +603,22 @@ const QueryRegionsProvider = (function () {
             .then(respWrapper => {
                 if (!respWrapper.ok()) {
                     return Promise.reject(
-                        new Error('Query regions failed with HTTP Status Code' + respWrapper.resp.statusCode)
+                        new Error(
+                            'Query regions failed with' +
+                            `HTTP Status Code ${respWrapper.resp.statusCode}, ` +
+                            `Body ${respWrapper.data}`
+                        )
                     );
                 }
                 try {
-                    const hosts = JSON.parse(respWrapper.data).hosts;
-                    return hosts.map(getRegionFromQuery);
+                    const hosts = respWrapper.data.hosts;
+                    return hosts.map(data => getRegionFromQuery(data, {
+                        preferredScheme: this.preferredScheme
+                    }));
                 } catch (err) {
+                    err.message = 'There isn\'t available hosts in query result.\n' + err.message;
                     return Promise.reject(
-                        new Error('There isn\'t available hosts in query result', {
-                            cause: err
-                        })
+                        err
                     );
                 }
             });
@@ -645,9 +643,18 @@ const QueryRegionsProvider = (function () {
      * @param {Object} data.api
      * @param {string[]} data.api.domains
      * @param {number} data.ttl
+     * @param {Object} [options]
+     * @param {string} [options.preferredScheme]
      * @returns {Region}
      */
-    function getRegionFromQuery (data) {
+    function getRegionFromQuery (data, options) {
+        options = options || {};
+
+        const endpointOptions = {};
+        if (options.preferredScheme) {
+            endpointOptions.defaultScheme = options.preferredScheme;
+        }
+
         /**
          * @param {string[]} domains
          * @returns {Endpoint[]}
@@ -656,7 +663,7 @@ const QueryRegionsProvider = (function () {
             if (!Array.isArray(domains)) {
                 return [];
             }
-            return domains.map(d => new Endpoint(d));
+            return domains.map(d => new Endpoint(d, endpointOptions));
         };
 
         let services = {

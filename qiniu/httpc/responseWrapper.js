@@ -1,3 +1,9 @@
+/**
+ * @class
+ * @param {any} data
+ * @param {http.IncomingMessage} resp
+ * @constructor
+ */
 function ResponseWrapper ({
     data,
     resp

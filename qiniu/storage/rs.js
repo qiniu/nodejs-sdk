@@ -1,257 +1,403 @@
 const querystring = require('querystring');
 const encodeUrl = require('encodeurl');
-const rpc = require('../rpc');
+const client = require('../httpc/client');
 const conf = require('../conf');
 const digest = require('../auth/digest');
 const util = require('../util');
+const middleware = require('../httpc/middleware');
+const { SERVICE_NAME } = require('../httpc/region');
+const { EndpointsRetryPolicy } = require('../httpc/endpointsRetryPolicy');
+const { RegionsRetryPolicy } = require('../httpc/regionsRetryPolicy');
+const { Retrier } = require('../retry');
+const pkg = require('../../package.json');
+
+const { wrapTryCallback } = require('./internal');
 
 exports.BucketManager = BucketManager;
 exports.PutPolicy = PutPolicy;
 
-function BucketManager(mac, config) {
+/**
+ * @typedef {function(Error, any, IncomingMessage)} BucketOperationCallback
+ */
+
+/**
+ * @param {digest.Mac} [mac]
+ * @param {conf.Config} [config]
+ * @constructor
+ */
+function BucketManager (mac, config) {
     this.mac = mac || new digest.Mac();
     this.config = config || new conf.Config();
-}
 
-// 获取资源信息
-// @link https://developer.qiniu.com/kodo/api/1308/stat
-// @param bucket 空间名称
-// @param key    文件名称
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.stat = function (bucket, key, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
+    let uaMiddleware = new middleware.UserAgentMiddleware(pkg.version);
+    // compact set UA by conf.USER_AGENT
+    uaMiddleware = Object.defineProperty(uaMiddleware, 'userAgent', {
+        get: function () {
+            return conf.USER_AGENT;
         }
-        statReq(ctx.mac, ctx.config, bucket, key, callbackFunc);
     });
-};
-
-function statReq (mac, config, bucket, key, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var statOp = exports.statOp(bucket, key);
-    var requestURI = scheme + config.zone.rsHost + statOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-//  修改文件的类型
-// @link https://developer.qiniu.com/kodo/api/1252/chgm
-// @param bucket  空间名称
-// @param key     文件名称
-// @param newMime 新文件类型
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.changeMime = function (bucket, key, newMime,
-    callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        changeMimeReq(ctx.mac, ctx.config, bucket, key, newMime, callbackFunc);
+    this._httpClient = new client.HttpClient({
+        middlewares: [
+            uaMiddleware,
+            new middleware.QiniuAuthMiddleware({
+                mac: this.mac
+            })
+        ]
     });
-};
-
-function changeMimeReq(mac, config, bucket, key, newMime, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var changeMimeOp = exports.changeMimeOp(bucket, key, newMime);
-    var requestURI = scheme + config.zone.rsHost + changeMimeOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-// 修改文件返回的Headers内容
-// @link TODO
-// @param bucket  空间名称
-// @param key     文件名称
-// @param headers 需要修改的headers
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.changeHeaders = function (bucket, key, headers,
-    callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        changeHeadersReq(ctx.mac, ctx.config, bucket, key, headers, callbackFunc);
-    });
-};
-
-function changeHeadersReq(mac, config, bucket, key, headers, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var changeHeadersOp = exports.changeHeadersOp(bucket, key, headers);
-    var requestURI = scheme + config.zone.rsHost + changeHeadersOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-// 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
-// @link https://developer.qiniu.com/kodo/1288/move
-// @param srcBucket  源空间名称
-// @param srcKey     源文件名称
-// @param destBucket 目标空间名称
-// @param destKey    目标文件名称
-// @param options    可选参数
-//                   force 强制覆盖
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.move = function (srcBucket, srcKey, destBucket, destKey,
-    options, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, srcBucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        moveReq(ctx.mac, ctx.config, srcBucket, srcKey, destBucket, destKey,
-            options, callbackFunc);
-    });
-};
-
-function moveReq(mac, config, srcBucket, srcKey, destBucket, destKey,
-    options, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var moveOp = exports.moveOp(srcBucket, srcKey, destBucket, destKey, options);
-    var requestURI = scheme + config.zone.rsHost + moveOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-// 复制一个文件
-// @link https://developer.qiniu.com/kodo/api/1254/copy
-// @param srcBucket  源空间名称
-// @param srcKey     源文件名称
-// @param destBucket 目标空间名称
-// @param destKey    目标文件名称
-// @param options    可选参数
-//                   force 强制覆盖
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.copy = function (srcBucket, srcKey, destBucket, destKey,
-    options, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, srcBucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        copyReq(ctx.mac, ctx.config, srcBucket, srcKey, destBucket, destKey,
-            options, callbackFunc);
-    });
-};
-
-function copyReq(mac, config, srcBucket, srcKey, destBucket, destKey,
-    options, callbackFunc) {
-    options = options || {};
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var copyOp = exports.copyOp(srcBucket, srcKey, destBucket, destKey, options);
-    var requestURI = scheme + config.zone.rsHost + copyOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-// 删除资源
-// @link https://developer.qiniu.com/kodo/api/1257/delete
-// @param bucket 空间名称
-// @param key    文件名称
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.delete = function (bucket, key, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        deleteReq(ctx.mac, ctx.config, bucket, key, callbackFunc);
-    });
-};
-
-function deleteReq(mac, config, bucket, key, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var deleteOp = exports.deleteOp(bucket, key);
-    var requestURI = scheme + config.zone.rsHost + deleteOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-// 更新文件的生命周期
-// @link https://developer.qiniu.com/kodo/api/1732/update-file-lifecycle
-// @param bucket 空间名称
-// @param key    文件名称
-// @param days   有效期天数
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.deleteAfterDays = function (bucket, key, days,
-    callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        deleteAfterDaysReq(ctx.mac, ctx.config, bucket, key, days, callbackFunc);
-    });
-};
-
-function deleteAfterDaysReq(mac, config, bucket, key, days, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var deleteAfterDaysOp = exports.deleteAfterDaysOp(bucket, key, days);
-    var requestURI = scheme + config.zone.rsHost + deleteAfterDaysOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
 }
 
 /**
- * @param { string } bucket - 空间名称
- * @param { string } key - 文件名称
- * @param { Object } options - 配置项
- * @param { number } options.toIaAfterDays - 多少天后将文件转为低频存储，设置为 -1 表示取消已设置的转低频存储的生命周期规则， 0 表示不修改转低频生命周期规则。
- * @param { number } options.toArchiveAfterDays - 多少天后将文件转为归档存储，设置为 -1 表示取消已设置的转归档存储的生命周期规则， 0 表示不修改转归档生命周期规则。
- * @param { number } options.toArchiveIRAfterDays - 多少天后将文件转为归档直读存储，设置为 -1 表示取消已设置的转归档直读存储的生命周期规则， 0 表示不修改转归档直读生命周期规则。
- * @param { number } options.toDeepArchiveAfterDays - 多少天后将文件转为深度归档存储，设置为 -1 表示取消已设置的转深度归档存储的生命周期规则， 0 表示不修改转深度归档生命周期规则。
- * @param { number } options.deleteAfterDays - 多少天后将文件删除，设置为 -1 表示取消已设置的删除存储的生命周期规则， 0 表示不修改删除存储的生命周期规则。
- * @param { Object } options.cond - 匹配条件，只有条件匹配才会设置成功
- * @param { string } options.cond.hash
- * @param { string } options.cond.mime
- * @param { number } options.cond.fsize
- * @param { number } options.cond.putTime
- * @param { function } callbackFunc - 回调函数
+ * @private
+ * @param {Endpoint} endpoint
+ * @returns {string}
+ */
+BucketManager.prototype._getEndpointVal = function (endpoint) {
+    const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    return endpoint.getValue({
+        scheme: preferredScheme
+    });
+};
+
+/**
+ * @private
+ * @param {RegionsProvider} options.regionsProvider
+ * @param {SERVICE_NAME} options.serviceName
+ * @returns {RetryPolicy[]}
+ */
+BucketManager.prototype._getRetryPolicies = function (options) {
+    const {
+        regionsProvider,
+        serviceName
+    } = options;
+    return [
+        new EndpointsRetryPolicy({
+            skipInitContext: true
+        }),
+        new RegionsRetryPolicy({
+            regionsProvider,
+            serviceName
+        })
+    ];
+};
+
+/**
+ * @private
+ * @param {Object} options
+ * @param {string} options.bucketName
+ * @param {SERVICE_NAME} options.serviceName
+ * @returns {Promise<Retrier>}
+ */
+BucketManager.prototype._getRegionsRetrier = function (options) {
+    const {
+        bucketName,
+        serviceName
+    } = options;
+    return this.config.getRegionsProvider({
+        bucketName,
+        accessKey: this.mac.accessKey
+    })
+        .then(regionsProvider => {
+            const retryPolicies = this._getRetryPolicies({
+                regionsProvider,
+                serviceName
+            });
+            return new Retrier({
+                retryPolicies,
+                onBeforeRetry: context => context.result && context.result.needRetry()
+            });
+        });
+};
+
+/**
+ * @private
+ * @param {Object} options
+ * @param {EndpointsProvider} options.ucProvider
+ * @returns {RetryPolicy[]}
+ */
+BucketManager.prototype._getUcRetryPolices = function (options) {
+    const {
+        ucProvider
+    } = options;
+    return [
+        new EndpointsRetryPolicy({
+            endpointsProvider: ucProvider
+        })
+    ];
+};
+
+/**
+ * @private
+ * @returns {Retrier}
+ */
+BucketManager.prototype._getUcRetrier = function () {
+    const ucProvider = this.config.getUcEndpointsProvider();
+    return new Retrier({
+        retryPolicies: this._getUcRetryPolices({
+            ucProvider
+        }),
+        onBeforeRetry: context =>
+            context.result.needRetry()
+    });
+};
+
+/**
+ * @param {string} [options.bucketName]
+ * @param {SERVICE_NAME} options.serviceName
+ * @param {function(RegionsRetryPolicyContext | EndpointsRetryPolicyContext): Promise<any>} options.func
+ * @return {Promise<any>}
+ * @private
+ */
+BucketManager.prototype._tryReq = function (options) {
+    const {
+        bucketName,
+        serviceName,
+        func
+    } = options;
+
+    if (serviceName === SERVICE_NAME.UC) {
+        const retrier = this._getUcRetrier();
+        return retrier.initContext()
+            .then(context => retrier.retry({
+                func,
+                context
+            }));
+    }
+
+    if (!bucketName) {
+        return Promise.reject(new Error('Must provide bucket name for non-uc services'));
+    }
+
+    return this._getRegionsRetrier({
+        bucketName,
+        serviceName
+    })
+        .then(retrier => Promise.all([
+            retrier,
+            retrier.initContext()
+        ]))
+        .then(([retrier, context]) => retrier.retry({
+            func,
+            context
+        }));
+};
+
+/**
+ * 获取资源信息
+ * @link https://developer.qiniu.com/kodo/api/1308/stat
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.stat = function (bucket, key, callbackFunc) {
+    const statOp = exports.statOp(bucket, key);
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + statOp;
+            return this._httpClient.get({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 修改文件的类型
+ * @link https://developer.qiniu.com/kodo/api/1252/chgm
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {string} newMime 新文件类型
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.changeMime = function (
+    bucket,
+    key,
+    newMime,
+    callbackFunc
+) {
+    const changeMimeOp = exports.changeMimeOp(bucket, key, newMime);
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + changeMimeOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 修改文件返回的 Headers 内容
+ * @link https://developer.qiniu.com/kodo/1252/chgm
+ * @param {string} bucket  空间名称
+ * @param {string} key 文件名称
+ * @param {Object.<string, string>} headers 需要修改的 headers
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.changeHeaders = function (
+    bucket,
+    key,
+    headers,
+    callbackFunc
+) {
+    const changeHeadersOp = exports.changeHeadersOp(bucket, key, headers);
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + changeHeadersOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 移动或重命名文件，当 bucketSrc == bucketDest 相同的时候，就是重命名文件操作
+ * @link https://developer.qiniu.com/kodo/1288/move
+ * @param {string} srcBucket 源空间名称
+ * @param {string} srcKey 源文件名称
+ * @param {string} destBucket 目标空间名称
+ * @param {string} destKey 目标文件名称
+ * @param {Object} [options] 可选参数
+ * @param {boolean} [options.force] 强制覆盖
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.move = function (
+    srcBucket,
+    srcKey,
+    destBucket,
+    destKey,
+    options,
+    callbackFunc
+) {
+    const moveOp = exports.moveOp(srcBucket, srcKey, destBucket, destKey, options);
+    return this._tryReq({
+        bucketName: srcBucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + moveOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 复制一个文件
+ * @link https://developer.qiniu.com/kodo/1254/copy
+ * @param {string} srcBucket  源空间名称
+ * @param {string} srcKey     源文件名称
+ * @param {string} destBucket 目标空间名称
+ * @param {string} destKey    目标文件名称
+ * @param {Object} [options] 可选参数
+ * @param {boolean} [options.force] 强制覆盖
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.copy = function (
+    srcBucket,
+    srcKey,
+    destBucket,
+    destKey,
+    options,
+    callbackFunc
+) {
+    const copyOp = exports.copyOp(srcBucket, srcKey, destBucket, destKey, options);
+    return this._tryReq({
+        bucketName: srcBucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + copyOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 删除资源
+ * @link https://developer.qiniu.com/kodo/1257/delete
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.delete = function (bucket, key, callbackFunc) {
+    const deleteOp = exports.deleteOp(bucket, key);
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + deleteOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 更新文件的生命周期
+ * @link https://developer.qiniu.com/kodo/1732/update-file-lifecycle
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {number} days 有效期天数
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.deleteAfterDays = function (
+    bucket,
+    key,
+    days,
+    callbackFunc
+) {
+    const deleteAfterDaysOp = exports.deleteAfterDaysOp(bucket, key, days);
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + deleteAfterDaysOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * @param {string} bucket - 空间名称
+ * @param {string} key - 文件名称
+ * @param {Object} [options] - 配置项
+ * @param {number} [options.toIaAfterDays] - 多少天后将文件转为低频存储，设置为 -1 表示取消已设置的转低频存储的生命周期规则， 0 表示不修改转低频生命周期规则。
+ * @param {number} [options.toArchiveAfterDays] - 多少天后将文件转为归档存储，设置为 -1 表示取消已设置的转归档存储的生命周期规则， 0 表示不修改转归档生命周期规则。
+ * @param {number} [options.toArchiveIRAfterDays] - 多少天后将文件转为归档直读存储，设置为 -1 表示取消已设置的转归档直读存储的生命周期规则， 0 表示不修改转归档直读生命周期规则。
+ * @param {number} [options.toDeepArchiveAfterDays] - 多少天后将文件转为深度归档存储，设置为 -1 表示取消已设置的转深度归档存储的生命周期规则， 0 表示不修改转深度归档生命周期规则。
+ * @param {number} [options.deleteAfterDays] - 多少天后将文件删除，设置为 -1 表示取消已设置的删除存储的生命周期规则， 0 表示不修改删除存储的生命周期规则。
+ * @param {Object} [options.cond] - 匹配条件，只有条件匹配才会设置成功
+ * @param {string} [options.cond.hash]
+ * @param {string} [options.cond.mime]
+ * @param {number} [options.cond.fsize]
+ * @param {number} [options.cond.putTime]
+ * @param {function} [callbackFunc] - 回调函数
+ * @returns {Promise<any>}
  */
 BucketManager.prototype.setObjectLifeCycle = function (
     bucket,
@@ -259,183 +405,170 @@ BucketManager.prototype.setObjectLifeCycle = function (
     options,
     callbackFunc
 ) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        setObjectLifecycleReq(ctx.mac, ctx.config, bucket, key, options, callbackFunc);
-    });
-};
-
-function setObjectLifecycleReq (mac, config, bucket, key, options, callbackFunc) {
-    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    options = options || {};
     const setObjectLifecycleOp = exports.setObjectLifecycleOp(bucket, key, options);
-    const requestUrl = scheme + config.zone.rsHost + setObjectLifecycleOp;
-    rpc.postWithOptions(
-        requestUrl,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + setObjectLifecycleOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
 
-// 抓取资源
-// @link https://developer.qiniu.com/kodo/api/1263/fetch
-// @param resUrl 资源链接
-// @param bucket 空间名称
-// @param key    文件名称
-// @param callbackFunc(err, respBody, respInfo) 回调函数
+/**
+ * 抓取资源
+ * @link https://developer.qiniu.com/kodo/1263/fetch
+ * @param {string} resUrl 资源链接
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.fetch = function (resUrl, bucket, key, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
+    const encodedEntryURI = util.encodedEntry(bucket, key);
+    const encodedResURL = util.urlsafeBase64Encode(resUrl);
+    const fetchOp = `/fetch/${encodedResURL}/to/${encodedEntryURI}`;
+
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.IO,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + fetchOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
         }
-        fetchReq(ctx.mac, ctx.config, resUrl, bucket, key, callbackFunc);
     });
 };
 
-function fetchReq(mac, config, resUrl, bucket, key, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var encodedEntryURI = util.encodedEntry(bucket, key);
-    var encodedResURL = util.urlsafeBase64Encode(resUrl);
-    var requestURI = scheme + config.zone.ioHost + '/fetch/' + encodedResURL +
-        '/to/' + encodedEntryURI;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-// 更新镜像副本
-// @link https://developer.qiniu.com/kodo/api/1293/prefetch
-// @param bucket 空间名称
-// @param key    文件名称
-// @param callbackFunc(err, respBody, respInfo) 回调函数
+/**
+ * 镜像资源更新
+ * @link https://developer.qiniu.com/kodo/1293/prefetch
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.prefetch = function (bucket, key, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
+    const encodedEntryURI = util.encodedEntry(bucket, key);
+    const prefetchOp = `/prefetch/${encodedEntryURI}`;
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.IO,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + prefetchOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
         }
-        prefetchReq(ctx.mac, ctx.config, bucket, key, callbackFunc);
     });
 };
 
-function prefetchReq(mac, config, bucket, key, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var encodedEntryURI = util.encodedEntry(bucket, key);
-    var requestURI = scheme + config.zone.ioHost + '/prefetch/' + encodedEntryURI;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
-
-// 修改文件的存储类型
-// @link https://developer.qiniu.com/kodo/api/3710/modify-the-file-type
-// @param bucket  空间名称
-// @param key     文件名称
-// @param newType 新文件存储类型
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.changeType = function (bucket, key, newType,
-    callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
+/**
+ * 修改文件的存储类型
+ * @link https://developer.qiniu.com/kodo/3710/chtype
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {number} newType 新文件存储类型
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.changeType = function (
+    bucket,
+    key,
+    newType,
+    callbackFunc
+) {
+    const changeTypeOp = exports.changeTypeOp(bucket, key, newType);
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + changeTypeOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
         }
-        changeTypeReq(ctx.mac, ctx.config, bucket, key, newType, callbackFunc);
     });
 };
-
-function changeTypeReq(mac, config, bucket, key, newType, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var changeTypeOp = exports.changeTypeOp(bucket, key, newType);
-    var requestURI = scheme + config.zone.rsHost + changeTypeOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac
-        },
-        callbackFunc
-    );
-}
 
 /**
  * 设置空间镜像源
  * @link https://developer.qiniu.com/kodo/3966/bucket-image-source
  * @param {string} bucket 空间名称
  * @param {string} srcSiteUrl 镜像源地址
- * @param {string} srcHost 镜像Host
- * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ * @param {string} [srcHost] 镜像Host
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
  */
-BucketManager.prototype.image = function (bucket, srcSiteUrl, srcHost,
-    callbackFunc) {
+BucketManager.prototype.image = function (
+    bucket,
+    srcSiteUrl,
+    srcHost,
+    callbackFunc
+) {
     const encodedSrcSite = util.urlsafeBase64Encode(srcSiteUrl);
-    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    let requestURI = scheme + conf.UC_HOST + '/image/' + bucket + '/from/' + encodedSrcSite;
+    let reqOp = `/image/${bucket}/from/${encodedSrcSite}`;
     if (srcHost) {
         const encodedHost = util.urlsafeBase64Encode(srcHost);
-        requestURI += '/host/' + encodedHost;
+        reqOp += `/host/${encodedHost}`;
     }
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
 /**
  * 取消设置空间镜像源
  * @param {string} bucket 空间名称
- * @param {function(err: error, respBody: object, respInfo: object)} callbackFunc 回调函数
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
  */
 BucketManager.prototype.unimage = function (bucket, callbackFunc) {
-    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    const requestURI = scheme + conf.UC_HOST + '/unimage/' + bucket;
-    const digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', 'application/x-www-form-urlencoded');
-    rpc.postWithoutForm(requestURI, digest, callbackFunc);
+    const reqOp = `/unimage/${bucket}`;
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
 /**
  * 获取指定前缀的文件列表
  * @link https://developer.qiniu.com/kodo/api/1284/list
  *
- * @param { string } bucket 空间名称
- * @param { Object } options 列举操作的可选参数
- * @param { string } options.prefix 列举的文件前缀
- * @param { string } options.marker 上一次列举返回的位置标记，作为本次列举的起点信息
- * @param { number } options.limit 每次返回的最大列举文件数量
- * @param { string } options.delimiter 指定目录分隔符
- * @param { function } callbackFunc(err, respBody, respInfo) 回调函数
+ * @param {string} bucket 空间名称
+ * @param {Object} [options] 列举操作的可选参数
+ * @param {string} [options.prefix] 列举的文件前缀
+ * @param {string} [options.marker] 上一次列举返回的位置标记，作为本次列举的起点信息
+ * @param {number} [options.limit] 每次返回的最大列举文件数量
+ * @param {string} [options.delimiter] 指定目录分隔符
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
  */
 BucketManager.prototype.listPrefix = function (bucket, options, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        listPrefixReq(ctx.mac, ctx.config, bucket, options, callbackFunc);
-    });
-};
-
-function listPrefixReq (mac, config, bucket, options, callbackFunc) {
     options = options || {};
     // 必须参数
     const reqParams = {
@@ -466,19 +599,21 @@ function listPrefixReq (mac, config, bucket, options, callbackFunc) {
         reqParams.delimiter = '';
     }
 
-    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
     const reqSpec = querystring.stringify(reqParams);
-    const requestURI = scheme + config.zone.rsfHost + '/list?' + reqSpec;
+    const reqOp = `/list?${reqSpec}`;
 
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RSF,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
 
 /**
  * 获取指定前缀的文件列表 V2
@@ -486,24 +621,15 @@ function listPrefixReq (mac, config, bucket, options, callbackFunc) {
  * @deprecated API 可能返回仅包含 marker，不包含 item 或 dir 的项，请使用 {@link listPrefix}
  *
  * @param bucket 空间名称
- * @param { Object } options 列举操作的可选参数
- * @param { string } options.prefix 列举的文件前缀
- * @param { string } options.marker 上一次列举返回的位置标记，作为本次列举的起点信息
- * @param { number } options.limit 每次返回的最大列举文件数量
- * @param { string } options.delimiter 指定目录分隔符
- * @param { function } callbackFunc(err, respBody, respInfo) 回调函数
+ * @param {Object} [options] 列举操作的可选参数
+ * @param {string} [options.prefix] 列举的文件前缀
+ * @param {string} [options.marker] 上一次列举返回的位置标记，作为本次列举的起点信息
+ * @param {number} [options.limit] 每次返回的最大列举文件数量
+ * @param {string} [options.delimiter] 指定目录分隔符
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
  */
 BucketManager.prototype.listPrefixV2 = function (bucket, options, callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        listPrefixReqV2(ctx.mac, ctx.config, bucket, options, callbackFunc);
-    });
-};
-
-function listPrefixReqV2 (mac, config, bucket, options, callbackFunc) {
     options = options || {};
     // 必须参数
     const reqParams = {
@@ -534,24 +660,40 @@ function listPrefixReqV2 (mac, config, bucket, options, callbackFunc) {
         reqParams.delimiter = '';
     }
 
-    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
     const reqSpec = querystring.stringify(reqParams);
-    const requestURI = scheme + config.zone.rsfHost + '/v2/list?' + reqSpec;
+    const reqOp = `/v2/list?${reqSpec}`;
 
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RSF,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post(
+                {
+                    url: requestURL,
+                    callback: wrapTryCallback(callbackFunc)
+                },
+                {
+                    dataType: 'text'
+                }
+            );
+        }
+    });
+};
 
-// 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
+/**
+ * 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
+ * @param {string[]} operations 操作
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.batch = function (operations, callbackFunc) {
     if (!operations.length) {
-        callbackFunc(new Error('Empty operations'), null, null)
+        const error = new Error('Empty operations');
+        if (typeof callbackFunc === 'function') {
+            callbackFunc(error, null, null);
+        }
+        return Promise.reject(error);
     }
 
     let bucket;
@@ -566,50 +708,77 @@ BucketManager.prototype.batch = function (operations, callbackFunc) {
         }
     }
     if (!bucket) {
-        callbackFunc(new Error('Empty bucket'));
-        return;
+        const error = new Error('Empty bucket');
+        callbackFunc(error, null, null);
+        return Promise.reject(error);
     }
 
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
-        }
-        batchReq(ctx.mac, ctx.config, operations, callbackFunc);
-    });
-};
-
-function batchReq (mac, config, operations, callbackFunc) {
-    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    const requestURI = scheme + config.zone.rsHost + '/batch';
+    const reqOp = '/batch';
     const reqParams = {
         op: operations
     };
-    const reqBody = querystring.stringify(reqParams);
-    rpc.postWithOptions(
-        requestURI,
-        reqBody,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
+    const reqData = querystring.stringify(reqParams);
 
-// 批量操作支持的指令构造器
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                data: reqData,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 批量操作支持的指令构造器
+ * @param {string} bucket
+ * @param {string} key
+ * @returns {string}
+ */
 exports.statOp = function (bucket, key) {
     return '/stat/' + util.encodedEntry(bucket, key);
 };
 
+/**
+ * @param {string} bucket
+ * @param {string} key
+ * @returns {string}
+ */
 exports.deleteOp = function (bucket, key) {
-    return '/delete/' + util.encodedEntry(bucket, key);
+    return `/delete/${util.encodedEntry(bucket, key)}`;
 };
 
+/**
+ * @param {string} bucket
+ * @param {string} key
+ * @param {number} days
+ * @returns {string}
+ */
 exports.deleteAfterDaysOp = function (bucket, key, days) {
-    var encodedEntryURI = util.encodedEntry(bucket, key);
-    return '/deleteAfterDays/' + encodedEntryURI + '/' + days;
+    const encodedEntryURI = util.encodedEntry(bucket, key);
+    return `/deleteAfterDays/${encodedEntryURI}/${days}`;
 };
 
+/**
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {Object} [options] 配置项
+ * @param {number} [options.toIaAfterDays] 多少天后将文件转为低频存储，设置为 -1 表示取消已设置的转低频存储的生命周期规则， 0 表示不修改转低频生命周期规则。
+ * @param {number} [options.toArchiveAfterDays] 多少天后将文件转为归档存储，设置为 -1 表示取消已设置的转归档存储的生命周期规则， 0 表示不修改转归档生命周期规则。
+ * @param {number} [options.toArchiveIRAfterDays] 多少天后将文件转为归档直读存储，设置为 -1 表示取消已设置的转归档直读存储的生命周期规则， 0 表示不修改转归档直读生命周期规则。
+ * @param {number} [options.toDeepArchiveAfterDays] 多少天后将文件转为深度归档存储，设置为 -1 表示取消已设置的转深度归档存储的生命周期规则， 0 表示不修改转深度归档生命周期规则。
+ * @param {number} [options.deleteAfterDays] 多少天后将文件删除，设置为 -1 表示取消已设置的删除存储的生命周期规则， 0 表示不修改删除存储的生命周期规则。
+ * @param {Object} [options.cond] 匹配条件，只有条件匹配才会设置成功
+ * @param {string} [options.cond.hash]
+ * @param {string} [options.cond.mime]
+ * @param {number} [options.cond.fsize]
+ * @param {number} [options.cond.putTime]
+ * @returns {string}
+ */
 exports.setObjectLifecycleOp = function (bucket, key, options) {
     const encodedEntry = util.encodedEntry(bucket, key);
     let result = '/lifecycle/' + encodedEntry +
@@ -630,67 +799,112 @@ exports.setObjectLifecycleOp = function (bucket, key, options) {
     return result;
 };
 
+/**
+ * @param {string} bucket
+ * @param {string} key
+ * @param {string} newMime
+ * @returns {string}
+ */
 exports.changeMimeOp = function (bucket, key, newMime) {
-    var encodedEntryURI = util.encodedEntry(bucket, key);
-    var encodedMime = util.urlsafeBase64Encode(newMime);
-    return '/chgm/' + encodedEntryURI + '/mime/' + encodedMime;
+    const encodedEntryURI = util.encodedEntry(bucket, key);
+    const encodedMime = util.urlsafeBase64Encode(newMime);
+    return `/chgm/${encodedEntryURI}/mime/${encodedMime}`;
 };
 
+/**
+ * @param {string} bucket
+ * @param {string} key
+ * @param {Object<string, string>} headers
+ * @returns {string}
+ */
 exports.changeHeadersOp = function (bucket, key, headers) {
-    var encodedEntryURI = util.encodedEntry(bucket, key);
-    var prefix = 'x-qn-meta-!';
-    var path = '/chgm/' + encodedEntryURI;
-    for (var headerKey in headers) {
-        var encodedValue = util.urlsafeBase64Encode(headers[headerKey]);
-        var prefixedHeaderKey = prefix + headerKey;
-        path += '/' + prefixedHeaderKey + '/' + encodedValue;
+    const encodedEntryURI = util.encodedEntry(bucket, key);
+    const prefix = 'x-qn-meta-!';
+    let path = `/chgm/${encodedEntryURI}`;
+    for (const headerKey in headers) {
+        const encodedValue = util.urlsafeBase64Encode(headers[headerKey]);
+        const prefixedHeaderKey = prefix + headerKey;
+        path += `/${prefixedHeaderKey}/${encodedValue}`;
     }
 
     return path;
 };
 
+/**
+ * @param {string} bucket
+ * @param {string} key
+ * @param {number} newType
+ * @returns {string}
+ */
 exports.changeTypeOp = function (bucket, key, newType) {
-    var encodedEntryURI = util.encodedEntry(bucket, key);
-    return '/chtype/' + encodedEntryURI + '/type/' + newType;
+    const encodedEntryURI = util.encodedEntry(bucket, key);
+    return `/chtype/${encodedEntryURI}/type/${newType}`;
 };
 
+/**
+ * @param {string} bucket
+ * @param {string} key
+ * @param {number} newStatus
+ * @returns {string}
+ */
 exports.changeStatusOp = function (bucket, key, newStatus) {
-    var encodedEntryURI = util.encodedEntry(bucket, key);
-    return '/chstatus/' + encodedEntryURI + '/status/' + newStatus;
+    const encodedEntryURI = util.encodedEntry(bucket, key);
+    return `/chstatus/${encodedEntryURI}/status/${newStatus}`;
 };
 
+/**
+ * @param {string} srcBucket
+ * @param {string} srcKey
+ * @param {string} destBucket
+ * @param {string} destKey
+ * @param {Object} [options]
+ * @param {boolean} [options.force]
+ * @returns {string}
+ */
 exports.moveOp = function (srcBucket, srcKey, destBucket, destKey, options) {
     options = options || {};
-    var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
-    var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
-    var op = '/move/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
+    const encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
+    const encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
+    let op = `/move/${encodedEntryURISrc}/${encodedEntryURIDest}`;
     if (options.force) {
         op += '/force/true';
     }
     return op;
 };
 
+/**
+ * @param {string} srcBucket
+ * @param {string} srcKey
+ * @param {string} destBucket
+ * @param {string} destKey
+ * @param {Object} [options]
+ * @param {boolean} [options.force]
+ * @returns {string}
+ */
 exports.copyOp = function (srcBucket, srcKey, destBucket, destKey, options) {
     options = options || {};
-    var encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
-    var encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
-    var op = '/copy/' + encodedEntryURISrc + '/' + encodedEntryURIDest;
+    const encodedEntryURISrc = util.encodedEntry(srcBucket, srcKey);
+    const encodedEntryURIDest = util.encodedEntry(destBucket, destKey);
+    let op = `/copy/${encodedEntryURISrc}/${encodedEntryURIDest}`;
     if (options.force) {
         op += '/force/true';
     }
     return op;
 };
 
-// 空间资源下载
-
-// 获取私有空间的下载链接
-// @param domain 空间绑定的域名，比如以http或https开头
-// @param fileName 原始文件名
-// @param deadline 文件有效期时间戳（单位秒）
-// @return 私有下载链接
-BucketManager.prototype.privateDownloadUrl = function (domain, fileName,
-    deadline) {
-    var baseUrl = this.publicDownloadUrl(domain, fileName);
+/**
+ * 获取下载链接
+ * @param domain 空间绑定的域名，比如以http或https开头
+ * @param fileName 原始文件名
+ * @param deadline 文件有效期时间戳（单位秒）
+ * @return {string} 私有下载链接
+ */
+BucketManager.prototype.privateDownloadUrl = function (
+    domain,
+    fileName,
+    deadline
+) {
+    let baseUrl = this.publicDownloadUrl(domain, fileName);
     if (baseUrl.indexOf('?') >= 0) {
         baseUrl += '&e=';
     } else {
@@ -698,587 +912,559 @@ BucketManager.prototype.privateDownloadUrl = function (domain, fileName,
     }
     baseUrl += deadline;
 
-    var signature = util.hmacSha1(baseUrl, this.mac.secretKey);
-    var encodedSign = util.base64ToUrlSafe(signature);
-    var downloadToken = this.mac.accessKey + ':' + encodedSign;
-    return baseUrl + '&token=' + downloadToken;
+    const signature = util.hmacSha1(baseUrl, this.mac.secretKey);
+    const encodedSign = util.base64ToUrlSafe(signature);
+    const downloadToken = `${this.mac.accessKey}:${encodedSign}`;
+    return `${baseUrl}&token=${downloadToken}`;
 };
 
-// 获取公开空间的下载链接
-// @param domain 空间绑定的域名，比如以http或https开头
-// @param fileName 原始文件名
-// @return 公开下载链接
+/**
+ * 获取公开空间的下载链接
+ * @param {string} domain 空间绑定的域名，比如以 http 或 https 开头
+ * @param {string} fileName 原始文件名
+ * @return {string} 公开下载链接
+ */
 BucketManager.prototype.publicDownloadUrl = function (domain, fileName) {
     return domain + '/' + encodeUrl(fileName);
 };
 
-//  修改文件状态
-// @link https://developer.qiniu.com/kodo/api/4173/modify-the-file-status
-// @param bucket  空间名称
-// @param key     文件名称
-// @param status  文件状态
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-// updateObjectStatus(bucketName string, key string, status ObjectStatus, condition UpdateObjectInfoCondition)
-BucketManager.prototype.updateObjectStatus = function (bucket, key, status,
-    callbackFunc) {
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
+/**
+ * 修改文件状态
+ * @link https://developer.qiniu.com/kodo/4173/modify-the-file-status
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {number} status 文件状态
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<void>}
+ */
+BucketManager.prototype.updateObjectStatus = function (
+    bucket,
+    key,
+    status,
+    callbackFunc
+) {
+    const changeStatusOp = exports.changeStatusOp(bucket, key, status);
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + changeStatusOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
         }
-        updateStatusReq(ctx.mac, ctx.config, bucket, key, status, callbackFunc);
     });
 };
 
-function updateStatusReq(mac, config, bucket, key, status, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var changeStatusOp = exports.changeStatusOp(bucket, key, status);
-    var requestURI = scheme + config.zone.rsHost + changeStatusOp;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
-
-// 列举bucket
-// @link https://developer.qiniu.com/kodo/api/3926/get-service
-// @param callbackFunc(err, respBody, respInfo) 回调函数
+/**
+ * 列举 bucket
+ * @link https://developer.qiniu.com/kodo/3926/get-service
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.listBucket = function (callbackFunc) {
-    var requestURI = 'https://rs.qbox.me/buckets';
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
-};
+    const listBucketOp = '/buckets';
 
-// 获取bucket信息
-// @param bucket 空间名
-// @param callbackFunc(err, respBody, respInfo) 回调函数
-BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/v2/bucketInfo?bucket=' + bucket;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + listBucketOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
 /**
- * rules/add 增加 bucket 规则
- * @param { string } bucket 空间名
- *
- * @param { Object } options - 配置项
- * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
- * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
- * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
- * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读
- * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
- * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
- * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
- * @param { number } options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
- * @param { number } options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
- *
- * @param { function } callbackFunc - 回调函数
+ * 获取bucket信息
+ * @param {string} bucket 空间名
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
  */
-BucketManager.prototype.putBucketLifecycleRule = function (bucket, options,
-    callbackFunc) {
-    PutBucketLifecycleRule(this.mac, this.config, bucket, options, callbackFunc);
+BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
+    const bucketInfoOp = `/v2/bucketInfo?bucket=${bucket}`;
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + bucketInfoOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-function PutBucketLifecycleRule (mac, config, bucket, options, callbackFunc) {
-    options = options || {};
-    const reqParams = {
-        bucket: bucket,
-        name: options.name
-    };
-
-    if (options.prefix) {
-        reqParams.prefix = options.prefix;
-    } else {
-        reqParams.prefix = '';
-    }
-
-    if (options.to_line_after_days) {
-        reqParams.to_line_after_days = options.to_line_after_days;
-    } else {
-        reqParams.to_line_after_days = 0;
-    }
-
-    if (options.to_archive_ir_after_days) {
-        reqParams.to_archive_ir_after_days = options.to_archive_ir_after_days;
-    } else {
-        reqParams.to_archive_ir_after_days = 0;
-    }
-
-    if (options.to_archive_after_days) {
-        reqParams.to_archive_after_days = options.to_archive_after_days;
-    } else {
-        reqParams.to_archive_after_days = 0;
-    }
-
-    if (options.to_deep_archive_after_days) {
-        reqParams.to_deep_archive_after_days = options.to_deep_archive_after_days;
-    } else {
-        reqParams.to_deep_archive_after_days = 0;
-    }
-
-    if (options.delete_after_days) {
-        reqParams.delete_after_days = options.delete_after_days;
-    } else {
-        reqParams.delete_after_days = 0;
-    }
-
-    if (options.history_delete_after_days) {
-        reqParams.history_delete_after_days = options.history_delete_after_days;
-    } else {
-        reqParams.history_delete_after_days = 0;
-    }
-
-    if (options.history_to_line_after_days) {
-        reqParams.history_to_line_after_days = options.history_to_line_after_days;
-    } else {
-        reqParams.history_to_line_after_days = 0;
-    }
-
-    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    const reqSpec = querystring.stringify(reqParams);
-    const requestURI = scheme + conf.UC_HOST + '/rules/add?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
+/**
+ * 增加 bucket 规则
+ * @param { string } bucket 空间名
+ *
+ * @param {Object} options 配置项
+ * @param {string} options.name 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+ * @param {string} [options.prefix] 同一个 bucket 里面前缀不能重复
+ * @param {number} [options.to_line_after_days] 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
+ * @param {number} [options.to_archive_ir_after_days] 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读
+ * @param {number} [options.to_archive_after_days] 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
+ * @param {number} [options.to_deep_archive_after_days] 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
+ * @param {number} [options.delete_after_days] 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param {number} [options.history_delete_after_days] 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param {number} [options.history_to_line_after_days] 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+ *
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ *
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.putBucketLifecycleRule = function (
+    bucket,
+    options,
+    callbackFunc
+) {
+    const reqParams = Object.assign(
         {
-            mac: mac
+            bucket
         },
-        callbackFunc
+        {
+            prefix: '',
+            to_line_after_days: 0,
+            to_archive_ir_after_days: 0,
+            to_archive_after_days: 0,
+            to_deep_archive_after_days: 0,
+            delete_after_days: 0,
+            history_delete_after_days: 0,
+            history_to_line_after_days: 0
+        },
+        options
     );
-}
+    const reqSpec = querystring.stringify(reqParams);
+    const reqOp = `/rules/add?${reqSpec}`;
 
-/** rules/delete 删除 bucket 规则
- * @param { string } bucket - 空间名
- * @param { string } name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
- * @param { function } callbackFunc - 回调函数
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 删除 bucket 规则
+ * @param {string} bucket 空间名
+ * @param {string} name 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
+ * @param {function} [callbackFunc] 回调函数
+ *
+ * @returns {Promise<any>}
  */
 BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, callbackFunc) {
     const reqParams = {
         bucket: bucket,
         name: name
     };
-    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
     const reqSpec = querystring.stringify(reqParams);
-    const requestURI = scheme + conf.UC_HOST + '/rules/delete?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    const reqOp = `/rules/delete?${reqSpec}`;
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-/** rules/update 更新 bucket 规则
+/**
+ * 更新 bucket 规则
  * @param bucket 空间名
  *
- * @param { Object } options - 配置项
- * @param { string } options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线:
- * @param { string } options.prefix - 同一个 bucket 里面前缀不能重复
- * @param { number } options.to_line_after_days - 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
- * @param { number } options.to_archive_ir_after_days - 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读存储
- * @param { number } options.to_archive_after_days - 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
- * @param { number } options.to_deep_archive_after_days - 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
- * @param { number } options.delete_after_days - 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
- * @param { number } options.history_delete_after_days - 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
- * @param { number } options.history_to_line_after_days - 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
+ * @param {Object} options 配置项
+ * @param {string} options.name 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线:
+ * @param {string} [options.prefix] 同一个 bucket 里面前缀不能重复
+ * @param {number} [options.to_line_after_days] 指定文件上传多少天后转低频存储。指定为0表示不转低频存储
+ * @param {number} [options.to_archive_ir_after_days] 指定文件上传多少天后转归档直读存储。指定为0表示不转归档直读存储
+ * @param {number} [options.to_archive_after_days] 指定文件上传多少天后转归档存储。指定为0表示不转归档存储
+ * @param {number} [options.to_deep_archive_after_days] 指定文件上传多少天后转深度归档存储。指定为0表示不转深度归档存储
+ * @param {number} [options.delete_after_days] 指定上传文件多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param {number} [options.history_delete_after_days] 指定文件成为历史版本多少天后删除，指定为0表示不删除，大于0表示多少天后删除
+ * @param {number} [options.history_to_line_after_days] 指定文件成为历史版本多少天后转低频存储。指定为0表示不转低频存储
  *
  * @param { function } callbackFunc - 回调函数
+ *
+ * @returns {Promise<any>}
  */
 BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, callbackFunc) {
-    options = options || {};
-    const reqParams = {
-        bucket: bucket,
-        name: options.name
-    };
-
-    if (options.prefix) {
-        reqParams.prefix = options.prefix;
-    }
-
-    if (options.to_line_after_days) {
-        reqParams.to_line_after_days = options.to_line_after_days;
-    }
-
-    if (options.to_archive_ir_after_days) {
-        reqParams.to_archive_ir_after_days = options.to_archive_ir_after_days;
-    }
-
-    if (options.to_archive_after_days) {
-        reqParams.to_archive_after_days = options.to_archive_after_days;
-    }
-
-    if (options.to_deep_archive_after_days) {
-        reqParams.to_deep_archive_after_days = options.to_deep_archive_after_days;
-    }
-
-    if (options.delete_after_days) {
-        reqParams.delete_after_days = options.delete_after_days;
-    }
-
-    if (options.history_delete_after_days) {
-        reqParams.history_delete_after_days = options.history_delete_after_days;
-    }
-
-    if (options.history_to_line_after_days) {
-        reqParams.history_to_line_after_days = options.history_to_line_after_days;
-    }
-
-    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    const reqSpec = querystring.stringify(reqParams);
-    const requestURI = scheme + conf.UC_HOST + '/rules/update?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
+    const reqParams = Object.assign(
         {
-            mac: this.mac
+            bucket
         },
-        callbackFunc
+        options
     );
+    const reqSpec = querystring.stringify(reqParams);
+    const reqOp = `/rules/update?${reqSpec}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-/** rules/get - 获取 bucket 规则
- *  @param { string } bucket - 空间名
- *  @param { function } callbackFunc - 回调函数
+/**
+ * 获取 bucket 规则
+ * @param {string} bucket 空间名
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ *
+ * @returns {Promise<any>}
  */
 BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/rules/get?bucket=' + bucket;
-    rpc.getWithOptions(
-        requestURI,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    const reqOp = `/rules/get?bucket=${bucket}`;
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-// events/add 增加事件通知规则
+/**
+ * 增加事件通知规则
+ * @param {string} bucket
+ * @param {Object} options
+ * @param {string} options.name
+ * @param {string} options.event
+ * @param {string} options.callbackURL
+ * @param {string} [options.prefix]
+ * @param {string} [options.suffix]
+ * @param {string} [options.access_key]
+ * @param {string} [options.host]
+ * @param {BucketOperationCallback} [callbackFunc]
+ *
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc) {
-    PutBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
+    const reqParams = Object.assign(
+        { // 必填参数
+            bucket: bucket
+        },
+        // the flowing fields is optional in server
+        // keep compatibility with old sdk versions
+        {
+            prefix: '',
+            suffix: '',
+            access_key: '',
+            host: ''
+        },
+        options
+    );
+
+    const reqSpec = querystring.stringify(reqParams);
+
+    // in docs the params should be putted into body
+    // keep compatibility with old sdk versions
+    const reqOp = `/events/add?${reqSpec}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-function PutBucketEvent(mac, config, options, bucket, callbackFunc) {
-    options = options || {};
-    var reqParams = { // 必填参数
-        bucket: bucket,
-        name: options.name,
-        event: options.event,
-        callbackURL: options.callbackURL
-    };
-
-    if (options.prefix) {
-        reqParams.prefix = options.prefix;
-    } else {
-        reqParams.prefix = '';
-    }
-
-    if (options.suffix) {
-        reqParams.suffix = options.suffix;
-    } else {
-        reqParams.suffix = '';
-    }
-
-    if (options.access_key) {
-        reqParams.access_key = options.access_key;
-    } else {
-        reqParams.access_key = '';
-    }
-
-    if (options.host) {
-        reqParams.host = options.host;
-    } else {
-        reqParams.host = '';
-    }
-
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/events/add?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
-
-// events/get 更新事件通知规则
+/**
+ * 更新事件通知规则
+ * @param {string} bucket
+ * @param {Object} options
+ * @param {string} options.name
+ * @param {string} [options.prefix]
+ * @param {string} [options.suffix]
+ * @param {string} [options.event]
+ * @param {string} [options.callbackURL]
+ * @param {string} [options.access_key]
+ * @param {string} [options.host]
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
 BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackFunc) {
-    UpdateBucketEvent(this.mac, this.config, options, bucket, callbackFunc);
+    const reqParams = Object.assign(
+        {
+            bucket: bucket
+        },
+        options
+    );
+
+    const reqSpec = querystring.stringify(reqParams);
+    const reqOp = `/events/update?${reqSpec}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-function UpdateBucketEvent(mac, config, options, bucket, callbackFunc) {
-    options = options || {};
-    var reqParams = {
-        bucket: bucket,
-        name: options.name
-    };
-
-    if (options.prefix) {
-        reqParams.prefix = options.prefix;
-    }
-
-    if (options.suffix) {
-        reqParams.suffix = options.suffix;
-    }
-
-    if (options.event) {
-        reqParams.event = options.event;
-    }
-
-    if (options.callbackURL) {
-        reqParams.callbackURL = options.callbackURL;
-    }
-
-    if (options.access_key) {
-        reqParams.access_key = options.access_key;
-    }
-
-    if (options.host) {
-        reqParams.host = options.host;
-    }
-
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/events/update?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
-
-// events/get 获取事件通知规则
+/**
+ * 获取事件通知规则
+ * @param {string} bucket
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
 BucketManager.prototype.getBucketEvent = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/events/get?bucket=' + bucket;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    const reqOp = `/events/get?bucket=${bucket}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-// events/delete 删除事件通知规则
+/**
+ * 删除事件通知规则
+ * @param {string} bucket
+ * @param {string} name
+ * @param {BucketOperationCallback} [callbackFunc]
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.deleteBucketEvent = function (bucket, name, callbackFunc) {
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         name: name
     };
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/events/delete?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    const reqSpec = querystring.stringify(reqParams);
+    const reqOp = `/events/delete?${reqSpec}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-// 设置防盗链
-// @param bucket: bucket 名
-// @param mode 0: 表示关闭Referer; 1: 表示设置Referer白名单; 2: 表示设置Referer黑名单
-// @param norefer 0: 表示不允许空 Refer 访问; 1: 表示允许空 Refer 访问
-// @param pattern  一种为空主机头域名, 比如 foo.com; 一种是泛域名, 比如 *.bar.com;
-//          一种是完全通配符, 即一个 *; 多个规则之间用;隔开
-// @param source_enabled=: 源站是否支持，默认为0只给CDN配置, 设置为1表示开启源站防盗链
+/**
+ * 设置防盗链
+ * @param {string} bucket 空间名
+ * @param {Object} options
+ * @param {number} options.mode 防盗链模式。0: 表示关闭; 1: 表示设置Referer白名单; 2: 表示设置Referer黑名单
+ * @param {number} options.norefer 是否支持空 Referer 访问。0: 表示不允许空 Refer 访问; 1: 表示允许空 Refer 访问
+ * @param {string} options.pattern Referer 规则，多个规则之间用 `;` 隔开。当前支持规则：
+ *     - 空主机头域名, 比如 foo.com
+ *     - 泛域名, 比如 *.foo.com
+ *     - 完全通配符, 即一个 *
+ * @param {string} [options.source_enabled] 是否为源站开启。默认为 0 只给 CDN 配置, 设置为 1 表示开启源站防盗链
+ * @param {BucketOperationCallback} [callbackFunc]
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.putReferAntiLeech = function (bucket, options, callbackFunc) {
-    PutReferAntiLeech(this.mac, this.config, bucket, options, callbackFunc);
+    const reqParams = Object.assign(
+        {
+            bucket
+        },
+        {
+            mode: 0,
+            norefer: 0,
+            pattern: '*',
+            source_enabled: 0
+        },
+        options
+    );
+
+    const reqSpec = querystring.stringify(reqParams);
+    const reqOp = `/referAntiLeech?${reqSpec}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-function PutReferAntiLeech(mac, config, bucket, options, callbackFunc) {
-    options = options || {};
-    var reqParams = {
-        bucket: bucket
-    };
+/**
+ * @typedef CorsRule
+ * @property {string[]} allowed_origin
+ * @property {string[]} allowed_method
+ * @property {string[]} [allowed_header]
+ * @property {string[]} [exposed_header]
+ * @property {number} [max_age]
+ */
 
-    if (options.mode) {
-        reqParams.mode = options.mode;
-    } else {
-        reqParams.mode = 0;
-    }
-
-    if (options.norefer) {
-        reqParams.norefer = options.norefer;
-    } else {
-        reqParams.norefer = 0;
-    }
-
-    if (options.pattern) {
-        reqParams.pattern = options.pattern;
-    } else {
-        reqParams.pattern = '*';
-    }
-
-    if (options.source_enabled) {
-        reqParams.source_enabled = options.source_enabled;
-    } else {
-        reqParams.source_enabled = 0;
-    }
-
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/referAntiLeech?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
-
-/// corsRules/set 设置bucket的cors（跨域）规则
+/**
+ * 设置空间的 cors（跨域）规则
+ * @param {string} bucket
+ * @param {CorsRule[]} body
+ * @param [callbackFunc]
+ * @returns {Promise<any>}
+ */
 BucketManager.prototype.putCorsRules = function (bucket, body, callbackFunc) {
-    PutCorsRules(this.mac, this.config, bucket, body, callbackFunc);
+    const reqBody = JSON.stringify(body);
+    const reqOp = `/corsRules/set/${bucket}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                data: reqBody,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-function PutCorsRules(mac, config, bucket, body, callbackFunc) {
-    var reqBody = JSON.stringify(body);
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/corsRules/set/' + bucket;
-    rpc.postWithOptions(
-        requestURI,
-        reqBody,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
-
-/// corsRules/get 获取bucket跨域
+/**
+ * 获取空间跨域规则
+ * @param {string} bucket
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
 BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
-    GetCorsRules(this.mac, this.config, bucket, callbackFunc);
+    const reqOp = '/corsRules/get/' + bucket;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-function GetCorsRules(mac, config, bucket, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/corsRules/get/' + bucket;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
-
-// BucketManager.prototype.getBucketSourceConfig = function(body, callbackFunc) {
-//     var reqBody = JSON.stringify(body);
-//     console.log(reqBody);
-//     var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-//     var requestURI = scheme + conf.UC_HOST + '/mirrorConfig/get';
-//     var digest = util.generateAccessTokenV2(this.mac, requestURI, 'POST', conf.FormMimeJson, reqBody);
-//     rpc.postWithForm(requestURI, reqBody,digest, callbackFunc);
-// }
-
-// 原图保护
-// @param bucket 空间名称
-// @param mode 为1表示开启原图保护，0表示关闭
+/**
+ * @param {string} bucket 空间名称
+ * @param {number} mode 为 1 表示开启原图保护，0 表示关闭
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
 BucketManager.prototype.putBucketAccessStyleMode = function (bucket, mode, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/accessMode/' + bucket + '/mode/' + mode;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    const reqOp = `/accessMode/${bucket}/mode/${mode}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-// 设置Bucket的cache-control: max-age属性
-// @param maxAge:为0或者负数表示为默认值（31536000）
+/**
+ * 设置缓存策略的 max-age 属性
+ * @param {string} bucket
+ * @param {Object} options
+ * @param {number} options.maxAge 为 0 或者负数表示为默认值（31536000）
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
 BucketManager.prototype.putBucketMaxAge = function (bucket, options, callbackFunc) {
-    var maxAge = options.maxAge;
+    let maxAge = options.maxAge;
     if (maxAge <= 0) {
         maxAge = 31536000;
     }
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         maxAge: maxAge
     };
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/maxAge?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
+    const reqSpec = querystring.stringify(reqParams);
+    const reqOp = '/maxAge?' + reqSpec;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-// 设置Bucket私有属性
-// @param private为0表示公开，为1表示私有
+/**
+ * 设置空间私有属性
+ * @param {string} bucket
+ * @param {Object} options
+ * @param {number} [options.private] 为 0 表示公开，为 1 表示私有
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
 BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbackFunc) {
-    options = options || {};
-    var reqParams = {
-        bucket: bucket
-    };
-
-    if (options.private) {
-        reqParams.private = options.private;
-    } else {
-        reqParams.private = 0;
-    }
-
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = querystring.stringify(reqParams);
-    var requestURI = scheme + conf.UC_HOST + '/private?' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
+    const reqParams = Object.assign(
         {
-            mac: this.mac
+            bucket: bucket
         },
-        callbackFunc
+        {
+            private: 0
+        },
+        options
     );
+
+    const reqSpec = querystring.stringify(reqParams);
+    const reqOp = `/private?${reqSpec}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
 };
 
-// 设置配额
-// @param bucket: 空间名称，不支持授权空间
-// @param size: 空间存储量配额,参数传入0或不传表示不更改当前配置，传入-1表示取消限额，新创建的空间默认没有限额。
-// @param count: 空间文件数配额，参数含义同<size>
+/**
+ * 设置配额
+ * @param {string} bucket 空间名称，不支持授权空间
+ * @param {Object} options
+ * @param {number} [options.size] 空间存储量配额,参数传入 0 或不传表示不更改当前配置，传入 -1 表示取消限额，新创建的空间默认没有限额。
+ * @param {number} [options.count] 空间文件数配额，参数含义同<size>
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
 BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc) {
     options = options || {};
-    var reqParams = {
+    const reqParams = {
         bucket: bucket
     };
 
@@ -1294,73 +1480,85 @@ BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc
         reqParams.count = 0;
     }
 
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var reqSpec = `${reqParams.bucket}/size/${reqParams.size}/count/${reqParams.count}`;
-    var requestURI = scheme + conf.UC_HOST + '/setbucketquota/' + reqSpec;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
-};
+    const reqSpec = `${reqParams.bucket}/size/${reqParams.size}/count/${reqParams.count}`;
+    const reqOp = `/setbucketquota/${reqSpec}`;
 
-// 获取配额
-// @param bucket: 空间名称，不支持授权空间
-BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/getbucketquota/' + bucket;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
-};
-
-// 获得Bucket的所有域名
-// @param bucket:bucketName
-BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + conf.UC_HOST + '/v3/domains?tbl=' + bucket;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: this.mac
-        },
-        callbackFunc
-    );
-};
-
-// 解冻归档存储文件
-BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFunc) {
-    const [bucket] = entry.split(':');
-    util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
-        if (err) {
-            callbackFunc(err, null, null);
-            return;
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
         }
-        restoreArReq(ctx.mac, ctx.config, entry, freezeAfterDays, callbackFunc);
     });
 };
 
-function restoreArReq (mac, config, entry, freezeAfterDays, callbackFunc) {
-    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    const requestURI = scheme + config.zone.rsHost + '/restoreAr/' + util.urlsafeBase64Encode(entry) + '/freezeAfterDays/' + freezeAfterDays;
-    rpc.postWithOptions(
-        requestURI,
-        null,
-        {
-            mac: mac
-        },
-        callbackFunc
-    );
-}
+/**
+ * 获取配额
+ * @param {string} bucket 空间名称，不支持授权空间
+ * @param {BucketOperationCallback} [callbackFunc]
+ */
+BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
+    const reqOp = '/getbucketquota/' + bucket;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 获取空间的所有域名
+ * @param {string} bucket
+ * @param {BucketOperationCallback} [callbackFunc]
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
+    const reqOp = `/v3/domains?tbl=${bucket}`;
+
+    return this._tryReq({
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 解冻归档存储文件
+ * @param {string} entry
+ * @param {number} freezeAfterDays
+ * @param [callbackFunc]
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFunc) {
+    const [bucket] = entry.split(':');
+    const restoreArOp = '/restoreAr/' + util.urlsafeBase64Encode(entry) + '/freezeAfterDays/' + freezeAfterDays;
+
+    return this._tryReq({
+        bucketName: bucket,
+        serviceName: SERVICE_NAME.RS,
+        func: context => {
+            const requestURL = this._getEndpointVal(context.endpoint) + restoreArOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
 
 // just for compatibility with old sdk versions
 function _putPolicyBuildInKeys () {

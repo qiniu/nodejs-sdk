@@ -1,6 +1,5 @@
 const url = require('url');
 const crypto = require('crypto');
-const zone = require('./zone');
 
 // Check Timestamp Expired or not
 exports.isTimestampExpired = function (timestamp) {
@@ -238,21 +237,24 @@ exports.canonicalMimeHeaderKey = function (fieldName) {
         .join('-');
 };
 
-// 创建 AccessToken 凭证
-// @param mac            AK&SK对象
-// @param requestURI     请求URL
-// @param reqMethod      请求方法，例如 GET，POST
-// @param reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
-// @param reqBody        请求Body，仅当请求的 ContentType 为 application/json 或者
-//                       application/x-www-form-urlencoded 时才需要传入该参数
+/**
+ * 创建 AccessToken 凭证
+ * @param {Mac} mac AK&SK对象
+ * @param {string} requestURI 请求URL
+ * @param {string} reqMethod 请求方法，例如 GET，POST
+ * @param {string} reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
+ * @param {string | Buffer} reqBody 请求Body，仅当请求的 ContentType 为 application/json 或者
+ * application/x-www-form-urlencoded 时才需要传入该参数
+ * @param {Object.<string, string>} reqHeaders 请求头部
+ */
 exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContentType, reqBody, reqHeaders) {
-    var u = new url.URL(requestURI);
-    var path = u.pathname;
-    var search = u.search;
-    var host = u.host;
-    var port = u.port;
+    const u = new url.URL(requestURI);
+    const path = u.pathname;
+    const search = u.search;
+    const host = u.host;
+    const port = u.port;
 
-    var access = reqMethod.toUpperCase() + ' ' + path;
+    let access = reqMethod.toUpperCase() + ' ' + path;
     if (search) {
         access += search;
     }
@@ -298,8 +300,8 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
         access += reqBody;
     }
 
-    var digest = exports.hmacSha1(access, mac.secretKey);
-    var safeDigest = exports.base64ToUrlSafe(digest);
+    const digest = exports.hmacSha1(access, mac.secretKey);
+    const safeDigest = exports.base64ToUrlSafe(digest);
     return 'Qiniu ' + mac.accessKey + ':' + safeDigest;
 };
 
@@ -314,7 +316,12 @@ exports.isQiniuCallback = function (mac, requestURI, reqBody, callbackAuth) {
     return auth === callbackAuth;
 };
 
+/**
+ * @deprecated use Config.prototype.getRegionsProvider instead
+ */
 exports.prepareZone = function (ctx, accessKey, bucket, callback) {
+    // resolve cycle dependency by require dynamically
+    const zone = require('./zone');
     var useCache = false;
     if (ctx.config.zone !== '' && ctx.config.zone != null) {
         if (ctx.config.zoneExpire === -1) {

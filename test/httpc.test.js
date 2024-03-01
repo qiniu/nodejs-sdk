@@ -33,6 +33,9 @@ const {
     Zone_z1
 } = qiniu.zone;
 
+const { EndpointsRetryPolicy } = require('../qiniu/httpc/endpointsRetryPolicy');
+const { RegionsRetryPolicy } = require('../qiniu/httpc/regionsRetryPolicy');
+
 describe('test http module', function () {
     const accessKey = process.env.QINIU_ACCESS_KEY;
     // const secretKey = process.env.QINIU_SECRET_KEY;
@@ -315,7 +318,8 @@ describe('test http module', function () {
         it('test fromZone with options', function () {
             const regionZ1 = Region.fromZone(Zone_z1, {
                 ttl: 84600,
-                isPreferCdnHost: true
+                isPreferCdnHost: true,
+                preferredScheme: 'http'
             });
             const upHosts = regionZ1.services[SERVICE_NAME.UP].map(endpoint => endpoint.host);
             const cdnUpHosts = upHosts.slice(0, Zone_z0.cdnUpHosts.length);
@@ -324,6 +328,12 @@ describe('test http module', function () {
             const rsHosts = regionZ1.services[SERVICE_NAME.RS].map(endpoint => endpoint.host);
             const rsfHosts = regionZ1.services[SERVICE_NAME.RSF].map(endpoint => endpoint.host);
             const apiHosts = regionZ1.services[SERVICE_NAME.API].map(endpoint => endpoint.host);
+
+            for (const k in regionZ1.services) {
+                regionZ1.services[k].forEach(e => {
+                    should.equal(e.defaultScheme, 'http');
+                });
+            }
 
             should.not.exist(regionZ1.regionId);
             should.equal(regionZ1.ttl, 84600);
@@ -379,6 +389,9 @@ describe('test http module', function () {
         });
 
         it('test fromRegionId with options', function () {
+            const preferredScheme = 'http';
+            // the preferredScheme will not affect custom service
+            const customServiceEndpoint = new Endpoint('custom-service.example.com');
             const regionZ1 = Region.fromRegionId(
                 'z1',
                 {
@@ -387,9 +400,11 @@ describe('test http module', function () {
                     createTime: new Date(0),
                     extendedServices: {
                         'custom-service': [
-                            new Endpoint('custom-service.example.com')
+                            customServiceEndpoint
                         ]
-                    }
+                    },
+                    preferredScheme: preferredScheme,
+                    isPreferCdnUpHost: false
                 }
             );
 
@@ -402,34 +417,34 @@ describe('test http module', function () {
 
             const expectedServicesEndpointValues = {
                 [SERVICE_NAME.UC]: [
-                    'https://uc.qiniuapi.com'
+                    `${preferredScheme}://uc.qiniuapi.com`
                 ],
                 [SERVICE_NAME.UP]: [
-                    'https://upload-z1.qiniup.com',
-                    'https://up-z1.qiniup.com',
-                    'https://up-z1.qbox.me'
+                    `${preferredScheme}://up-z1.qiniup.com`,
+                    `${preferredScheme}://up-z1.qbox.me`,
+                    `${preferredScheme}://upload-z1.qiniup.com`
                 ],
                 [SERVICE_NAME.IO]: [
-                    'https://iovip-z1.qiniuio.com',
-                    'https://iovip-z1.qbox.me'
+                    `${preferredScheme}://iovip-z1.qiniuio.com`,
+                    `${preferredScheme}://iovip-z1.qbox.me`
                 ],
                 [SERVICE_NAME.RS]: [
-                    'https://rs-z1.qiniuapi.com',
-                    'https://rs-z1.qbox.me'
+                    `${preferredScheme}://rs-z1.qiniuapi.com`,
+                    `${preferredScheme}://rs-z1.qbox.me`
                 ],
                 [SERVICE_NAME.RSF]: [
-                    'https://rsf-z1.qiniuapi.com',
-                    'https://rsf-z1.qbox.me'
+                    `${preferredScheme}://rsf-z1.qiniuapi.com`,
+                    `${preferredScheme}://rsf-z1.qbox.me`
                 ],
                 [SERVICE_NAME.API]: [
-                    'https://api-z1.qiniuapi.com',
-                    'https://api-z1.qbox.me'
+                    `${preferredScheme}://api-z1.qiniuapi.com`,
+                    `${preferredScheme}://api-z1.qbox.me`
                 ],
                 [SERVICE_NAME.S3]: [
-                    'https://s3.mock-z1.qiniucs.com'
+                    `${preferredScheme}://s3.mock-z1.qiniucs.com`
                 ],
                 'custom-service': [
-                    'https://custom-service.example.com'
+                    customServiceEndpoint.getValue()
                 ]
             };
 
@@ -703,6 +718,310 @@ describe('test http module', function () {
                         should.ok(regions.length > 0, 'regions length should great than 0');
                     });
             });
+
+            it('test QueryRegionsProvider with preferredScheme', function () {
+                const queryRegionsProvider = new QueryRegionsProvider({
+                    accessKey: accessKey,
+                    bucketName: bucketName,
+                    endpointsProvider: new Endpoint(QUERY_REGION_HOST),
+                    preferredScheme: 'http'
+                });
+                return queryRegionsProvider.getRegions()
+                    .then(regions => {
+                        should.ok(regions.length > 0, 'regions length should great than 0');
+                        for (const k in regions[0].services) {
+                            for (const e of regions[0].services[k]) {
+                                should.equal(e.defaultScheme, 'http');
+                            }
+                        }
+                    });
+            });
+        });
+    });
+
+    describe('test EndpointRetryPolicy', function () {
+        const endpoints = [
+            new Endpoint('a'),
+            new Endpoint('b'),
+            new Endpoint('c')
+        ];
+        const endpointsProvider = new StaticEndpointsProvider(endpoints);
+        it('test init context with provider', function () {
+            const endpointsRetryPolicy = new EndpointsRetryPolicy({
+                endpointsProvider: endpointsProvider
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            endpointsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.deepEqual(mockedContext.endpoint, endpoints[0]);
+                    should.deepEqual(mockedContext.alternativeEndpoints, endpoints.slice(1));
+                });
+        });
+
+        it('test init context with array', function () {
+            const endpointsRetryPolicy = new EndpointsRetryPolicy({
+                endpoints: endpoints
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return endpointsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.deepEqual(mockedContext.endpoint, endpoints[0]);
+                    should.deepEqual(mockedContext.alternativeEndpoints, endpoints.slice(1));
+                });
+        });
+
+        it('test shouldRetry', function () {
+            const endpointsRetryPolicy = new EndpointsRetryPolicy({
+                endpointsProvider: endpointsProvider
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return endpointsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.equal(endpointsRetryPolicy.shouldRetry(mockedContext), true);
+                });
+        });
+
+        it('test prepareRetry', function () {
+            const endpointsRetryPolicy = new EndpointsRetryPolicy({
+                endpointsProvider: endpointsProvider
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            const expectedEndpoints = ['https://a', 'https://b', 'https://c'];
+
+            return endpointsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    return expectedEndpoints.reduce((promise, expectedEndpoint, currentIndex) => {
+                        return promise
+                            .then(() => {
+                                const isLastOne = currentIndex === expectedEndpoints.length - 1;
+                                should.equal(mockedContext.endpoint.getValue(), expectedEndpoint);
+                                if (isLastOne) {
+                                    return Promise.resolve();
+                                }
+                                return endpointsRetryPolicy.prepareRetry(mockedContext);
+                            });
+                    }, Promise.resolve());
+                })
+                .then(() => {
+                    should.equal(endpointsRetryPolicy.shouldRetry(mockedContext), false);
+                });
+        });
+
+        it('test skip init context', function () {
+            const endpointsRetryPolicy = new EndpointsRetryPolicy({
+                endpointsProvider: endpointsProvider,
+                skipInitContext: true
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return endpointsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.equal(mockedContext.endpoint, undefined);
+                    should.equal(mockedContext.alternativeEndpoints, undefined);
+                });
+        });
+    });
+
+    describe('test RegionsRetryPolicy', function () {
+        const regions = [
+            Region.fromRegionId('z0'),
+            Region.fromRegionId('z1'),
+            Region.fromRegionId('z2')
+        ];
+        const regionsProvider = new StaticRegionsProvider(regions);
+
+        it('test init context with provider', function () {
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceName: SERVICE_NAME.UP
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.deepEqual(mockedContext.region, regions[0]);
+                    should.deepEqual(mockedContext.alternativeRegions, regions.slice(1));
+                });
+        });
+
+        it('test init context with array', function () {
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regions: regions,
+                serviceName: SERVICE_NAME.UP
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.deepEqual(mockedContext.region, regions[0]);
+                    should.deepEqual(mockedContext.alternativeRegions, regions.slice(1));
+                });
+        });
+
+        it('test shouldRetry', function () {
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceName: SERVICE_NAME.UP
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.equal(regionsRetryPolicy.shouldRetry(mockedContext), true);
+                });
+        });
+
+        it('test prepareRetry', function () {
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceName: SERVICE_NAME.UP
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    return regions
+                        .reduce((promise, expectedRegion, currentIndex) => {
+                            return promise
+                                .then(() => {
+                                    const isLastOne = currentIndex === regions.length - 1;
+                                    should.equal(mockedContext.region.regionId, expectedRegion.regionId);
+                                    should.deepEqual(mockedContext.endpoint, expectedRegion.services[SERVICE_NAME.UP][0]);
+                                    should.deepEqual(mockedContext.alternativeEndpoints, expectedRegion.services[SERVICE_NAME.UP].slice(1));
+                                    if (isLastOne) {
+                                        return Promise.resolve();
+                                    }
+                                    return regionsRetryPolicy.prepareRetry(mockedContext);
+                                });
+                        }, Promise.resolve());
+                })
+                .then(() => {
+                    should.equal(regionsRetryPolicy.shouldRetry(mockedContext), false);
+                });
+        });
+
+        it('test onChangedRegion', function () {
+            let regionChangedTimes = 0;
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceName: SERVICE_NAME.UP,
+                onChangedRegion: () => {
+                    regionChangedTimes++;
+                    return Promise.resolve();
+                }
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    return regions
+                        .reduce((promise, expectedRegion, currentIndex) => {
+                            return promise
+                                .then(() => {
+                                    const isLastOne = currentIndex === regions.length - 1;
+                                    if (isLastOne) {
+                                        return Promise.resolve();
+                                    }
+                                    return regionsRetryPolicy.prepareRetry(mockedContext);
+                                });
+                        }, Promise.resolve());
+                })
+                .then(() => {
+                    should.equal(regionChangedTimes, 2);
+                });
+        });
+
+        it('test init context with preferredEndpoints', function () {
+            const preferredEndpoints = [
+                new Endpoint('https://preferred-endpoint.example.com'),
+                new Endpoint('https://preferred-endpoint2.example.com')
+            ];
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceName: SERVICE_NAME.UP,
+                preferredEndpoints: preferredEndpoints
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.deepEqual(mockedContext.endpoint, preferredEndpoints[0]);
+                    should.deepEqual(mockedContext.alternativeEndpoints, preferredEndpoints.slice(1));
+                    should.deepEqual(mockedContext.alternativeRegions, regions);
+                });
+        });
+
+        it('test init context with preferredEndpointsProvider', function () {
+            const preferredEndpoints = [
+                new Endpoint('https://preferred-endpoint.example.com'),
+                new Endpoint('https://preferred-endpoint2.example.com')
+            ];
+            const preferredEndpointsProvider = new StaticEndpointsProvider(preferredEndpoints);
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceName: SERVICE_NAME.UP,
+                preferredEndpointsProvider: preferredEndpointsProvider
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.deepEqual(mockedContext.endpoint, preferredEndpoints[0]);
+                    should.deepEqual(mockedContext.alternativeEndpoints, preferredEndpoints.slice(1));
+                    should.deepEqual(mockedContext.alternativeRegions, regions);
+                });
         });
     });
 });

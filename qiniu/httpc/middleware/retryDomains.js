@@ -42,7 +42,7 @@ RetryDomainsMiddleware.prototype._shouldRetry = function (err, respWrapper, reqO
  * @memberOf RetryDomainsMiddleware
  * @param {ReqOpts} reqOpts
  * @param {function(ReqOpts):Promise<ResponseWrapper>} next
- * @return {Promise<RespWrapper>}
+ * @return {Promise<ResponseWrapper>}
  */
 RetryDomainsMiddleware.prototype.send = function (reqOpts, next) {
     const url = new URL(reqOpts.url);
