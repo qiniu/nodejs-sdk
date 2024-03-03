@@ -23,7 +23,7 @@ UserAgentMiddleware.prototype.constructor = UserAgentMiddleware;
  * @memberOf UserAgentMiddleware
  * @param {ReqOpts} reqOpts
  * @param {function(ReqOpts):Promise<ResponseWrapper>} next
- * @return {Promise<ResponseWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 UserAgentMiddleware.prototype.send = function (reqOpts, next) {
     if (!reqOpts.urllibOptions.headers) {

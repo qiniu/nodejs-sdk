@@ -30,7 +30,7 @@ EndpointsRetryPolicy.prototype.constructor = EndpointsRetryPolicy;
 
 /**
  * @param {EndpointsRetryPolicyContext} context
- * @return {Promise<void>}
+ * @returns {Promise<void>}
  */
 EndpointsRetryPolicy.prototype.initContext = function (context) {
     if (this.skipInitContext) {
@@ -53,7 +53,7 @@ EndpointsRetryPolicy.prototype.initContext = function (context) {
 
 /**
  * @param {EndpointsRetryPolicyContext} context
- * @return {boolean}
+ * @returns {boolean}
  */
 EndpointsRetryPolicy.prototype.shouldRetry = function (context) {
     return context.alternativeEndpoints.length > 0;
@@ -61,7 +61,7 @@ EndpointsRetryPolicy.prototype.shouldRetry = function (context) {
 
 /**
  * @param {EndpointsRetryPolicyContext} context
- * @return {Promise<void>}
+ * @returns {Promise<void>}
  */
 EndpointsRetryPolicy.prototype.prepareRetry = function (context) {
     context.endpoint = context.alternativeEndpoints.shift();

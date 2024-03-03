@@ -162,7 +162,7 @@ ResumeUploader.prototype._getRegionsRetrier = function (options) {
  * @param {number} rsStreamLen
  * @param {PutExtra} putExtra
  * @param {reqCallback} [callbackFunc]
- * @return {Promise<UploadResult>}
+ * @returns {Promise<UploadResult>}
  */
 ResumeUploader.prototype.putStream = function (
     uploadToken,
@@ -899,7 +899,7 @@ ResumeUploader.prototype.putFileWithoutKey = function (
  * @param {PutExtra} putExtra
  * @param {Object} options
  * @param {string | null} [options.key]
- * @return {PutExtra}
+ * @returns {PutExtra}
  */
 function getDefaultPutExtra (putExtra, options) {
     options = options || {};

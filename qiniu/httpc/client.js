@@ -53,7 +53,7 @@ HttpClient.prototype._handleRequest = function (req) {
 /**
  *
  * @param {ReqOpts} requestOptions
- * @return {Promise<ResponseWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.sendRequest = function (requestOptions) {
     const mwList = this.middlewares.concat(requestOptions.middlewares || []);
@@ -104,7 +104,7 @@ HttpClient.prototype.sendRequest = function (requestOptions) {
  * @param {Object} [reqOptions.headers]
  * @param {middleware.Middleware[]} [reqOptions.middlewares]
  * @param {urllib.RequestOptions} [urllibOptions]
- * @return {Promise<ResponseWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.get = function (reqOptions, urllibOptions) {
     const {
@@ -152,7 +152,7 @@ HttpClient.prototype.get = function (reqOptions, urllibOptions) {
  * @param {middleware.Middleware[]} [reqOptions.middlewares]
  * @param {function(err: Error | null, ret: any, info: IncomingMessage): void} [reqOptions.callback]
  * @param {urllib.RequestOptions} [urllibOptions]
- * @return {Promise<ResponseWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.post = function (reqOptions, urllibOptions) {
     const {
@@ -205,7 +205,7 @@ HttpClient.prototype.post = function (reqOptions, urllibOptions) {
  * @param {Object} [reqOptions.headers]
  * @param {middleware.Middleware[]} [reqOptions.middlewares]
  * @param {urllib.RequestOptions} [urllibOptions]
- * @return {Promise<ResponseWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.put = function (reqOptions, urllibOptions) {
     const {

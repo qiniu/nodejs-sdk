@@ -61,7 +61,7 @@ TokenExpiredRetryPolicy.prototype.initContext = function (context) {
 
 /**
  * @param {Object} context
- * @return {boolean}
+ * @returns {boolean}
  */
 TokenExpiredRetryPolicy.prototype.shouldRetry = function (context) {
     const {
@@ -127,7 +127,7 @@ exports.getNoNeedRetryError = getNoNeedRetryError;
 
 /**
  * @param fn
- * @return {(function(...[*]): (*|undefined))|*}
+ * @returns {(function(...[*]): (*|undefined))|*}
  */
 function wrapTryCallback (fn) {
     if (typeof fn !== 'function') {

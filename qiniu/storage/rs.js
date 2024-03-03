@@ -144,7 +144,7 @@ BucketManager.prototype._getUcRetrier = function () {
  * @param {string} [options.bucketName]
  * @param {SERVICE_NAME} options.serviceName
  * @param {function(RegionsRetryPolicyContext | EndpointsRetryPolicyContext): Promise<any>} options.func
- * @return {Promise<any>}
+ * @returns {Promise<any>}
  * @private
  */
 BucketManager.prototype._tryReq = function (options) {
@@ -897,7 +897,7 @@ exports.copyOp = function (srcBucket, srcKey, destBucket, destKey, options) {
  * @param domain 空间绑定的域名，比如以http或https开头
  * @param fileName 原始文件名
  * @param deadline 文件有效期时间戳（单位秒）
- * @return {string} 私有下载链接
+ * @returns {string} 私有下载链接
  */
 BucketManager.prototype.privateDownloadUrl = function (
     domain,
@@ -922,7 +922,7 @@ BucketManager.prototype.privateDownloadUrl = function (
  * 获取公开空间的下载链接
  * @param {string} domain 空间绑定的域名，比如以 http 或 https 开头
  * @param {string} fileName 原始文件名
- * @return {string} 公开下载链接
+ * @returns {string} 公开下载链接
  */
 BucketManager.prototype.publicDownloadUrl = function (domain, fileName) {
     return domain + '/' + encodeUrl(fileName);

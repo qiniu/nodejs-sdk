@@ -210,7 +210,7 @@ const isTokenTable = {
 /**
  * 是否合法的 header field name 字符
  * @param ch string
- * @return boolean|undefined
+ * @returns boolean|undefined
  */
 function validHeaderKeyChar (ch) {
     if (ch.charCodeAt(0) >= 128) {
@@ -222,7 +222,7 @@ function validHeaderKeyChar (ch) {
 /**
  * 规范化 header field name
  * @param fieldName string
- * @return string
+ * @returns string
  */
 exports.canonicalMimeHeaderKey = function (fieldName) {
     for (const ch of fieldName) {

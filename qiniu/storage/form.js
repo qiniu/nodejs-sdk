@@ -413,7 +413,7 @@ FormUploader.prototype.putFileWithoutKey = function (
  * @param {PutExtra} putExtra
  * @param {Object} options
  * @param {string} options.key
- * @return {PutExtra}
+ * @returns {PutExtra}
  */
 function getDefaultPutExtra (putExtra, options) {
     putExtra = putExtra || new PutExtra();

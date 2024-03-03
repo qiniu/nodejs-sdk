@@ -301,7 +301,7 @@ const CachedRegionsProvider = (function () {
      * @param {function(CachedPersistedRegions):void} fn
      * @param {Object} [options]
      * @param {boolean} [options.ignoreParseError]
-     * @return {Promise<void>}
+     * @returns {Promise<void>}
      */
     function walkFileCache (fn, options) {
         options = options || {};
@@ -466,7 +466,7 @@ const CachedRegionsProvider = (function () {
     /**
      * @private
      * @param {string} persistedRegions
-     * @return {CachedPersistedRegions}
+     * @returns {CachedPersistedRegions}
      */
     function parsePersistedRegions (persistedRegions) {
         const { cacheKey, regions } = JSON.parse(persistedRegions);
@@ -480,7 +480,7 @@ const CachedRegionsProvider = (function () {
      * @private
      * @param {string} cacheKey
      * @param {Region[]} regions
-     * @return {string}
+     * @returns {string}
      */
     function stringifyPersistedRegions (cacheKey, regions) {
         return JSON.stringify({

@@ -19,7 +19,7 @@ QiniuAuthMiddleware.prototype.constructor = QiniuAuthMiddleware;
  * @memberOf QiniuAuthMiddleware
  * @param {ReqOpts} reqOpts
  * @param {function(ReqOpts):Promise<ResponseWrapper>} next
- * @return {Promise<ResponseWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 QiniuAuthMiddleware.prototype.send = function (reqOpts, next) {
     const headers = reqOpts.urllibOptions.headers;

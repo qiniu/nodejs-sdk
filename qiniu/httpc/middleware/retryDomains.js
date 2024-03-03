@@ -27,7 +27,7 @@ RetryDomainsMiddleware.prototype.constructor = RetryDomainsMiddleware;
  * @param {Error || null} err
  * @param {ResponseWrapper || null} respWrapper
  * @param {ReqOpts} reqOpts
- * @return {boolean}
+ * @returns {boolean}
  * @private
  */
 RetryDomainsMiddleware.prototype._shouldRetry = function (err, respWrapper, reqOpts) {
@@ -42,7 +42,7 @@ RetryDomainsMiddleware.prototype._shouldRetry = function (err, respWrapper, reqO
  * @memberOf RetryDomainsMiddleware
  * @param {ReqOpts} reqOpts
  * @param {function(ReqOpts):Promise<ResponseWrapper>} next
- * @return {Promise<ResponseWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 RetryDomainsMiddleware.prototype.send = function (reqOpts, next) {
     const url = new URL(reqOpts.url);

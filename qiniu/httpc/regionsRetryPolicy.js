@@ -40,7 +40,7 @@ RegionsRetryPolicy.prototype.constructor = RegionsRetryPolicy;
 
 /**
  * @param {RegionsRetryPolicyContext} context
- * @return {Promise<void>}
+ * @returns {Promise<void>}
  */
 RegionsRetryPolicy.prototype.initContext = function (context) {
     const regionsPromise = this.regions.length > 0
@@ -63,7 +63,7 @@ RegionsRetryPolicy.prototype.initContext = function (context) {
 
 /**
  * @param {RegionsRetryPolicyContext} context
- * @return {boolean}
+ * @returns {boolean}
  */
 RegionsRetryPolicy.prototype.shouldRetry = function (context) {
     return context.alternativeRegions.length > 0;
@@ -71,7 +71,7 @@ RegionsRetryPolicy.prototype.shouldRetry = function (context) {
 
 /**
  * @param {RegionsRetryPolicyContext} context
- * @return {Promise<void>}
+ * @returns {Promise<void>}
  */
 RegionsRetryPolicy.prototype.prepareRetry = function (context) {
     context.region = context.alternativeRegions.shift();
@@ -92,7 +92,7 @@ RegionsRetryPolicy.prototype.prepareRetry = function (context) {
  * @param {RegionsRetryPolicyContext} options.context
  * @param {Region[]} options.regions
  * @param {Endpoint[]} options.preferredEndpoints
- * @return {Promise<void>}
+ * @returns {Promise<void>}
  * @private
  */
 RegionsRetryPolicy.prototype._initRegions = function (options) {
@@ -137,7 +137,7 @@ RegionsRetryPolicy.prototype._initRegions = function (options) {
 
 /**
  * @param {RegionsRetryPolicyContext} context
- * @return {Promise<void>}
+ * @returns {Promise<void>}
  * @private
  */
 RegionsRetryPolicy.prototype._prepareEndpoints = function (context) {
