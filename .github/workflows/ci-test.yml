@@ -1,14 +1,13 @@
 name: NodeJS CI with NPM
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        node_version: ['6', '8', '10', '12', '14', '16']
+        node_version: ['6', '8', '10', '12', '14', '16', '18', '20']
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
