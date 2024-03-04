@@ -27,13 +27,19 @@ before(function () {
 });
 
 after(function () {
-    return Promise.all([
-        fs.promises.unlink(testFilePath1),
-        fs.promises.unlink(testFilePath2)
-    ])
-        .catch(err => {
-            console.log('Form upload test. Unlink files failed', err);
-        });
+    return Promise.all(
+        [
+            testFilePath1,
+            testFilePath2
+        ].map(p => new Promise(resolve => {
+            fs.unlink(p, err => {
+                if (err) {
+                    console.log(`unlink ${p} failed`, err);
+                }
+                resolve();
+            });
+        }))
+    );
 });
 
 describe('test form up', function () {

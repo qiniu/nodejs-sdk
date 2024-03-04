@@ -522,7 +522,8 @@ describe('test start bucket manager', function () {
 
     // 空间生命周期
     describe('test lifeRule', function () {
-        const ruleName = 'test_rule_name' + Math.floor(Math.random() * 1000);
+        const ruleName = 'test_rule_name' + Math.floor(Math.random() * 100000);
+        const randomPrefix = 'test' + Math.floor(Math.random() * 100000);
 
         function testGet (expectItem, otherRespInfo) {
             return bucketManager.getBucketLifecycleRule(bucketName)
@@ -554,7 +555,7 @@ describe('test start bucket manager', function () {
         it('test lifeRule put', function () {
             const options = {
                 name: ruleName,
-                prefix: 'test',
+                prefix: randomPrefix,
                 to_line_after_days: 30,
                 to_archive_ir_after_days: 35,
                 to_archive_after_days: 40,
@@ -570,7 +571,7 @@ describe('test start bucket manager', function () {
                 should.equal(resp.statusCode, 200, JSON.stringify(resp));
                 return testGet(
                     {
-                        prefix: 'test',
+                        prefix: randomPrefix,
                         to_line_after_days: 30,
                         to_archive_ir_after_days: 35,
                         to_archive_after_days: 40,
@@ -590,9 +591,10 @@ describe('test start bucket manager', function () {
         });
 
         it('test lifeRule update', function () {
+            const expectedPrefix = `update_${randomPrefix}`;
             const options = {
                 name: ruleName,
-                prefix: 'update_prefix',
+                prefix: expectedPrefix,
                 to_line_after_days: 30,
                 to_archive_ir_after_days: 40,
                 to_archive_after_days: 50,
@@ -608,7 +610,7 @@ describe('test start bucket manager', function () {
                 should.equal(resp.statusCode, 200, JSON.stringify(resp));
                 return testGet(
                     {
-                        prefix: 'update_prefix',
+                        prefix: expectedPrefix,
                         to_line_after_days: 30,
                         to_archive_ir_after_days: 40,
                         to_archive_after_days: 50,
@@ -734,7 +736,7 @@ describe('test start bucket manager', function () {
     });
 
     describe('test events', function () {
-        const eventName = 'event_test' + Math.floor(Math.random() * 1000);
+        const eventName = 'event_test' + Math.floor(Math.random() * 100000);
 
         before(function () {
             return bucketManager.deleteBucketEvent(
@@ -1028,8 +1030,8 @@ describe('test start bucket manager', function () {
     describe('test bucketQuota', function () {
         it('test putBucketQuota', function () {
             const options = {
-                size: 10,
-                count: 10
+                size: 5 * Math.pow(1024, 3), // 5GB
+                count: 1000
             };
 
             const promises = doAndWrapResultPromises(callback =>

@@ -67,10 +67,18 @@ before(function () {
 });
 
 after(function () {
-    return fs.promises.unlink(testFilePath)
-        .catch(err => {
-            console.log('Resume upload test. Unlink files failed', err);
-        });
+    return Promise.all(
+        [
+            testFilePath
+        ].map(p => new Promise(resolve => {
+            fs.unlink(p, err => {
+                if (err) {
+                    console.log(`unlink ${p} failed`, err);
+                }
+                resolve();
+            });
+        }))
+    );
 });
 
 // file to upload
@@ -250,7 +258,7 @@ describe('test resume up', function () {
                 if (mimeType !== undefined) {
                     putExtra.mimeType = mimeType;
                 }
-                const key = 'storage_putFile_test' + Math.floor(Math.random() * 1000);
+                const key = 'storage_putFile_test' + Math.floor(Math.random() * 100000);
 
                 const promises = doAndWrapResultPromises(callback =>
                     resumeUploader.putFile(
@@ -325,7 +333,7 @@ describe('test resume up', function () {
                     putExtra.mimeType = mimeType;
                 }
 
-                const key = 'storage_putStream_test' + Math.floor(Math.random() * 1000);
+                const key = 'storage_putStream_test' + Math.floor(Math.random() * 100000);
 
                 const streamSize = 9 * 1024 * 1024;
                 const {
@@ -397,12 +405,16 @@ describe('test resume up', function () {
 
         const filepathListToDelete = [];
         after(function () {
-            return Promise.all(filepathListToDelete.map(p =>
-                fs.promises.unlink(p)
-                    .catch(() => {
-                        // pass
-                    })
-            ));
+            return Promise.all(
+                filepathListToDelete.map(p => new Promise(resolve => {
+                    fs.unlink(p, err => {
+                        if (err) {
+                            console.log(`unlink ${p} failed`, err);
+                        }
+                        resolve();
+                    });
+                }))
+            );
         });
 
         testParams.forEach(testParam => {
@@ -425,7 +437,7 @@ describe('test resume up', function () {
             }
 
             it(`test resume up#putStream resume; ${msg}`, function () {
-                const key = 'storage_putStream_resume_test' + Math.floor(Math.random() * 1000);
+                const key = 'storage_putStream_resume_test' + Math.floor(Math.random() * 100000);
 
                 const putExtra = new qiniu.resume_up.PutExtra();
                 putExtra.resumeRecordFile = path.join(os.tmpdir(), key + '.resume.json');
