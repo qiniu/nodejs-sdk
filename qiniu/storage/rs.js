@@ -1039,7 +1039,7 @@ BucketManager.prototype.putBucketLifecycleRule = function (
         options
     );
     const reqSpec = querystring.stringify(reqParams);
-    const reqOp = `/rules/add?${reqSpec}`;
+    const reqOp = '/rules/add';
 
     return this._tryReq({
         serviceName: SERVICE_NAME.UC,
@@ -1047,6 +1047,7 @@ BucketManager.prototype.putBucketLifecycleRule = function (
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
+                data: reqSpec,
                 callback: wrapTryCallback(callbackFunc)
             });
         }
@@ -1067,13 +1068,14 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
         name: name
     };
     const reqSpec = querystring.stringify(reqParams);
-    const reqOp = `/rules/delete?${reqSpec}`;
+    const reqOp = '/rules/delete';
     return this._tryReq({
         serviceName: SERVICE_NAME.UC,
         func: context => {
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
+                data: reqSpec,
                 callback: wrapTryCallback(callbackFunc)
             });
         }
@@ -1107,7 +1109,7 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
         options
     );
     const reqSpec = querystring.stringify(reqParams);
-    const reqOp = `/rules/update?${reqSpec}`;
+    const reqOp = '/rules/update';
 
     return this._tryReq({
         serviceName: SERVICE_NAME.UC,
@@ -1115,6 +1117,7 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
+                data: reqSpec,
                 callback: wrapTryCallback(callbackFunc)
             });
         }
@@ -1134,7 +1137,7 @@ BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc)
         serviceName: SERVICE_NAME.UC,
         func: context => {
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
-            return this._httpClient.post({
+            return this._httpClient.get({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
             });
@@ -1177,7 +1180,7 @@ BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc
 
     // in docs the params should be putted into body
     // keep compatibility with old sdk versions
-    const reqOp = `/events/add?${reqSpec}`;
+    const reqOp = '/events/add';
 
     return this._tryReq({
         serviceName: SERVICE_NAME.UC,
@@ -1185,6 +1188,7 @@ BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
+                data: reqSpec,
                 callback: wrapTryCallback(callbackFunc)
             });
         }
@@ -1213,7 +1217,7 @@ BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackF
     );
 
     const reqSpec = querystring.stringify(reqParams);
-    const reqOp = `/events/update?${reqSpec}`;
+    const reqOp = '/events/update';
 
     return this._tryReq({
         serviceName: SERVICE_NAME.UC,
@@ -1221,6 +1225,7 @@ BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackF
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
+                data: reqSpec,
                 callback: wrapTryCallback(callbackFunc)
             });
         }
@@ -1239,7 +1244,7 @@ BucketManager.prototype.getBucketEvent = function (bucket, callbackFunc) {
         serviceName: SERVICE_NAME.UC,
         func: context => {
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
-            return this._httpClient.post({
+            return this._httpClient.get({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
             });
@@ -1260,7 +1265,7 @@ BucketManager.prototype.deleteBucketEvent = function (bucket, name, callbackFunc
         name: name
     };
     const reqSpec = querystring.stringify(reqParams);
-    const reqOp = `/events/delete?${reqSpec}`;
+    const reqOp = '/events/delete';
 
     return this._tryReq({
         serviceName: SERVICE_NAME.UC,
@@ -1268,6 +1273,7 @@ BucketManager.prototype.deleteBucketEvent = function (bucket, name, callbackFunc
             const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
+                data: reqSpec,
                 callback: wrapTryCallback(callbackFunc)
             });
         }
