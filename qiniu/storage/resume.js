@@ -91,7 +91,7 @@ function PutExtra (
  * @param {'v1' | 'v2' | string} options.uploadApiVersion
  * @param {string} [options.resumeRecordFilePath]
  */
-ResumeUploader.prototype._getRegionsRetrier = function (options) {
+function _getRegionsRetrier (options) {
     const {
         bucketName,
         accessKey,
@@ -147,7 +147,7 @@ ResumeUploader.prototype._getRegionsRetrier = function (options) {
                 }
             });
         });
-};
+}
 
 /**
  * @typedef UploadResult
@@ -185,7 +185,7 @@ ResumeUploader.prototype.putStream = function (
     // Why need retrier even if retryable is false?
     // Because the retrier is used to get the endpoints,
     // which will be initialed by region policy.
-    return this._getRegionsRetrier({
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken),
         retryable: false,
@@ -838,7 +838,7 @@ ResumeUploader.prototype.putFile = function (
         }
     );
 
-    return this._getRegionsRetrier({
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken),
 

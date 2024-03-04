@@ -36,7 +36,7 @@ function FormUploader (config) {
  * @param {boolean} [options.retryable]
  * @returns {Promise<Retrier>}
  */
-FormUploader.prototype._getRegionsRetrier = function (options) {
+function _getRegionsRetrier (options) {
     const {
         bucketName,
         accessKey,
@@ -134,7 +134,7 @@ FormUploader.prototype.putStream = function (
     // Why need retrier even if retryable is false?
     // Because the retrier is used to get the endpoints,
     // which will be initialed by region policy.
-    return this._getRegionsRetrier({
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken),
         retryable: false
@@ -231,7 +231,7 @@ FormUploader.prototype.put = function (
     fsStream.push(null);
 
     // initial retrier and try upload
-    return this._getRegionsRetrier({
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
     })
@@ -368,7 +368,7 @@ FormUploader.prototype.putFile = function (
     );
 
     // initial retrier and try upload
-    return this._getRegionsRetrier({
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
     })

@@ -51,12 +51,12 @@ function BucketManager (mac, config) {
  * @param {Endpoint} endpoint
  * @returns {string}
  */
-BucketManager.prototype._getEndpointVal = function (endpoint) {
+function _getEndpointVal (endpoint) {
     const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
     return endpoint.getValue({
         scheme: preferredScheme
     });
-};
+}
 
 /**
  * @private
@@ -64,7 +64,7 @@ BucketManager.prototype._getEndpointVal = function (endpoint) {
  * @param {SERVICE_NAME} options.serviceName
  * @returns {RetryPolicy[]}
  */
-BucketManager.prototype._getRetryPolicies = function (options) {
+function _getRetryPolicies (options) {
     const {
         regionsProvider,
         serviceName
@@ -78,7 +78,7 @@ BucketManager.prototype._getRetryPolicies = function (options) {
             serviceName
         })
     ];
-};
+}
 
 /**
  * @private
@@ -87,7 +87,7 @@ BucketManager.prototype._getRetryPolicies = function (options) {
  * @param {SERVICE_NAME} options.serviceName
  * @returns {Promise<Retrier>}
  */
-BucketManager.prototype._getRegionsRetrier = function (options) {
+function _getRegionsRetrier (options) {
     const {
         bucketName,
         serviceName
@@ -97,7 +97,7 @@ BucketManager.prototype._getRegionsRetrier = function (options) {
         accessKey: this.mac.accessKey
     })
         .then(regionsProvider => {
-            const retryPolicies = this._getRetryPolicies({
+            const retryPolicies = _getRetryPolicies.call(this, {
                 regionsProvider,
                 serviceName
             });
@@ -106,7 +106,7 @@ BucketManager.prototype._getRegionsRetrier = function (options) {
                 onBeforeRetry: context => context.result && context.result.needRetry()
             });
         });
-};
+}
 
 /**
  * @private
@@ -114,7 +114,7 @@ BucketManager.prototype._getRegionsRetrier = function (options) {
  * @param {EndpointsProvider} options.ucProvider
  * @returns {RetryPolicy[]}
  */
-BucketManager.prototype._getUcRetryPolices = function (options) {
+function _getUcRetryPolices (options) {
     const {
         ucProvider
     } = options;
@@ -123,22 +123,22 @@ BucketManager.prototype._getUcRetryPolices = function (options) {
             endpointsProvider: ucProvider
         })
     ];
-};
+}
 
 /**
  * @private
  * @returns {Retrier}
  */
-BucketManager.prototype._getUcRetrier = function () {
+function _getUcRetrier () {
     const ucProvider = this.config.getUcEndpointsProvider();
     return new Retrier({
-        retryPolicies: this._getUcRetryPolices({
+        retryPolicies: _getUcRetryPolices.call(this, {
             ucProvider
         }),
         onBeforeRetry: context =>
             context.result.needRetry()
     });
-};
+}
 
 /**
  * @param {string} [options.bucketName]
@@ -147,7 +147,7 @@ BucketManager.prototype._getUcRetrier = function () {
  * @returns {Promise<any>}
  * @private
  */
-BucketManager.prototype._tryReq = function (options) {
+function _tryReq (options) {
     const {
         bucketName,
         serviceName,
@@ -155,7 +155,7 @@ BucketManager.prototype._tryReq = function (options) {
     } = options;
 
     if (serviceName === SERVICE_NAME.UC) {
-        const retrier = this._getUcRetrier();
+        const retrier = _getUcRetrier.call(this);
         return retrier.initContext()
             .then(context => retrier.retry({
                 func,
@@ -167,7 +167,7 @@ BucketManager.prototype._tryReq = function (options) {
         return Promise.reject(new Error('Must provide bucket name for non-uc services'));
     }
 
-    return this._getRegionsRetrier({
+    return _getRegionsRetrier.call(this, {
         bucketName,
         serviceName
     })
@@ -179,7 +179,7 @@ BucketManager.prototype._tryReq = function (options) {
             func,
             context
         }));
-};
+}
 
 /**
  * 获取资源信息
@@ -191,11 +191,11 @@ BucketManager.prototype._tryReq = function (options) {
  */
 BucketManager.prototype.stat = function (bucket, key, callbackFunc) {
     const statOp = exports.statOp(bucket, key);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + statOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + statOp;
             return this._httpClient.get({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -220,11 +220,11 @@ BucketManager.prototype.changeMime = function (
     callbackFunc
 ) {
     const changeMimeOp = exports.changeMimeOp(bucket, key, newMime);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + changeMimeOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + changeMimeOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -249,11 +249,11 @@ BucketManager.prototype.changeHeaders = function (
     callbackFunc
 ) {
     const changeHeadersOp = exports.changeHeadersOp(bucket, key, headers);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + changeHeadersOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + changeHeadersOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -283,11 +283,11 @@ BucketManager.prototype.move = function (
     callbackFunc
 ) {
     const moveOp = exports.moveOp(srcBucket, srcKey, destBucket, destKey, options);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: srcBucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + moveOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + moveOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -317,11 +317,11 @@ BucketManager.prototype.copy = function (
     callbackFunc
 ) {
     const copyOp = exports.copyOp(srcBucket, srcKey, destBucket, destKey, options);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: srcBucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + copyOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + copyOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -340,11 +340,11 @@ BucketManager.prototype.copy = function (
  */
 BucketManager.prototype.delete = function (bucket, key, callbackFunc) {
     const deleteOp = exports.deleteOp(bucket, key);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + deleteOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + deleteOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -369,11 +369,11 @@ BucketManager.prototype.deleteAfterDays = function (
     callbackFunc
 ) {
     const deleteAfterDaysOp = exports.deleteAfterDaysOp(bucket, key, days);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + deleteAfterDaysOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + deleteAfterDaysOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -407,11 +407,11 @@ BucketManager.prototype.setObjectLifeCycle = function (
 ) {
     options = options || {};
     const setObjectLifecycleOp = exports.setObjectLifecycleOp(bucket, key, options);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + setObjectLifecycleOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + setObjectLifecycleOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -434,11 +434,11 @@ BucketManager.prototype.fetch = function (resUrl, bucket, key, callbackFunc) {
     const encodedResURL = util.urlsafeBase64Encode(resUrl);
     const fetchOp = `/fetch/${encodedResURL}/to/${encodedEntryURI}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.IO,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + fetchOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + fetchOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -458,11 +458,11 @@ BucketManager.prototype.fetch = function (resUrl, bucket, key, callbackFunc) {
 BucketManager.prototype.prefetch = function (bucket, key, callbackFunc) {
     const encodedEntryURI = util.encodedEntry(bucket, key);
     const prefetchOp = `/prefetch/${encodedEntryURI}`;
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.IO,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + prefetchOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + prefetchOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -487,11 +487,11 @@ BucketManager.prototype.changeType = function (
     callbackFunc
 ) {
     const changeTypeOp = exports.changeTypeOp(bucket, key, newType);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + changeTypeOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + changeTypeOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -521,11 +521,11 @@ BucketManager.prototype.image = function (
         const encodedHost = util.urlsafeBase64Encode(srcHost);
         reqOp += `/host/${encodedHost}`;
     }
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -542,11 +542,11 @@ BucketManager.prototype.image = function (
  */
 BucketManager.prototype.unimage = function (bucket, callbackFunc) {
     const reqOp = `/unimage/${bucket}`;
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -602,11 +602,11 @@ BucketManager.prototype.listPrefix = function (bucket, options, callbackFunc) {
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = `/list?${reqSpec}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RSF,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -663,11 +663,11 @@ BucketManager.prototype.listPrefixV2 = function (bucket, options, callbackFunc) 
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = `/v2/list?${reqSpec}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RSF,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post(
                 {
                     url: requestURL,
@@ -719,11 +719,11 @@ BucketManager.prototype.batch = function (operations, callbackFunc) {
     };
     const reqData = querystring.stringify(reqParams);
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqData,
@@ -944,11 +944,11 @@ BucketManager.prototype.updateObjectStatus = function (
     callbackFunc
 ) {
     const changeStatusOp = exports.changeStatusOp(bucket, key, status);
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + changeStatusOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + changeStatusOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -966,10 +966,10 @@ BucketManager.prototype.updateObjectStatus = function (
 BucketManager.prototype.listBucket = function (callbackFunc) {
     const listBucketOp = '/buckets';
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + listBucketOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + listBucketOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -986,10 +986,10 @@ BucketManager.prototype.listBucket = function (callbackFunc) {
  */
 BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
     const bucketInfoOp = `/v2/bucketInfo?bucket=${bucket}`;
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + bucketInfoOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + bucketInfoOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1041,10 +1041,10 @@ BucketManager.prototype.putBucketLifecycleRule = function (
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = '/rules/add';
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqSpec,
@@ -1069,10 +1069,10 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
     };
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = '/rules/delete';
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqSpec,
@@ -1111,10 +1111,10 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = '/rules/update';
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqSpec,
@@ -1133,10 +1133,10 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
  */
 BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc) {
     const reqOp = `/rules/get?bucket=${bucket}`;
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.get({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1182,10 +1182,10 @@ BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc
     // keep compatibility with old sdk versions
     const reqOp = '/events/add';
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqSpec,
@@ -1219,10 +1219,10 @@ BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackF
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = '/events/update';
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqSpec,
@@ -1240,10 +1240,10 @@ BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackF
 BucketManager.prototype.getBucketEvent = function (bucket, callbackFunc) {
     const reqOp = `/events/get?bucket=${bucket}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.get({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1267,10 +1267,10 @@ BucketManager.prototype.deleteBucketEvent = function (bucket, name, callbackFunc
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = '/events/delete';
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqSpec,
@@ -1311,10 +1311,10 @@ BucketManager.prototype.putReferAntiLeech = function (bucket, options, callbackF
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = `/referAntiLeech?${reqSpec}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1343,10 +1343,10 @@ BucketManager.prototype.putCorsRules = function (bucket, body, callbackFunc) {
     const reqBody = JSON.stringify(body);
     const reqOp = `/corsRules/set/${bucket}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 data: reqBody,
@@ -1364,10 +1364,10 @@ BucketManager.prototype.putCorsRules = function (bucket, body, callbackFunc) {
 BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
     const reqOp = '/corsRules/get/' + bucket;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1384,10 +1384,10 @@ BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
 BucketManager.prototype.putBucketAccessStyleMode = function (bucket, mode, callbackFunc) {
     const reqOp = `/accessMode/${bucket}/mode/${mode}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1415,10 +1415,10 @@ BucketManager.prototype.putBucketMaxAge = function (bucket, options, callbackFun
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = '/maxAge?' + reqSpec;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1448,10 +1448,10 @@ BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbac
     const reqSpec = querystring.stringify(reqParams);
     const reqOp = `/private?${reqSpec}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1489,10 +1489,10 @@ BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc
     const reqSpec = `${reqParams.bucket}/size/${reqParams.size}/count/${reqParams.count}`;
     const reqOp = `/setbucketquota/${reqSpec}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1509,10 +1509,10 @@ BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc
 BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
     const reqOp = '/getbucketquota/' + bucket;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1530,10 +1530,10 @@ BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
 BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
     const reqOp = `/v3/domains?tbl=${bucket}`;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + reqOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
@@ -1553,11 +1553,11 @@ BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFu
     const [bucket] = entry.split(':');
     const restoreArOp = '/restoreAr/' + util.urlsafeBase64Encode(entry) + '/freezeAfterDays/' + freezeAfterDays;
 
-    return this._tryReq({
+    return _tryReq.call(this, {
         bucketName: bucket,
         serviceName: SERVICE_NAME.RS,
         func: context => {
-            const requestURL = this._getEndpointVal(context.endpoint) + restoreArOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + restoreArOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)
