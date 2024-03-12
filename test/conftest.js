@@ -104,7 +104,10 @@ function doAndWrapResultPromises (func) {
                 return;
             }
             resolve({ data, resp });
-        });
+        })
+            .catch(err => {
+                reject(err);
+            });
     });
     return promises;
 }
