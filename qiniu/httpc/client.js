@@ -82,7 +82,8 @@ HttpClient.prototype.sendRequest = function (requestOptions) {
     const resPromise = handle(requestOptions);
 
     if (requestOptions.callback) {
-        // callback error will be chained to result.
+        // user should handle callback error outside.
+        // already wrapped callback for inner usage in storage.
         resPromise.then(({ data, resp }) => {
             requestOptions.callback(null, data, resp);
         });

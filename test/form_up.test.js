@@ -33,7 +33,7 @@ after(function () {
             testFilePath2
         ].map(p => new Promise(resolve => {
             fs.unlink(p, err => {
-                if (err) {
+                if (err && err.code !== 'ENOENT') {
                     console.log(`unlink ${p} failed`, err);
                 }
                 resolve();

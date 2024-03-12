@@ -72,7 +72,7 @@ after(function () {
             testFilePath
         ].map(p => new Promise(resolve => {
             fs.unlink(p, err => {
-                if (err) {
+                if (err && err.code !== 'ENOENT') {
                     console.log(`unlink ${p} failed`, err);
                 }
                 resolve();
@@ -384,22 +384,21 @@ describe('test resume up', function () {
             {
                 name: 'version',
                 values: [
-                    // undefined,
+                    undefined,
                     'v1',
                     'v2'
                 ]
             },
-            // {
-            //     name: 'partSize',
-            //     values: [
-            //         undefined,
-            //         6 * 1024 * 1024
-            //     ]
-            // },
+            {
+                name: 'partSize',
+                values: [
+                    undefined,
+                    6 * 1024 * 1024
+                ]
+            },
             {
                 name: 'fileSizeMB',
-                // values: [2, 4, 6, 10]
-                values: [2, 10]
+                values: [2, 4, 6, 10]
             }
         );
 
@@ -408,7 +407,7 @@ describe('test resume up', function () {
             return Promise.all(
                 filepathListToDelete.map(p => new Promise(resolve => {
                     fs.unlink(p, err => {
-                        if (err) {
+                        if (err && err.code !== 'ENOENT') {
                             console.log(`unlink ${p} failed`, err);
                         }
                         resolve();
