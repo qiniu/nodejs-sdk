@@ -933,4 +933,81 @@ describe('test start bucket manager', function () {
             );
         });
     });
+
+    describe('test PutPolicy', function () {
+        it('test build-in options (backward compatibility)', function () {
+            const buildInProps = {
+                scope: 'mocked-bucket:some/key',
+                isPrefixalScope: 1,
+                insertOnly: 1,
+                saveKey: 'some/key/specified.mp4',
+                forceSaveKey: true,
+                endUser: 'some-user-id',
+                returnUrl: 'https://mocked.qiniu.com/put-policy/return-url',
+                returnBody: '{"msg": "mocked"}',
+                callbackUrl: 'https://mocked.qiniu.com/put-policy/callback-url',
+                callbackHost: 'mocked.qiniu.com',
+                callbackBody: '{"msg": "mocked"}',
+                callbackBodyType: 'application/json',
+                callbackFetchKey: 1,
+                persistentOps: 'avthumb/flv|saveas/bW9ja2VkLWJ1Y2tldDpzb21lL2tleS9zcGVjaWZpZWQuZmx2Cg==',
+                persistentNotifyUrl: 'https://mocked.qiniu.com/put-policy/persistent-notify-url',
+                persistentPipeline: 'mocked-pipe',
+                fsizeLimit: 104857600,
+                fsizeMin: 10485760,
+                detectMime: 1,
+                mimeLimit: 'video/*',
+                deleteAfterDays: 365,
+                fileType: 1
+            };
+            const policy = new qiniu.rs.PutPolicy(buildInProps);
+            for (const k of Object.keys(buildInProps)) {
+                should.equal(policy[k], buildInProps[k], `key ${k}, ${policy[k]} not eql ${buildInProps[k]}`);
+            }
+            const flags = policy.getFlags();
+            for (const k of Object.keys(buildInProps)) {
+                should.equal(flags[k], buildInProps[k], `key ${k}, ${policy[k]} not eql ${buildInProps[k]}`);
+            }
+        });
+
+        it('test expires option default value', function () {
+            const putPolicyOptions = {
+                scope: 'mocked-bucket:some/key'
+            };
+            const policy = new qiniu.rs.PutPolicy(putPolicyOptions);
+
+            // deviation should be less than 1sec
+            const deviation = policy.getFlags().deadline - Math.floor(Date.now() / 1000) - 3600;
+            Math.abs(deviation).should.lessThan(1);
+        });
+
+        it('test expires option', function () {
+            const expires = 604800;
+            const putPolicyOptions = {
+                scope: 'mocked-bucket:some/key',
+                expires: expires
+            };
+            const policy = new qiniu.rs.PutPolicy(putPolicyOptions);
+
+            // deviation should be less than 1sec
+            const deviation = policy.getFlags().deadline - Math.floor(Date.now() / 1000) - expires;
+            Math.abs(deviation).should.lessThan(1);
+        });
+
+        it('test custom options', function () {
+            const putPolicyOptions = {
+                scope: 'mocked-bucket:some/key',
+                mockedProp: 'mockedProp',
+                transform: 'some',
+                transform_fallback_mode: 'bar',
+                transform_fallback_key: 'foo'
+            };
+            const policy = new qiniu.rs.PutPolicy(putPolicyOptions);
+            const flags = policy.getFlags();
+
+            for (const k of Object.keys(putPolicyOptions)) {
+                should.equal(flags[k], putPolicyOptions[k], `key ${k}, ${policy[k]} not eql ${putPolicyOptions[k]}`);
+            }
+        });
+    });
 });

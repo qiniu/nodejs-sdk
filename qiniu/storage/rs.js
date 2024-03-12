@@ -1362,58 +1362,83 @@ function restoreArReq (mac, config, entry, freezeAfterDays, callbackFunc) {
     );
 }
 
-// 上传策略
-// @link https://developer.qiniu.com/kodo/manual/1206/put-policy
-function PutPolicy(options) {
-    if (typeof options !== 'object') {
-        throw new Error('invalid putpolicy options');
-    }
-
-    this.scope = options.scope || null;
-    this.isPrefixalScope = options.isPrefixalScope || null;
-    this.expires = options.expires || 3600;
-    this.insertOnly = options.insertOnly || null;
-
-    this.saveKey = options.saveKey || null;
-    this.forceSaveKey = options.forceSaveKey || null;
-    this.endUser = options.endUser || null;
-
-    this.returnUrl = options.returnUrl || null;
-    this.returnBody = options.returnBody || null;
-
-    this.callbackUrl = options.callbackUrl || null;
-    this.callbackHost = options.callbackHost || null;
-    this.callbackBody = options.callbackBody || null;
-    this.callbackBodyType = options.callbackBodyType || null;
-    this.callbackFetchKey = options.callbackFetchKey || null;
-
-    this.persistentOps = options.persistentOps || null;
-    this.persistentNotifyUrl = options.persistentNotifyUrl || null;
-    this.persistentPipeline = options.persistentPipeline || null;
-
-    this.fsizeLimit = options.fsizeLimit || null;
-    this.fsizeMin = options.fsizeMin || null;
-    this.mimeLimit = options.mimeLimit || null;
-
-    this.detectMime = options.detectMime || null;
-    this.deleteAfterDays = options.deleteAfterDays || null;
-    this.fileType = options.fileType || null;
-}
-
-PutPolicy.prototype.getFlags = function () {
-    var flags = {};
-    var attrs = ['scope', 'isPrefixalScope', 'insertOnly', 'saveKey', 'forceSaveKey',
+// just for compatibility with old sdk versions
+function _putPolicyBuildInKeys () {
+    return ['scope', 'isPrefixalScope', 'insertOnly', 'saveKey', 'forceSaveKey',
         'endUser', 'returnUrl', 'returnBody', 'callbackUrl', 'callbackHost',
         'callbackBody', 'callbackBodyType', 'callbackFetchKey', 'persistentOps',
         'persistentNotifyUrl', 'persistentPipeline', 'fsizeLimit', 'fsizeMin',
         'detectMime', 'mimeLimit', 'deleteAfterDays', 'fileType'
     ];
+}
 
-    for (var i = attrs.length - 1; i >= 0; i--) {
-        if (this[attrs[i]] !== null) {
-            flags[attrs[i]] = this[attrs[i]];
-        }
+/**
+ * @typedef PutPolicyOptions
+ * @extends Object.<string, string | number>
+ * @property {string} scope
+ * @property {number} [isPrefixalScope]
+ * @property {number} [expires]
+ * @property {number} [insertOnly]
+ * @property {string} [saveKey]
+ * @property {string} [forceSaveKey]
+ * @property {string} [endUser]
+ * @property {string} [returnUrl]
+ * @property {string} [returnBody]
+ * @property {string} [callbackUrl]
+ * @property {string} [callbackHost]
+ * @property {string} [callbackBody]
+ * @property {string} [callbackBodyType]
+ * @property {number} [callbackFetchKey]
+ * @property {string} [persistentOps]
+ * @property {string} [persistentNotifyUrl]
+ * @property {string} [persistentPipeline]
+ * @property {number} [fsizeLimit]
+ * @property {number} [fsizeMin]
+ * @property {string} [mimeLimit]
+ * @property {number} [detectMime]
+ * @property {number} [deleteAfterDays]
+ * @property {number} [fileType]
+ * @property {string} [transform] Deprecated
+ * @property {string} [transformFallbackMode] Deprecated
+ * @property {string} [transformFallbackKey] Deprecated
+ */
+
+/**
+ * 上传策略
+ * @link https://developer.qiniu.com/kodo/manual/1206/put-policy
+ * @param {PutPolicyOptions} options
+ * @constructor
+ * @extends Object.<string, string | number>
+ */
+function PutPolicy (options) {
+    if (typeof options !== 'object') {
+        throw new Error('invalid putpolicy options');
     }
+
+    Object.keys(options).forEach(k => {
+        if (k === 'expires') {
+            return;
+        }
+        this[k] = options[k];
+    });
+
+    this.expires = options.expires || 3600;
+    _putPolicyBuildInKeys().forEach(k => {
+        if (this[k] === undefined) {
+            this[k] = this[k] || null;
+        }
+    });
+}
+
+PutPolicy.prototype.getFlags = function () {
+    const flags = {};
+
+    Object.keys(this).forEach(k => {
+        if (k === 'expires' || this[k] === null) {
+            return;
+        }
+        flags[k] = this[k];
+    });
 
     flags.deadline = this.expires + Math.floor(Date.now() / 1000);
 
@@ -1422,10 +1447,13 @@ PutPolicy.prototype.getFlags = function () {
 
 PutPolicy.prototype.uploadToken = function (mac) {
     mac = mac || new digest.Mac();
-    var flags = this.getFlags();
-    var encodedFlags = util.urlsafeBase64Encode(JSON.stringify(flags));
-    var encoded = util.hmacSha1(encodedFlags, mac.secretKey);
-    var encodedSign = util.base64ToUrlSafe(encoded);
-    var uploadToken = mac.accessKey + ':' + encodedSign + ':' + encodedFlags;
-    return uploadToken;
+    const flags = this.getFlags();
+    const encodedFlags = util.urlsafeBase64Encode(JSON.stringify(flags));
+    const encoded = util.hmacSha1(encodedFlags, mac.secretKey);
+    const encodedSign = util.base64ToUrlSafe(encoded);
+    return [
+        mac.accessKey,
+        encodedSign,
+        encodedFlags
+    ].join(':');
 };

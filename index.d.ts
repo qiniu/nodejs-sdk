@@ -1478,6 +1478,7 @@ export declare namespace rs {
         expires?: number;
         insertOnly?: number;
         saveKey?: string;
+        forceSaveKey?: boolean;
         endUser?: string;
         returnUrl?: string;
         returnBody?: string;
@@ -1498,8 +1499,19 @@ export declare namespace rs {
         detectMime?: number;
         deleteAfterDays?: number;
         fileType?: number;
+
+        // @deprecated
+        transform?: string;
+        // @deprecated
+        transformFallbackMode?: string;
+        // @deprecated
+        transformFallbackKey?: string;
+
+        [key: string]: string | number | boolean;
     }
     class PutPolicy {
+        [k: string]: string | number | boolean | Function;
+
         constructor(options?: PutPolicyOptions);
 
         getFlags(): any;
