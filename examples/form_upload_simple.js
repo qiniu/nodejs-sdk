@@ -1,6 +1,6 @@
 const os = require('os');
 
-const qiniu = require('qiniu');
+const qiniu = require('../index');
 
 const bucket = process.env.QINIU_TEST_BUCKET;
 const accessKey = process.env.QINIU_ACCESS_KEY;
@@ -26,18 +26,16 @@ formUploader.putFile(
     uploadToken,
     'frontend-static-resource/widgets/_next/static/css/83eda6926b94bb14.css',
     localFile,
-    putExtra,
-    function (respErr,
-        respBody, respInfo) {
-        if (respErr) {
-            throw respErr;
-        }
-
-        if (respInfo.statusCode === 200) {
-            console.log(respBody);
+    putExtra
+)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
         } else {
-            console.log(respInfo.statusCode);
-            console.log(respBody);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-    }
-);
+    })
+    .catch(err => {
+        console.log('put failed', err);
+    });

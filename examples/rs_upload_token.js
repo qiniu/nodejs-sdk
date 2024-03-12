@@ -1,13 +1,12 @@
 const qiniu = require('qiniu');
-const proc = require('process');
 
-var accessKey = proc.env.QINIU_ACCESS_KEY;
-var secretKey = proc.env.QINIU_SECRET_KEY;
-var bucket = proc.env.QINIU_TEST_BUCKET;
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-var putPolicy = new qiniu.rs.PutPolicy({
+const accessKey = process.env.QINIU_ACCESS_KEY;
+const secretKey = process.env.QINIU_SECRET_KEY;
+const bucket = process.env.QINIU_TEST_BUCKET;
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const putPolicy = new qiniu.rs.PutPolicy({
     scope: bucket
 });
 
-var uploadToken = putPolicy.uploadToken(mac);
+const uploadToken = putPolicy.uploadToken(mac);
 console.log(uploadToken);

@@ -4,18 +4,17 @@ const Readable = require('stream').Readable;
 
 const getCrc32 = require('crc32');
 const mime = require('mime');
-const formstream = require('formstream');
+const FormStream = require('formstream');
 
 const conf = require('../conf');
 const util = require('../util');
 const rpc = require('../rpc');
-
-const {
-    prepareRegionsProvider,
-    doWorkWithRetry,
-    ChangeEndpointRetryPolicy,
-    ChangeRegionRetryPolicy
-} = require('./internal');
+const { SERVICE_NAME } = require('../httpc/region');
+const { ResponseWrapper } = require('../httpc/responseWrapper');
+const { EndpointsRetryPolicy } = require('../httpc/endpointsRetryPolicy');
+const { RegionsRetryPolicy } = require('../httpc/regionsRetryPolicy');
+const { Retrier } = require('../retry');
+const { wrapTryCallback } = require('./internal');
 
 exports.FormUploader = FormUploader;
 exports.PutExtra = PutExtra;
@@ -27,17 +26,49 @@ exports.PutExtra = PutExtra;
  */
 function FormUploader (config) {
     this.config = config || new conf.Config();
-
-    // RetryPolicy API sign isn't stable not export to user
-    // Internal usage only
-    this.retryPolicies = [
-        new ChangeEndpointRetryPolicy(),
-        new ChangeRegionRetryPolicy()
-    ];
 }
 
 /**
+ * @private
+ * @param {Object} options
+ * @param {string} options.accessKey
+ * @param {string} options.bucketName
+ * @param {boolean} [options.retryable]
+ * @returns {Promise<Retrier>}
+ */
+function _getRegionsRetrier (options) {
+    const {
+        bucketName,
+        accessKey,
+        retryable = true
+    } = options;
+
+    return this.config.getRegionsProvider({
+        bucketName,
+        accessKey
+    })
+        .then(regionsProvider => {
+            const retryPolicies = [
+                new EndpointsRetryPolicy({
+                    skipInitContext: true
+                }),
+                new RegionsRetryPolicy({
+                    regionsProvider,
+                    serviceName: SERVICE_NAME.UP
+                })
+            ];
+
+            return new Retrier({
+                retryPolicies,
+                onBeforeRetry: context => retryable && context.result.needRetry()
+            });
+        });
+};
+
+/**
  * 上传可选参数
+ * @class
+ * @constructor
  * @param {string} [fname] 请求体中的文件的名称
  * @param {Object} [params] 额外参数设置，参数名称必须以x:开头
  * @param {string} [mimeType] 指定文件的mimeType
@@ -90,7 +121,7 @@ FormUploader.prototype.putStream = function (
     putExtra,
     callbackFunc
 ) {
-    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
 
     // PutExtra
     putExtra = getDefaultPutExtra(
@@ -100,55 +131,73 @@ FormUploader.prototype.putStream = function (
         }
     );
 
-    fsStream.on('error', function (err) {
-        callbackFunc(err, null, null);
-    });
-
-    // RegionsProvider
-    return prepareRegionsProvider({
-        config: this.config,
+    // Why need retrier even if retryable is false?
+    // Because the retrier is used to get the endpoints,
+    // which will be initialed by region policy.
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
-        accessKey: util.getAKFromUptoken(uploadToken)
+        accessKey: util.getAKFromUptoken(uploadToken),
+        retryable: false
     })
-        .then(regionsProvider => {
-            return doWorkWithRetry({
-                workFn: sendPutReq,
-
-                callbackFunc,
-                regionsProvider,
-                // stream not support retry
-                retryPolicies: []
-            });
-        });
-
-    function sendPutReq (endpoint) {
-        const endpointValue = endpoint.getValue({
-            scheme: preferScheme
-        });
-
-        const postForm = createMultipartForm(
-            uploadToken,
-            key,
-            fsStream,
-            putExtra
-        );
-        return new Promise(resolve => {
-            putReq(
-                endpointValue,
-                postForm,
-                (err, ret, info) => resolve({ err, ret, info })
-            );
-        });
-    }
+        .then(retrier => Promise.all([
+            retrier,
+            retrier.initContext()
+        ]))
+        .then(([retrier, context]) => retrier.retry({
+            func: context => putReq(
+                context.endpoint.getValue({ scheme: preferredScheme }),
+                uploadToken,
+                key,
+                fsStream,
+                putExtra,
+                callbackFunc
+            ),
+            context
+        }));
 };
 
 /**
  * @param {string} upDomain
- * @param {formstream} postForm
+ * @param {string} uploadToken
+ * @param {string} key
+ * @param {Readable} fsStream
+ * @param {PutExtra} putExtra
  * @param {reqCallback} callbackFunc
  */
-function putReq (upDomain, postForm, callbackFunc) {
-    rpc.postMultipart(upDomain, postForm, callbackFunc);
+function putReq (
+    upDomain,
+    uploadToken,
+    key,
+    fsStream,
+    putExtra,
+    callbackFunc
+) {
+    const postForm = createMultipartForm(
+        uploadToken,
+        key,
+        fsStream,
+        putExtra
+    );
+    const wrappedCallback = wrapTryCallback(callbackFunc);
+    return new Promise((resolve, reject) => {
+        rpc.postMultipart(
+            upDomain,
+            postForm,
+            function (err, data, resp) {
+                if (err) {
+                    err.resp = resp;
+                    reject(err);
+                    wrappedCallback(err, data, resp);
+                    return;
+                }
+                resolve(new ResponseWrapper({
+                    data,
+                    resp
+                }));
+                wrappedCallback(err, data, resp);
+            }
+        );
+    });
 }
 
 /**
@@ -167,7 +216,7 @@ FormUploader.prototype.put = function (
     putExtra,
     callbackFunc
 ) {
-    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
 
     // initial PutExtra
     putExtra = getDefaultPutExtra(
@@ -177,48 +226,36 @@ FormUploader.prototype.put = function (
         }
     );
 
-    // initial RegionsProvider
-    return prepareRegionsProvider({
-        config: this.config,
+    const fsStream = new Readable();
+    fsStream.push(body);
+    fsStream.push(null);
+
+    // initial retrier and try upload
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
     })
-        .then(regionsProvider => {
-            return doWorkWithRetry({
-                workFn: sendPutReq,
+        .then(retrier => Promise.all([
+            retrier,
+            retrier.initContext()
+        ]))
+        .then(([retrier, context]) => retrier.retry({
+            func: context => {
+                const fsStream = new Readable();
+                fsStream.push(body);
+                fsStream.push(null);
 
-                callbackFunc,
-                regionsProvider,
-                retryPolicies: this.retryPolicies
-            });
-        });
-
-    function sendPutReq (endpoint) {
-        const fsStream = new Readable();
-        fsStream.push(body);
-        fsStream.push(null);
-
-        const endpointValue = endpoint.getValue({
-            scheme: preferScheme
-        });
-
-        const postForm = createMultipartForm(
-            uploadToken,
-            key,
-            fsStream,
-            putExtra
-        );
-
-        return new Promise(resolve => {
-            putReq(
-                endpointValue,
-                postForm,
-                (err, ret, info) => {
-                    resolve({ err, ret, info });
-                }
-            );
-        });
-    }
+                return putReq(
+                    context.endpoint.getValue({ scheme: preferredScheme }),
+                    uploadToken,
+                    key,
+                    fsStream,
+                    putExtra,
+                    callbackFunc
+                );
+            },
+            context
+        }));
 };
 
 /**
@@ -242,10 +279,10 @@ FormUploader.prototype.putWithoutKey = function (
  * @param {string | null} key
  * @param {stream.Readable} fsStream
  * @param {PutExtra | null} putExtra
- * @returns {formstream}
+ * @returns {FormStream}
  */
 function createMultipartForm (uploadToken, key, fsStream, putExtra) {
-    const postForm = formstream();
+    const postForm = new FormStream();
     postForm.field('token', uploadToken);
     if (key != null) {
         postForm.field('key', key);
@@ -311,7 +348,7 @@ FormUploader.prototype.putFile = function (
     putExtra,
     callbackFunc
 ) {
-    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
 
     // initial PutExtra
     putExtra = putExtra || new PutExtra();
@@ -330,43 +367,30 @@ FormUploader.prototype.putFile = function (
         }
     );
 
-    // initial RegionsProvider
-    return prepareRegionsProvider({
-        config: this.config,
+    // initial retrier and try upload
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
     })
-        .then(regionsProvider => {
-            return doWorkWithRetry({
-                workFn: sendPutReq,
+        .then(retrier => Promise.all([
+            retrier,
+            retrier.initContext()
+        ]))
+        .then(([retrier, context]) => retrier.retry({
+            func: context => {
+                const fsStream = fs.createReadStream(localFile);
 
-                callbackFunc,
-                regionsProvider,
-                retryPolicies: this.retryPolicies
-            });
-        });
-
-    function sendPutReq (endpoint) {
-        const fsStream = fs.createReadStream(localFile);
-        const endpointValue = endpoint.getValue({
-            scheme: preferScheme
-        });
-        const postForm = createMultipartForm(
-            uploadToken,
-            key,
-            fsStream,
-            putExtra
-        );
-        return new Promise(resolve => {
-            putReq(
-                endpointValue,
-                postForm,
-                (err, ret, info) => {
-                    resolve({ err, ret, info });
-                }
-            );
-        });
-    }
+                return putReq(
+                    context.endpoint.getValue({ scheme: preferredScheme }),
+                    uploadToken,
+                    key,
+                    fsStream,
+                    putExtra,
+                    callbackFunc
+                );
+            },
+            context
+        }));
 };
 
 /** 上传本地文件
@@ -389,7 +413,7 @@ FormUploader.prototype.putFileWithoutKey = function (
  * @param {PutExtra} putExtra
  * @param {Object} options
  * @param {string} options.key
- * @return {PutExtra}
+ * @returns {PutExtra}
  */
 function getDefaultPutExtra (putExtra, options) {
     putExtra = putExtra || new PutExtra();

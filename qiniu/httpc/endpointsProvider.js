@@ -1,28 +1,4 @@
 /**
- * @interface EndpointsProvider
- */
-
-/**
- * @function
- * @name EndpointsProvider#getEndpoints
- * @returns {Promise<Endpoint[]>}
- */
-
-/**
- * @interface MutableEndpointsProvider
- * @extends EndpointsProvider
- */
-
-/**
- * @function
- * @name MutableEndpointsProvider#setEndpoints
- * @param {endpoints: Endpoint[]} endpoints
- * @returns {Promise<void>}
- */
-
-// --- could split to files if migrate to typescript --- //
-
-/**
  * @class
  * @implements EndpointsProvider
  * @property {Endpoint[]} endpoints

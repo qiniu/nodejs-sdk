@@ -1,417 +1,577 @@
 const should = require('should');
-const assert = require('assert');
-const qiniu = require('../index.js');
-const proc = require('process');
-const urllib = require('urllib');
-const console = require('console');
+
 const mockDate = require('mockdate');
 
-// eslint-disable-next-line no-undef
-before(function (done) {
-    if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY || !process.env.QINIU_TEST_BUCKET || !process.env.QINIU_TEST_DOMAIN) {
-        console.log('should run command `source test-env.sh` first\n');
-        process.exit(0);
-    }
-    done();
+const qiniu = require('../index.js');
+
+const {
+    getEnvConfig,
+    checkEnvConfigAndExit,
+    doAndWrapResultPromises
+} = require('./conftest');
+
+before(function () {
+    checkEnvConfigAndExit();
 });
 
-// eslint-disable-next-line no-undef
 describe('test start bucket manager', function () {
     this.timeout(0);
 
-    var accessKey = proc.env.QINIU_ACCESS_KEY;
-    var secretKey = proc.env.QINIU_SECRET_KEY;
-    var srcBucket = proc.env.QINIU_TEST_BUCKET;
-    var domain = proc.env.QINIU_TEST_DOMAIN;
-    var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-    var config = new qiniu.conf.Config();
+    const {
+        accessKey,
+        secretKey,
+        bucketName,
+        domain
+    } = getEnvConfig();
+    // const srcBucket = bucketName;
+    const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+    const config = new qiniu.conf.Config();
     // config.useCdnDomain = true;
-    config.useHttpsDomain = true;
-    var bucketManager = new qiniu.rs.BucketManager(mac, config);
+    // config.useHttpsDomain = true;
+    const bucketManager = new qiniu.rs.BucketManager(mac, config);
 
+    // clean up objects after test
     const keysToDeleteAfter = [];
-    after(function (done) {
+    after(function () {
         const deleteOps = [];
         keysToDeleteAfter.forEach(function (key) {
-            deleteOps.push(qiniu.rs.deleteOp(srcBucket, key));
+            deleteOps.push(qiniu.rs.deleteOp(bucketName, key));
         });
 
-        deleteOps.length && bucketManager.batch(deleteOps, function (respErr, respBody) {
-            respBody.forEach(function (ret, i) {
-                ret.code.should.be.eql(
-                    200,
-                    JSON.stringify({
-                        key: keysToDeleteAfter[i],
-                        ret: ret
-                    })
-                );
+        if (!deleteOps.length) {
+            return;
+        }
+
+        return bucketManager.batch(deleteOps)
+            .then(({ data, resp }) => {
+                if (!Array.isArray(data)) {
+                    console.log(resp);
+                    return;
+                }
+                data.forEach(function (ret, i) {
+                    ret.code.should.be.oneOf(200, 612);
+                });
             });
-            done();
-        });
     });
 
-    // TODO: using this method to wrapper all operation. done tests:
-    //       - restoreAr
-    //       - setObjectLifecycle
-    function testObjectOperationWrapper (destBucket, destObjectKey, callback) {
+    /**
+     * copy an object to new object with random key
+     * the new object will be auto clean after test
+     * @param {string} destBucket
+     * @param {string} destObjectKey
+     * @returns {Promise<string>}
+     */
+    function getObjectRandomKey (destBucket, destObjectKey, autoCleanup = true) {
         const srcKey = 'qiniu.mp4';
-        const destKey = destObjectKey + Math.random();
+        const destKey = destObjectKey + Math.floor(Math.random() * 100000);
         const options = {
             force: true
         };
-        bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options,
-            function (err, respBody, respInfo) {
-                // console.log(respBody);
-                should.not.exist(err);
-                respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                keysToDeleteAfter.push(destKey);
-                callback(destKey);
+        return bucketManager.copy(bucketName, srcKey, destBucket, destKey, options)
+            .then(({ resp }) => {
+                resp.statusCode.should.be.eql(200, JSON.stringify(resp));
+                if (autoCleanup) {
+                    keysToDeleteAfter.push(destKey);
+                }
+                return destKey;
             });
     }
-    // test stat
-    // eslint-disable-next-line no-undef
+
     describe('test stat', function () {
-        // eslint-disable-next-line no-undef
-        it('test stat', function (done) {
-            var bucket = srcBucket;
-            var key = 'qiniu.mp4';
-            bucketManager.stat(bucket, key, function (err, respBody,
-                respInfo) {
-                console.log(respBody, respInfo);
-                should.not.exist(err);
-                respBody.should.have.keys('hash', 'fsize', 'mimeType',
-                    'putTime', 'type');
-                done();
-            });
+        it('test stat', function () {
+            const key = 'qiniu.mp4';
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.stat(bucketName, key, callback)
+            );
+
+            const checkFunc = ({ data, resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                data.should.have.keys(
+                    'hash',
+                    'fsize',
+                    'mimeType',
+                    'putTime',
+                    'type'
+                );
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test privateDownloadUrl', function () {
-        it('test privateDownloadUrl', function (done) {
-            var key = 'test_file';
-            var url = bucketManager.privateDownloadUrl('http://' + domain, key, 20);
-            urllib.request(url, function (err, respBody, respInfo) {
-                console.log(respBody.toString(), respInfo);
-                should.not.exist(err);
-                should.equal(respInfo.status, 200);
-                done();
-            });
-        });
-    });
-
-    // test copy and move and delete
-    // eslint-disable-next-line no-undef
-    describe('test copy', function () {
-        // eslint-disable-next-line no-undef
-        it('test copy', function (done) {
-            var destBucket = srcBucket;
-            var srcKey = 'qiniu.mp4';
-            var destKey = 'qiniu_copy.mp4';
-            var options = {
-                force: true
-            };
-            bucketManager.copy(srcBucket, srcKey, destBucket, destKey,
-                options,
-                function (err, respBody, respInfo) {
-                    // console.log(respBody);
-                    should.not.exist(err);
-                    assert.strictEqual(respInfo.statusCode, 200);
-                    done();
-
-                    // test move
-                    // eslint-disable-next-line no-undef
-                    describe('test move', function () {
-                        var moveDestKey = 'qiniu_move.mp4';
-                        // eslint-disable-next-line no-undef
-                        it('test move', function (done1) {
-                            bucketManager.move(destBucket, destKey,
-                                destBucket, moveDestKey, options,
-                                function (err1, ret1, info1) {
-                                    should.not.exist(err1);
-                                    assert.strictEqual(info1.statusCode, 200);
-                                    done1();
-
-                                    // test delete
-                                    // eslint-disable-next-line no-undef
-                                    describe('test delete', function () {
-                                        // eslint-disable-next-line no-undef
-                                        it('test delete', function (
-                                            done2) {
-                                            bucketManager.delete(
-                                                destBucket,
-                                                moveDestKey,
-                                                function (err2, ret2,
-                                                    info2) {
-                                                    should.not.exist(
-                                                        err2);
-                                                    assert.strictEqual(info2.statusCode,
-                                                        200);
-                                                    done2();
-                                                });
-                                        });
-                                    });
-                                });
-                        });
-                    });
+        it('test privateDownloadUrl', function () {
+            const key = 'test_file';
+            const url = bucketManager.privateDownloadUrl('http://' + domain, key, 20);
+            return qiniu.rpc.qnHttpClient.sendRequest({
+                url: url,
+                urllibOptions: {
+                    method: 'GET'
+                }
+            })
+                .then(({ resp }) => {
+                    should.equal(resp.statusCode, 200, JSON.stringify(resp));
                 });
         });
     });
 
-    // test copy and deleteAfterDays
-    describe('test copy', function () {
-        it('test copy', function (done) {
-            var destBucket = srcBucket;
-            var srcKey = 'qiniu.mp4';
-            var destKey = 'qiniu_delete_after_days.mp4';
-            var options = {
+    describe('test move', function () {
+        it('test move to exist object without force', function () {
+            const destBucket = bucketName;
+            const destKey = 'qiniu-move-non-force';
+
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(destBucket, destKey)
+                    .then(key => Promise.all([
+                        key,
+                        getObjectRandomKey(destBucket, destKey)
+                    ]))
+                    .then(([key, existKey]) =>
+                        bucketManager.move(
+                            destBucket,
+                            key,
+                            destBucket,
+                            existKey,
+                            undefined,
+                            callback
+                        )
+                    )
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 614, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        it('test move to exist object with force', function () {
+            const destBucket = bucketName;
+            const destKey = 'qiniu-move-force';
+            const options = {
                 force: true
             };
-            bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options,
-                function (err, respBody, respInfo) {
-                    // console.log(respBody);
-                    should.not.exist(err);
-                    assert.strictEqual(respInfo.statusCode, 200);
-                    done();
 
-                    // test deleteAfterDays
-                    describe('test deleteAfterDays', function () {
-                        it('test deleteAfterDays', function (done1) {
-                            bucketManager.deleteAfterDays(destBucket, destKey, 1,
-                                function (err1, ret1, info1) {
-                                    should.not.exist(err1);
-                                    assert.strictEqual(info1.statusCode, 200);
-                                    done1();
-                                });
-                        });
-                    });
-                });
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(destBucket, destKey)
+                    .then(key => Promise.all([
+                        key,
+                        getObjectRandomKey(destBucket, destKey)
+                    ]))
+                    .then(([key, existKey]) =>
+                        bucketManager.move(
+                            destBucket,
+                            key,
+                            destBucket,
+                            existKey,
+                            options,
+                            callback
+                        )
+                    )
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
-    // eslint-disable-next-line no-undef
+    // test copy
+    describe('test copy', function () {
+        it('test copy to exist object without force', function () {
+            const destBucket = bucketName;
+            const destKey = 'qiniu-copy-non-force';
+
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(destBucket, destKey)
+                    .then(key => Promise.all([
+                        key,
+                        getObjectRandomKey(destBucket, destKey)
+                    ]))
+                    .then(([key, existKey]) =>
+                        bucketManager.copy(
+                            destBucket,
+                            key,
+                            destBucket,
+                            existKey,
+                            undefined,
+                            callback
+                        )
+                    )
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 614, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        it('test copy to exist object without force', function () {
+            const destBucket = bucketName;
+            const destKey = 'qiniu-copy-force';
+            const options = {
+                force: true
+            };
+
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(destBucket, destKey)
+                    .then(key => Promise.all([
+                        key,
+                        getObjectRandomKey(destBucket, destKey)
+                    ]))
+                    .then(([key, existKey]) =>
+                        bucketManager.copy(
+                            destBucket,
+                            key,
+                            destBucket,
+                            existKey,
+                            options,
+                            callback
+                        )
+                    )
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+    });
+
     describe('test fetch', function () {
-        // eslint-disable-next-line no-undef
-        it('test fetch', function (done) {
+        it('test fetch', function () {
             const resUrl = 'http://devtools.qiniu.com/qiniu.png';
-            const bucket = srcBucket;
+            const bucket = bucketName;
             const key = 'qiniu.png';
 
-            bucketManager.fetch(resUrl, bucket, key,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err, respInfo);
-                    respBody.should.have.keys(
-                        'hash',
-                        'fsize',
-                        'mimeType',
-                        'key'
-                    );
-                    done();
-                }
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.fetch(resUrl, bucket, key, callback)
             );
-        });
-    });
 
-    // eslint-disable-next-line no-undef
-    describe('test changeMime', function () {
-        // eslint-disable-next-line no-undef
-        it('test changeMime', function (done) {
-            var key = 'test_file';
-            var bucket = srcBucket;
-
-            bucketManager.changeMime(bucket, key, 'text/html',
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    assert.strictEqual(respInfo.statusCode, 200);
-                    done();
-                }
-            );
-        });
-    });
-
-    // eslint-disable-next-line no-undef
-    describe('test changeHeaders', function () {
-        // eslint-disable-next-line no-undef
-        it('test changeHeaders', function (done) {
-            var key = 'test_file';
-            var bucket = srcBucket;
-
-            bucketManager.changeHeaders(bucket, key, {
-                'Content-Type': 'text/plain',
-                'Last-Modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
-                'x-qn-test-custom-header': '0'
-            }, function (err, respBody, respInfo) {
-                console.log(respInfo);
-                should.not.exist(err);
-                assert.strictEqual(respInfo.statusCode, 200);
-                done();
-            });
-        });
-    });
-
-    // stat file and changeType
-    describe('test changeType', function () {
-        it('test changeType', function (done) {
-            var key = 'test_file';
-            var bucket = srcBucket;
-            bucketManager.stat(bucket, key, function (e, res, info) {
-                should.not.exist(e);
-                assert.strictEqual(info.statusCode, 200);
-                var type = res.type === 1 ? 0 : 1;
-                bucketManager.changeType(bucket, key, type,
-                    function (err, respBody, respInfo) {
-                        should.not.exist(err);
-                        assert.strictEqual(respInfo.statusCode, 200);
-                        done();
-                    }
+            const checkFunc = ({ data, resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                data.should.have.keys(
+                    'hash',
+                    'fsize',
+                    'mimeType',
+                    'key'
                 );
-            });
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+    });
+
+    describe('test changeMime', function () {
+        it('test changeMime', function () {
+            let actualKey = '';
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'change-mime')
+                    .then(key => {
+                        actualKey = key;
+                        return key;
+                    })
+                    .then(key =>
+                        bucketManager.changeMime(bucketName, key, 'text/html', callback)
+                    )
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                return bucketManager.stat(bucketName, actualKey)
+                    .then(({ data, resp: statResp }) => {
+                        should.equal(data.mimeType, 'text/html', JSON.stringify(statResp));
+                    });
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+    });
+
+    describe('test changeHeaders', function () {
+        it('test changeHeaders', function () {
+            let actualKey = '';
+
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'change-headers')
+                    .then(key => {
+                        actualKey = key;
+                        return key;
+                    })
+                    .then(key =>
+                        bucketManager.changeHeaders(
+                            bucketName,
+                            key,
+                            {
+                                'Content-Type': 'text/plain',
+                                'Last-Modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
+                                'x-qn-test-custom-header': '0'
+                            },
+                            callback
+                        )
+                    )
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                return bucketManager.stat(bucketName, actualKey)
+                    .then(({ data }) => {
+                        data['x-qn-meta'].should.containEql({
+                            '!Content-Type': 'text/plain',
+                            '!Last-Modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
+                            '!x-qn-test-custom-header': '0'
+                        });
+                    });
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+    });
+
+    describe('test changeType', function () {
+        it('test changeType', function () {
+            let actualKey = '';
+
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'change-type')
+                    .then(key => {
+                        actualKey = key;
+                        return key;
+                    })
+                    .then(key =>
+                        bucketManager.changeType(bucketName, key, 1, callback)
+                    )
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                return bucketManager.stat(bucketName, actualKey)
+                    .then(({ data, resp: statResp }) => {
+                        should.equal(data.type, 1, JSON.stringify(statResp));
+                    });
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test updateObjectStatus', function () {
-        it('test updateObjectStatus disable', function (done) {
-            var key = 'test_file';
-            var bucket = srcBucket;
-            bucketManager.updateObjectStatus(bucket, key, 1, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                assert.strictEqual(respInfo.statusCode, 200);
-                done();
-            });
+        let actualKey = '';
+
+        before(function () {
+            return getObjectRandomKey(bucketName, 'file-status')
+                .then(key => {
+                    actualKey = key;
+                });
         });
 
-        it('test updateObjectStatus enable', function (done) {
-            var key = 'test_file';
-            var bucket = srcBucket;
-            bucketManager.updateObjectStatus(bucket, key, 0, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                assert.strictEqual(respInfo.statusCode, 200);
-                done();
-            });
+        it('test updateObjectStatus disable', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.updateObjectStatus(bucketName, actualKey, 1, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        it('test updateObjectStatus enable', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.updateObjectStatus(bucketName, actualKey, 0, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test listBucket', function () {
-        it('test listBucket', function (done) {
-            bucketManager.listBucket(function (err,
-                respBody, respInfo) {
-                should.not.exist(err);
-                console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
-                respBody.should.containEql(srcBucket);
-                done();
-            });
+        it('test listBucket', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.listBucket(callback)
+            );
+
+            const checkFunc = ({ data, resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                data.should.containEql(bucketName);
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
-    // eslint-disable-next-line no-undef
-    describe('test bucketinfo', function () {
-        // eslint-disable-next-line no-undef
-        it('test bucketinfo', function (done) {
-            var bucket = srcBucket;
+    describe('test bucketInfo', function () {
+        it('test bucketInfo', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.getBucketInfo(bucketName, callback)
+            );
 
-            bucketManager.getBucketInfo(bucket, function (err,
-                respBody, respInfo) {
-                should.not.exist(err);
-                should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                done();
-            });
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test listPrefix', function () {
-        it('test listPrefix', function (done) {
-            var bucket = srcBucket;
+        it('test listPrefix', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.listPrefix(
+                    bucketName,
+                    {
+                        prefix: 'test'
+                    },
+                    callback
+                )
+            );
 
-            bucketManager.listPrefix(bucket, {
-                prefix: 'test'
-            }, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                console.log(JSON.stringify(respBody) + '\n');
-                console.log(JSON.stringify(respInfo));
-                respBody.should.have.keys('items');
-                respBody.items.forEach(function (item) {
+            const checkFunc = ({
+                data,
+                resp
+            }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+
+                data.should.have.keys('items');
+                data.items.forEach(function (item) {
                     item.should.have.keys('key', 'hash');
                     item.key.should.startWith('test');
                 });
-                done();
-            });
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test listPrefixV2', function () {
-        it('test listPrefixV2', function (done) {
-            var bucket = srcBucket;
+        it('test listPrefixV2', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.listPrefixV2(
+                    bucketName,
+                    {
+                        prefix: 'test'
+                    },
+                    callback
+                )
+            );
 
-            bucketManager.listPrefixV2(bucket, {
-                prefix: 'test'
-            }, function (_err, respBody, respInfo) {
-                // the irregular data return from Server that Cannot be converted by urllib to JSON Object
-                // so err !=null and you can judge respBody==null or err.res.statusCode==200
-                should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                done();
-            });
+            const checkFunc = ({
+                resp
+            }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc)
+                .catch(err => checkFunc({ resp: err.resp }));
         });
     });
 
     // 空间生命周期
     describe('test lifeRule', function () {
-        const bucket = srcBucket;
-        const ruleName = 'test_rule_name';
+        const ruleName = 'test_rule_name' + Math.floor(Math.random() * 100000);
+        const randomPrefix = 'test' + Math.floor(Math.random() * 100000);
 
-        function testGet (expectItem, nextCall, otherRespInfo) {
-            bucketManager.getBucketLifecycleRule(
-                bucket,
-                function (
-                    err,
-                    respBody,
-                    respInfo
-                ) {
-                    should.not.exist(err);
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                    if (!expectItem && !respBody) {
-                        nextCall();
+        function testGet (expectItem, otherRespInfo) {
+            return bucketManager.getBucketLifecycleRule(bucketName)
+                .then(({ data, resp }) => {
+                    should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                    if (!expectItem && !data) {
                         return;
                     }
-                    const actualItem = respBody.find(function (item) {
+                    const actualItem = data.find(function (item) {
                         return item.name === ruleName;
                     });
                     if (!expectItem) {
                         should.not.exist(actualItem);
-                        nextCall();
                         return;
                     }
                     should.exist(actualItem, JSON.stringify({
-                        respInfo: respInfo,
-                        otherRespInfo: otherRespInfo
+                        resp: resp,
+                        otherResp: otherRespInfo
                     }));
                     actualItem.should.have.properties(expectItem);
-                    nextCall();
-                }
-            );
+                });
         }
 
-        before(function (done) {
-            bucketManager.deleteBucketLifecycleRule(bucket, ruleName, done);
+        before(function () {
+            return bucketManager.deleteBucketLifecycleRule(bucketName, ruleName)
+                .catch(() => {});
         });
 
-        it('test lifeRule put', function (done) {
+        it('test lifeRule put', function () {
             const options = {
                 name: ruleName,
-                prefix: 'test',
+                prefix: randomPrefix,
                 to_line_after_days: 30,
                 to_archive_ir_after_days: 35,
                 to_archive_after_days: 40,
                 to_deep_archive_after_days: 50,
                 delete_after_days: 65
             };
-            bucketManager.putBucketLifecycleRule(
-                bucket,
-                options,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                    testGet({
-                        prefix: 'test',
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putBucketLifecycleRule(bucketName, options, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                return testGet(
+                    {
+                        prefix: randomPrefix,
                         to_line_after_days: 30,
                         to_archive_ir_after_days: 35,
                         to_archive_after_days: 40,
@@ -419,30 +579,38 @@ describe('test start bucket manager', function () {
                         delete_after_days: 65,
                         history_delete_after_days: 0,
                         history_to_line_after_days: 0
-                    }, done, respInfo);
-                }
-            );
+                    },
+                    resp
+                );
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test lifeRule update', function (done) {
+        it('test lifeRule update', function () {
+            const expectedPrefix = `update_${randomPrefix}`;
             const options = {
                 name: ruleName,
-                prefix: 'update_prefix',
+                prefix: expectedPrefix,
                 to_line_after_days: 30,
                 to_archive_ir_after_days: 40,
                 to_archive_after_days: 50,
                 to_deep_archive_after_days: 60,
                 delete_after_days: 65
             };
-            bucketManager.updateBucketLifecycleRule(
-                bucket,
-                options,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
 
-                    testGet({
-                        prefix: 'update_prefix',
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.updateBucketLifecycleRule(bucketName, options, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                return testGet(
+                    {
+                        prefix: expectedPrefix,
                         to_line_after_days: 30,
                         to_archive_ir_after_days: 40,
                         to_archive_after_days: 50,
@@ -450,356 +618,484 @@ describe('test start bucket manager', function () {
                         delete_after_days: 65,
                         history_delete_after_days: 0,
                         history_to_line_after_days: 0
-                    }, done, respInfo);
-                }
-            );
+                    },
+                    resp
+                );
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test lifeRule delete', function (done) {
-            bucketManager.deleteBucketLifecycleRule(
-                bucket,
-                ruleName,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                    testGet(null, done, respInfo);
-                }
+        it('test lifeRule delete', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.deleteBucketLifecycleRule(bucketName, ruleName, callback)
             );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                return testGet(
+                    null,
+                    resp
+                );
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test object lifecycle', function () {
-        const bucket = srcBucket;
+        it('test deleteAfterDays', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'delete-after-days')
+                    .then(key =>
+                        bucketManager.deleteAfterDays(bucketName, key, 1, callback)
+                    )
+            );
 
-        it('test setObjectLifeCycle', function (done) {
-            testObjectOperationWrapper(bucket, 'test_set_object_lifecycle', function (key) {
-                bucketManager.setObjectLifeCycle(
-                    bucket,
-                    key,
-                    {
-                        toIaAfterDays: 10,
-                        toArchiveIRAfterDays: 15,
-                        toArchiveAfterDays: 20,
-                        toDeepArchiveAfterDays: 30,
-                        deleteAfterDays: 40
-                    },
-                    function (err, respBody, respInfo) {
-                        should.not.exist(err);
-                        respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                        done();
-                    }
-                );
-            });
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test setObjectLifeCycle with cond', function (done) {
-            testObjectOperationWrapper(bucket, 'test_set_object_lifecycle_cond', function (key) {
-                bucketManager.stat(bucket, key, function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                    const { hash } = respBody;
+        it('test setObjectLifeCycle', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'set-object-lifecycle')
+                    .then(key =>
+                        bucketManager.setObjectLifeCycle(
+                            bucketName,
+                            key,
+                            {
+                                toIaAfterDays: 10,
+                                toArchiveIRAfterDays: 15,
+                                toArchiveAfterDays: 20,
+                                toDeepArchiveAfterDays: 30,
+                                deleteAfterDays: 40
+                            },
+                            callback
+                        )
+                    )
+            );
 
-                    bucketManager.setObjectLifeCycle(
-                        bucket,
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        it('test setObjectLifeCycle with cond', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'set-object-lifecycle-cond')
+                    .then(key => Promise.all([
                         key,
-                        {
-                            toIaAfterDays: 10,
-                            toArchiveIRAfterDays: 15,
-                            toArchiveAfterDays: 20,
-                            toDeepArchiveAfterDays: 30,
-                            deleteAfterDays: 40,
-                            cond: {
-                                hash: hash
-                            }
-                        },
-                        function (err, respBody, respInfo) {
-                            should.not.exist(err);
-                            respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                            done();
-                        }
-                    );
-                });
-            });
+                        bucketManager.stat(bucketName, key)
+                    ]))
+                    .then(([key, { data, resp }]) => {
+                        should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                        return bucketManager.setObjectLifeCycle(
+                            bucketName,
+                            key,
+                            {
+                                toIaAfterDays: 10,
+                                toArchiveIRAfterDays: 15,
+                                toArchiveAfterDays: 20,
+                                toDeepArchiveAfterDays: 30,
+                                deleteAfterDays: 40,
+                                cond: {
+                                    hash: data.hash
+                                }
+                            },
+                            callback
+                        );
+                    })
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test events', function () {
-        const bucket = srcBucket;
-        const eventName = 'event_test';
+        const eventName = 'event_test' + Math.floor(Math.random() * 100000);
 
-        before(function (done) {
-            bucketManager.deleteBucketEvent(
-                bucket,
-                eventName,
-                function () {
-                    done();
-                }
-            );
+        before(function () {
+            return bucketManager.deleteBucketEvent(
+                bucketName,
+                eventName
+            )
+                .catch(() => {});
         });
 
-        it('test addEvents', function (done) {
+        it('test addEvents', function () {
             const options = {
                 name: eventName,
                 event: 'mkfile',
                 callbackURL: 'http://node.ijemy.com/qncback'
             };
-            bucketManager.putBucketEvent(
-                bucket,
-                options,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                }
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putBucketEvent(
+                    bucketName,
+                    options,
+                    callback
+                )
             );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test updateEvents', function (done) {
+        it('test updateEvents', function () {
             const options = {
                 name: eventName,
                 event: 'copy',
                 callbackURL: 'http://node.ijemy.com/qncback'
             };
-            bucketManager.updateBucketEvent(
-                bucket,
-                options,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                }
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.updateBucketEvent(
+                    bucketName,
+                    options,
+                    callback
+                )
             );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test getEvents', function (done) {
-            bucketManager.getBucketEvent(
-                bucket,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                }
+        it('test getEvents', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.getBucketEvent(
+                    bucketName,
+                    callback
+                )
             );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test deleteEvents', function (done) {
-            bucketManager.deleteBucketEvent(
-                bucket,
-                eventName,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                }
+        it('test deleteEvents', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.deleteBucketEvent(
+                    bucketName,
+                    eventName,
+                    callback
+                )
             );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test referAntiLeech', function () {
-        describe('test referAntiLeech', function () {
-            var options = {
+        it('test referAntiLeech', function () {
+            const options = {
                 mode: 1,
                 norefer: 0,
                 pattern: '*.iorange.vip'
             };
-            var bucket = srcBucket;
-            it('test referAntiLeech', function (done) {
-                bucketManager.putReferAntiLeech(bucket, options, function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                });
-            });
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putReferAntiLeech(bucketName, options, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test corsRules', function () {
-        var bucket = srcBucket;
-        describe('test putCorsRules', function () {
-            it('test putCorsRules', function (done) {
-                var body = [];
-                var req01 = {
-                    allowed_origin: ['http://www.test1.com'],
-                    allowed_method: ['GET', 'POST']
-                };
-                var req02 = {
-                    allowed_origin: ['http://www.test2.com'],
-                    allowed_method: ['GET', 'POST', 'HEAD'],
-                    allowed_header: ['testheader', 'Content-Type'],
-                    exposed_header: ['test1', 'test2'],
-                    max_age: 20
-                };
-                body[0] = req01;
-                body[1] = req02;
+        it('test putCorsRules', function () {
+            const req01 = {
+                allowed_origin: ['http://www.test1.com'],
+                allowed_method: ['GET', 'POST']
+            };
+            const req02 = {
+                allowed_origin: ['http://www.test2.com'],
+                allowed_method: ['GET', 'POST', 'HEAD'],
+                allowed_header: ['testheader', 'Content-Type'],
+                exposed_header: ['test1', 'test2'],
+                max_age: 20
+            };
+            const body = [
+                req01,
+                req02
+            ];
 
-                bucketManager.putCorsRules(bucket, body, function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                });
-            });
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putCorsRules(bucketName, body, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        describe('test getCorsRules', function () {
-            it('test getCorsRules', function (done) {
-                bucketManager.getCorsRules(bucket, function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                });
-            });
+        it('test getCorsRules', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.getCorsRules(bucketName, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
-    //
-    // describe('test mirrorConfig', function() {
-    //     describe('test getMirrorConfig', function() {
-    //         var bucket = srcBucket;
-    //         it('test getMirrorConfig', function(done) {
-    //             var body = {
-    //                 "bucket":bucket,
-    //             };
-    //             bucketManager.getBucketSourceConfig(body, function(err, respBody, respInfo) {
-    //                 should.not.exist(err);
-    //                 console.log(JSON.stringify(respBody) + "\n");
-    //                 console.log(JSON.stringify(respInfo));
-    //                 done();
-    //             });
-    //         });
-    //     });
-    // });
 
     describe('test accessMode', function () {
-        var bucket = srcBucket;
-        it('test accessMode', function (done) {
-            var mode = 0;
-            bucketManager.putBucketAccessStyleMode(bucket, mode, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                done();
-            });
+        it('test accessMode', function () {
+            const mode = 0;
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putBucketAccessStyleMode(bucketName, mode, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test restoreAr', function () {
-        const bucket = srcBucket;
-
-        function changeType (key, type, callback) {
-            bucketManager.changeType(
+        function changeType (bucket, key, type) {
+            return bucketManager.changeType(
                 bucket,
                 key,
-                type,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                    callback();
-                }
-            );
+                type
+            )
+                .then(({ resp }) => {
+                    should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                    return key;
+                });
         }
 
-        it('test restoreAr Archive', function (done) {
-            testObjectOperationWrapper(bucket, 'test_restore_ar_archive', function (key) {
-                // change file type to Archive
-                changeType(key, 2, function () {
-                    const freezeAfterDays = 1;
-                    const entry = bucket + (key ? ':' + key : '');
-                    bucketManager.restoreAr(entry, freezeAfterDays, function (err, respBody, respInfo) {
-                        should.not.exist(err);
-                        respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                        done();
-                    });
-                });
-            });
+        it('test restoreAr Archive', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'test-restore-ar-archive')
+                    .then(key =>
+                        // change file type to Archive
+                        changeType(bucketName, key, 2)
+                    )
+                    .then(key => {
+                        const freezeAfterDays = 1;
+                        const entry = key ? `${bucketName}:${key}` : bucketName;
+                        return bucketManager.restoreAr(entry, freezeAfterDays, callback);
+                    })
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test restoreAr DeepArchive', function (done) {
-            testObjectOperationWrapper(bucket, 'test_restore_ar_deep_archive', function (key) {
-                // change file type to DeepArchive
-                changeType(key, 3, function () {
-                    const freezeAfterDays = 2;
-                    const entry = bucket + (key ? ':' + key : '');
-                    bucketManager.restoreAr(entry, freezeAfterDays, function (err, respBody, respInfo) {
-                        should.not.exist(err);
-                        respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                        done();
-                    });
-                });
-            });
+        it('test restoreAr DeepArchive', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                getObjectRandomKey(bucketName, 'test-restore-ar-deep-archive')
+                    .then(key =>
+                        // change file type to DeepArchive
+                        changeType(bucketName, key, 3, callback)
+                    )
+                    .then(key => {
+                        const freezeAfterDays = 2;
+                        const entry = key ? `${bucketName}:${key}` : bucketName;
+                        return bucketManager.restoreAr(entry, freezeAfterDays, callback);
+                    })
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test putBucketMaxAge', function () {
-        var bucket = srcBucket;
-        it('test putBucketMaxAge', function (done) {
-            var options = {
+        it('test putBucketMaxAge', function () {
+            const options = {
                 maxAge: 0
             };
-            bucketManager.putBucketMaxAge(bucket, options, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                done();
-            });
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putBucketMaxAge(bucketName, options, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test putBucketAccessMode', function () {
-        var bucket = srcBucket;
-        it('test putBucketAccessMode', function (done) {
-            var options = {
+        it('test putBucketAccessMode', function () {
+            const options = {
                 private: 0
             };
-            bucketManager.putBucketAccessMode(bucket, options, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                done();
-            });
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putBucketAccessMode(bucketName, options, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test bucketQuota', function () {
-        var bucket = srcBucket;
-        describe('test putBucketQuota', function () {
-            it('test putBucketQuota', function (done) {
-                var options = {
-                    size: 10,
-                    count: 10
-                };
-                bucketManager.putBucketQuota(bucket, options, function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                });
-            });
-            it('test cancel putBucketQuota', function (done) {
-                var options = {
-                    size: -1,
-                    count: -1
-                };
-                bucketManager.putBucketQuota(bucket, options, function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                });
-            });
+        it('test putBucketQuota', function () {
+            const options = {
+                size: 5 * Math.pow(1024, 3), // 5GB
+                count: 1000
+            };
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putBucketQuota(bucketName, options, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
-        describe('test getBucketQuota', function () {
-            it('test getBucketQuota', function (done) {
-                bucketManager.getBucketQuota(bucket, function (err, respBody, respInfo) {
-                    should.not.exist(err);
-                    should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                    done();
-                });
-            });
+        it('test cancel putBucketQuota', function () {
+            const options = {
+                size: -1,
+                count: -1
+            };
+
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.putBucketQuota(bucketName, options, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+        it('test getBucketQuota', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.getBucketQuota(bucketName, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test listBucketDomains', function () {
-        var bucket = srcBucket;
-        it('test listBucketDomains', function (done) {
-            bucketManager.listBucketDomains(bucket, function (err, respBody, respInfo) {
-                should.not.exist(err);
-                should.equal(respInfo.status, 200, JSON.stringify(respInfo));
-                done();
-            });
+        it('test listBucketDomains', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.listBucketDomains(bucketName, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
@@ -816,21 +1112,22 @@ describe('test start bucket manager', function () {
             mockDate.reset();
         });
 
-        it('test invalid X-Qiniu-Date expect 403', function (done) {
-            const bucket = srcBucket;
+        it('test invalid X-Qiniu-Date expect 403', function () {
             const key = 'qiniu.mp4';
-            bucketManager.stat(bucket, key, function (
-                err,
-                respBody,
-                respInfo
-            ) {
-                should.not.exist(err);
-                respInfo.statusCode.should.be.eql(403, JSON.stringify(respInfo));
-                done();
-            });
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.stat(bucketName, key, callback)
+            );
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 403, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test invalid X-Qiniu-Date expect 200 by disable date sign', function (done) {
+        it('test invalid X-Qiniu-Date expect 200 by disable date sign', function () {
             const mac = new qiniu.auth.digest.Mac(
                 accessKey,
                 secretKey,
@@ -841,48 +1138,54 @@ describe('test start bucket manager', function () {
             });
             const bucketManager = new qiniu.rs.BucketManager(mac, config);
 
-            const bucket = srcBucket;
             const key = 'qiniu.mp4';
-            bucketManager.stat(bucket, key, function (
-                err,
-                respBody,
-                respInfo
-            ) {
-                should.not.exist(err, JSON.stringify(respInfo));
-                respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                respBody.should.have.keys(
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.stat(bucketName, key, callback)
+            );
+
+            const checkFunc = ({ data, resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                data.should.have.keys(
                     'hash',
                     'fsize',
                     'mimeType',
                     'putTime',
                     'type'
                 );
-                done();
-            });
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test invalid X-Qiniu-Date env expect 200', function (done) {
+        it('test invalid X-Qiniu-Date env expect 200', function () {
             process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE = 'true';
-            const bucket = srcBucket;
+
             const key = 'qiniu.mp4';
-            bucketManager.stat(bucket, key, function (
-                err,
-                respBody,
-                respInfo
-            ) {
-                should.not.exist(err, JSON.stringify(respInfo));
-                respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                respBody.should.have.keys(
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.stat(bucketName, key, callback)
+            );
+
+            const checkFunc = ({ data, resp }) => {
+                should.equal(resp.status, 200, JSON.stringify(resp));
+                data.should.have.keys(
                     'hash',
                     'fsize',
                     'mimeType',
                     'putTime',
                     'type'
                 );
-                done();
-            });
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
-        it('test invalid X-Qiniu-Date env be ignored expect 403', function (done) {
+
+        it('test invalid X-Qiniu-Date env be ignored expect 403', function () {
             process.env.DISABLE_QINIU_TIMESTAMP_SIGNATURE = 'true';
             const mac = new qiniu.auth.digest.Mac(
                 accessKey,
@@ -894,43 +1197,59 @@ describe('test start bucket manager', function () {
             });
             const bucketManager = new qiniu.rs.BucketManager(mac, config);
 
-            const bucket = srcBucket;
             const key = 'qiniu.mp4';
-            bucketManager.stat(bucket, key, function (
-                err,
-                respBody,
-                respInfo
-            ) {
-                should.not.exist(err);
-                respInfo.statusCode.should.be.eql(403, JSON.stringify(respInfo));
-                done();
-            });
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.stat(bucketName, key, callback)
+            );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.status, 403, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 
     describe('test bucket image source', function () {
-        it('test set image', function (done) {
-            bucketManager.image(
-                srcBucket,
-                'http://devtools.qiniu.com/',
-                'devtools.qiniu.com',
-                function (err, respBody, respInfo) {
-                    should.not.exist(err, JSON.stringify(respInfo));
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                    done();
-                }
+        it('test set image', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.image(
+                    bucketName,
+                    'http://devtools.qiniu.com/',
+                    'devtools.qiniu.com',
+                    callback
+                )
             );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
 
-        it('test unset image', function (done) {
-            bucketManager.unimage(
-                srcBucket,
-                function (err, respBody, respInfo) {
-                    should.not.exist(err, JSON.stringify(respInfo));
-                    respInfo.statusCode.should.be.eql(200, JSON.stringify(respInfo));
-                    done();
-                }
+        it('test unset image', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.unimage(
+                    bucketName,
+                    callback
+                )
             );
+
+            const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
         });
     });
 

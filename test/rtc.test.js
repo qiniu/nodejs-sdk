@@ -15,6 +15,7 @@ before(function (done) {
 
 // eslint-disable-next-line no-undef
 describe('test rtc credentials', function () {
+    this.timeout(10000);
     var accessKey = proc.env.QINIU_ACCESS_KEY;
     var secretKey = proc.env.QINIU_SECRET_KEY;
 
@@ -51,6 +52,7 @@ describe('test rtc credentials', function () {
     describe('test update app', function () {
         // eslint-disable-next-line no-undef
         it('update app', function (done) {
+            should.ok(appId, 'appId not found. May create failed');
             appData.title = 'testtitle2';
             qiniu.app.updateApp(appId, appData, credentials, function (err, res) {
                 should.not.exist(err);
@@ -65,6 +67,7 @@ describe('test rtc credentials', function () {
     describe('test get app', function () {
         // eslint-disable-next-line no-undef
         it('get app', function (done) {
+            should.ok(appId, 'appId not found. May create failed');
             qiniu.app.getApp(appId, credentials, function (err, res) {
                 should.not.exist(err);
                 assert.strictEqual(res.title, 'testtitle2');
@@ -78,6 +81,7 @@ describe('test rtc credentials', function () {
     describe('test delete app', function () {
         // eslint-disable-next-line no-undef
         it('delete app', function (done) {
+            should.ok(appId, 'appId not found. May create failed');
             qiniu.app.deleteApp(appId, credentials, function (err) {
                 should.not.exist(err);
                 done();

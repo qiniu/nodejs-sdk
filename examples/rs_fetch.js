@@ -1,30 +1,29 @@
 const qiniu = require('qiniu');
 const proc = require('process');
 
-var accessKey = proc.env.QINIU_ACCESS_KEY;
-var secretKey = proc.env.QINIU_SECRET_KEY;
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-var config = new qiniu.conf.Config();
+const accessKey = proc.env.QINIU_ACCESS_KEY;
+const secretKey = proc.env.QINIU_SECRET_KEY;
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const config = new qiniu.conf.Config();
 // config.useHttpsDomain = true;
-// config.zone = qiniu.zone.Zone_z1;
-var bucketManager = new qiniu.rs.BucketManager(mac, config);
-var resUrl = 'http://devtools.qiniu.com/qiniu.png';
-var bucket = proc.env.QINIU_TEST_BUCKET;
-var key = 'qiniu.png';
+// config.regionsProvider = qiniu.httpc.Region.fromRegionId('z0');
+const bucketManager = new qiniu.rs.BucketManager(mac, config);
+const resUrl = 'http://devtools.qiniu.com/qiniu.png';
+const bucket = proc.env.QINIU_TEST_BUCKET;
+const key = 'qiniu.png';
 
-bucketManager.fetch(resUrl, bucket, key, function (err, respBody, respInfo) {
-    if (err) {
-        console.log(err);
-    // throw err;
-    } else {
-        if (respInfo.statusCode == 200) {
-            console.log(respBody.key);
-            console.log(respBody.hash);
-            console.log(respBody.fsize);
-            console.log(respBody.mimeType);
+bucketManager.fetch(resUrl, bucket, key)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data.key);
+            console.log(data.hash);
+            console.log(data.fsize);
+            console.log(data.mimeType);
         } else {
-            console.log(respInfo.statusCode);
-            console.log(respBody);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-    }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });

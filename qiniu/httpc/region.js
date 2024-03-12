@@ -1,6 +1,30 @@
 const { Endpoint } = require('./endpoint');
 
 /**
+ * @interface RegionsProvider
+ */
+
+/**
+ * @function
+ * @name RegionsProvider#getRegions
+ * @returns {Promise<Region[]>}
+ */
+
+/**
+ * @interface MutableRegionsProvider
+ * @extends RegionsProvider
+ */
+
+/**
+ * @function
+ * @name MutableRegionsProvider#setRegions
+ * @param {Region[]} regions
+ * @returns {Promise<void>}
+ */
+
+// --- could split to files if migrate to typescript --- //
+
+/**
  * @readonly
  * @enum {string}
  */
@@ -21,6 +45,8 @@ const SERVICE_NAME = {
  */
 
 /**
+ * @class
+ * @implements RegionsProvider
  * @param {Object} options
  * @param {string} [options.regionId]
  * @param {string} [options.s3RegionId]
@@ -58,6 +84,7 @@ function Region (options) {
  * @param {string} [options.s3RegionId]
  * @param {number} [options.ttl]
  * @param {boolean} [options.isPreferCdnHost]
+ * @param {string} [options.preferredScheme]
  */
 Region.fromZone = function (zone, options) {
     options = options || {};
@@ -67,22 +94,27 @@ Region.fromZone = function (zone, options) {
         ? zone.cdnUpHosts.concat(zone.srcUpHosts)
         : zone.srcUpHosts.concat(zone.cdnUpHosts);
 
+    const endpointOptions = {};
+    if (options.preferredScheme) {
+        endpointOptions.defaultScheme = options.preferredScheme;
+    }
+
     const services = {
         // use array destructure if migrate to typescript
         [SERVICE_NAME.UP]: upHosts.map(
-            h => new Endpoint(h)
+            h => new Endpoint(h, endpointOptions)
         ),
         [SERVICE_NAME.IO]: [
-            new Endpoint(zone.ioHost)
+            new Endpoint(zone.ioHost, endpointOptions)
         ],
         [SERVICE_NAME.RS]: [
-            new Endpoint(zone.rsHost)
+            new Endpoint(zone.rsHost, endpointOptions)
         ],
         [SERVICE_NAME.RSF]: [
-            new Endpoint(zone.rsfHost)
+            new Endpoint(zone.rsfHost, endpointOptions)
         ],
         [SERVICE_NAME.API]: [
-            new Endpoint(zone.apiHost)
+            new Endpoint(zone.apiHost, endpointOptions)
         ]
     };
 
@@ -100,6 +132,8 @@ Region.fromZone = function (zone, options) {
  * @param {string} [options.s3RegionId]
  * @param {number} [options.ttl]
  * @param {Date} [options.createTime]
+ * @param {string} [options.preferredScheme]
+ * @param {boolean} [options.isPreferCdnUpHost]
  * @param {Object.<ServiceKey, Endpoint[]>} [options.extendedServices]
  * @returns {Region}
  */
@@ -109,50 +143,123 @@ Region.fromRegionId = function (regionId, options) {
     const s3RegionId = options.s3RegionId || regionId;
     const ttl = options.ttl;
     const createTime = options.createTime;
+    const isPreferCdnUpHost = typeof options.isPreferCdnUpHost === 'boolean'
+        ? options.isPreferCdnUpHost
+        : true;
+
+    const endpointOptions = {};
+    if (options.preferredScheme) {
+        endpointOptions.defaultScheme = options.preferredScheme;
+    }
 
     const isZ0 = regionId === 'z0';
+    let upCdnEndpoints;
+    let upSourceEndpoints;
+    if (isZ0) {
+        upCdnEndpoints = [
+            new Endpoint(
+                'upload.qiniup.com',
+                endpointOptions
+            )
+        ];
+        upSourceEndpoints = [
+            new Endpoint(
+                'up.qiniup.com',
+                endpointOptions
+            ),
+            new Endpoint(
+                'up.qbox.me',
+                endpointOptions
+            )
+        ];
+    } else {
+        upCdnEndpoints = [
+            new Endpoint(
+                'upload-' + regionId + '.qiniup.com',
+                endpointOptions
+            )
+        ];
+        upSourceEndpoints = [
+            new Endpoint(
+                'up-' + regionId + '.qiniup.com',
+                endpointOptions
+            ),
+            new Endpoint(
+                'up-' + regionId + '.qbox.me',
+                endpointOptions
+            )
+        ];
+    }
 
     /**
      * @type {Object.<ServiceKey, Endpoint[]>}
      */
     let services = {
         [SERVICE_NAME.UC]: [
-            new Endpoint('uc.qiniuapi.com')
+            new Endpoint(
+                'uc.qiniuapi.com',
+                endpointOptions
+            )
         ],
-        [SERVICE_NAME.UP]: isZ0
-            ? [
-                new Endpoint('upload.qiniup.com'),
-                new Endpoint('up.qiniup.com'),
-                new Endpoint('up.qbox.me')
-            ]
-            : [
-                new Endpoint('upload-' + regionId + '.qiniup.com'),
-                new Endpoint('up-' + regionId + '.qiniup.com'),
-                new Endpoint('up-' + regionId + '.qbox.me')
-            ],
+        [SERVICE_NAME.UP]: isPreferCdnUpHost
+            ? upCdnEndpoints.concat(upSourceEndpoints)
+            : upSourceEndpoints.concat(upCdnEndpoints),
         [SERVICE_NAME.IO]: isZ0
             ? [
-                new Endpoint('iovip.qiniuio.com'),
-                new Endpoint('iovip.qbox.me')
+                new Endpoint(
+                    'iovip.qiniuio.com',
+                    endpointOptions
+                ),
+                new Endpoint(
+                    'iovip.qbox.me',
+                    endpointOptions
+                )
             ]
             : [
-                new Endpoint('iovip-' + regionId + '.qiniuio.com'),
-                new Endpoint('iovip-' + regionId + '.qbox.me')
+                new Endpoint(
+                    'iovip-' + regionId + '.qiniuio.com',
+                    endpointOptions
+                ),
+                new Endpoint(
+                    'iovip-' + regionId + '.qbox.me',
+                    endpointOptions
+                )
             ],
         [SERVICE_NAME.RS]: [
-            new Endpoint('rs-' + regionId + '.qiniuapi.com'),
-            new Endpoint('rs-' + regionId + '.qbox.me')
+            new Endpoint(
+                'rs-' + regionId + '.qiniuapi.com',
+                endpointOptions
+            ),
+            new Endpoint(
+                'rs-' + regionId + '.qbox.me',
+                endpointOptions
+            )
         ],
         [SERVICE_NAME.RSF]: [
-            new Endpoint('rsf-' + regionId + '.qiniuapi.com'),
-            new Endpoint('rsf-' + regionId + '.qbox.me')
+            new Endpoint(
+                'rsf-' + regionId + '.qiniuapi.com',
+                endpointOptions
+            ),
+            new Endpoint(
+                'rsf-' + regionId + '.qbox.me',
+                endpointOptions
+            )
         ],
         [SERVICE_NAME.API]: [
-            new Endpoint('api-' + regionId + '.qiniuapi.com'),
-            new Endpoint('api-' + regionId + '.qbox.me')
+            new Endpoint(
+                'api-' + regionId + '.qiniuapi.com',
+                endpointOptions
+            ),
+            new Endpoint(
+                'api-' + regionId + '.qbox.me',
+                endpointOptions
+            )
         ],
         [SERVICE_NAME.S3]: [
-            new Endpoint('s3.' + s3RegionId + '.qiniucs.com')
+            new Endpoint(
+                's3.' + s3RegionId + '.qiniucs.com',
+                endpointOptions
+            )
         ]
     };
 
@@ -167,7 +274,17 @@ Region.fromRegionId = function (regionId, options) {
     });
 };
 
+/**
+ * @returns {Promise<Region[]>}
+ */
+Region.prototype.getRegions = function () {
+    return Promise.resolve([this]);
+};
+
 Object.defineProperty(Region.prototype, 'isLive', {
+    /**
+     * @returns {boolean}
+     */
     get: function () {
         if (this.ttl < 0) {
             return true;

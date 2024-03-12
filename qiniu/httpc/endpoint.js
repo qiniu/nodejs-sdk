@@ -1,5 +1,30 @@
 /**
+ * @interface EndpointsProvider
+ */
+
+/**
+ * @function
+ * @name EndpointsProvider#getEndpoints
+ * @returns {Promise<Endpoint[]>}
+ */
+
+/**
+ * @interface MutableEndpointsProvider
+ * @extends EndpointsProvider
+ */
+
+/**
+ * @function
+ * @name MutableEndpointsProvider#setEndpoints
+ * @param {endpoints: Endpoint[]} endpoints
+ * @returns {Promise<void>}
+ */
+
+// --- could split to files if migrate to typescript --- //
+
+/**
  * @class
+ * @implements EndpointsProvider
  * @param {string} host
  * @param {Object} [options]
  * @param {string} [options.defaultScheme]
@@ -23,6 +48,13 @@ Endpoint.prototype.getValue = function (options) {
     const host = this.host;
 
     return scheme + '://' + host;
+};
+
+/**
+ * @returns {Promise<Endpoint[]>}
+ */
+Endpoint.prototype.getEndpoints = function () {
+    return Promise.resolve([this]);
 };
 
 exports.Endpoint = Endpoint;

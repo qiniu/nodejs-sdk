@@ -1,24 +1,25 @@
 const qiniu = require('qiniu');
-const proc = require('process');
 
-var accessKey = proc.env.QINIU_ACCESS_KEY;
-var secretKey = proc.env.QINIU_SECRET_KEY;
+const accessKey = process.env.QINIU_ACCESS_KEY;
+const secretKey = process.env.QINIU_SECRET_KEY;
 
-var bucket = proc.env.QINIU_TEST_BUCKET;
+const bucket = process.env.QINIU_TEST_BUCKET;
 
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-var config = new qiniu.conf.Config();
-config.zone = qiniu.zone.Zone_z0;
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const config = new qiniu.conf.Config();
+config.regionsProvider = qiniu.httpc.Region.fromRegionId('z0');
 config.useHttpsDomain = 'https';
-var bucketManager = new qiniu.rs.BucketManager(mac, config);
+const bucketManager = new qiniu.rs.BucketManager(mac, config);
 // @param bucketName 空间名
-bucketManager.getBucketInfo(bucket, function (err, respBody, respInfo) {
-    if (err) {
-        console.log(err);
-        throw err;
-    }
-    if (respInfo.status == 200) {
-        console.log('---respBody\n' + JSON.stringify(respBody) + '\n---');
-        console.log('---respInfo\n' + JSON.stringify(respInfo) + '\n---');
-    }
-});
+bucketManager.getBucketInfo(bucket)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
