@@ -22,6 +22,7 @@ jobs:
           npm install -g istanbul
       - name: Run cases
         run: |
+          npm run check-type
           npm test
           istanbul cover ./node_modules/mocha/bin/_mocha --reporter test -- -R spec
         env:

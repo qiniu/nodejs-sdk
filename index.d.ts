@@ -564,7 +564,7 @@ export declare namespace httpc {
         function composeMiddlewares<T>(
             middlewares: Middleware[],
             handler: (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>
-        );
+        ): (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>;
 
         /**
          * 设置 User-Agent 请求头中间件
@@ -1665,7 +1665,7 @@ export declare namespace rs {
         // @deprecated
         transformFallbackKey?: string;
 
-        [key: string]: string | number | boolean;
+        [key: string]: string | number | boolean | undefined;
     }
     class PutPolicy {
         [k: string]: string | number | boolean | Function;
