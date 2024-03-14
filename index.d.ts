@@ -1507,7 +1507,7 @@ export declare namespace rs {
         // @deprecated
         transformFallbackKey?: string;
 
-        [key: string]: string | number | boolean;
+        [key: string]: string | number | boolean | undefined;
     }
     class PutPolicy {
         [k: string]: string | number | boolean | Function;
