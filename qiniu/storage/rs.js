@@ -1377,6 +1377,7 @@ BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
 };
 
 /**
+ * 设置空间原图保护
  * @param {string} bucket 空间名称
  * @param {number} mode 为 1 表示开启原图保护，0 表示关闭
  * @param {BucketOperationCallback} [callbackFunc]
@@ -1431,7 +1432,7 @@ BucketManager.prototype.putBucketMaxAge = function (bucket, options, callbackFun
  * 设置空间私有属性
  * @param {string} bucket
  * @param {Object} options
- * @param {number} [options.private] 为 0 表示公开，为 1 表示私有
+ * @param {number} [options.private] 为 0 表示公开，为 1 表示私有，默认为 0
  * @param {BucketOperationCallback} [callbackFunc]
  */
 BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbackFunc) {

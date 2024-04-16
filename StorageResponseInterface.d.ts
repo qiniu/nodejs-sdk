@@ -231,3 +231,9 @@ export interface GetBucketInfoV2Result {
     remark: string;
     ctime: string;
 }
+
+export interface GetBucketQuotaResult {
+    [k: string]: any;
+    size: number;
+    count: number;
+}

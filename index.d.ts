@@ -9,9 +9,11 @@ import { Readable } from "stream";
 import {
     BatchOpsResult,
     FetchObjectResult,
-    GetBucketCorsRulesResult, GetBucketDomainsV3Result,
+    GetBucketCorsRulesResult,
+    GetBucketDomainsV3Result,
     GetBucketEventsResult,
     GetBucketInfoV2Result,
+    GetBucketQuotaResult,
     GetBucketRulesResult,
     GetBucketsResult,
     GetObjectsResult,
@@ -1489,6 +1491,71 @@ export declare namespace rs {
          * @param callbackFunc - 回调函数
          */
         getCorsRules(bucket: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketCorsRulesResult>>
+
+        /**
+         * 设置空间原图保护
+         * @param bucket 空间名
+         * @param mode 为 1 表示开启原图保护，0 表示关闭
+         * @param callbackFunc 回调函数
+         */
+        putBucketAccessStyleMode(bucket: string, mode: number, callbackFunc?: callback): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+          * 设置缓存策略的 max-age 属性
+          * @param bucket
+          * @param options
+          * @param options.maxAge 为 0 或者负数表示为默认值（31536000）
+          * @param callbackFunc 回调函数
+          */
+        putBucketMaxAge(
+            bucket: string,
+            options: {
+                maxAge: number
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 设置空间私有属性
+         * @param bucket
+         * @param options
+         * @param options.private 为 0 表示公开，为 1 表示私有，默认为 0
+         * @param callbackFunc
+         */
+        putBucketAccessMode(
+            bucket: string,
+            options?: {
+                private?: number
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 设置配额
+         * @param bucket 空间名称，不支持授权空间
+         * @param options
+         * @param options.size 空间存储量配额,参数传入 0 或不传表示不更改当前配置，传入 -1 表示取消限额，新创建的空间默认没有限额。
+         * @param options.count 空间文件数配额，参数含义同<size>
+         * @param callbackFunc 回调函数
+         */
+        putBucketQuota(
+            bucket: string,
+            options?: {
+                size?: number,
+                count?: number
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 获取配额
+         * @param bucket 空间名称，不支持授权空间
+         * @param callbackFunc 回调函数
+         */
+        getBucketQuota(
+            bucket: string,
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<GetBucketQuotaResult>>
     }
 
     /**
