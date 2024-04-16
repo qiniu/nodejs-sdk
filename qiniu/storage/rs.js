@@ -1151,7 +1151,7 @@ BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc)
  * @param {Object} options
  * @param {string} options.name
  * @param {string} options.event
- * @param {string} options.callbackURL
+ * @param {string | string[]} options.callbackURL
  * @param {string} [options.prefix]
  * @param {string} [options.suffix]
  * @param {string} [options.access_key]
@@ -1203,7 +1203,7 @@ BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc
  * @param {string} [options.prefix]
  * @param {string} [options.suffix]
  * @param {string} [options.event]
- * @param {string} [options.callbackURL]
+ * @param {string | string[]} [options.callbackURL]
  * @param {string} [options.access_key]
  * @param {string} [options.host]
  * @param {BucketOperationCallback} [callbackFunc]

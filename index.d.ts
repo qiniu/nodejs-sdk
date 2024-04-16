@@ -1377,7 +1377,7 @@ export declare namespace rs {
          * @param options - 配置项
          * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
          * @param options.event - 事件类型，接受数组设置多个
-         * @param options.callbackUrl - 事件通知回调 URL，接受数组设置多个，失败依次重试
+         * @param options.callbackURL - 事件通知回调 URL，接受数组设置多个，失败依次重试
          * @param options.prefix - 可选，文件配置的前缀
          * @param options.suffix - 可选，文件配置的后缀
          * @param options.access_key - 可选，设置的话会对通知请求用对应的ak、sk进行签名
@@ -1389,7 +1389,7 @@ export declare namespace rs {
             options: {
                 name: string,
                 event: BucketEventName | BucketEventName[],
-                callbackUrl: string | string[],
+                callbackURL: string | string[],
                 prefix?: string,
                 suffix?: string,
                 access_key?: string,
@@ -1405,7 +1405,7 @@ export declare namespace rs {
          * @param options - 配置项
          * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
          * @param options.event - 事件类型，接受数组设置多个
-         * @param options.callbackUrl - 事件通知回调 URL，接受数组设置多个，失败依次重试
+         * @param options.callbackURL - 事件通知回调 URL，接受数组设置多个，失败依次重试
          * @param options.prefix - 可选，文件配置的前缀
          * @param options.suffix - 可选，文件配置的后缀
          * @param options.access_key - 可选，设置的话会对通知请求用对应的ak、sk进行签名
@@ -1417,7 +1417,7 @@ export declare namespace rs {
             options: {
                 name: string,
                 event?: BucketEventName | BucketEventName[],
-                callbackUrl?: string | string[],
+                callbackURL?: string | string[],
                 prefix?: string,
                 suffix?: string,
                 access_key?: string,
@@ -1443,8 +1443,7 @@ export declare namespace rs {
          * @param name - 规则名称
          * @param callbackFunc - 回调函数
          */
-        deleteBucketEvent(bucket: string, name: string, callbackFunc?: callback): void
-
+        deleteBucketEvent(bucket: string, name: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * @param bucket - 空间名
