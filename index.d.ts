@@ -528,14 +528,19 @@ export declare namespace httpc {
         urllibOptions: RequestOptions;
     }
 
+    // responseWrapper.js
     interface ResponseWrapperOptions<T = any> {
         data: T;
         resp: IncomingMessage;
     }
 
-    // responseWrapper.js
+    interface ResponseError {
+        error_code?: string,
+        error?: string,
+    }
+
     class ResponseWrapper<T = any> {
-        data: T;
+        data: T extends void ? undefined | ResponseError : T & ResponseError;
         resp: IncomingMessage;
         constructor(options: ResponseWrapperOptions);
         ok(): boolean;
