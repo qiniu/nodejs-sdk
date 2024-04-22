@@ -680,8 +680,6 @@ export declare namespace httpc {
     }
 
     class Endpoint implements EndpointsProvider {
-        static fromPersistInfo(persistInfo: EndpointPersistInfo): Endpoint;
-
         host: string;
         defaultScheme: string;
 
@@ -690,8 +688,6 @@ export declare namespace httpc {
         getValue(options?: {scheme?: string}): string;
 
         getEndpoints(): Promise<httpc.Endpoint[]>;
-
-        get persistInfo(): EndpointPersistInfo;
     }
 
     // region.js
@@ -768,8 +764,6 @@ export declare namespace httpc {
     class Region implements RegionsProvider {
         static fromZone(zone: conf.Zone, options?: RegionFromZoneOptions): Region;
         static fromRegionId(regionId: string, options?: RegionFromRegionIdOptions): Region;
-        static fromPersistInfo(persistInfo: RegionPersistInfo): Region;
-        static fromQueryData(data: QueryRegionsRespData): Region;
 
         // non-unique
         regionId?: string;
@@ -784,7 +778,6 @@ export declare namespace httpc {
         getRegions(): Promise<httpc.Region[]>;
 
         get isLive(): boolean;
-        get persistInfo(): RegionPersistInfo;
     }
 
     // endpointProvider.js
@@ -831,6 +824,14 @@ export declare namespace httpc {
     }
 
     class CachedRegionsProvider implements MutableRegionsProvider {
+        static cleanupCache(options: {
+            isClearAll?: boolean,
+            /**
+             * if instance is not passed, it will clean up the default scoop.
+             */
+            instance?: CachedRegionsProvider,
+        }): Promise<void>
+
         cacheKey: string;
         baseRegionsProvider: RegionsProvider;
 

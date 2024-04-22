@@ -5,6 +5,8 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 
+const { getManuallyPromise } = require('./conftest');
+
 const qiniu = require('../index');
 
 const {
@@ -35,6 +37,33 @@ const {
 
 const { EndpointsRetryPolicy } = require('../qiniu/httpc/endpointsRetryPolicy');
 const { RegionsRetryPolicy } = require('../qiniu/httpc/regionsRetryPolicy');
+
+function persistEndpoint (endpoint) {
+    return {
+        defaultScheme: endpoint.defaultScheme,
+        host: endpoint.host
+    };
+}
+
+function persistRegion (region) {
+    /**
+     * @type {Object.<string, EndpointPersistInfo[]>}
+     */
+    const persistedServices = {};
+    // use Object.entries when min version of Node.js update to ≥ v7.5.0
+    for (const k of Object.keys(region.services)) {
+        const v = region.services[k];
+        persistedServices[k] = v.map(persistEndpoint);
+    }
+
+    return {
+        regionId: region.regionId,
+        s3RegionId: region.s3RegionId,
+        services: persistedServices,
+        ttl: region.ttl,
+        createTime: region.createTime.getTime()
+    };
+}
 
 describe('test http module', function () {
     const accessKey = process.env.QINIU_ACCESS_KEY;
@@ -386,6 +415,9 @@ describe('test http module', function () {
             };
 
             should.deepEqual(servicesEndpointValues, expectedServicesEndpointValues);
+            should.ok(regionZ0.isLive);
+            regionZ0.createTime = new Date(0);
+            should.ok(!regionZ0.isLive);
         });
 
         it('test fromRegionId with options', function () {
@@ -515,15 +547,27 @@ describe('test http module', function () {
             const cacheFilesToDelete = [];
             const cacheKey = 'test-cache-key';
 
-            function getCachedRegionsProvider () {
-                const persistPath = path.join(process.cwd(), 'regions-cache-test' + cacheFilesToDelete.length + '.jsonl');
-                cacheFilesToDelete.push(persistPath);
+            /**
+             * @param {Object} [options]
+             * @param {boolean} [options.usingDefaultMemoScoop]
+             * @return {httpc.CachedRegionsProvider}
+             */
+            function getCachedRegionsProvider (options) {
+                options = options || {};
+
+                let persistPath;
+                if (!options.usingDefaultMemoScoop) {
+                    persistPath = path.join(process.cwd(), 'regions-cache-test' + cacheFilesToDelete.length + '.jsonl');
+                    cacheFilesToDelete.push(persistPath);
+                }
                 const result = new CachedRegionsProvider({
                     cacheKey,
                     baseRegionsProvider: new StaticRegionsProvider([]),
                     persistPath
                 });
-                result._memoCache = new Map();
+                if (!options.usingDefaultMemoScoop) {
+                    result._memoCache = new Map();
+                }
                 result.lastShrinkAt = new Date(0);
                 return result;
             }
@@ -582,14 +626,14 @@ describe('test http module', function () {
                 mockCreateTime.setMinutes(1, 2, 3);
                 rZ0.createTime = mockCreateTime;
 
-                const rZ0Expired = Region.fromRegionId('z0');
+                const rZ0Expired = Region.fromRegionId('z0', { ttl: 1 });
                 rZ0Expired.createTime = new Date(0);
 
                 fs.writeFileSync(
                     cachedRegionsProvider.persistPath,
                     JSON.stringify({
                         cacheKey: cachedRegionsProvider.cacheKey,
-                        regions: [rZ0Expired.persistInfo]
+                        regions: [persistRegion(rZ0Expired)]
                     })
                 );
                 cachedRegionsProvider._memoCache.set(cachedRegionsProvider.cacheKey, [rZ0]);
@@ -636,6 +680,180 @@ describe('test http module', function () {
                         const content = fs.readFileSync(cachedRegionsProvider.persistPath);
                         const jsonl = content.toString().split(os.EOL).filter(l => l.length);
                         should.equal(jsonl.length, 1);
+                    });
+            });
+
+            it('test CachedRegionsProvider should single flight', function () {
+                const expectRegions = [
+                    Region.fromRegionId('z0')
+                ];
+                let getRegionsCallTimes = 0;
+                const manuallyPromise = getManuallyPromise();
+                class MockRegionsProvider {
+                    getRegions () {
+                        getRegionsCallTimes += 1;
+                        return manuallyPromise.promise
+                            .then(() => expectRegions);
+                    }
+                }
+                const cachedRegionsProvider = getCachedRegionsProvider();
+                cachedRegionsProvider.baseRegionsProvider = new MockRegionsProvider();
+                const testResult = Promise.all([
+                    cachedRegionsProvider.getRegions(),
+                    cachedRegionsProvider.getRegions(),
+                    cachedRegionsProvider.getRegions()
+                ])
+                    .then(regionsResults => {
+                        should.equal(getRegionsCallTimes, 1);
+                        for (const regions of regionsResults) {
+                            should.deepEqual(
+                                regions.map(r => r.regionId),
+                                expectRegions.map(r => r.regionId)
+                            );
+                        }
+                    });
+                manuallyPromise.resolve(expectRegions);
+                return testResult;
+            });
+
+            it('test CachedRegionsProvider should provide memo expired regions when baseProvider getting failed', function () {
+                class MockRegionsProvider {
+                    getRegions () {
+                        return Promise.reject(new Error('mock timeout'));
+                    }
+                }
+                const cachedRegionsProvider = getCachedRegionsProvider();
+                cachedRegionsProvider.baseRegionsProvider = new MockRegionsProvider();
+
+                const rZ0Expired = Region.fromRegionId('z0', { ttl: 1 });
+                rZ0Expired.createTime = new Date(0);
+                should.ok(!rZ0Expired.isLive);
+
+                cachedRegionsProvider._memoCache.set(cachedRegionsProvider.cacheKey, [rZ0Expired]);
+                return cachedRegionsProvider.getRegions()
+                    .then(regions => {
+                        should.equal(regions.length, 1);
+                        const [actualRegion] = regions;
+                        should.equal(actualRegion.createTime.getTime(), 0);
+                    });
+            });
+
+            it('test CachedRegionsProvider should provide file expired regions when baseProvider getting failed', function () {
+                class MockRegionsProvider {
+                    getRegions () {
+                        return Promise.reject(new Error('mock error'));
+                    }
+                }
+                const cachedRegionsProvider = getCachedRegionsProvider();
+                cachedRegionsProvider.baseRegionsProvider = new MockRegionsProvider();
+
+                const rZ0Expired = Region.fromRegionId('z0', { ttl: 1 });
+                rZ0Expired.createTime = new Date(0);
+                should.ok(!rZ0Expired.isLive);
+                fs.writeFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [persistRegion(rZ0Expired)]
+                    })
+                );
+
+                return cachedRegionsProvider.getRegions()
+                    .then(regions => {
+                        should.equal(regions.length, 1);
+                        const [actualRegion] = regions;
+                        should.equal(actualRegion.createTime.getTime(), 0);
+                    });
+            });
+
+            it('test CachedRegionsProvider cleanup manually should all', function () {
+                const cachedRegionsProvider = getCachedRegionsProvider({
+                    usingDefaultMemoScoop: true
+                });
+
+                const rZ0 = Region.fromRegionId('z0');
+                should.ok(rZ0.isLive);
+                fs.writeFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [persistRegion(rZ0)]
+                    })
+                );
+                cachedRegionsProvider._memoCache.set(cachedRegionsProvider.cacheKey, [rZ0]);
+
+                return CachedRegionsProvider.cleanupCache({
+                    isClearAll: true
+                })
+                    .then(() =>
+                        cachedRegionsProvider.getRegions()
+                    )
+                    .then(regions => {
+                        should.equal(regions.length, 0);
+                    });
+            });
+
+            it('test CachedRegionsProvider cleanup manually should shrink expired only', function () {
+                const cachedRegionsProvider = getCachedRegionsProvider({
+                    usingDefaultMemoScoop: true
+                });
+
+                const rZ0 = Region.fromRegionId('z0', { ttl: 1 });
+                rZ0.createTime = new Date(0);
+                should.ok(!rZ0.isLive);
+                fs.writeFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [persistRegion(rZ0)]
+                    })
+                );
+                cachedRegionsProvider._memoCache.set(cachedRegionsProvider.cacheKey, [rZ0]);
+
+                const rZ1 = Region.fromRegionId('z1');
+                should.ok(rZ1.isLive);
+                fs.writeFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [persistRegion(rZ1)]
+                    })
+                );
+                cachedRegionsProvider._memoCache.set(cachedRegionsProvider.cacheKey, [rZ1]);
+
+                return CachedRegionsProvider.cleanupCache()
+                    .then(() =>
+                        cachedRegionsProvider.getRegions()
+                    )
+                    .then(regions => {
+                        should.equal(regions.length, 1);
+                        should.deepEqual([persistRegion(regions[0])], [persistRegion(rZ1)]);
+                    });
+            });
+
+            it('test CachedRegionsProvider cleanup manually with instance should clear all', function () {
+                const cachedRegionsProvider = getCachedRegionsProvider();
+
+                const rZ0 = Region.fromRegionId('z0');
+                should.ok(rZ0.isLive);
+                fs.writeFileSync(
+                    cachedRegionsProvider.persistPath,
+                    JSON.stringify({
+                        cacheKey: cachedRegionsProvider.cacheKey,
+                        regions: [persistRegion(rZ0)]
+                    })
+                );
+                cachedRegionsProvider._memoCache.set(cachedRegionsProvider.cacheKey, [rZ0]);
+
+                return CachedRegionsProvider.cleanupCache({
+                    isClearAll: true,
+                    instance: cachedRegionsProvider
+                })
+                    .then(() =>
+                        cachedRegionsProvider.getRegions()
+                    )
+                    .then(regions => {
+                        should.equal(regions.length, 0);
                     });
             });
         });

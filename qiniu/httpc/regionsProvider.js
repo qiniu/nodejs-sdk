@@ -5,7 +5,10 @@ const readline = require('readline');
 const stream = require('stream');
 
 const { Endpoint } = require('./endpoint');
-const { Region, SERVICE_NAME } = require('./region');
+const {
+    Region,
+    SERVICE_NAME
+} = require('./region');
 
 /**
  * @class
@@ -24,18 +27,25 @@ StaticRegionsProvider.prototype.getRegions = function () {
 // --- could split to files if migrate to typescript --- //
 const CachedRegionsProvider = (function () {
     /**
-     * cache regions in memory.
-     * @private DO NOT export this.
-     * @type {Map<string, Region[]>}
+     * default cache scoop
      */
-    const memoCachedRegions = new Map();
+    const globalCaches = {
+        /**
+         * cache regions in memory.
+         * @type {Map<string, Region[]>}
+         */
+        _memoCache: new Map(),
+        persistPath: path.join(os.tmpdir(), 'qn-regions-cache.jsonl'),
+        lastShrinkAt: new Date(0),
+        shrinkInterval: -1, // useless for now
+        shouldShrinkExpiredRegions: false
+    };
     /**
      * cache region query promises in memory for single flight.
      * @private DO NOT export this.
      * @type {Map<string, Promise<Region[]>>}
      */
     const cachedRegionsQuery = new Map();
-    const lastShrinkAt = new Date(0);
 
     /**
      * @class
@@ -44,6 +54,7 @@ const CachedRegionsProvider = (function () {
      * @param {string} options.cacheKey
      * @param {RegionsProvider} options.baseRegionsProvider
      * @param {number} [options.shrinkInterval]
+     * @param {boolean} [options.shouldShrinkExpiredRegions]
      * @param {string} [options.persistPath]
      * @constructor
      */
@@ -51,42 +62,78 @@ const CachedRegionsProvider = (function () {
         options
     ) {
         // only used for testing
-        this._memoCache = memoCachedRegions;
+        this._memoCache = globalCaches._memoCache;
 
         this.cacheKey = options.cacheKey;
         this.baseRegionsProvider = options.baseRegionsProvider;
 
-        this.lastShrinkAt = lastShrinkAt;
+        this.lastShrinkAt = new Date(0);
         this.shrinkInterval = options.shrinkInterval || 86400 * 1000;
+        this.shouldShrinkExpiredRegions = options.shouldShrinkExpiredRegions;
         this.persistPath = options.persistPath;
-        // allow disable persist
+        // allow null to disable persist cache
         if (!this.persistPath && this.persistPath !== null) {
-            this.persistPath = path.join(os.tmpdir(), 'qn-regions-cache.jsonl');
+            this.persistPath = globalCaches.persistPath;
         }
     }
+
+    /**
+     * @param {Object} [options]
+     * @param {boolean} [options.isClearAll]
+     * @param {CachedRegionsProvider} [options.instance] cleanup the global cache if not pass this param
+     * @return {Promise<void>}
+     */
+    CachedRegionsProvider.cleanupCache = function (options) {
+        options = options || {};
+        const instanceToCleanup = options.instance || globalCaches;
+
+        let result;
+        if (options.isClearAll) {
+            instanceToCleanup._memoCache.clear();
+            if (instanceToCleanup.persistPath) {
+                result = new Promise((resolve, reject) => {
+                    fs.unlink(instanceToCleanup.persistPath, err => {
+                        if (err && err.code !== 'ENOENT') {
+                            reject(err);
+                            return;
+                        }
+                        resolve();
+                    });
+                });
+            } else {
+                result = Promise.resolve();
+            }
+        } else {
+            result = shrinkCache.call(instanceToCleanup);
+        }
+        return result;
+    };
 
     /**
      * @returns {Promise<Region[]>}
      */
     CachedRegionsProvider.prototype.getRegions = function () {
-        /** @type Region[] */
-        return shrinkCache.call(this)
-            .then(() => {
-                const getRegionsFns = [
-                    getRegionsFromMemo,
-                    getRegionsFromFile,
-                    getRegionsFromBaseProvider
-                ];
+        let shrinkPromise = Promise.resolve();
+        if (shouldShrink.call(this)) {
+            shrinkPromise = shrinkCache.call(this);
+        }
 
-                return getRegionsFns.reduce((promiseChain, getRegionsFn) => {
-                    return promiseChain.then(regions => {
-                        if (regions.length) {
-                            return regions;
-                        }
-                        return getRegionsFn.call(this);
-                    });
-                }, Promise.resolve([]));
-            });
+        const getRegionsFns = [
+            getRegionsFromMemo,
+            getRegionsFromFile,
+            getRegionsFromBaseProvider
+        ];
+
+        return shrinkPromise.then(() => {
+            return getRegionsFns.reduce((promiseChain, getRegionsFn) => {
+                return promiseChain.then(regions => {
+                    if (regions.length && regions.every(r => r.isLive)) {
+                        return regions;
+                    }
+                    return getRegionsFn.call(this, regions);
+                });
+            }, Promise.resolve([]));
+        });
     };
 
     /**
@@ -117,32 +164,39 @@ const CachedRegionsProvider = (function () {
     };
 
     /**
-     * the returns value means if shrunk or not.
      * @private
-     * @returns {Promise<boolean>}
+     * @return {boolean}
+     */
+    function shouldShrink () {
+        if (this.lastShrinkAt.getTime() + this.shrinkInterval >= Date.now()) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @private
+     * @returns {Promise<void>}
      */
     function shrinkCache () {
-        const now = new Date();
-        const shouldShrink = this.lastShrinkAt.getTime() + this.shrinkInterval < now.getTime();
-        if (!shouldShrink) {
-            return Promise.resolve(false);
-        }
-        this.lastShrinkAt = now;
-
         // shrink memory cache
-        for (const [key, regions] of this._memoCache.entries()) {
-            const liveRegions = regions.filter(r => r.isLive);
-            if (liveRegions.length) {
-                this._memoCache.set(key, liveRegions);
-            } else {
-                this._memoCache.delete(key);
+        if (this.shouldShrinkExpiredRegions) {
+            for (const [key, regions] of this._memoCache.entries()) {
+                const liveRegions = regions.filter(r => r.isLive);
+                if (liveRegions.length) {
+                    this._memoCache.set(key, liveRegions);
+                } else {
+                    this._memoCache.delete(key);
+                }
             }
         }
 
-        if (!this.persistPath) {
-            return Promise.resolve(true);
-        }
         // shrink file cache
+        if (!this.persistPath) {
+            this.lastShrinkAt = Date.now();
+            return Promise.resolve();
+        }
+
         const shrunkCache = new Map();
         const shrinkPath = this.persistPath + '.shrink';
         const lockPath = this.persistPath + '.shrink.lock';
@@ -170,26 +224,33 @@ const CachedRegionsProvider = (function () {
         })
             .then(() => {
                 // parse useless data
-                return walkFileCache.call(this, ({
-                    cacheKey,
-                    regions
-                }) => {
-                    const validRegions = regions.filter(r => r.isLive);
-                    if (!validRegions.length) {
-                        return;
-                    }
-
-                    if (!shrunkCache.has(cacheKey)) {
-                        shrunkCache.set(cacheKey, validRegions);
-                        return;
-                    }
-
-                    const shrunkRegions = shrunkCache.get(cacheKey);
-                    shrunkCache.set(
+                return walkFileCache(
+                    ({
                         cacheKey,
-                        mergeRegions(shrunkRegions, validRegions)
-                    );
-                });
+                        regions
+                    }) => {
+                        const keptRegions = this.shouldShrinkExpiredRegions
+                            ? regions.filter(r => r.isLive)
+                            : regions;
+                        if (!keptRegions.length) {
+                            return;
+                        }
+
+                        if (!shrunkCache.has(cacheKey)) {
+                            shrunkCache.set(cacheKey, keptRegions);
+                            return;
+                        }
+
+                        const shrunkRegions = shrunkCache.get(cacheKey);
+                        shrunkCache.set(
+                            cacheKey,
+                            mergeRegions(shrunkRegions, keptRegions)
+                        );
+                    },
+                    {
+                        persistPath: this.persistPath
+                    }
+                );
             })
             .then(() => {
                 // write to file
@@ -223,15 +284,17 @@ const CachedRegionsProvider = (function () {
                 });
             })
             .then(() => {
+                this.lastShrinkAt = new Date();
                 unlockShrink();
                 process.removeListener('exit', unlockShrink);
-                return Promise.resolve(true);
+                return Promise.resolve();
             })
             .catch(err => {
                 // if exist
                 if (err.code === 'EEXIST' && err.path === lockPath) {
                     // ignore file shrinking err
-                    return Promise.resolve(false);
+                    this.lastShrinkAt = new Date();
+                    return Promise.resolve();
                 }
                 // use finally when min version of Node.js update to ≥ v10.3.0
                 unlockShrink();
@@ -242,24 +305,31 @@ const CachedRegionsProvider = (function () {
 
     /**
      * @private
+     * @param {Region[]} [fallbackValue]
      * @returns {Promise<Region[]>}
      */
-    function getRegionsFromMemo () {
+    function getRegionsFromMemo (fallbackValue) {
+        fallbackValue = fallbackValue || [];
+
         const regions = this._memoCache.get(this.cacheKey);
 
         if (Array.isArray(regions) && regions.length) {
             return Promise.resolve(regions);
         }
 
-        return Promise.resolve([]);
+        return Promise.resolve(fallbackValue);
     }
 
     /**
+     * @private
+     * @param {Region[]} [fallbackValue]
      * @returns {Promise<Region[]>}
      */
-    function getRegionsFromFile () {
+    function getRegionsFromFile (fallbackValue) {
+        fallbackValue = fallbackValue || [];
+
         if (!this.persistPath) {
-            return Promise.resolve([]);
+            return Promise.resolve(fallbackValue);
         }
 
         return flushFileCacheToMemo.call(this)
@@ -267,14 +337,18 @@ const CachedRegionsProvider = (function () {
                 return getRegionsFromMemo.call(this);
             })
             .catch(() => {
-                return Promise.resolve([]);
+                return Promise.resolve(fallbackValue);
             });
     }
 
     /**
+     * @private
+     * @param {Region[]} [fallbackValue]
      * @returns {Promise<Region[]>}
      */
-    function getRegionsFromBaseProvider () {
+    function getRegionsFromBaseProvider (fallbackValue) {
+        fallbackValue = fallbackValue || [];
+
         let result = cachedRegionsQuery.get(this.cacheKey);
         if (result) {
             return result;
@@ -288,6 +362,12 @@ const CachedRegionsProvider = (function () {
             })
             .then(() => {
                 return getRegionsFromMemo.call(this);
+            })
+            .catch(err => {
+                if (!fallbackValue.length) {
+                    return Promise.reject(err);
+                }
+                return Promise.resolve(fallbackValue);
             });
         cachedRegionsQuery.set(this.cacheKey, result);
         result.then(() => {
@@ -297,21 +377,21 @@ const CachedRegionsProvider = (function () {
     }
 
     /**
-     * @private
+     * @private equivalent to private static function
      * @param {function(CachedPersistedRegions):void} fn
-     * @param {Object} [options]
+     * @param {Object} options
+     * @param {string} options.persistPath
      * @param {boolean} [options.ignoreParseError]
      * @returns {Promise<void>}
      */
     function walkFileCache (fn, options) {
-        options = options || {};
         options.ignoreParseError = options.ignoreParseError || false;
-        if (!fs.existsSync(this.persistPath)) {
+        if (!fs.existsSync(options.persistPath)) {
             return Promise.resolve();
         }
         return new Promise((resolve, reject) => {
             const rl = readline.createInterface({
-                input: fs.createReadStream(this.persistPath)
+                input: fs.createReadStream(options.persistPath)
             });
 
             rl
@@ -337,26 +417,26 @@ const CachedRegionsProvider = (function () {
      * @returns Promise<void>
      */
     function flushFileCacheToMemo () {
-        return walkFileCache.call(this, ({
-            cacheKey,
-            regions
-        }) => {
-            const validRegions = regions.filter(r => r.isLive);
-            if (!validRegions.length) {
-                return;
-            }
-
-            if (!this._memoCache.has(cacheKey)) {
-                this._memoCache.set(cacheKey, validRegions);
-                return;
-            }
-
-            const memoRegions = this._memoCache.get(cacheKey);
-            this._memoCache.set(
+        return walkFileCache(
+            ({
                 cacheKey,
-                mergeRegions(memoRegions, validRegions)
-            );
-        });
+                regions
+            }) => {
+                if (!this._memoCache.has(cacheKey)) {
+                    this._memoCache.set(cacheKey, regions);
+                    return;
+                }
+
+                const memoRegions = this._memoCache.get(cacheKey);
+                this._memoCache.set(
+                    cacheKey,
+                    mergeRegions(memoRegions, regions)
+                );
+            },
+            {
+                persistPath: this.persistPath
+            }
+        );
     }
 
     // --- serializers ---
@@ -469,7 +549,10 @@ const CachedRegionsProvider = (function () {
      * @returns {CachedPersistedRegions}
      */
     function parsePersistedRegions (persistedRegions) {
-        const { cacheKey, regions } = JSON.parse(persistedRegions);
+        const {
+            cacheKey,
+            regions
+        } = JSON.parse(persistedRegions);
         return {
             cacheKey,
             regions: regions.map(getRegionFromPersisted)

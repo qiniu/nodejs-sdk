@@ -112,3 +112,26 @@ function doAndWrapResultPromises (func) {
     return promises;
 }
 exports.doAndWrapResultPromises = doAndWrapResultPromises;
+
+function getManuallyPromise () {
+    let _resolve;
+    let _reject;
+    const promise = new Promise((resolve, reject) => {
+        _resolve = resolve;
+        _reject = reject;
+    });
+
+    // result.resolve = (...args) => {
+    //     setTimeout(() => result._resolve(...args));
+    // };
+    // result.reject = (...args) => {
+    //     setTimeout(() => result._reject(...args));
+    // };
+
+    return {
+        promise,
+        resolve: _resolve,
+        reject: _reject
+    };
+}
+exports.getManuallyPromise = getManuallyPromise;
