@@ -1,12 +1,24 @@
 /**
- * typescript definition for qiniu 7.0.2
- * @date 2017-06-27
+ * typescript definition for qiniu 7.x
  * @author xialeistudio<xialeistudio@gmail.com>
  */
 import { Callback, RequestOptions } from 'urllib';
 import { Agent as HttpAgent, IncomingMessage} from 'http';
 import { Agent as HttpsAgent } from 'https';
 import { Readable } from "stream";
+import {
+    BatchOpsResult,
+    FetchObjectResult,
+    GetBucketCorsRulesResult,
+    GetBucketDomainsV3Result,
+    GetBucketEventsResult,
+    GetBucketInfoV2Result,
+    GetBucketQuotaResult,
+    GetBucketRulesResult,
+    GetBucketsResult,
+    GetObjectsResult,
+    StatObjectResult
+} from "./StorageResponseInterface";
 
 export declare type callback = (e?: Error, respBody?: any, respInfo?: any) => void;
 
@@ -19,6 +31,7 @@ export declare namespace auth {
         class Mac {
             accessKey: string;
             secretKey: string;
+            options: MacOptions;
 
             constructor(accessKey?: string, secretKey?: string, options?: MacOptions);
         }
@@ -123,6 +136,11 @@ export declare namespace conf {
     let RS_HOST: string;
     let RPC_TIMEOUT: number;
 
+    interface getRegionsProviderOptions {
+        bucketName: string;
+        accessKey: string;
+    }
+
     interface ConfigOptions {
         /**
          * @default false
@@ -137,9 +155,21 @@ export declare namespace conf {
         /**
          * @default null
          */
-        zone?: Zone,
+        ucEndpointsProvider?: httpc.EndpointsProvider;
 
         /**
+         * @default null
+         */
+        queryRegionsEndpointsProvider?: httpc.EndpointsProvider;
+
+        /**
+         * @deprecated use regionsProvider instead
+         * @default null
+         */
+        zone?: Zone;
+
+        /**
+         * @deprecated
          * @default -1
          */
         zoneExpire?: number;
@@ -149,8 +179,18 @@ export declare namespace conf {
          */
         regionsProvider?: httpc.RegionsProvider;
     }
-    class Config implements ConfigOptions {
+    class Config {
+        useHttpsDomain: boolean;
+        useCdnDomain: boolean;
+        ucEndpointsProvider?: httpc.EndpointsProvider | null;
+        queryRegionsEndpointsProvider?: httpc.EndpointsProvider | null;
+        regionsProvider?: httpc.RegionsProvider | null;
+        zone?: Zone | null;
+        zoneExpire?: number;
+
         constructor(options?: ConfigOptions);
+        getUcEndpointsProvider(): httpc.EndpointsProvider;
+        getRegionsProvider(options?: getRegionsProviderOptions): Promise<httpc.RegionsProvider>
     }
 
     class Zone {
@@ -166,10 +206,7 @@ export declare namespace conf {
 }
 
 export declare namespace form_up {
-    type UploadResult = {
-        data: any;
-        resp: IncomingMessage;
-    }
+    type UploadResult = httpc.ResponseWrapper
 
     class FormUploader {
         conf: conf.Config;
@@ -189,7 +226,7 @@ export declare namespace form_up {
             key: string | null,
             fsStream: NodeJS.ReadableStream,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
 
         /**
@@ -205,7 +242,7 @@ export declare namespace form_up {
             key: string | null,
             body: any,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
 
         /**
@@ -219,7 +256,7 @@ export declare namespace form_up {
             uploadToken: string,
             body: any,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
 
         /**
@@ -235,7 +272,7 @@ export declare namespace form_up {
             key: string | null,
             localFile: string,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
 
         /**
@@ -249,7 +286,7 @@ export declare namespace form_up {
             uploadToken: string,
             localFile: string,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
     }
 
@@ -323,7 +360,7 @@ export declare namespace resume_up {
             rsStream: NodeJS.ReadableStream,
             rsStreamLen: number,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
 
         /**
@@ -339,7 +376,7 @@ export declare namespace resume_up {
             key: string | null,
             localFile: string,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
 
         /**
@@ -353,7 +390,7 @@ export declare namespace resume_up {
             uploadToken: string,
             localFile: string,
             putExtra: PutExtra | null,
-            callback: callback
+            callback?: callback
         ): Promise<UploadResult>;
     }
 
@@ -486,19 +523,24 @@ export declare namespace httpc {
         agent?: HttpAgent;
         httpsAgent?: HttpsAgent;
         url: string;
-        middlewares: middleware.Middleware[];
+        middlewares?: middleware.Middleware[];
         callback?: Callback<T>;
         urllibOptions: RequestOptions;
     }
 
+    // responseWrapper.js
     interface ResponseWrapperOptions<T = any> {
         data: T;
         resp: IncomingMessage;
     }
 
-    // responseWrapper.js
+    interface ResponseError {
+        error_code?: string,
+        error?: string,
+    }
+
     class ResponseWrapper<T = any> {
-        data: T;
+        data: T extends void ? undefined | ResponseError : T & ResponseError;
         resp: IncomingMessage;
         constructor(options: ResponseWrapperOptions);
         ok(): boolean;
@@ -522,7 +564,7 @@ export declare namespace httpc {
         function composeMiddlewares<T>(
             middlewares: Middleware[],
             handler: (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>
-        );
+        ): (reqOpts: ReqOpts<T>) => Promise<ResponseWrapper<T>>;
 
         /**
          * 设置 User-Agent 请求头中间件
@@ -637,9 +679,7 @@ export declare namespace httpc {
         defaultScheme: string;
     }
 
-    class Endpoint {
-        static fromPersistInfo(persistInfo: EndpointPersistInfo): Endpoint;
-
+    class Endpoint implements EndpointsProvider {
         host: string;
         defaultScheme: string;
 
@@ -647,7 +687,7 @@ export declare namespace httpc {
 
         getValue(options?: {scheme?: string}): string;
 
-        get persistInfo(): EndpointPersistInfo;
+        getEndpoints(): Promise<httpc.Endpoint[]>;
     }
 
     // region.js
@@ -673,6 +713,7 @@ export declare namespace httpc {
         regionId?: string;
         s3RegionId?: string;
         ttl?: number;
+        preferredScheme?: 'http' | 'https' | string
         isPreferCdnHost?: boolean;
     }
 
@@ -681,6 +722,8 @@ export declare namespace httpc {
         ttl?: number;
         createTime?: Date;
         extendedServices?: Record<SERVICE_NAME | string, Endpoint[]>
+        preferredScheme?: 'http' | 'https' | string
+        isPreferCdnUpHost?: boolean
     }
 
     interface RegionPersistInfo {
@@ -718,11 +761,9 @@ export declare namespace httpc {
         };
     }
 
-    class Region {
+    class Region implements RegionsProvider {
         static fromZone(zone: conf.Zone, options?: RegionFromZoneOptions): Region;
         static fromRegionId(regionId: string, options?: RegionFromRegionIdOptions): Region;
-        static fromPersistInfo(persistInfo: RegionPersistInfo): Region;
-        static fromQueryData(data: QueryRegionsRespData): Region;
 
         // non-unique
         regionId?: string;
@@ -734,8 +775,9 @@ export declare namespace httpc {
 
         constructor(options: RegionOptions);
 
+        getRegions(): Promise<httpc.Region[]>;
+
         get isLive(): boolean;
-        get persistInfo(): RegionPersistInfo;
     }
 
     // endpointProvider.js
@@ -782,6 +824,14 @@ export declare namespace httpc {
     }
 
     class CachedRegionsProvider implements MutableRegionsProvider {
+        static cleanupCache(options: {
+            isClearAll?: boolean,
+            /**
+             * if instance is not passed, it will clean up the default scoop.
+             */
+            instance?: CachedRegionsProvider,
+        }): Promise<void>
+
         cacheKey: string;
         baseRegionsProvider: RegionsProvider;
 
@@ -802,6 +852,7 @@ export declare namespace httpc {
         accessKey: string;
         bucketName: string;
         endpointsProvider: EndpointsProvider;
+        preferredScheme?: 'http' | 'https' | string;
     }
 
     class QueryRegionsProvider implements RegionsProvider {
@@ -1006,7 +1057,7 @@ export declare namespace rs {
          * @param key 文件名称
          * @param callback
          */
-        stat(bucket: string, key: string, callback: callback): void;
+        stat(bucket: string, key: string, callback?: callback): Promise<httpc.ResponseWrapper<StatObjectResult>>;
 
         /**
          * 修改文件的类型
@@ -1017,7 +1068,7 @@ export declare namespace rs {
          * @param newMime 新文件类型
          * @param callback
          */
-        changeMime(bucket: string, key: string, newMime: string, callback: callback): void;
+        changeMime(bucket: string, key: string, newMime: string, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 修改文件的Headers
@@ -1028,7 +1079,7 @@ export declare namespace rs {
          * @param headers Headers对象
          * @param callback
          */
-        changeHeaders(bucket: string, key: string, headers: { [k: string]: string }, callback: callback): void;
+        changeHeaders(bucket: string, key: string, headers: { [k: string]: string }, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
@@ -1041,7 +1092,7 @@ export declare namespace rs {
          * @param options
          * @param callback
          */
-        move(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: { force?: boolean } | null, callback: callback): void;
+        move(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: { force?: boolean } | null, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 复制文件
@@ -1054,7 +1105,7 @@ export declare namespace rs {
          * @param options
          * @param callback
          */
-        copy(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: { force?: boolean } | null, callback: callback): void;
+        copy(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: { force?: boolean } | null, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 删除资源
@@ -1064,7 +1115,7 @@ export declare namespace rs {
          * @param key 文件名称
          * @param callback
          */
-        delete(bucket: string, key: string, callback: callback): void;
+        delete(bucket: string, key: string, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 设置文件删除的生命周期
@@ -1075,7 +1126,7 @@ export declare namespace rs {
          * @param days 有效期天数
          * @param callback
          */
-        deleteAfterDays(bucket: string, key: string, days: number, callback: callback): void;
+        deleteAfterDays(bucket: string, key: string, days: number, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 设置文件的生命周期
@@ -1110,8 +1161,10 @@ export declare namespace rs {
                     putTime?: number
                 }
             },
-            callbackFunc: callback
-        ): void;
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>;
+
+        listBucketDomains(bucket: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketDomainsV3Result>>
 
         /**
          * 解冻归档存储文件
@@ -1119,7 +1172,7 @@ export declare namespace rs {
          * @param freezeAfterDays
          * @param callbackFunc
          */
-        restoreAr(entry: string, freezeAfterDays: number, callbackFunc: callback): void;
+        restoreAr(entry: string, freezeAfterDays: number, callbackFunc?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 抓取资源
@@ -1130,7 +1183,7 @@ export declare namespace rs {
          * @param key 文件名称
          * @param callback
          */
-        fetch(resUrl: string, bucket: string, key: string, callback: callback): void;
+        fetch(resUrl: string, bucket: string, key: string, callback?: callback): Promise<httpc.ResponseWrapper<FetchObjectResult>>;
 
         /**
          * 更新镜像副本
@@ -1140,7 +1193,7 @@ export declare namespace rs {
          * @param key 文件名称
          * @param callback
          */
-        prefetch(bucket: string, key: string, callback: callback): void;
+        prefetch(bucket: string, key: string, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 修改文件的存储类型
@@ -1151,7 +1204,7 @@ export declare namespace rs {
          * @param newType 0 表示标准存储；1 表示低频存储。
          * @param callback
          */
-        changeType(bucket: string, key: string, newType: number, callback: callback): void;
+        changeType(bucket: string, key: string, newType: number, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 设置空间镜像源
@@ -1162,7 +1215,7 @@ export declare namespace rs {
          * @param srcHost 镜像Host
          * @param callback
          */
-        image(bucket: string, srcSiteUrl: string, srcHost: string, callback: callback): void;
+        image(bucket: string, srcSiteUrl: string, srcHost?: string, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 取消设置空间镜像源
@@ -1171,7 +1224,7 @@ export declare namespace rs {
          * @param bucket 空间名称
          * @param callback
          */
-        unimage(bucket: string, callback: callback): void;
+        unimage(bucket: string, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 获取指定前缀的文件列表
@@ -1181,7 +1234,7 @@ export declare namespace rs {
          * @param options 列举操作的可选参数
          * @param callback 回调函数
          */
-        listPrefix(bucket: string, options: ListPrefixOptions | null, callback: callback): void;
+        listPrefix(bucket: string, options: ListPrefixOptions | null, callback?: callback): Promise<httpc.ResponseWrapper<GetObjectsResult>>;
 
         /**
          * 获取制定前缀的文件列表 V2
@@ -1192,14 +1245,14 @@ export declare namespace rs {
          * @param options 列举操作的可选参数
          * @param callback 回调函数
          */
-        listPrefixV2(bucket: string, options: ListPrefixOptions | null, callback: callback): void;
+        listPrefixV2(bucket: string, options: ListPrefixOptions | null, callback?: callback): Promise<httpc.ResponseWrapper<string>>;
 
         /**
          * 批量文件管理请求，支持stat，chgm，chtype，delete，copy，move
          * @param operations
          * @param callback
          */
-        batch(operations: any, callback: callback): void;
+        batch(operations: any, callback?: callback): Promise<httpc.ResponseWrapper<BatchOpsResult>>;
 
         /**
          * 获取私有空间的下载链接
@@ -1215,6 +1268,33 @@ export declare namespace rs {
          * @param fileName 原始文件名
          */
         publicDownloadUrl(domain: string, fileName: string): string;
+
+        /**
+         * /chstatus 修改文件状态
+         * @param bucket - 空间名
+         * @param key - 文件
+         * @param status - 状态
+         * @param callbackFunc - 回调函数
+         */
+        updateObjectStatus(
+            bucket: string,
+            key: string,
+            status: number,
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 获取所有空间
+         * @param callbackFunc
+         */
+        listBucket(callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
+
+        /**
+         * 获取空间详情
+         * @param bucket - 空间名
+         * @param callbackFunc
+         */
+        getBucketInfo(bucket: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketInfoV2Result>>
 
         /**
          * rules/add 增加 bucket 规则
@@ -1247,15 +1327,15 @@ export declare namespace rs {
                 history_delete_after_days?: number,
                 history_to_line_after_days?: number,
             },
-            callbackFunc: callback
-        ): void;
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>;
 
         /** rules/delete 删除 bucket 规则
          * @param bucket - 空间名
          * @param name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
          * @param callbackFunc - 回调函数
          */
-        deleteBucketLifecycleRule(bucket: string, name: string, callbackFunc: callback): void;
+        deleteBucketLifecycleRule(bucket: string, name: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * rules/update 更新 bucket 规则
@@ -1288,15 +1368,15 @@ export declare namespace rs {
                 history_delete_after_days?: number,
                 history_to_line_after_days?: number,
             },
-            callbackFunc: callback
-        ): void;
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>;
 
 
         /** rules/get - 获取 bucket 规则
          *  @param bucket - 空间名
          *  @param callbackFunc - 回调函数
          */
-        getBucketLifecycleRule(bucket: string, callbackFunc: callback): void
+        getBucketLifecycleRule(bucket: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketRulesResult>>
 
         /**
          * 添加事件通知
@@ -1305,7 +1385,7 @@ export declare namespace rs {
          * @param options - 配置项
          * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
          * @param options.event - 事件类型，接受数组设置多个
-         * @param options.callbackUrl - 事件通知回调 URL，接受数组设置多个，失败依次重试
+         * @param options.callbackURL - 事件通知回调 URL，接受数组设置多个，失败依次重试
          * @param options.prefix - 可选，文件配置的前缀
          * @param options.suffix - 可选，文件配置的后缀
          * @param options.access_key - 可选，设置的话会对通知请求用对应的ak、sk进行签名
@@ -1317,14 +1397,14 @@ export declare namespace rs {
             options: {
                 name: string,
                 event: BucketEventName | BucketEventName[],
-                callbackUrl: string | string[],
+                callbackURL: string | string[],
                 prefix?: string,
                 suffix?: string,
                 access_key?: string,
                 host?: string,
             },
-            callbackFunc: callback,
-        ): void
+            callbackFunc?: callback,
+        ): Promise<httpc.ResponseWrapper<void>>
 
         /**
          * 更新事件通知
@@ -1333,7 +1413,7 @@ export declare namespace rs {
          * @param options - 配置项
          * @param options.name - 规则名称 bucket 内唯一，长度小于50，不能为空，只能为字母、数字、下划线
          * @param options.event - 事件类型，接受数组设置多个
-         * @param options.callbackUrl - 事件通知回调 URL，接受数组设置多个，失败依次重试
+         * @param options.callbackURL - 事件通知回调 URL，接受数组设置多个，失败依次重试
          * @param options.prefix - 可选，文件配置的前缀
          * @param options.suffix - 可选，文件配置的后缀
          * @param options.access_key - 可选，设置的话会对通知请求用对应的ak、sk进行签名
@@ -1345,14 +1425,14 @@ export declare namespace rs {
             options: {
                 name: string,
                 event?: BucketEventName | BucketEventName[],
-                callbackUrl?: string | string[],
+                callbackURL?: string | string[],
                 prefix?: string,
                 suffix?: string,
                 access_key?: string,
                 host?: string,
             },
-            callbackFunc: callback,
-        ): void
+            callbackFunc?: callback,
+        ): Promise<httpc.ResponseWrapper<void>>
 
         /**
          * 获取事件通知规则
@@ -1361,7 +1441,7 @@ export declare namespace rs {
          * @param bucket - 空间名
          * @param callbackFunc - 回调函数
          */
-        getBucketEvent(bucket: string, callbackFunc: callback): void
+        getBucketEvent(bucket: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketEventsResult>>
 
         /**
          * 删除事件通知规则
@@ -1371,7 +1451,20 @@ export declare namespace rs {
          * @param name - 规则名称
          * @param callbackFunc - 回调函数
          */
-        deleteBucketEvent(bucket: string, name: string, callbackFunc: callback): void
+        deleteBucketEvent(bucket: string, name: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<void>>;
+
+        /**
+         * @param bucket - 空间名
+         * @param options - 配置
+         */
+        putReferAntiLeech(
+            bucket: string,
+            options: {
+                mode: number,
+                norefer: number,
+                pattern: string,
+            }
+        ): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 设置 bucket 的 cors（跨域）规则
@@ -1394,8 +1487,8 @@ export declare namespace rs {
                 exposed_header?: string[],
                 max_age?: number,
             }[],
-            callbackFunc: callback
-        ): void
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
 
         /**
          * 获取 bucket 的 cors（跨域）规则
@@ -1403,7 +1496,72 @@ export declare namespace rs {
          * @param bucket - 空间名
          * @param callbackFunc - 回调函数
          */
-        getCorsRules(bucket: string, callbackFunc: callback): void
+        getCorsRules(bucket: string, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketCorsRulesResult>>
+
+        /**
+         * 设置空间原图保护
+         * @param bucket 空间名
+         * @param mode 为 1 表示开启原图保护，0 表示关闭
+         * @param callbackFunc 回调函数
+         */
+        putBucketAccessStyleMode(bucket: string, mode: number, callbackFunc?: callback): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+          * 设置缓存策略的 max-age 属性
+          * @param bucket
+          * @param options
+          * @param options.maxAge 为 0 或者负数表示为默认值（31536000）
+          * @param callbackFunc 回调函数
+          */
+        putBucketMaxAge(
+            bucket: string,
+            options: {
+                maxAge: number
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 设置空间私有属性
+         * @param bucket
+         * @param options
+         * @param options.private 为 0 表示公开，为 1 表示私有，默认为 0
+         * @param callbackFunc
+         */
+        putBucketAccessMode(
+            bucket: string,
+            options?: {
+                private?: number
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 设置配额
+         * @param bucket 空间名称，不支持授权空间
+         * @param options
+         * @param options.size 空间存储量配额,参数传入 0 或不传表示不更改当前配置，传入 -1 表示取消限额，新创建的空间默认没有限额。
+         * @param options.count 空间文件数配额，参数含义同<size>
+         * @param callbackFunc 回调函数
+         */
+        putBucketQuota(
+            bucket: string,
+            options?: {
+                size?: number,
+                count?: number
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 获取配额
+         * @param bucket 空间名称，不支持授权空间
+         * @param callbackFunc 回调函数
+         */
+        getBucketQuota(
+            bucket: string,
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<GetBucketQuotaResult>>
     }
 
     /**
@@ -1507,7 +1665,7 @@ export declare namespace rs {
         // @deprecated
         transformFallbackKey?: string;
 
-        [key: string]: string | number | boolean;
+        [key: string]: string | number | boolean | undefined;
     }
     class PutPolicy {
         [k: string]: string | number | boolean | Function;

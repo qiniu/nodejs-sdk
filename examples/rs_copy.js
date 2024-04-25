@@ -1,29 +1,29 @@
 const qiniu = require('qiniu');
-const proc = require('process');
 
-var accessKey = proc.env.QINIU_ACCESS_KEY;
-var secretKey = proc.env.QINIU_SECRET_KEY;
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-var config = new qiniu.conf.Config();
+const accessKey = process.env.QINIU_ACCESS_KEY;
+const secretKey = process.env.QINIU_SECRET_KEY;
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const config = new qiniu.conf.Config();
 // config.useHttpsDomain = true;
-config.zone = qiniu.zone.Zone_z0;
-var bucketManager = new qiniu.rs.BucketManager(mac, config);
-var srcBucket = proc.env.QINIU_TEST_BUCKET;
-var srcKey = 'qiniu.mp4';
-var destBucket = 'destBucket';
-var destKey = 'qiniu_new_copy.mp4';
-var options = {
+config.zone = qiniu.httpc.Region.fromRegionId('z0');
+const bucketManager = new qiniu.rs.BucketManager(mac, config);
+const srcBucket = process.env.QINIU_TEST_BUCKET;
+const srcKey = 'qiniu.mp4';
+const destBucket = 'destBucket';
+const destKey = 'qiniu_new_copy.mp4';
+const options = {
     force: true
 };
 
-bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options, function (
-    err, respBody, respInfo) {
-    if (err) {
-        console.log(err);
-    // throw err;
-    } else {
-    // 200 is success
-        console.log(respInfo.statusCode);
-        console.log(respBody);
-    }
-});
+bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });

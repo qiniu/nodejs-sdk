@@ -35,6 +35,15 @@ $ npm install qiniu
 1. 点击[注册🔗](https://portal.qiniu.com/signup)开通七牛开发者帐号
 2. 如果已有账号，直接登录七牛开发者后台，点击[这里🔗](https://portal.qiniu.com/user/key)查看 Access Key 和 Secret Key
 
+# Promise 风格 API 支持
+
+SDK 存储相关 API 已支持 Promise 风格异步代码，例如 `BucketManager`, `FormUploader`, `ResumeUploader`。
+
+原 Callback 风格依然支持，但请注意 `callbackFunc` 产生错误将不再向上层继续抛出。
+请在 `callbackFunc` 内部处理其产生的错误。
+
+请尽量从 Callback 风格切换到 Promise 风格，以备未来 Callback 风格的废弃。
+
 <a id="io-put"></a>
 # 文件上传
 - <a href="#upload-flow">上传流程</a>
@@ -69,10 +78,10 @@ $ npm install qiniu
 
 创建各种上传凭证之前，我们需要定义好其中鉴权对象`mac`：
 
-```
-var accessKey = 'your access key';
-var secretKey = 'your secret key';
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+```javascript
+const accessKey = 'your access key';
+const secretKey = 'your secret key';
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
 ```
 
 <a id="simple-uptoken"></a>
@@ -81,24 +90,24 @@ var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
 
 最简单的上传凭证只需要`AccessKey`，`SecretKey`和`Bucket`就可以。
 
-```
-var options = {
+```javascript
+const options = {
   scope: bucket,
 };
-var putPolicy = new qiniu.rs.PutPolicy(options);
-var uploadToken=putPolicy.uploadToken(mac);
+const putPolicy = new qiniu.rs.PutPolicy(options);
+const uploadToken=putPolicy.uploadToken(mac);
 ```
 
 默认情况下，在不指定上传凭证的有效时间情况下，默认有效期为 1 个小时。也可以自行指定上传凭证的有效期，例如：
 
-```
+```javascript
 //自定义凭证有效期（示例2小时，expires单位为秒，为上传凭证的有效时间）
-var options = {
+const options = {
   scope: bucket,
   expires: 7200
 };
-var putPolicy = new qiniu.rs.PutPolicy(options);
-var uploadToken=putPolicy.uploadToken(mac);
+const putPolicy = new qiniu.rs.PutPolicy(options);
+const uploadToken=putPolicy.uploadToken(mac);
 ```
 
 <a id="overwrite-uptoken"></a>
@@ -106,13 +115,13 @@ var uploadToken=putPolicy.uploadToken(mac);
 
 覆盖上传除了需要`简单上传`所需要的信息之外，还需要想进行覆盖的文件名称，这个文件名称同时可是客户端上传代码中指定的文件名，两者必须一致。
 
-```
-var keyToOverwrite = 'qiniu.mp4';
-var options = {
+```javascript
+const keyToOverwrite = 'qiniu.mp4';
+const options = {
   scope: bucket + ":" + keyToOverwrite
 }
-var putPolicy = new qiniu.rs.PutPolicy(options);
-var uploadToken=putPolicy.uploadToken(mac);
+const putPolicy = new qiniu.rs.PutPolicy(options);
+const uploadToken=putPolicy.uploadToken(mac);
 ```
 
 <a id="returnbody-uptoken"></a>
@@ -126,13 +135,13 @@ var uploadToken=putPolicy.uploadToken(mac);
 
 有时候我们希望能自定义这个返回的JSON格式的内容，可以通过设置`returnBody`参数来实现，在`returnBody`中，我们可以使用七牛支持的[魔法变量](https://developer.qiniu.com/kodo/1235/vars#magicvar)和[自定义变量](https://developer.qiniu.com/kodo/1235/vars#xvar)。
 
-```
-var options = {
+```javascript
+const options = {
   scope: bucket,
   returnBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}'
 }
-var putPolicy = new qiniu.rs.PutPolicy(options);
-var uploadToken=putPolicy.uploadToken(mac);
+const putPolicy = new qiniu.rs.PutPolicy(options);
+const uploadToken=putPolicy.uploadToken(mac);
 ```
 
 则文件上传到七牛之后，收到的回复内容如下：
@@ -146,28 +155,28 @@ var uploadToken=putPolicy.uploadToken(mac);
 
 上面生成的`自定义上传回复`的上传凭证适用于上传端（无论是客户端还是服务端）和七牛服务器之间进行直接交互的情况下。在客户端上传的场景之下，有时候客户端需要在文件上传到七牛之后，从业务服务器获取相关的信息，这个时候就要用到七牛的上传回调及相关回调参数的设置。
 
-```
-var options = {
+```javascript
+const options = {
   scope: bucket,
   callbackUrl: 'http://api.example.com/qiniu/upload/callback',
   callbackBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}',
   callbackBodyType: 'application/json'
 }
-var putPolicy = new qiniu.rs.PutPolicy(options);
-var uploadToken=putPolicy.uploadToken(mac);
+const putPolicy = new qiniu.rs.PutPolicy(options);
+const uploadToken=putPolicy.uploadToken(mac);
 ```
 
 在使用了上传回调的情况下，客户端收到的回复就是业务服务器响应七牛的JSON格式内容。
 通常情况下，我们建议使用`application/json`格式来设置`callbackBody`，保持数据格式的统一性。实际情况下，`callbackBody`也支持`application/x-www-form-urlencoded`格式来组织内容，这个主要看业务服务器在接收到`callbackBody`的内容时如果解析。例如：
 
-```
-var options = {
+```javascript
+const options = {
   scope: bucket,
   callbackUrl: 'http://api.example.com/qiniu/upload/callback',
   callbackBody: 'key=$(key)&hash=$(etag)&bucket=$(bucket)&fsize=$(fsize)&name=$(x:name)'
 }
-var putPolicy = new qiniu.rs.PutPolicy(options);
-var uploadToken=putPolicy.uploadToken(mac);
+const putPolicy = new qiniu.rs.PutPolicy(options);
+const uploadToken=putPolicy.uploadToken(mac);
 ```
 
 <a id="pfop-uptoken"></a>
@@ -175,13 +184,13 @@ var uploadToken=putPolicy.uploadToken(mac);
 
 七牛支持在文件上传到七牛之后，立即对其进行多种指令的数据处理，这个只需要在生成的上传凭证中指定相关的处理参数即可。
 
-```
-var saveMp4Entry = qiniu.util.urlsafeBase64Encode(bucket + ":avthumb_test_target.mp4");
-var saveJpgEntry = qiniu.util.urlsafeBase64Encode(bucket + ":vframe_test_target.jpg");
+```javascript
+const saveMp4Entry = qiniu.util.urlsafeBase64Encode(bucket + ":avthumb_test_target.mp4");
+const saveJpgEntry = qiniu.util.urlsafeBase64Encode(bucket + ":vframe_test_target.jpg");
 //数据处理指令，支持多个指令
-var avthumbMp4Fop = "avthumb/mp4|saveas/" + saveMp4Entry;
-var vframeJpgFop = "vframe/jpg/offset/1|saveas/" + saveJpgEntry;
-var options = {
+const avthumbMp4Fop = "avthumb/mp4|saveas/" + saveMp4Entry;
+const vframeJpgFop = "vframe/jpg/offset/1|saveas/" + saveJpgEntry;
+const options = {
   scope: bucket,
   //将多个数据处理指令拼接起来
   persistentOps: avthumbMp4Fop + ";" + vframeJpgFop,
@@ -190,8 +199,8 @@ var options = {
   //数据处理完成结果通知地址
   persistentNotifyUrl: "http://api.example.com/qiniu/pfop/notify",
 }
-var putPolicy = new qiniu.rs.PutPolicy(options);
-var uploadToken=putPolicy.uploadToken(mac);
+const putPolicy = new qiniu.rs.PutPolicy(options);
+const uploadToken=putPolicy.uploadToken(mac);
 ```
 
 队列 pipeline 请参阅[创建私有队列](https://portal.qiniu.com/dora/create-mps)；转码操作具体参数请参阅[音视频转码](https://developer.qiniu.com/dora/1248/audio-and-video-transcoding-avthumb)；saveas 请参阅[处理结果另存](https://developer.qiniu.com/dora/1305/processing-results-save-saveas)。
@@ -201,8 +210,8 @@ var uploadToken=putPolicy.uploadToken(mac);
 
 七牛支持客户端上传文件的时候定义一些自定义参数，这些参数可以在`returnBody`和`callbackBody`里面和七牛内置支持的魔法变量（即系统变量）通过相同的方式来引用。这些自定义的参数名称必须以`x:`开头。例如客户端上传的时候指定了自定义的参数`x:name`和`x:age`分别是`string`和`int`类型。那么可以通过下面的方式引用：
 
-```
-var options = {
+```javascript
+const options = {
   //其他上传策略参数...
   returnBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)","age":$(x:age)}'
 }
@@ -210,8 +219,8 @@ var options = {
 
 或者
 
-```
-var options = {
+```javascript
+const options = {
   //其他上传策略参数...
   callbackBody: '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)","age":$(x:age)}',
 }
@@ -232,16 +241,21 @@ var options = {
 
 七牛存储支持空间创建在不同的机房，在使用七牛的 Node.js SDK 中的`FormUploader`和`ResumeUploader`上传文件之前，必须要构建一个上传用的`config`对象，在该对象中，可以指定空间对应的`zone`以及其他的一些影响上传的参数。
 
-```
-var config = new qiniu.conf.Config();
+```javascript
+const config = new qiniu.conf.Config();
 // 空间对应的机房
-config.zone = qiniu.zone.Zone_z0;
+config.regionsProvider = qiniu.httpc.Region.fromRegionId('z0');
+// Zone 对象已弃用，目前暂时兼容。regionsProvider 配置项优先级更高。
+// config.zone = qiniu.zone.Zone_z0;
 // 是否使用https域名
 //config.useHttpsDomain = true;
 // 上传是否使用cdn加速
 //config.useCdnDomain = true;
 ```
 
+不同区域请使用对应区域 ID 生成对应 RegionsProvider。区域 ID 请参考[存储区域文档](https://developer.qiniu.com/kodo/1671/region-endpoint-fq)。
+
+若不配置区域，将会通过 AK 与 Bucket 查询对应区域。非必要建议不配置区域信息。
 
 其中关于`Zone`对象和区域的关系如下：
 
@@ -258,80 +272,77 @@ config.zone = qiniu.zone.Zone_z0;
 #### 文件上传（表单方式）
 最简单的就是上传本地文件，直接指定文件的完整路径即可上传。
 
-```
-var localFile = "/Users/jemy/Documents/qiniu.mp4";
-var formUploader = new qiniu.form_up.FormUploader(config);
-var putExtra = new qiniu.form_up.PutExtra();
-var key='test.mp4';
+```javascript
+const localFile = "/Users/jemy/Documents/qiniu.mp4";
+const formUploader = new qiniu.form_up.FormUploader(config);
+const putExtra = new qiniu.form_up.PutExtra();
+const key='test.mp4';
 // 文件上传
-formUploader.putFile(uploadToken, key, localFile, putExtra, function(respErr,
-  respBody, respInfo) {
-  if (respErr) {
-    throw respErr;
-  }
-
-  if (respInfo.statusCode == 200) {
-    console.log(respBody);
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+formUploader.putFile(uploadToken, key, localFile, putExtra)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="form-upload-bytes"></a>
 #### 字节数组上传（表单方式）
 可以支持将内存中的字节数组上传到空间中。
 
-```
-var formUploader = new qiniu.form_up.FormUploader(config);
-var putExtra = new qiniu.form_up.PutExtra();
-var key='test.txt';
-formUploader.put(uploadToken, key, "hello world", putExtra, function(respErr,
-  respBody, respInfo) {
-  if (respErr) {
-    throw respErr;
-  }
-
-  if (respInfo.statusCode == 200) {
-    console.log(respBody);
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+```javascript
+const formUploader = new qiniu.form_up.FormUploader(config);
+const putExtra = new qiniu.form_up.PutExtra();
+const key='test.txt';
+formUploader.put(uploadToken, key, "hello world", putExtra)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="form-upload-stream"></a>
 #### 数据流上传（表单方式）
 这里演示的是`ReadableStream`对象的上传。
 
-```
-var formUploader = new qiniu.form_up.FormUploader(config);
-var putExtra = new qiniu.form_up.PutExtra();
-var readableStream = xxx; // 可读的流
-formUploader.putStream(uploadToken, key, readableStream, putExtra, function(respErr,
-  respBody, respInfo) {
-  if (respErr) {
-    throw respErr;
-  }
-
-  if (respInfo.statusCode == 200) {
-    console.log(respBody);
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+```javascript
+const formUploader = new qiniu.form_up.FormUploader(config);
+const putExtra = new qiniu.form_up.PutExtra();
+const readableStream = xxx; // 可读的流
+formUploader.putStream(uploadToken, key, readableStream, putExtra)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="resume-upload-file"></a>
 #### 文件分片上传（断点续传）
 
-```
-var localFile = "/Users/jemy/Documents/qiniu.mp4";
-var resumeUploader = new qiniu.resume_up.ResumeUploader(config);
-var putExtra = new qiniu.resume_up.PutExtra();
+```javascript
+const localFile = "/Users/jemy/Documents/qiniu.mp4";
+const resumeUploader = new qiniu.resume_up.ResumeUploader(config);
+const putExtra = new qiniu.resume_up.PutExtra();
 // 扩展参数
 putExtra.params = {
   "x:name": "",
@@ -341,21 +352,20 @@ putExtra.fname = 'testfile.mp4';
 
 // 如果指定了断点记录文件，那么下次会从指定的该文件尝试读取上次上传的进度，以实现断点续传
 putExtra.resumeRecordFile = 'progress.log';
-var key = null;
+const key = null;
 // 文件分片上传
-resumeUploader.putFile(uploadToken, key, localFile, putExtra, function(respErr,
-  respBody, respInfo) {
-  if (respErr) {
-    throw respErr;
-  }
-
-  if (respInfo.statusCode == 200) {
-    console.log(respBody);
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+resumeUploader.putFile(uploadToken, key, localFile, putExtra)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="upload-result-parse"></a>
@@ -371,7 +381,7 @@ resumeUploader.putFile(uploadToken, key, localFile, putExtra, function(respErr,
 
 Node.js SDK中提供了一个方法`qiniu.util.isQiniuCallback`来校验该头部是否合法：
 
-```
+```javascript
 // 校验七牛上传回调的Authorization
 // @param mac           AK&SK对象
 // @param requestURI   回调的URL中的requestURI
@@ -397,14 +407,14 @@ exports.isQiniuCallback = function(mac, requestURI, reqBody, callbackAuth) {
 ### 公开空间
 对于公开空间，其访问的链接主要是将空间绑定的域名（可以是七牛空间的默认域名或者是绑定的自定义域名）拼接上空间里面的文件名即可访问，标准情况下需要在拼接链接之前，将文件名进行`urlencode`以兼容不同的字符。
 
-```
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-var config = new qiniu.conf.Config();
-var bucketManager = new qiniu.rs.BucketManager(mac, config);
-var publicBucketDomain = 'http://if-pbl.qiniudn.com';
+```javascript
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const config = new qiniu.conf.Config();
+const bucketManager = new qiniu.rs.BucketManager(mac, config);
+const publicBucketDomain = 'http://if-pbl.qiniudn.com';
 
 // 公开空间访问链接
-var publicDownloadUrl = bucketManager.publicDownloadUrl(publicBucketDomain, key);
+const publicDownloadUrl = bucketManager.publicDownloadUrl(publicBucketDomain, key);
 console.log(publicDownloadUrl);
 ```
 
@@ -412,13 +422,13 @@ console.log(publicDownloadUrl);
 ### 私有空间
 对于私有空间，其访问链接需要进行签名才能访问，且有访问日期限制。因此需要额外传入过期时间戳。
 
-```
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-var config = new qiniu.conf.Config();
-var bucketManager = new qiniu.rs.BucketManager(mac, config);
-var privateBucketDomain = 'http://if-pri.qiniudn.com';
-var deadline = parseInt(Date.now() / 1000) + 3600; // 1小时过期
-var privateDownloadUrl = bucketManager.privateDownloadUrl(privateBucketDomain, key, deadline);
+```javascript
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const config = new qiniu.conf.Config();
+const bucketManager = new qiniu.rs.BucketManager(mac, config);
+const privateBucketDomain = 'http://if-pri.qiniudn.com';
+const deadline = parseInt(Date.now() / 1000) + 3600; // 1小时过期
+const privateDownloadUrl = bucketManager.privateDownloadUrl(privateBucketDomain, key, deadline);
 ```
 
 <a id="rs"></a>
@@ -447,103 +457,107 @@ var privateDownloadUrl = bucketManager.privateDownloadUrl(privateBucketDomain, k
 
 资源管理相关的操作首先要构建`BucketManager`对象：
 
-```
-var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-var config = new qiniu.conf.Config();
-//config.useHttpsDomain = true;
-config.zone = qiniu.zone.Zone_z0;
-var bucketManager = new qiniu.rs.BucketManager(mac, config);
+```javascript
+const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const config = new qiniu.conf.Config();
+config.useHttpsDomain = true;
+const bucketManager = new qiniu.rs.BucketManager(mac, config);
 ```
 
 <a id="rs-stat"></a>
 ## 获取文件信息
 
-```
-var bucket = "if-pbl";
-var key = "qiniux.mp4";
+```javascript
+const bucket = "if-pbl";
+const key = "qiniux.mp4";
 
-bucketManager.stat(bucket, key, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    if (respInfo.statusCode == 200) {
-      console.log(respBody.hash);
-      console.log(respBody.fsize);
-      console.log(respBody.mimeType);
-      console.log(respBody.putTime);
-      console.log(respBody.type);
-    } else {
-      console.log(respInfo.statusCode);
-      console.log(respBody.error);
-    }
-  }
-});
+bucketManager.stat(bucket, key)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data.hash);
+            console.log(data.fsize);
+            console.log(data.mimeType);
+            console.log(data.putTime);
+            console.log(data.type);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-chgm"></a>
 ## 修改文件MimeType
 
-```
-var bucket = 'if-pbl';
-var key = 'qiniu.mp4';
-var newMime = 'video/x-mp4';
+```javascript
+const bucket = 'if-pbl';
+const key = 'qiniu.mp4';
+const newMime = 'video/x-mp4';
 
-bucketManager.changeMime(bucket, key, newMime, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    //200 is success
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+bucketManager.changeMime(bucket, key, newMime)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-chgm-h"></a>
 ## 修改文件Headers
 
-```
-var bucket = 'if-pbl';
-var key = 'qiniu.mp4';
-var headers = {
+```javascript
+const bucket = 'if-pbl';
+const key = 'qiniu.mp4';
+const headers = {
   'Content-Type': 'application/octet-stream',
   'Last-Modified': 'Web, 21 Oct 2015 07:00:00 GMT',
   'x-custom-header-xx': 'value',
 };
 
-bucketManager.changeHeaders(bucket, key, headers, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    //200 is success
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+bucketManager.changeHeaders(bucket, key, headers)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-chtype"></a>
 ## 修改文件存储类型
 
-```
-var bucket = 'if-pbl';
-var key = 'qiniu.mp4';
+```javascript
+const bucket = 'if-pbl';
+const key = 'qiniu.mp4';
 //newType=0表示普通存储，newType为1表示低频存储
-var newType = 0;
+const newType = 0;
 
-bucketManager.changeType(bucket, key, newType, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    //200 is success
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+bucketManager.changeType(bucket, key, newType)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-move"></a>
@@ -559,70 +573,76 @@ bucketManager.changeType(bucket, key, newType, function(err, respBody, respInfo)
 
 `move`操作支持强制覆盖选项，即如果目标文件已存在，可以设置强制覆盖选项`force`来覆盖那个文件的内容。
 
-```
-var srcBucket = "if-pbl";
-var srcKey = "qiniu.mp4";
-var destBucket = "if-pbl";
-var destKey = "qiniu_new.mp4";
+```javascript
+const srcBucket = "if-pbl";
+const srcKey = "qiniu.mp4";
+const destBucket = "if-pbl";
+const destKey = "qiniu_new.mp4";
 // 强制覆盖已有同名文件
-var options = {
+const options = {
   force: true
 }
-bucketManager.move(srcBucket, srcKey, destBucket, destKey, options, function(
-  err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    //200 is success
-    console.log(respInfo.statusCode);
-  }
-});
+bucketManager.move(srcBucket, srcKey, destBucket, destKey, options)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-copy"></a>
 ## 复制文件副本
 文件的复制和文件移动其实操作一样，主要的区别是移动后源文件不存在了，而复制的结果是源文件还存在，只是多了一个新的文件副本。
 
-```
-var srcBucket = "if-pbl";
-var srcKey = "qiniu.mp4";
-var destBucket = "if-pbl";
-var destKey = "qiniu_new_copy.mp4";
+```javascript
+const srcBucket = "if-pbl";
+const srcKey = "qiniu.mp4";
+const destBucket = "if-pbl";
+const destKey = "qiniu_new_copy.mp4";
 // 强制覆盖已有同名文件
-var options = {
+const options = {
   force: true
 }
 
-bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options, function(
-  err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    //200 is success
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+bucketManager.copy(srcBucket, srcKey, destBucket, destKey, options)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-delete"></a>
 ## 删除空间中的文件
 
-```
-var bucket = "if-pbl";
-var key = "qiniu_new_copy.mp4";
+```javascript
+const bucket = "if-pbl";
+const key = "qiniu_new_copy.mp4";
 
-bucketManager.delete(bucket, key, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+bucketManager.delete(bucket, key)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 
@@ -630,111 +650,115 @@ bucketManager.delete(bucket, key, function(err, respBody, respInfo) {
 ## 设置或更新文件的生存时间
 可以给已经存在于空间中的文件设置文件生存时间，或者更新已设置了生存时间但尚未被删除的文件的新的生存时间。
 
-```
-var bucket = "if-pbl";
-var key = "qiniu_new_copy.mp4";
-var days = 10;
+```javascript
+const bucket = "if-pbl";
+const key = "qiniu_new_copy.mp4";
+const days = 10;
 
-bucketManager.deleteAfterDays(bucket, key, days, function(err, respBody,
-  respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
+bucketManager.deleteAfterDays(bucket, key, days)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-list"></a>
 ## 获取指定前缀的文件列表
 
-```
-var bucket = 'if-pbl';
+```javascript
+const bucket = 'if-pbl';
 // @param options 列举操作的可选参数
 //                prefix    列举的文件前缀
 //                marker    上一次列举返回的位置标记，作为本次列举的起点信息
 //                limit     每次返回的最大列举文件数量
 //                delimiter 指定目录分隔符
-var options = {
+const options = {
   limit: 10,
   prefix: 'images/',
 };
 
-bucketManager.listPrefix(bucket, options, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    throw err;
-  }
-
-  if (respInfo.statusCode == 200) {
-    //如果这个nextMarker不为空，那么还有未列举完毕的文件列表，下次调用listPrefix的时候，
-    //指定options里面的marker为这个值
-    var nextMarker = respBody.marker;
-    var commonPrefixes = respBody.commonPrefixes;
-    console.log(nextMarker);
-    console.log(commonPrefixes);
-    var items = respBody.items;
-    items.forEach(function(item) {
-      console.log(item.key);
-      // console.log(item.putTime);
-      // console.log(item.hash);
-      // console.log(item.fsize);
-      // console.log(item.mimeType);
-      // console.log(item.endUser);
-      // console.log(item.type);
+let nextMarker = '';
+bucketManager.listPrefix(bucket, options)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+        //如果这个nextMarker不为空，那么还有未列举完毕的文件列表，下次调用listPrefix的时候，
+        //指定options里面的marker为这个值
+        const commonPrefixes = data.commonPrefixes;
+        nextMarker = data.marker
+        console.log(nextMarker);
+        console.log(commonPrefixes);
+        const items = data.items;
+        items.forEach(function(item) {
+            console.log(item.key);
+            // console.log(item.putTime);
+            // console.log(item.hash);
+            // console.log(item.fsize);
+            // console.log(item.mimeType);
+            // console.log(item.endUser);
+            // console.log(item.type);
+        });
+    } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
     });
-  } else {
-    console.log(respInfo.statusCode);
-    console.log(respBody);
-  }
-});
 ```
 
 
 <a id="rs-fetch"></a>
 ## 抓取网络资源到空间
 
-```
-var resUrl = 'http://devtools.qiniu.com/qiniu.png';
-var bucket = "if-bc";
-var key = "qiniu.png";
+```javascript
+const resUrl = 'http://devtools.qiniu.com/qiniu.png';
+const bucket = "if-bc";
+const key = "qiniu.png";
 
-bucketManager.fetch(resUrl, bucket, key, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    if (respInfo.statusCode == 200) {
-      console.log(respBody.key);
-      console.log(respBody.hash);
-      console.log(respBody.fsize);
-      console.log(respBody.mimeType);
-    } else {
-      console.log(respInfo.statusCode);
-      console.log(respBody);
-    }
-  }
-});
+bucketManager.fetch(resUrl, bucket, key)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(respBody.key);
+            console.log(respBody.hash);
+            console.log(respBody.fsize);
+            console.log(respBody.mimeType);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-prefetch"></a>
 ## 更新镜像空间中存储的文件内容
 
-```
-var bucket = "if-pbl";
-var key = "qiniu.mp4";
+```javascript
+const bucket = "if-pbl";
+const key = "qiniu.mp4";
 
-bucketManager.prefetch(bucket, key, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    //200 is success
-    console.log(respInfo.statusCode);
-  }
-});
+bucketManager.prefetch(bucket, key)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-batch"></a>
@@ -743,252 +767,249 @@ bucketManager.prefetch(bucket, key, function(err, respBody, respInfo) {
 <a id="rs-batch-stat"></a>
 ### 批量获取文件信息
 
-```
+```javascript
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
-var statOperations = [
-  qiniu.rs.statOp(srcBucket, 'qiniu1.mp4'),
-  qiniu.rs.statOp(srcBucket, 'qiniu2.mp4'),
-  qiniu.rs.statOp(srcBucket, 'qiniu3.mp4'),
-  qiniu.rs.statOp(srcBucket, 'qiniu4x.mp4'),
+const statOperations = [
+    qiniu.rs.statOp(srcBucket, 'qiniu1.mp4'),
+    qiniu.rs.statOp(srcBucket, 'qiniu2.mp4'),
+    qiniu.rs.statOp(srcBucket, 'qiniu3.mp4'),
+    qiniu.rs.statOp(srcBucket, 'qiniu4x.mp4'),
 ];
 
-bucketManager.batch(statOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    // 200 is success, 298 is part success
-    if (parseInt(respInfo.statusCode / 100) == 2) {
-      respBody.forEach(function(item) {
-        if (item.code == 200) {
-          console.log(item.data.fsize + "\t" + item.data.hash + "\t" +
-            item.data.mimeType + "\t" + item.data.putTime + "\t" +
-            item.data.type);
+bucketManager.batch(statOperations)
+    .then(({ data, resp }) => {
+        // 200 is success, 298 is part success
+        if (Math.floor(respInfo.statusCode / 100) === 2) {
+            respBody.forEach(function(item) {
+              console.log(item.data.fsize);
+              console.log(item.data.hash);
+              console.log(item.data.mimeType);
+              console.log(item.data.putTime);
+              console.log(item.data.type);
+            });
         } else {
-          console.log(item.code + "\t" + item.data.error);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-      });
-    } else {
-      console.log(respInfo.statusCode);
-      console.log(respBody);
-    }
-  }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-batch-chgm"></a>
 ### 批量修改文件类型
 
-```
+```javascript
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
-var chgmOperations = [
-  qiniu.rs.changeMimeOp(srcBucket, 'qiniu1.mp4', 'video/x-mp4'),
-  qiniu.rs.changeMimeOp(srcBucket, 'qiniu2.mp4', 'video/x-mp4'),
-  qiniu.rs.changeMimeOp(srcBucket, 'qiniu3.mp4', 'video/x-mp4'),
-  qiniu.rs.changeMimeOp(srcBucket, 'qiniu4.mp4', 'video/x-mp4'),
+const chgmOperations = [
+    qiniu.rs.changeMimeOp(srcBucket, 'qiniu1.mp4', 'video/x-mp4'),
+    qiniu.rs.changeMimeOp(srcBucket, 'qiniu2.mp4', 'video/x-mp4'),
+    qiniu.rs.changeMimeOp(srcBucket, 'qiniu3.mp4', 'video/x-mp4'),
+    qiniu.rs.changeMimeOp(srcBucket, 'qiniu4.mp4', 'video/x-mp4'),
 ];
 
-bucketManager.batch(chgmOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    // 200 is success, 298 is part success
-    if (parseInt(respInfo.statusCode / 100) == 2) {
-      respBody.forEach(function(item) {
-        if (item.code == 200) {
-          console.log("success");
+bucketManager.batch(chgmOperations)
+    .then(({ data, resp }) => {
+        // 200 is success, 298 is part success
+        if (Math.floor(respInfo.statusCode / 100) == 2) {
+            respBody.forEach(function(item) {
+                if (item.code == 200) {
+                    console.log("success");
+                } else {
+                    console.log(item.code);
+                    console.log(item.data.error);
+                }
+            });
         } else {
-          console.log(item.code + "\t" + item.data.error);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-      });
-    } else {
-      console.log(respInfo.statusCode);
-      console.log(respBody);
-    }
-  }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-batch-delete"></a>
 ### 批量删除文件
 
-```
+```javascript
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
-var deleteOperations = [
-  qiniu.rs.deleteOp(srcBucket, 'qiniu1.mp4'),
-  qiniu.rs.deleteOp(srcBucket, 'qiniu2.mp4'),
-  qiniu.rs.deleteOp(srcBucket, 'qiniu3.mp4'),
-  qiniu.rs.deleteOp(srcBucket, 'qiniu4x.mp4'),
+const deleteOperations = [
+    qiniu.rs.deleteOp(srcBucket, 'qiniu1.mp4'),
+    qiniu.rs.deleteOp(srcBucket, 'qiniu2.mp4'),
+    qiniu.rs.deleteOp(srcBucket, 'qiniu3.mp4'),
+    qiniu.rs.deleteOp(srcBucket, 'qiniu4x.mp4'),
 ];
 
-bucketManager.batch(deleteOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    // 200 is success, 298 is part success
-    if (parseInt(respInfo.statusCode / 100) == 2) {
-      respBody.forEach(function(item) {
-        if (item.code == 200) {
-          console.log(item.code + "\tsuccess");
+bucketManager.batch(deleteOperations)
+    .then(({ data, resp }) => {
+        // 200 is success, 298 is part success
+        if (Math.floor(respInfo.statusCode / 100) == 2) {
+            respBody.forEach(function(item) {
+                if (item.code == 200) {
+                    console.log("success");
+                } else {
+                    console.log(item.code);
+                    console.log(item.data.error);
+                }
+            });
         } else {
-          console.log(item.code + "\t" + item.data.error);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-      });
-    } else {
-      console.log(respInfo.deleteusCode);
-      console.log(respBody);
-    }
-  }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-batch-copy"></a>
 ### 批量复制文件
-```
-var srcBucket = 'if-pbl';
-var srcKey = 'qiniu.mp4';
-var destBucket = srcBucket;
+```javascript
+const srcBucket = 'if-pbl';
+const srcKey = 'qiniu.mp4';
+const destBucket = srcBucket;
 
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
-var copyOperations = [
-  qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu1.mp4'),
-  qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu2.mp4'),
-  qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu3.mp4'),
-  qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu4.mp4'),
+const copyOperations = [
+    qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu1.mp4'),
+    qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu2.mp4'),
+    qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu3.mp4'),
+    qiniu.rs.copyOp(srcBucket, srcKey, destBucket, 'qiniu4.mp4'),
 ];
 
-bucketManager.batch(copyOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    // 200 is success, 298 is part success
-    if (parseInt(respInfo.statusCode / 100) == 2) {
-      respBody.forEach(function(item) {
-        if (item.code == 200) {
-          console.log(item.code + "\tsuccess");
+bucketManager.batch(copyOperations)
+    .then(({ data, resp }) => {
+        // 200 is success, 298 is part success
+        if (Math.floor(respInfo.statusCode / 100) == 2) {
+            respBody.forEach(function(item) {
+                if (item.code == 200) {
+                    console.log("success");
+                } else {
+                    console.log(item.code);
+                    console.log(item.data.error);
+                }
+            });
         } else {
-          console.log(item.code + "\t" + item.data.error);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-      });
-    } else {
-      console.log(respInfo.deleteusCode);
-      console.log(respBody);
-    }
-  }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-batch-move"></a>
 ### 批量移动或重命名文件
 
-```
-var srcBucket = 'if-pbl';
-var destBucket = srcBucket;
+```javascript
+const srcBucket = 'if-pbl';
+const destBucket = srcBucket;
 
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
-var moveOperations = [
-  qiniu.rs.moveOp(srcBucket, 'qiniu1.mp4', destBucket, 'qiniu1_move.mp4'),
-  qiniu.rs.moveOp(srcBucket, 'qiniu2.mp4', destBucket, 'qiniu2_move.mp4'),
-  qiniu.rs.moveOp(srcBucket, 'qiniu3.mp4', destBucket, 'qiniu3_move.mp4'),
-  qiniu.rs.moveOp(srcBucket, 'qiniu4.mp4', destBucket, 'qiniu4_move.mp4'),
+const moveOperations = [
+    qiniu.rs.moveOp(srcBucket, 'qiniu1.mp4', destBucket, 'qiniu1_move.mp4'),
+    qiniu.rs.moveOp(srcBucket, 'qiniu2.mp4', destBucket, 'qiniu2_move.mp4'),
+    qiniu.rs.moveOp(srcBucket, 'qiniu3.mp4', destBucket, 'qiniu3_move.mp4'),
+    qiniu.rs.moveOp(srcBucket, 'qiniu4.mp4', destBucket, 'qiniu4_move.mp4'),
 ];
 
-bucketManager.batch(moveOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    // 200 is success, 298 is part success
-    if (parseInt(respInfo.statusCode / 100) == 2) {
-      respBody.forEach(function(item) {
-        if (item.code == 200) {
-          console.log(item.code + "\tsuccess");
+bucketManager.batch(moveOperations)
+    .then(({ data, resp }) => {
+        // 200 is success, 298 is part success
+        if (Math.floor(respInfo.statusCode / 100) == 2) {
+            respBody.forEach(function(item) {
+                if (item.code == 200) {
+                    console.log("success");
+                } else {
+                    console.log(item.code);
+                    console.log(item.data.error);
+                }
+            });
         } else {
-          console.log(item.code + "\t" + item.data.error);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-      });
-    } else {
-      console.log(respInfo.deleteusCode);
-      console.log(respBody);
-    }
-  }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-batch-deleteAfterDays"></a>
 ### 批量更新文件的有效期
 
-```
-var srcBucket = 'if-pbl';
+```javascript
+const srcBucket = 'if-pbl';
 
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
-var deleteAfterDaysOperations = [
-  qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu1.mp4', 10),
-  qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu2.mp4', 10),
-  qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu3.mp4', 10),
-  qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu4.mp4', 10),
+const deleteAfterDaysOperations = [
+    qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu1.mp4', 10),
+    qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu2.mp4', 10),
+    qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu3.mp4', 10),
+    qiniu.rs.deleteAfterDaysOp(srcBucket, 'qiniu4.mp4', 10),
 ];
 
-bucketManager.batch(deleteAfterDaysOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    // 200 is success, 298 is part success
-    if (parseInt(respInfo.statusCode / 100) == 2) {
-      respBody.forEach(function(item) {
-        if (item.code == 200) {
-          console.log(item.code + "\tsuccess");
+bucketManager.batch(deleteAfterDaysOperations)
+    .then(({ data, resp }) => {
+        // 200 is success, 298 is part success
+        if (Math.floor(respInfo.statusCode / 100) == 2) {
+            respBody.forEach(function(item) {
+                if (item.code == 200) {
+                    console.log("success");
+                } else {
+                    console.log(item.code);
+                    console.log(item.data.error);
+                }
+            });
         } else {
-          console.log(item.code + "\t" + item.data.error);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-      });
-    } else {
-      console.log(respInfo.statusCode);
-      console.log(respBody);
-    }
-  }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="rs-batch-type"></a>
 ### 批量更新文件存储类型
 
-```
-var srcBucket = 'if-pbl';
+```javascript
+const srcBucket = 'if-pbl';
 
 //每个operations的数量不可以超过1000个，如果总数量超过1000，需要分批发送
 //type=0为普通存储，type=1为低频存储
-var changeTypeOperations = [
-  qiniu.rs.changeTypeOp(srcBucket, 'qiniu1.mp4', 1),
-  qiniu.rs.changeTypeOp(srcBucket, 'qiniu2.mp4', 1),
-  qiniu.rs.changeTypeOp(srcBucket, 'qiniu3.mp4', 1),
-  qiniu.rs.changeTypeOp(srcBucket, 'qiniu4.mp4', 1),
+const changeTypeOperations = [
+    qiniu.rs.changeTypeOp(srcBucket, 'qiniu1.mp4', 1),
+    qiniu.rs.changeTypeOp(srcBucket, 'qiniu2.mp4', 1),
+    qiniu.rs.changeTypeOp(srcBucket, 'qiniu3.mp4', 1),
+    qiniu.rs.changeTypeOp(srcBucket, 'qiniu4.mp4', 1),
 ];
 
-bucketManager.batch(changeTypeOperations, function(err, respBody, respInfo) {
-  if (err) {
-    console.log(err);
-    //throw err;
-  } else {
-    // 200 is success, 298 is part success
-    if (parseInt(respInfo.statusCode / 100) == 2) {
-      respBody.forEach(function(item) {
-        if (item.code == 200) {
-          console.log("success");
+bucketManager.batch(changeTypeOperations)
+    .then(({ data, resp }) => {
+        // 200 is success, 298 is part success
+        if (Math.floor(respInfo.statusCode / 100) == 2) {
+            respBody.forEach(function(item) {
+                if (item.code == 200) {
+                    console.log("success");
+                } else {
+                    console.log(item.code);
+                    console.log(item.data.error);
+                }
+            });
         } else {
-          console.log(item.code + "\t" + item.data.error);
+            console.log(resp.statusCode);
+            console.log(data);
         }
-      });
-    } else {
-      console.log(respInfo.statusCode);
-      console.log(respBody);
-    }
-  }
-});
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });
 ```
 
 <a id="pfop"></a>

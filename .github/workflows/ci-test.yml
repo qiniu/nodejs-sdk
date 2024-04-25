@@ -1,14 +1,13 @@
 name: NodeJS CI with NPM
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        node_version: ['6', '8', '10', '12', '14', '16']
+        node_version: ['6', '8', '10', '12', '14', '16', '18', '20']
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,15 +19,16 @@ jobs:
       - name: Setup dependencies
         run: |
           npm install
-          npm install -g codecov@3.8.1
-          npm install -g istanbul
+          # nyc@14 support nodejs >= 6
+          npm install -g nyc@14
       - name: Run cases
         run: |
-          npm test
-          istanbul cover ./node_modules/mocha/bin/_mocha --reporter test -- -R spec
-          codecov
+          npm run check-type
+          nyc --reporter=lcov npm test
         env:
           QINIU_ACCESS_KEY: ${{ secrets.QINIU_ACCESS_KEY }}
           QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
           QINIU_TEST_BUCKET: ${{ secrets.QINIU_TEST_BUCKET }}
           QINIU_TEST_DOMAIN: ${{ secrets.QINIU_TEST_DOMAIN }}
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4

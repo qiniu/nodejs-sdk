@@ -1,3 +1,9 @@
+/**
+ * @class
+ * @param {any} data
+ * @param {http.IncomingMessage} resp
+ * @constructor
+ */
 function ResponseWrapper ({
     data,
     resp
@@ -7,14 +13,14 @@ function ResponseWrapper ({
 }
 
 /**
- * @return {boolean}
+ * @returns {boolean}
  */
 ResponseWrapper.prototype.ok = function () {
     return this.resp && Math.floor(this.resp.statusCode / 100) === 2;
 };
 
 /**
- * @return {boolean}
+ * @returns {boolean}
  */
 ResponseWrapper.prototype.needRetry = function () {
     if (this.resp.statusCode > 0 && this.resp.statusCode < 500) {

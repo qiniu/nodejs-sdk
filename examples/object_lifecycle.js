@@ -1,14 +1,13 @@
 const qiniu = require('../index');
-const proc = require('process');
 
-const accessKey = proc.env.QINIU_ACCESS_KEY;
-const secretKey = proc.env.QINIU_SECRET_KEY;
+const accessKey = process.env.QINIU_ACCESS_KEY;
+const secretKey = process.env.QINIU_SECRET_KEY;
 const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
 const config = new qiniu.conf.Config();
 config.useHttpsDomain = true;
 // config.zone = qiniu.zone.Zone_z0;
 const bucketManager = new qiniu.rs.BucketManager(mac, config);
-const bucket = proc.env.QINIU_TEST_BUCKET;
+const bucket = process.env.QINIU_TEST_BUCKET;
 const key = 'test_file';
 
 bucketManager.setObjectLifeCycle(
@@ -27,4 +26,15 @@ bucketManager.setObjectLifeCycle(
         }
         console.log(respBody);
     }
-);
+)
+    .then(({ data, resp }) => {
+        if (resp.statusCode === 200) {
+            console.log(data);
+        } else {
+            console.log(resp.statusCode);
+            console.log(data);
+        }
+    })
+    .catch(err => {
+        console.log('failed', err);
+    });

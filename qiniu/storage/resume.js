@@ -10,15 +10,18 @@ const conf = require('../conf');
 const util = require('../util');
 const rpc = require('../rpc');
 
-const {
-    prepareRegionsProvider,
-    doWorkWithRetry,
-    TokenExpiredRetryPolicy,
-    ChangeEndpointRetryPolicy,
-    ChangeRegionRetryPolicy
-} = require('./internal');
-const { StaticEndpointsProvider } = require('../httpc/endpointsProvider');
+const { SERVICE_NAME } = require('../httpc/region');
+const { ResponseWrapper } = require('../httpc/responseWrapper');
 const { Endpoint } = require('../httpc/endpoint');
+const { EndpointsRetryPolicy } = require('../httpc/endpointsRetryPolicy');
+const { RegionsRetryPolicy } = require('../httpc/regionsRetryPolicy');
+const { Retrier } = require('../retry');
+
+const {
+    wrapTryCallback,
+    TokenExpiredRetryPolicy,
+    getNoNeedRetryError
+} = require('./internal');
 
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
@@ -29,16 +32,6 @@ exports.PutExtra = PutExtra;
  */
 function ResumeUploader (config) {
     this.config = config || new conf.Config();
-
-    /**
-     * Internal usage only for now.
-     * @readonly
-     */
-    this.retryPolicies = [
-        new TokenExpiredRetryPolicy(),
-        new ChangeEndpointRetryPolicy(),
-        new ChangeRegionRetryPolicy()
-    ];
 }
 
 /**
@@ -58,6 +51,8 @@ function ResumeUploader (config) {
 
 /**
  * 上传可选参数
+ * @class
+ * @constructor
  * @param {string} [fname]                      请求体中的文件的名称
  * @param {Object} [params]                     额外参数设置，参数名称必须以x:开头
  * @param {string | null} [mimeType]            指定文件的mimeType
@@ -88,6 +83,73 @@ function PutExtra (
 }
 
 /**
+ * @private
+ * @param {Object} options
+ * @param {string} options.accessKey
+ * @param {string} options.bucketName
+ * @param {boolean} [options.retryable]
+ * @param {'v1' | 'v2' | string} options.uploadApiVersion
+ * @param {string} [options.resumeRecordFilePath]
+ */
+function _getRegionsRetrier (options) {
+    const {
+        bucketName,
+        accessKey,
+        retryable = true,
+
+        uploadApiVersion,
+        resumeRecordFilePath
+    } = options;
+
+    const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
+
+    const resumeInfo = getResumeRecordInfo(resumeRecordFilePath);
+    let preferredEndpoints;
+    if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
+        preferredEndpoints = resumeInfo.upDomains.map(d =>
+            new Endpoint(d, { defaultScheme: preferredScheme }));
+    }
+
+    return this.config.getRegionsProvider({
+        bucketName,
+        accessKey
+    })
+        .then(regionsProvider => {
+            const retryPolicies = [
+                new TokenExpiredRetryPolicy({
+                    uploadApiVersion,
+                    resumeRecordFilePath
+                }),
+                new EndpointsRetryPolicy({
+                    skipInitContext: true
+                }),
+                new RegionsRetryPolicy({
+                    regionsProvider,
+                    serviceName: SERVICE_NAME.UP,
+                    onChangedRegion: () => {
+                        try {
+                            fs.unlinkSync(resumeRecordFilePath);
+                        } catch (_e) {
+                            // ignore
+                        }
+                    },
+                    preferredEndpoints
+                })
+            ];
+
+            return new Retrier({
+                retryPolicies,
+                onBeforeRetry: context => {
+                    if (context.error && context.error.noNeedRetry) {
+                        return false;
+                    }
+                    return retryable && context.result.needRetry();
+                }
+            });
+        });
+}
+
+/**
  * @typedef UploadResult
  * @property {any} data
  * @property {http.IncomingMessage} resp
@@ -99,8 +161,8 @@ function PutExtra (
  * @param {stream.Readable} rsStream
  * @param {number} rsStreamLen
  * @param {PutExtra} putExtra
- * @param {reqCallback} callbackFunc
- * @return {Promise<UploadResult>}
+ * @param {reqCallback} [callbackFunc]
+ * @returns {Promise<UploadResult>}
  */
 ResumeUploader.prototype.putStream = function (
     uploadToken,
@@ -110,9 +172,9 @@ ResumeUploader.prototype.putStream = function (
     putExtra,
     callbackFunc
 ) {
-    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
-    const isValidCallback = typeof callbackFunc === 'function';
+    const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
 
+    // PutExtra
     putExtra = getDefaultPutExtra(
         putExtra,
         {
@@ -120,51 +182,35 @@ ResumeUploader.prototype.putStream = function (
         }
     );
 
-    rsStream.on('error', function (err) {
-        // callbackFunc
-        isValidCallback && callbackFunc(err, null, null);
-        destroy(rsStream);
-    });
-
-    return prepareRegionsProvider({
-        config: this.config,
+    // Why need retrier even if retryable is false?
+    // Because the retrier is used to get the endpoints,
+    // which will be initialed by region policy.
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
-        accessKey: util.getAKFromUptoken(uploadToken)
+        accessKey: util.getAKFromUptoken(uploadToken),
+        retryable: false,
+
+        // useless by not retryable
+        uploadApiVersion: putExtra.version,
+        resumeRecordFilePath: putExtra.resumeRecordFile
     })
-        .then(regionsProvider => {
-            const resumeInfo = getResumeRecordInfo(putExtra.resumeRecordFile);
-            let preferredEndpointsProvider;
-            if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
-                preferredEndpointsProvider = new StaticEndpointsProvider(
-                    resumeInfo.upDomains.map(d => new Endpoint(d, { defaultScheme: preferScheme }))
-                );
-            }
-            return doWorkWithRetry({
-                workFn: sendPutReq,
-
-                callbackFunc,
-                regionsProvider,
-                // use resume upDomain firstly
-                preferredEndpointsProvider: preferredEndpointsProvider,
-                // stream not support retry
-                retryPolicies: []
-            });
-        });
-
-    function sendPutReq (endpoint) {
-        endpoint = Object.create(endpoint);
-        endpoint.defaultScheme = preferScheme;
-        return new Promise(resolve => {
-            putReq(
-                endpoint,
+        .then(retrier => Promise.all([
+            retrier,
+            retrier.initContext()
+        ]))
+        .then(([retrier, context]) => retrier.retry({
+            func: context => putReq(
+                context.endpoint,
+                preferredScheme,
                 uploadToken,
                 key,
                 rsStream,
                 rsStreamLen,
                 putExtra,
-                (err, ret, info) => resolve({ err, ret, info }));
-        });
-    }
+                callbackFunc
+            ),
+            context
+        }));
 };
 
 /**
@@ -189,14 +235,16 @@ function getResumeRecordInfo (resumeRecordFilePath) {
 /**
  * @param {Endpoint} upEndpoint
  * @param {string} uploadToken
+ * @param {string} preferredScheme
  * @param {string | null} key
- * @param {ReadableStream} rsStream
+ * @param {Readable} rsStream
  * @param {number} rsStreamLen
  * @param {PutExtra} putExtra
  * @param {reqCallback} callbackFunc
  */
 function putReq (
     upEndpoint,
+    preferredScheme,
     uploadToken,
     key,
     rsStream,
@@ -227,56 +275,69 @@ function putReq (
         throw new Error('part upload version number error');
     }
 
+    const wrappedCallback = wrapTryCallback(callbackFunc);
+
     // upload parts
-    doPutReq(
-        {
-            blkputRets,
-            rsStream,
-            rsStreamLen,
-            blkStream,
-            totalBlockNum
-        },
-        {
-            upEndpoint,
-            uploadToken,
-            key,
-            putExtra
-        },
-        function (err, ret, info) {
-            if (info.statusCode === 200 && putExtra.resumeRecordFile) {
-                try {
-                    fs.unlinkSync(putExtra.resumeRecordFile);
-                } catch (_e) {
-                    // ignore
+    return new Promise((resolve, reject) => {
+        doPutReq(
+            {
+                blkputRets,
+                rsStream,
+                rsStreamLen,
+                blkStream,
+                totalBlockNum
+            },
+            {
+                upEndpoint,
+                preferredScheme,
+                uploadToken,
+                key,
+                putExtra
+            },
+            function (err, ret, info) {
+                if (err) {
+                    err.resp = info;
+                    reject(err);
+                    wrappedCallback(err, ret, info);
+                    return;
                 }
+                if (info.statusCode === 200 && putExtra.resumeRecordFile) {
+                    try {
+                        fs.unlinkSync(putExtra.resumeRecordFile);
+                    } catch (_e) {
+                        // ignore
+                    }
+                }
+                resolve(new ResponseWrapper({ data: ret, resp: info }));
+                wrappedCallback(err, ret, info);
             }
-            callbackFunc(err, ret, info);
-        }
-    );
+        );
+    });
 }
 
 /**
  * @typedef SourceOptions
- * @property { Object.<string, any> | undefined } blkputRets
- * @property { ReadableStream } rsStream
- * @property { BlockStream } blkStream
- * @property { number } rsStreamLen
- * @property { number } totalBlockNum
+ * @property {Object.<string, any> | undefined} blkputRets
+ * @property {Readable} rsStream
+ * @property {BlockStream} blkStream
+ * @property {number} rsStreamLen
+ * @property {number} totalBlockNum
  */
 
 /**
  * @typedef UploadOptions
- * @property { string | null } key
- * @property { Endpoint } upEndpoint
- * @property { string } uploadToken
- * @property { PutExtra } putExtra
+ * @property {string | null} key
+ * @property {Endpoint} upEndpoint
+ * @property {string} preferredScheme
+ * @property {string} uploadToken
+ * @property {PutExtra} putExtra
  */
 
 /**
  * @param {SourceOptions} sourceOptions
  * @param {UploadOptions} uploadOptions
  * @param {reqCallback} callbackFunc
- * @returns { Promise<UploadResult> }
+ * @returns {void}
  */
 function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     const {
@@ -288,6 +349,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     let blkputRets = sourceOptions.blkputRets;
     const {
         upEndpoint,
+        preferredScheme,
         key,
         uploadToken,
         putExtra
@@ -311,8 +373,9 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     }
     finishedBlkPutRets.upDomains.push(upEndpoint.host);
 
+    // TODO: test what will happen when stream.on('error')
     // upload parts
-    const upDomains = upEndpoint.getValue();
+    const upDomain = upEndpoint.getValue({ scheme: preferredScheme });
     let readLen = 0;
     let curBlock = 0;
     let isSent = false;
@@ -341,7 +404,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
         if (needUploadBlk) {
             blkStream.pause();
             mkblkReq(
-                upDomains,
+                upDomain,
                 uploadToken,
                 chunk,
                 function (
@@ -364,11 +427,23 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
                             });
                         }
                         if (putExtra.progressCallback) {
-                            putExtra.progressCallback(readLen, rsStreamLen);
+                            try {
+                                putExtra.progressCallback(readLen, rsStreamLen);
+                            } catch (err) {
+                                callbackFunc(
+                                    getNoNeedRetryError(
+                                        err,
+                                        'Some unexpect error occurred on calling progressCallback'
+                                    ),
+                                    respBody,
+                                    respInfo
+                                );
+                                return;
+                            }
                         }
                         blkStream.resume();
                         if (finishedCtxList.length === totalBlockNum) {
-                            mkfileReq(upDomains, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+                            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
                             isSent = true;
                         }
                     }
@@ -377,8 +452,8 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
     });
 
     blkStream.on('end', function () {
-        if (!isSent && rsStreamLen === 0) {
-            mkfileReq(upDomains, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
+        if (!isSent && finishedCtxList.length === totalBlockNum) {
+            mkfileReq(upDomain, uploadToken, rsStreamLen, finishedCtxList, key, putExtra, callbackFunc);
         }
         destroy(rsStream);
     });
@@ -388,7 +463,7 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
  * @param {SourceOptions} sourceOptions
  * @param {UploadOptions} uploadOptions
  * @param {reqCallback} callbackFunc
- * @returns { Promise<UploadResult> }
+ * @returns {void}
  */
 function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     const {
@@ -400,6 +475,7 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     } = sourceOptions;
     const {
         upEndpoint,
+        preferredScheme,
         uploadToken,
         key,
         putExtra
@@ -427,7 +503,7 @@ function putReqV2 (sourceOptions, uploadOptions, callbackFunc) {
     }
     finishedEtags.upDomains.push(upEndpoint.host);
 
-    const upDomain = upEndpoint.getValue();
+    const upDomain = upEndpoint.getValue({ scheme: preferredScheme });
     const bucket = util.getBucketFromUptoken(uploadToken);
     const encodedObjectName = key ? util.urlsafeBase64Encode(key) : '~';
     if (finishedEtags.uploadId) {
@@ -630,7 +706,19 @@ function resumeUploadV2 (
                             });
                         }
                         if (putExtra.progressCallback) {
-                            putExtra.progressCallback(readLen, rsStreamLen);
+                            try {
+                                putExtra.progressCallback(readLen, rsStreamLen);
+                            } catch (err) {
+                                callbackFunc(
+                                    getNoNeedRetryError(
+                                        err,
+                                        'Some unexpect error occurred on calling progressCallback'
+                                    ),
+                                    respBody,
+                                    respInfo
+                                );
+                                return;
+                            }
                         }
                         blkStream.resume();
                         if (finishedEtags.etags.length === totalBlockNum) {
@@ -721,7 +809,7 @@ function completeParts (
  * @param {string | null} key
  * @param {string} localFile
  * @param {PutExtra} putExtra
- * @param {reqCallback} callbackFunc
+ * @param {reqCallback} [callbackFunc]
  * @returns {Promise<UploadResult>}
  */
 ResumeUploader.prototype.putFile = function (
@@ -731,7 +819,7 @@ ResumeUploader.prototype.putFile = function (
     putExtra,
     callbackFunc
 ) {
-    const preferScheme = this.config.useHttpsDomain ? 'https' : 'http';
+    const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
 
     // PutExtra
     putExtra = putExtra || new PutExtra();
@@ -750,62 +838,52 @@ ResumeUploader.prototype.putFile = function (
         }
     );
 
-    // regions
-    return prepareRegionsProvider({
-        config: this.config,
+    return _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
-        accessKey: util.getAKFromUptoken(uploadToken)
+        accessKey: util.getAKFromUptoken(uploadToken),
+
+        uploadApiVersion: putExtra.version,
+        resumeRecordFilePath: putExtra.resumeRecordFile
     })
-        .then(regionsProvider => {
-            const resumeInfo = getResumeRecordInfo(putExtra.resumeRecordFile);
-            let preferredEndpointsProvider;
-            if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
-                preferredEndpointsProvider = new StaticEndpointsProvider(
-                    resumeInfo.upDomains.map(d => new Endpoint(d, { defaultScheme: preferScheme }))
+        .then(retrier => Promise.all([
+            retrier,
+            retrier.initContext()
+        ]))
+        .then(([retrier, context]) => retrier.retry({
+            func: context => {
+                const rsStream = fs.createReadStream(localFile, {
+                    highWaterMark: conf.BLOCK_SIZE
+                });
+                const rsStreamLen = fs.statSync(localFile).size;
+                const p = putReq(
+                    context.endpoint,
+                    preferredScheme,
+                    uploadToken,
+                    key,
+                    rsStream,
+                    rsStreamLen,
+                    putExtra,
+                    callbackFunc
                 );
-            }
-            return doWorkWithRetry({
-                workFn: sendPutReq,
-
-                callbackFunc,
-                regionsProvider,
-                uploadApiVersion: putExtra.version,
-                // use resume upDomain firstly
-                preferredEndpointsProvider: preferredEndpointsProvider,
-                resumeRecordFilePath: putExtra.resumeRecordFile,
-                retryPolicies: this.retryPolicies
-            });
-        });
-
-    function sendPutReq (endpoint) {
-        endpoint = Object.create(endpoint);
-        endpoint.defaultScheme = preferScheme;
-        const rsStream = fs.createReadStream(localFile, {
-            highWaterMark: conf.BLOCK_SIZE
-        });
-        const rsStreamLen = fs.statSync(localFile).size;
-        return new Promise((resolve) => {
-            putReq(
-                endpoint,
-                uploadToken,
-                key,
-                rsStream,
-                rsStreamLen,
-                putExtra,
-                (err, ret, info) => {
-                    destroy(rsStream);
-                    resolve({ err, ret, info });
-                }
-            );
-        });
-    }
+                p
+                    .then(() => {
+                        destroy(rsStream);
+                    })
+                    .catch(() => {
+                        // use finally when min version of Node.js update to ≥ v10.3.0
+                        destroy(rsStream);
+                    });
+                return p;
+            },
+            context
+        }));
 };
 
 /**
  * @param {string} uploadToken
  * @param {string} localFile
  * @param {PutExtra} putExtra
- * @param {reqCallback} callbackFunc
+ * @param {reqCallback} [callbackFunc]
  * @returns {Promise<UploadResult>}
  */
 ResumeUploader.prototype.putFileWithoutKey = function (
@@ -821,7 +899,7 @@ ResumeUploader.prototype.putFileWithoutKey = function (
  * @param {PutExtra} putExtra
  * @param {Object} options
  * @param {string | null} [options.key]
- * @return {PutExtra}
+ * @returns {PutExtra}
  */
 function getDefaultPutExtra (putExtra, options) {
     options = options || {};

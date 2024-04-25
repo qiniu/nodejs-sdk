@@ -1,4 +1,4 @@
-var conf = require('../conf');
+const conf = require('../conf');
 
 exports.Mac = Mac;
 

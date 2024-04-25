@@ -4,5 +4,6 @@ module.exports = {
     composeMiddlewares: base.composeMiddlewares,
     Middleware: base.Middleware,
     RetryDomainsMiddleware: require('./retryDomains').RetryDomainsMiddleware,
-    UserAgentMiddleware: require('./ua').UserAgentMiddleware
+    UserAgentMiddleware: require('./ua').UserAgentMiddleware,
+    QiniuAuthMiddleware: require('./qiniuAuth').QiniuAuthMiddleware
 };

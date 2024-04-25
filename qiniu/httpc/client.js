@@ -12,13 +12,14 @@ const { ResponseWrapper } = require('./responseWrapper');
  * @param {http.Agent} [options.httpAgent]
  * @param {https.Agent} [options.httpsAgent]
  * @param {middleware.Middleware[]} [options.middlewares]
- *
+ * @param {number | number[]} [options.timeout]
  * @constructor
  */
 function HttpClient (options) {
     this.httpAgent = options.httpAgent || http.globalAgent;
     this.httpsAgent = options.httpsAgent || https.globalAgent;
     this.middlewares = options.middlewares || [];
+    this.timeout = options.timeout;
 }
 
 HttpClient.prototype._handleRequest = function (req) {
@@ -44,18 +45,18 @@ HttpClient.prototype._handleRequest = function (req) {
  * @property {http.Agent} [agent]
  * @property {https.Agent} [httpsAgent]
  * @property {string} url
- * @property {middleware.Middleware[]} middlewares
- * @property {urllib.Callback} callback
+ * @property {middleware.Middleware[]} [middlewares]
+ * @property {urllib.Callback} [callback]
  * @property {urllib.RequestOptions} urllibOptions
  */
 
 /**
  *
  * @param {ReqOpts} requestOptions
- * @return {Promise<RespWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.sendRequest = function (requestOptions) {
-    const mwList = this.middlewares.concat(requestOptions.middlewares);
+    const mwList = this.middlewares.concat(requestOptions.middlewares || []);
 
     if (!requestOptions.agent) {
         requestOptions.agent = this.httpAgent;
@@ -63,6 +64,14 @@ HttpClient.prototype.sendRequest = function (requestOptions) {
 
     if (!requestOptions.httpsAgent) {
         requestOptions.httpsAgent = this.httpsAgent;
+    }
+
+    if (!requestOptions.urllibOptions.headers) {
+        requestOptions.urllibOptions.headers = {};
+    }
+
+    if (!requestOptions.urllibOptions.headers['Content-Type']) {
+        requestOptions.urllibOptions.headers['Content-Type'] = 'application/x-www-form-urlencoded';
     }
 
     const handle = middleware.composeMiddlewares(
@@ -73,13 +82,15 @@ HttpClient.prototype.sendRequest = function (requestOptions) {
     const resPromise = handle(requestOptions);
 
     if (requestOptions.callback) {
-        resPromise
-            .then(({ data, resp }) =>
-                requestOptions.callback(null, data, resp)
-            )
-            .catch(err => {
-                requestOptions.callback(err, null, err.resp);
-            });
+        // user should handle callback error outside.
+        // already wrapped callback for inner usage in storage.
+        resPromise.then(({ data, resp }) => {
+            requestOptions.callback(null, data, resp);
+        });
+        // no chained for preventing callback twice when callback errored.
+        resPromise.catch(err => {
+            requestOptions.callback(err, null, err.resp);
+        });
     }
 
     return resPromise;
@@ -94,7 +105,7 @@ HttpClient.prototype.sendRequest = function (requestOptions) {
  * @param {Object} [reqOptions.headers]
  * @param {middleware.Middleware[]} [reqOptions.middlewares]
  * @param {urllib.RequestOptions} [urllibOptions]
- * @return {Promise<RespWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.get = function (reqOptions, urllibOptions) {
     const {
@@ -118,10 +129,13 @@ HttpClient.prototype.get = function (reqOptions, urllibOptions) {
     );
     urllibOptions.data = params;
     urllibOptions.followRedirect = true;
+    urllibOptions.gzip = urllibOptions.gzip !== undefined ? urllibOptions.gzip : true;
+    urllibOptions.dataType = urllibOptions.dataType || 'json';
+    urllibOptions.timeout = urllibOptions.timeout || this.timeout;
 
     return this.sendRequest({
         url: url,
-        middlewares: middlewares || [],
+        middlewares: middlewares,
         agent: agent,
         httpsAgent: httpsAgent,
         callback: callback,
@@ -137,8 +151,9 @@ HttpClient.prototype.get = function (reqOptions, urllibOptions) {
  * @param {string | Buffer | Readable} [reqOptions.data]
  * @param {Object} [reqOptions.headers]
  * @param {middleware.Middleware[]} [reqOptions.middlewares]
+ * @param {function(err: Error | null, ret: any, info: IncomingMessage): void} [reqOptions.callback]
  * @param {urllib.RequestOptions} [urllibOptions]
- * @return {Promise<RespWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.post = function (reqOptions, urllibOptions) {
     const {
@@ -160,7 +175,9 @@ HttpClient.prototype.post = function (reqOptions, urllibOptions) {
         headers,
         urllibOptions.headers || {}
     );
-    urllibOptions.gzip = true;
+    urllibOptions.gzip = urllibOptions.gzip !== undefined ? urllibOptions.gzip : true;
+    urllibOptions.dataType = urllibOptions.dataType || 'json';
+    urllibOptions.timeout = urllibOptions.timeout || this.timeout;
 
     if (Buffer.isBuffer(data) || typeof data === 'string') {
         urllibOptions.content = data;
@@ -172,7 +189,7 @@ HttpClient.prototype.post = function (reqOptions, urllibOptions) {
 
     return this.sendRequest({
         url: url,
-        middlewares: middlewares || [],
+        middlewares: middlewares,
         agent: agent,
         httpsAgent: httpsAgent,
         callback: callback,
@@ -189,7 +206,7 @@ HttpClient.prototype.post = function (reqOptions, urllibOptions) {
  * @param {Object} [reqOptions.headers]
  * @param {middleware.Middleware[]} [reqOptions.middlewares]
  * @param {urllib.RequestOptions} [urllibOptions]
- * @return {Promise<RespWrapper>}
+ * @returns {Promise<ResponseWrapper>}
  */
 HttpClient.prototype.put = function (reqOptions, urllibOptions) {
     const {
@@ -211,7 +228,9 @@ HttpClient.prototype.put = function (reqOptions, urllibOptions) {
         headers,
         urllibOptions.headers || {}
     );
-    urllibOptions.gzip = true;
+    urllibOptions.gzip = urllibOptions.gzip !== undefined ? urllibOptions.gzip : true;
+    urllibOptions.dataType = urllibOptions.dataType || 'json';
+    urllibOptions.timeout = urllibOptions.timeout || this.timeout;
 
     if (Buffer.isBuffer(data) || typeof data === 'string') {
         urllibOptions.content = data;
@@ -223,7 +242,7 @@ HttpClient.prototype.put = function (reqOptions, urllibOptions) {
 
     return this.sendRequest({
         url: url,
-        middlewares: middlewares || [],
+        middlewares: middlewares,
         agent: agent,
         httpsAgent: httpsAgent,
         callback: callback,

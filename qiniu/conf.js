@@ -1,10 +1,18 @@
 const os = require('os');
 const pkg = require('../package.json');
+const { Endpoint } = require('./httpc/endpoint');
+const { Region } = require('./httpc/region');
+const { StaticEndpointsProvider } = require('./httpc/endpointsProvider');
+const crypto = require('crypto');
+const {
+    CachedRegionsProvider,
+    QueryRegionsProvider
+} = require('./httpc/regionsProvider');
 
 exports.ACCESS_KEY = '<PLEASE APPLY YOUR ACCESS KEY>';
 exports.SECRET_KEY = '<DONT SEND YOUR SECRET KEY TO ANYONE>';
 
-var defaultUserAgent = function () {
+const defaultUserAgent = function () {
     return 'QiniuNodejs/' + pkg.version + ' (' + os.type() + '; ' + os.platform() +
         '; ' + os.arch() + '; )';
 };
@@ -50,68 +58,184 @@ Object.defineProperty(exports, 'UC_HOST', {
 exports.RPC_HTTP_AGENT = null;
 exports.RPC_HTTPS_AGENT = null;
 
-exports.Config = function Config (options) {
-    options = options || {};
-    // use http or https protocol
-    this.useHttpsDomain = !!(options.useHttpsDomain || false);
-    // use cdn accerlated domains, this is not work with auto query region
-    this.useCdnDomain = !!(options.useCdnDomain && true);
-    // zone of the bucket
-    // z0 huadong, z1 huabei, z2 huanan, na0 beimei
-    this.zone = options.zone || null;
-    this.zoneExpire = options.zoneExpire || -1;
-    // only available with upload for now
-    this.regionsProvider = options.regionsProvider || null;
-};
+const Config = (function () {
+    /**
+     * @class
+     * @constructor
+     * @param {Object} [options]
+     * @param {boolean} [options.useHttpsDomain]
+     * @param {boolean} [options.useCdnDomain]
+     * @param {EndpointsProvider} [options.ucEndpointsProvider]
+     * @param {EndpointsProvider} [options.queryRegionsEndpointsProvider]
+     * @param {RegionsProvider} [options.regionsProvider]
+     * @param {Zone} [options.zone]
+     * @param {number} [options.zoneExpire]
+     */
+    function Config (options) {
+        options = options || {};
+        // use http or https protocol
+        this.useHttpsDomain = !!(options.useHttpsDomain || false);
+        // use cdn accelerated domains, this is not work with auto query region
+        this.useCdnDomain = !!(options.useCdnDomain && true);
+        // custom uc endpoints
+        this.ucEndpointsProvider = options.ucEndpointsProvider || null;
+        // custom query region endpoints
+        this.queryRegionsEndpointsProvider = options.queryRegionsEndpointsProvider || null;
+        // custom regions
+        this.regionsProvider = options.regionsProvider || null;
 
-exports.Zone = function (
-    srcUpHosts,
-    cdnUpHosts,
-    ioHost,
-    rsHost,
-    rsfHost,
-    apiHost
-) {
-    this.srcUpHosts = srcUpHosts || [];
-    this.cdnUpHosts = cdnUpHosts || [];
-    this.ioHost = ioHost || '';
-    this.rsHost = rsHost;
-    this.rsfHost = rsfHost;
-    this.apiHost = apiHost;
-
-    // set specific hosts if possible
-    const dotIndex = this.ioHost.indexOf('.');
-    if (dotIndex !== -1) {
-        const ioTag = this.ioHost.substring(0, dotIndex);
-        const zoneSepIndex = ioTag.indexOf('-');
-        if (zoneSepIndex !== -1) {
-            const zoneTag = ioTag.substring(zoneSepIndex + 1);
-            switch (zoneTag) {
-            case 'z1':
-                !this.rsHost && (this.rsHost = 'rs-z1.qbox.me');
-                !this.rsfHost && (this.rsfHost = 'rsf-z1.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-z1.qiniuapi.com');
-                break;
-            case 'z2':
-                !this.rsHost && (this.rsHost = 'rs-z2.qbox.me');
-                !this.rsfHost && (this.rsfHost = 'rsf-z2.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-z2.qiniuapi.com');
-                break;
-            case 'na0':
-                !this.rsHost && (this.rsHost = 'rs-na0.qbox.me');
-                !this.rsfHost && (this.rsfHost = 'rsf-na0.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-na0.qiniuapi.com');
-                break;
-            case 'as0':
-                !this.rsHost && (this.rsHost = 'rs-as0.qbox.me');
-                !this.rsfHost && (this.rsfHost = 'rsf-as0.qbox.me');
-                !this.apiHost && (this.apiHost = 'api-as0.qiniuapi.com');
-                break;
-            }
-        }
+        // deprecated
+        // zone of the bucket
+        this.zone = options.zone || null;
+        this.zoneExpire = options.zoneExpire || -1;
     }
 
-    !this.rsHost && (this.rsHost = 'rs.qiniu.com');
-    !this.rsfHost && (this.rsfHost = 'rsf.qiniu.com');
-    !this.apiHost && (this.apiHost = 'api.qiniuapi.com');
-};
+    /**
+     * @returns {EndpointsProvider}
+     */
+    Config.prototype.getUcEndpointsProvider = function () {
+        if (this.ucEndpointsProvider) {
+            return this.ucEndpointsProvider;
+        }
+
+        return new Endpoint(
+            UC_HOST,
+            {
+                defaultScheme: this.useHttpsDomain ? 'https' : 'http'
+            }
+        );
+    };
+
+    /**
+     * @private
+     * @returns {EndpointsProvider}
+     */
+    Config.prototype._getQueryRegionEndpointsProvider = function () {
+        if (this.queryRegionsEndpointsProvider) {
+            return this.queryRegionsEndpointsProvider;
+        }
+
+        if (this.ucEndpointsProvider) {
+            return this.ucEndpointsProvider;
+        }
+
+        const queryRegionsHosts = [QUERY_REGION_HOST].concat(QUERY_REGION_BACKUP_HOSTS);
+        return new StaticEndpointsProvider(queryRegionsHosts.map(h =>
+            new Endpoint(
+                h,
+                {
+                    defaultScheme: this.useHttpsDomain ? 'https' : 'http'
+                }
+            )
+        ));
+    };
+
+    /**
+     * @param {Object} [options]
+     * @param {string} [options.bucketName]
+     * @param {string} [options.accessKey]
+     * @returns {Promise<RegionsProvider>}
+     */
+    Config.prototype.getRegionsProvider = function (options) {
+        // returns custom regions provider, if it's configured
+        if (this.regionsProvider) {
+            return Promise.resolve(this.regionsProvider);
+        }
+
+        // backward compatibility with custom zone configuration
+        const zoneProvider = getRegionsProviderFromZone.call(this);
+        if (zoneProvider) {
+            return Promise.resolve(zoneProvider);
+        }
+
+        // get default regions provider
+        const {
+            bucketName,
+            accessKey
+        } = options || {};
+        if (!bucketName || !accessKey) {
+            return Promise.reject(
+                new Error('bucketName and accessKey is required for query regions')
+            );
+        }
+        return getDefaultRegionsProvider.call(this, {
+            bucketName,
+            accessKey
+        });
+    };
+
+    /**
+     * @private
+     * @returns {RegionsProvider | undefined}
+     */
+    function getRegionsProviderFromZone () {
+        let zoneTTL;
+        let shouldUseZone;
+        if (this.zoneExpire > 0) {
+            zoneTTL = this.zoneExpire - Math.trunc(Date.now() / 1000);
+            shouldUseZone = this.zone && zoneTTL > 0;
+        } else {
+            zoneTTL = -1;
+            shouldUseZone = Boolean(this.zone);
+        }
+        if (!shouldUseZone) {
+            return;
+        }
+        return Region.fromZone(this.zone, {
+            ttl: zoneTTL,
+            isPreferCdnHost: this.useCdnDomain,
+            preferredScheme: this.useHttpsDomain ? 'https' : 'http'
+        });
+    }
+
+    /**
+     * @private
+     * @param {Object} options
+     * @param {string} options.bucketName
+     * @param {string} options.accessKey
+     * @returns {Promise<RegionsProvider>}
+     */
+    function getDefaultRegionsProvider (options) {
+        const {
+            bucketName,
+            accessKey
+        } = options;
+
+        const queryRegionsEndpointsProvider = this._getQueryRegionEndpointsProvider();
+        return queryRegionsEndpointsProvider
+            .getEndpoints()
+            .then(endpoints => {
+                const endpointsMd5 = endpoints
+                    .map(e => e.host)
+                    .sort()
+                    .reduce(
+                        (hash, host) => hash.update(host),
+                        crypto.createHash('md5')
+                    )
+                    .digest('hex');
+                const cacheKey = [
+                    endpointsMd5,
+                    accessKey,
+                    bucketName
+                ].join(':');
+                return new CachedRegionsProvider({
+                    cacheKey,
+                    baseRegionsProvider: new QueryRegionsProvider({
+                        accessKey: accessKey,
+                        bucketName: bucketName,
+                        endpointsProvider: queryRegionsEndpointsProvider,
+                        preferredScheme: this.useHttpsDomain ? 'https' : 'http'
+                    })
+                });
+            });
+    }
+
+    return Config;
+})();
+
+exports.Config = Config;
+/**
+ * backward compatibility
+ * @deprecated use qiniu/httpc/region.js instead
+ */
+exports.Zone = require('./zone').Zone;
