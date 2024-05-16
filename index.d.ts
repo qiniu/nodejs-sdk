@@ -514,8 +514,22 @@ export declare namespace util {
      * @param requestURI 回调的URL中的requestURI
      * @param reqBody 回调的URL中的requestURI 请求Body，仅当请求的ContentType为application/x-www-form-urlencoded时才需要传入该参数
      * @param callbackAuth 回调时请求的Authorization头部值
+     * @param extra 当回调为 Qiniu 签名时需要传入
+     * @param extra.reqMethod 请求方法，例如 GET，POST
+     * @param extra.reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
+     * @param extra.reqHeaders 请求头部
      */
-    function isQiniuCallback(mac: auth.digest.Mac, requestURI: string, reqBody: string | null, callbackAuth: string): boolean;
+    function isQiniuCallback(
+        mac: auth.digest.Mac,
+        requestURI: string,
+        reqBody: string | null,
+        callbackAuth: string,
+        extra?: {
+            reqMethod: string,
+            reqContentType?: string,
+            reqHeaders?: Record<string, string>
+        }
+    ): boolean;
 }
 
 export declare namespace httpc {
