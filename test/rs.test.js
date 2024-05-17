@@ -462,6 +462,51 @@ describe('test start bucket manager', function () {
         });
     });
 
+    describe('test createBucket and deleteBucket', function () {
+        const targetBucketName = bucketName + 'creating' + Math.floor(Math.random() * 100000);
+        it('test createBucket', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.createBucket(
+                    targetBucketName,
+                    callback
+                )
+            );
+
+            const checkFunc = ({
+                _,
+                resp
+            }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        it('test deleteBucket', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.deleteBucket(
+                    targetBucketName,
+                    callback
+                )
+            );
+
+            const checkFunc = ({
+                _,
+                resp
+            }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+    });
+
     describe('test listPrefix', function () {
         it('test listPrefix', function () {
             const promises = doAndWrapResultPromises(callback =>

@@ -1304,6 +1304,31 @@ export declare namespace rs {
         listBucket(callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
 
         /**
+         * 创建空间
+         * @param bucket 空间名
+         * @param options 选项
+         * @param options.regionId 区域 ID
+         * @param callbackFunc 回调函数
+         */
+        createBucket(
+            bucket: string,
+            options: {
+                regionId: string
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 删除空间
+         * @param bucket 空间名
+         * @param callbackFunc 回调函数
+         */
+        deleteBucket(
+            bucket: string,
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
          * 获取空间详情
          * @param bucket - 空间名
          * @param callbackFunc

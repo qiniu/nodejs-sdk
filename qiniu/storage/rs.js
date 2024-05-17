@@ -979,7 +979,50 @@ BucketManager.prototype.listBucket = function (callbackFunc) {
 };
 
 /**
- * 获取bucket信息
+ * 创建 bucket
+ * @param {string} bucket 空间名
+ * @param {Object} options 选项
+ * @param {string} options.regionId 区域 ID
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.createBucket = function (bucket, options, callbackFunc) {
+    const createBucketOp = `/mkbucketv3/${bucket}/region/${options.regionId}`;
+    return _tryReq.call(this, {
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + createBucketOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 删除 bucket
+ * @param {string} bucket 空间名
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.deleteBucket = function (bucket, callbackFunc) {
+    const deleteBucketOp = `/drop/${bucket}`;
+
+    return _tryReq.call(this, {
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = _getEndpointVal.call(this, context) + deleteBucketOp;
+            return this._httpClient.post({
+                url: requestURL,
+                callback: wrapTryCallback(callbackFunc)
+            });
+        }
+    });
+};
+
+/**
+ * 获取 bucket 信息
  * @param {string} bucket 空间名
  * @param {BucketOperationCallback} [callbackFunc] 回调函数
  * @returns {Promise<any>}
