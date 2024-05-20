@@ -1048,7 +1048,7 @@ BucketManager.prototype.deleteBucket = function (bucket, callbackFunc) {
     return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
-            const requestURL = _getEndpointVal.call(this, context) + deleteBucketOp;
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + deleteBucketOp;
             return this._httpClient.post({
                 url: requestURL,
                 callback: wrapTryCallback(callbackFunc)

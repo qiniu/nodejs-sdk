@@ -839,14 +839,22 @@ describe('test start bucket manager', function () {
     });
 
     describe('test events', function () {
+        const bucketName4Test = 'event-test-bucket' + Math.floor(Math.random() * 100000);
         const eventName = 'event_test' + Math.floor(Math.random() * 100000);
 
         before(function () {
-            return bucketManager.deleteBucketEvent(
-                bucketName,
-                eventName
-            )
-                .catch(() => {});
+            return bucketManager.createBucket(
+                bucketName4Test,
+                {
+                    regionId: 'z0'
+                }
+            );
+        });
+
+        after(function () {
+            return bucketManager.deleteBucket(
+                bucketName4Test
+            );
         });
 
         it('test addEvents', function () {
@@ -858,7 +866,7 @@ describe('test start bucket manager', function () {
 
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.putBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     options,
                     callback
                 )
@@ -883,7 +891,7 @@ describe('test start bucket manager', function () {
 
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.updateBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     options,
                     callback
                 )
@@ -902,7 +910,7 @@ describe('test start bucket manager', function () {
         it('test getEvents', function () {
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.getBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     callback
                 )
             );
@@ -920,7 +928,7 @@ describe('test start bucket manager', function () {
         it('test deleteEvents', function () {
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.deleteBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     eventName,
                     callback
                 )
