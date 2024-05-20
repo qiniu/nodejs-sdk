@@ -960,11 +960,47 @@ BucketManager.prototype.updateObjectStatus = function (
 /**
  * 列举 bucket
  * @link https://developer.qiniu.com/kodo/3926/get-service
+ * @param {Object.<string, string>} [options]
+ * @param {string} [options.shared] 可传入 `'rd'` 列举出读权限的空间
+ * @param {Object.<string, string>} [options.tagCondition] 过滤空间的标签或标签值条件，指定多个标签或标签值时同时满足条件的空间才会返回
  * @param {BucketOperationCallback} [callbackFunc] 回调函数
  * @returns {Promise<any>}
  */
-BucketManager.prototype.listBucket = function (callbackFunc) {
-    const listBucketOp = '/buckets';
+BucketManager.prototype.listBucket = function (options, callbackFunc) {
+    let shared;
+    let tagCondition;
+    if (typeof options === 'function') {
+        callbackFunc = options;
+    } else {
+        options = options || {};
+        shared = options.shared;
+        tagCondition = options.tagCondition;
+    }
+
+    const reqParams = {};
+    if (shared) {
+        reqParams.shared = shared;
+    }
+    if (tagCondition) {
+        reqParams.tagCondition = util.urlsafeBase64Encode(
+            // use Object.entries when min version of Node.js update to ≥ v7.5.0
+            // the `querystring.stringify` will convert unsafe characters to percent encode,
+            // so stringify with below
+            Object.keys(tagCondition)
+                .map(k => {
+                    let cond = 'key=' + k;
+                    if (tagCondition[k]) {
+                        cond += '&value=' + tagCondition[k];
+                    }
+                    return cond;
+                })
+                .join(';')
+        );
+    }
+    const reqSpec = Object.keys(reqParams).length > 0
+        ? '?' + querystring.stringify(reqParams)
+        : '';
+    const listBucketOp = '/buckets' + reqSpec;
 
     return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,

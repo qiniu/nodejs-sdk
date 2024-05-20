@@ -443,6 +443,64 @@ describe('test start bucket manager', function () {
                 .then(() => promises.native)
                 .then(checkFunc);
         });
+
+        it('test listBucket shared', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.listBucket(
+                    {
+                        shared: 'rd'
+                    },
+                    callback
+                )
+            );
+
+            const checkFunc = ({ data, resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                data.should.containEql(bucketName);
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        const testParams4TagCondition = [
+            {
+                sdk: 'nodejs'
+            },
+            {
+                sdk: '',
+                lang: null
+            },
+            {
+                sdk: 'nodejs',
+                lang: 'javascript'
+            }
+        ];
+
+        testParams4TagCondition.forEach(cond => {
+            it(`test listBucket tagCondition(${JSON.stringify(cond)})`, function () {
+                const promises = doAndWrapResultPromises(callback =>
+                    bucketManager.listBucket(
+                        {
+                            tagCondition: cond
+                        },
+                        callback
+                    )
+                );
+
+                const checkFunc = ({ data, resp }) => {
+                    should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                    data.should.containEql(bucketName);
+                };
+
+                return promises.callback
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc);
+            });
+        });
     });
 
     describe('test bucketInfo', function () {
