@@ -6,9 +6,6 @@ const fs = require('fs');
 
 const { RetryPolicy } = require('../retry');
 
-exports.TokenExpiredRetryPolicy = TokenExpiredRetryPolicy;
-exports.wrapTryCallback = wrapTryCallback;
-
 // --- split to files --- //
 /**
  * @typedef {RetryPolicyContext} TokenExpiredRetryPolicyContext
@@ -114,6 +111,69 @@ TokenExpiredRetryPolicy.prototype.prepareRetry = function (context) {
     });
 };
 
+exports.TokenExpiredRetryPolicy = TokenExpiredRetryPolicy;
+
+/**
+ * @class
+ * @extends RetryPolicy
+ * @constructor
+ */
+function AccUnavailableRetryPolicy () {
+}
+
+AccUnavailableRetryPolicy.prototype = Object.create(RetryPolicy.prototype);
+AccUnavailableRetryPolicy.prototype.constructor = AccUnavailableRetryPolicy;
+
+AccUnavailableRetryPolicy.prototype.initContext = function (context) {
+    return Promise.resolve();
+};
+
+AccUnavailableRetryPolicy.prototype.isAccNotAvailable = function (context) {
+    try {
+        return context.result.resp.statusCode === 400 &&
+            context.result.resp.data.error.includes('transfer acceleration is not configured on this bucket');
+    } catch (_err) {
+        return false;
+    }
+};
+
+AccUnavailableRetryPolicy.prototype.shouldRetry = function (context) {
+    if (!context.result) {
+        return false;
+    }
+    if (!context.alternativeServiceNames.length) {
+        return false;
+    }
+    const [nextServiceName] = context.alternativeServiceNames;
+    if (
+        !context.region.services[nextServiceName] ||
+        !context.region.services[nextServiceName].length
+    ) {
+        return false;
+    }
+    return this.isAccNotAvailable(context);
+};
+
+AccUnavailableRetryPolicy.prototype.prepareRetry = function (context) {
+    if (!context.alternativeServiceNames.length) {
+        return Promise.reject(new Error(
+            'No alternative service available.'
+        ));
+    }
+
+    context.serviceName = context.alternativeServiceNames.shift();
+    [context.endpoint, ...context.alternativeEndpoints] = context.region.services[context.serviceName];
+    if (!context.endpoint) {
+        return Promise.reject(new Error(
+            'No alternative endpoint available.'
+        ));
+    }
+
+    return Promise.resolve();
+};
+
+exports.AccUnavailableRetryPolicy = AccUnavailableRetryPolicy;
+
 /**
  * @param {Error} err
  * @param {string} msg
@@ -147,3 +207,23 @@ function wrapTryCallback (fn) {
         }
     };
 }
+
+/**
+ * Compatible with callback style
+ * Could be removed when make break changes.
+ */
+function handleReqCallback (responseWrapperPromise, callbackFunc) {
+    if (typeof callbackFunc !== 'function') {
+        return;
+    }
+    const wrappedCallback = wrapTryCallback(callbackFunc);
+    responseWrapperPromise
+        .then(({ data, resp }) => {
+            wrappedCallback(null, data, resp);
+        })
+        .catch(err => {
+            wrappedCallback(err, null, err.resp);
+        });
+}
+
+exports.handleReqCallback = handleReqCallback;

@@ -148,6 +148,14 @@ export declare namespace conf {
         useHttpsDomain?: boolean;
 
         /**
+         * 在使用前需要提前开通加速域名
+         * 详见：https://developer.qiniu.com/kodo/12656/transfer-acceleration
+         * @default false
+         */
+        accelerateUploading?: boolean;
+
+        /**
+         * @deprecated 实际已无加速上传能力，使用 accelerateUploading 代替
          * @default true
          */
         useCdnDomain?: boolean;
@@ -185,6 +193,7 @@ export declare namespace conf {
         ucEndpointsProvider?: httpc.EndpointsProvider | null;
         queryRegionsEndpointsProvider?: httpc.EndpointsProvider | null;
         regionsProvider?: httpc.RegionsProvider | null;
+        regionsQueryResultCachePath?: string | null;
         zone?: Zone | null;
         zoneExpire?: number;
 
@@ -702,12 +711,15 @@ export declare namespace httpc {
         getValue(options?: {scheme?: string}): string;
 
         getEndpoints(): Promise<httpc.Endpoint[]>;
+
+        clone(): Endpoint;
     }
 
     // region.js
     enum SERVICE_NAME {
         UC = 'uc',
         UP = 'up',
+        UP_ACC = 'up_acc',
         IO = 'io',
         RS = 'rs',
         RSF = 'rsf',
@@ -778,6 +790,7 @@ export declare namespace httpc {
     class Region implements RegionsProvider {
         static fromZone(zone: conf.Zone, options?: RegionFromZoneOptions): Region;
         static fromRegionId(regionId: string, options?: RegionFromRegionIdOptions): Region;
+        static merge(...r: Region[]): Region;
 
         // non-unique
         regionId?: string;
@@ -790,6 +803,10 @@ export declare namespace httpc {
         constructor(options: RegionOptions);
 
         getRegions(): Promise<httpc.Region[]>;
+
+        clone(): Region;
+
+        merge(...r: Region[]): Region;
 
         get isLive(): boolean;
     }

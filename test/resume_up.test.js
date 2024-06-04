@@ -7,6 +7,13 @@ const crypto = require('crypto');
 const http = require('http');
 
 const qiniu = require('../index.js');
+
+const {
+    Endpoint,
+    Region,
+    SERVICE_NAME
+} = qiniu.httpc;
+
 const {
     getEnvConfig,
     checkEnvConfigAndExit,
@@ -498,6 +505,131 @@ describe('test resume up', function () {
                         promises = p;
                         return promises.callback;
                     })
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc)
+                    .then(() => {
+                        keysToDelete.push(key);
+                    });
+            });
+        });
+    });
+
+    describe('test resume up#accelerateUploading', function () {
+        const accConfig = new qiniu.conf.Config();
+        // accConfig.useHttpsDomain = true;
+        accConfig.accelerateUploading = true;
+        const accResumeUploader = new qiniu.resume_up.ResumeUploader(accConfig);
+        const bucketNameWithoutAcc = 'bucket-without-acc-' + Math.floor(Math.random() * 100000);
+
+        before(function () {
+            return bucketManager.createBucket(bucketNameWithoutAcc);
+        });
+
+        testParams.forEach(function (testParam) {
+            const {
+                version,
+                partSize,
+                mimeType
+            } = testParam;
+            const msg = `params(${JSON.stringify(testParam)})`;
+
+            // default is v1. v1 not support setting part size, skipping.
+            if (
+                (
+                    version === undefined ||
+                    version === 'v1'
+                ) &&
+                partSize !== undefined
+            ) {
+                return;
+            }
+
+            const putExtra = new qiniu.resume_up.PutExtra();
+            if (version !== undefined) {
+                putExtra.version = version;
+            }
+            if (partSize !== undefined) {
+                putExtra.partSize = partSize;
+            }
+            if (mimeType !== undefined) {
+                putExtra.mimeType = mimeType;
+            }
+
+            it(`upload acc normally; ${msg}`, function () {
+                const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+                const promises = doAndWrapResultPromises(callback =>
+                    accResumeUploader.putFile(uploadToken, key, testFilePath, putExtra, callback)
+                );
+
+                const checkFunc = ({ data }) => {
+                    data.should.have.keys('key', 'hash');
+                };
+
+                return promises.callback
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc)
+                    .then(() => {
+                        keysToDelete.push(key);
+                    });
+            });
+
+            it(`upload acc unavailable fallback to src; ${msg}`, function () {
+                const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+                const putPolicy = new qiniu.rs.PutPolicy({
+                    scope: bucketNameWithoutAcc
+                });
+                const uploadToken = putPolicy.uploadToken(mac);
+                const r1 = Region.fromRegionId('z0');
+                r1.services[SERVICE_NAME.UP_ACC] = [
+                    new Endpoint(`${bucketNameWithoutAcc}.kodo-accelerate.cn-east-1.qiniucs.com`),
+                    new Endpoint('qn-up-acc.fake.qiniu.com')
+                ];
+                accConfig.regionsProvider = r1;
+
+                const promises = doAndWrapResultPromises(callback =>
+                    accResumeUploader.putFile(uploadToken, key, testFilePath, putExtra, callback)
+                );
+
+                const checkFunc = ({ data }) => {
+                    data.should.have.keys('key', 'hash');
+                };
+
+                return promises.callback
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc)
+                    .then(() => {
+                        keysToDelete.push(key);
+                    });
+            });
+
+            it(`upload acc network error fallback to src; ${msg}`, function () {
+                const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+                const putPolicy = new qiniu.rs.PutPolicy({
+                    scope: bucketNameWithoutAcc
+                });
+                const uploadToken = putPolicy.uploadToken(mac);
+                const r1 = Region.fromRegionId('z0');
+                r1.services[SERVICE_NAME.UP_ACC] = [
+                    new Endpoint('qiniu-acc.fake.qiniu.com'),
+                    new Endpoint('qn-up-acc.fake.qiniu.com')
+                ];
+                accConfig.regionsProvider = r1;
+
+                const promises = doAndWrapResultPromises(callback =>
+                    accResumeUploader.putFile(uploadToken, key, testFilePath, putExtra)
+                );
+
+                const checkFunc = ({ data }) => {
+                    data.should.have.keys('key', 'hash');
+                };
+
+                return promises.native
                     .then(checkFunc)
                     .then(() => promises.native)
                     .then(checkFunc)

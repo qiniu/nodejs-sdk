@@ -427,7 +427,7 @@ describe('test start bucket manager', function () {
         });
     });
 
-    describe('test listBucket', function () {
+    describe('test listBuckets', function () {
         it('test listBucket', function () {
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.listBucket(callback)
@@ -526,6 +526,9 @@ describe('test start bucket manager', function () {
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.createBucket(
                     targetBucketName,
+                    {
+                        regionId: 'z0'
+                    },
                     callback
                 )
             );

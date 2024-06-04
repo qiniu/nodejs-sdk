@@ -18,9 +18,10 @@ const { RegionsRetryPolicy } = require('../httpc/regionsRetryPolicy');
 const { Retrier } = require('../retry');
 
 const {
-    wrapTryCallback,
+    AccUnavailableRetryPolicy,
     TokenExpiredRetryPolicy,
-    getNoNeedRetryError
+    getNoNeedRetryError,
+    handleReqCallback
 } = require('./internal');
 
 exports.ResumeUploader = ResumeUploader;
@@ -115,7 +116,11 @@ function _getRegionsRetrier (options) {
         accessKey
     })
         .then(regionsProvider => {
+            const serviceNames = this.config.accelerateUploading
+                ? [SERVICE_NAME.UP_ACC, SERVICE_NAME.UP]
+                : [SERVICE_NAME.UP];
             const retryPolicies = [
+                new AccUnavailableRetryPolicy(),
                 new TokenExpiredRetryPolicy({
                     uploadApiVersion,
                     resumeRecordFilePath
@@ -125,7 +130,7 @@ function _getRegionsRetrier (options) {
                 }),
                 new RegionsRetryPolicy({
                     regionsProvider,
-                    serviceName: SERVICE_NAME.UP,
+                    serviceNames,
                     onChangedRegion: () => {
                         try {
                             fs.unlinkSync(resumeRecordFilePath);
@@ -139,11 +144,17 @@ function _getRegionsRetrier (options) {
 
             return new Retrier({
                 retryPolicies,
-                onBeforeRetry: context => {
-                    if (context.error && context.error.noNeedRetry) {
-                        return false;
+                onBeforeRetry: (context, policy) => {
+                    if (context.error) {
+                        if (context.error.noNeedRetry) {
+                            return false;
+                        }
+                        return retryable;
                     }
-                    return retryable && context.result.needRetry();
+                    if (policy instanceof AccUnavailableRetryPolicy) {
+                        return true;
+                    }
+                    return retryable && context.result && context.result.needRetry();
                 }
             });
         });
@@ -185,7 +196,7 @@ ResumeUploader.prototype.putStream = function (
     // Why need retrier even if retryable is false?
     // Because the retrier is used to get the endpoints,
     // which will be initialed by region policy.
-    return _getRegionsRetrier.call(this, {
+    const result = _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken),
         retryable: false,
@@ -206,11 +217,14 @@ ResumeUploader.prototype.putStream = function (
                 key,
                 rsStream,
                 rsStreamLen,
-                putExtra,
-                callbackFunc
+                putExtra
             ),
             context
         }));
+
+    handleReqCallback(result, callbackFunc);
+
+    return result;
 };
 
 /**
@@ -240,7 +254,6 @@ function getResumeRecordInfo (resumeRecordFilePath) {
  * @param {Readable} rsStream
  * @param {number} rsStreamLen
  * @param {PutExtra} putExtra
- * @param {reqCallback} callbackFunc
  */
 function putReq (
     upEndpoint,
@@ -249,8 +262,7 @@ function putReq (
     key,
     rsStream,
     rsStreamLen,
-    putExtra,
-    callbackFunc
+    putExtra
 ) {
     // make block stream
     const blkStream = rsStream.pipe(new BlockStream({
@@ -275,8 +287,6 @@ function putReq (
         throw new Error('part upload version number error');
     }
 
-    const wrappedCallback = wrapTryCallback(callbackFunc);
-
     // upload parts
     return new Promise((resolve, reject) => {
         doPutReq(
@@ -298,7 +308,6 @@ function putReq (
                 if (err) {
                     err.resp = info;
                     reject(err);
-                    wrappedCallback(err, ret, info);
                     return;
                 }
                 if (info.statusCode === 200 && putExtra.resumeRecordFile) {
@@ -309,7 +318,6 @@ function putReq (
                     }
                 }
                 resolve(new ResponseWrapper({ data: ret, resp: info }));
-                wrappedCallback(err, ret, info);
             }
         );
     });
@@ -838,7 +846,7 @@ ResumeUploader.prototype.putFile = function (
         }
     );
 
-    return _getRegionsRetrier.call(this, {
+    const result = _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken),
 
@@ -862,8 +870,7 @@ ResumeUploader.prototype.putFile = function (
                     key,
                     rsStream,
                     rsStreamLen,
-                    putExtra,
-                    callbackFunc
+                    putExtra
                 );
                 p
                     .then(() => {
@@ -877,6 +884,10 @@ ResumeUploader.prototype.putFile = function (
             },
             context
         }));
+
+    handleReqCallback(result, callbackFunc);
+
+    return result;
 };
 
 /**

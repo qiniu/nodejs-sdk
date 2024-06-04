@@ -7,6 +7,13 @@ const fs = require('fs');
 const qiniu = require('../index.js');
 
 const {
+    Endpoint,
+    Region,
+    SERVICE_NAME,
+    StaticRegionsProvider
+} = qiniu.httpc;
+
+const {
     getEnvConfig,
     checkEnvConfigAndExit,
     createRandomFile,
@@ -430,6 +437,100 @@ describe('test form up', function () {
             };
 
             return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc)
+                .then(() => {
+                    keysToDelete.push(key);
+                });
+        });
+    });
+
+    describe('test form up#accelerateUploading', function () {
+        const accConfig = new qiniu.conf.Config();
+        // accConfig.useHttpsDomain = true;
+        accConfig.accelerateUploading = true;
+        const accFormUploader = new qiniu.form_up.FormUploader(accConfig);
+        const bucketNameWithoutAcc = 'bucket-without-acc-' + Math.floor(Math.random() * 100000);
+
+        before(function () {
+            return bucketManager.createBucket(bucketNameWithoutAcc);
+        });
+
+        it('upload acc normally', function () {
+            const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+            const promises = doAndWrapResultPromises(callback =>
+                accFormUploader.putFile(uploadToken, key, testFilePath2, putExtra, callback)
+            );
+
+            const checkFunc = ({ data }) => {
+                data.should.have.keys('key', 'hash');
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc)
+                .then(() => {
+                    keysToDelete.push(key);
+                });
+        });
+
+        it('upload acc unavailable fallback to src', function () {
+            const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+            const putPolicy = new qiniu.rs.PutPolicy({
+                scope: bucketNameWithoutAcc
+            });
+            const uploadToken = putPolicy.uploadToken(mac);
+            const r1 = Region.fromRegionId('z0');
+            r1.services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint(`${bucketNameWithoutAcc}.kodo-accelerate.cn-east-1.qiniucs.com`),
+                new Endpoint('qn-up-acc.fake.qiniu.com')
+            ];
+            accConfig.regionsProvider = r1;
+
+            const promises = doAndWrapResultPromises(callback =>
+                accFormUploader.putFile(uploadToken, key, testFilePath2, putExtra, callback)
+            );
+
+            const checkFunc = ({ data }) => {
+                data.should.have.keys('key', 'hash');
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc)
+                .then(() => {
+                    keysToDelete.push(key);
+                });
+        });
+
+        it('upload acc network error fallback to src', function () {
+            const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+            const putPolicy = new qiniu.rs.PutPolicy({
+                scope: bucketNameWithoutAcc
+            });
+            const uploadToken = putPolicy.uploadToken(mac);
+            const r1 = Region.fromRegionId('z0');
+            r1.services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint('qiniu-acc.fake.qiniu.com'),
+                new Endpoint('qn-up-acc.fake.qiniu.com')
+            ];
+            accConfig.regionsProvider = r1;
+
+            const promises = doAndWrapResultPromises(callback =>
+                accFormUploader.putFile(uploadToken, key, testFilePath2, putExtra)
+            );
+
+            const checkFunc = ({ data }) => {
+                data.should.have.keys('key', 'hash');
+            };
+
+            return promises.native
                 .then(checkFunc)
                 .then(() => promises.native)
                 .then(checkFunc)

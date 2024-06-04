@@ -57,4 +57,10 @@ Endpoint.prototype.getEndpoints = function () {
     return Promise.resolve([this]);
 };
 
+Endpoint.prototype.clone = function () {
+    return new Endpoint(this.host, {
+        defaultScheme: this.defaultScheme
+    });
+};
+
 exports.Endpoint = Endpoint;

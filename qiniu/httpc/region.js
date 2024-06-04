@@ -31,6 +31,7 @@ const { Endpoint } = require('./endpoint');
 const SERVICE_NAME = {
     UC: 'uc',
     UP: 'up',
+    UP_ACC: 'up_acc',
     IO: 'io',
     RS: 'rs',
     RSF: 'rsf',
@@ -275,10 +276,55 @@ Region.fromRegionId = function (regionId, options) {
 };
 
 /**
+ * @param {Region} regions
+ * @returns {Region}
+ */
+Region.merge = function (...regions) {
+    const [source, ...rest] = regions;
+    const target = source.clone();
+    rest.forEach(s => {
+        Object.keys(s.services).forEach(n => {
+            if (!target.services[n]) {
+                target.services[n] = s.services[n].map(endpoint => endpoint.clone());
+                return;
+            }
+            s.services[n].forEach(endpoint => {
+                if (!target.services[n].some(existsEndpoint => existsEndpoint.getValue() === endpoint.getValue())) {
+                    target.services[n].push(endpoint.clone());
+                }
+            });
+        });
+    });
+    return target;
+};
+
+/**
  * @returns {Promise<Region[]>}
  */
 Region.prototype.getRegions = function () {
     return Promise.resolve([this]);
+};
+
+Region.prototype.clone = function () {
+    const services = Object.keys(this.services).reduce((s, n) => {
+        s[n] = this.services[n].map(endpoint => endpoint.clone());
+        return s;
+    }, {});
+    return new Region({
+        regionId: this.regionId,
+        s3RegionId: this.s3RegionId,
+        services: services,
+        ttl: this.ttl,
+        createTime: this.createTime
+    });
+};
+
+/**
+ * @param {Region} regions
+ * @returns {Region}
+ */
+Region.prototype.merge = function (...regions) {
+    return Region.merge(this, ...regions);
 };
 
 Object.defineProperty(Region.prototype, 'isLive', {

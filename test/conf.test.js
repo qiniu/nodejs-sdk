@@ -1,6 +1,9 @@
 const should = require('should');
 
 const qiniu = require('../index');
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
 
 describe('test Config class', function () {
     const {
@@ -189,6 +192,32 @@ describe('test Config class', function () {
                         ]);
                     });
             });
+        });
+    });
+
+    describe('test disable file cache', function () {
+        it('test disable file cache', function () {
+            const defaultPersistPath = path.join(os.tmpdir(), 'qn-regions-cache.jsonl');
+            try {
+                fs.unlinkSync(defaultPersistPath);
+            } catch (e) {
+                if (e.code !== 'ENOENT') {
+                    throw e;
+                }
+            }
+
+            const config = new qiniu.conf.Config();
+            config.regionsQueryResultCachePath = null;
+
+            return config.getRegionsProvider({
+                bucketName,
+                accessKey
+            })
+                .then(regionsProvider => regionsProvider.getRegions())
+                .then(regions => {
+                    should.ok(regions.length > 0);
+                    should.ok(!fs.existsSync(defaultPersistPath));
+                });
         });
     });
 });
