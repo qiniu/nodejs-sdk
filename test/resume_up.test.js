@@ -107,13 +107,13 @@ describe('test resume up', function () {
 
     const keysToDelete = [];
     after(function () {
+        if (!keysToDelete.length) {
+            return;
+        }
+
         const deleteOps = keysToDelete.map(k =>
             qiniu.rs.deleteOp(bucketName, k)
         );
-
-        if (!deleteOps.length) {
-            return;
-        }
 
         return bucketManager.batch(deleteOps)
             .then(({ data, resp }) => {
@@ -517,13 +517,31 @@ describe('test resume up', function () {
 
     describe('test resume up#accelerateUploading', function () {
         const accConfig = new qiniu.conf.Config();
-        // accConfig.useHttpsDomain = true;
+        accConfig.useHttpsDomain = true;
         accConfig.accelerateUploading = true;
         const accResumeUploader = new qiniu.resume_up.ResumeUploader(accConfig);
         const bucketNameWithoutAcc = 'bucket-without-acc-' + Math.floor(Math.random() * 100000);
+        const accKeysToDelete = [];
+        const accPutPolicy = new qiniu.rs.PutPolicy({
+            scope: bucketNameWithoutAcc
+        });
+        const accUploadToken = accPutPolicy.uploadToken(mac);
 
         before(function () {
             return bucketManager.createBucket(bucketNameWithoutAcc);
+        });
+
+        after(function () {
+            if (!accKeysToDelete.length) {
+                return;
+            }
+            return bucketManager.batch(accKeysToDelete.map(k => qiniu.rs.deleteOp(bucketNameWithoutAcc, k)))
+                .then(({ data, resp }) => {
+                    if (!Array.isArray(data)) {
+                        console.log(resp);
+                    }
+                    return bucketManager.deleteBucket(bucketNameWithoutAcc);
+                });
         });
 
         testParams.forEach(function (testParam) {
@@ -563,7 +581,9 @@ describe('test resume up', function () {
                     accResumeUploader.putFile(uploadToken, key, testFilePath, putExtra, callback)
                 );
 
-                const checkFunc = ({ data }) => {
+                const checkFunc = ({ data, resp }) => {
+                    const isAccelerateUploading = (resp.requestUrls || []).some(url => url.includes('kodo-accelerate'));
+                    should.ok(isAccelerateUploading, `should using acc host, but requestUrls: ${JSON.stringify(resp.requestUrls)}`);
                     data.should.have.keys('key', 'hash');
                 };
 
@@ -579,10 +599,6 @@ describe('test resume up', function () {
             it(`upload acc unavailable fallback to src; ${msg}`, function () {
                 const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
 
-                const putPolicy = new qiniu.rs.PutPolicy({
-                    scope: bucketNameWithoutAcc
-                });
-                const uploadToken = putPolicy.uploadToken(mac);
                 const r1 = Region.fromRegionId('z0');
                 r1.services[SERVICE_NAME.UP_ACC] = [
                     new Endpoint(`${bucketNameWithoutAcc}.kodo-accelerate.cn-east-1.qiniucs.com`),
@@ -591,7 +607,7 @@ describe('test resume up', function () {
                 accConfig.regionsProvider = r1;
 
                 const promises = doAndWrapResultPromises(callback =>
-                    accResumeUploader.putFile(uploadToken, key, testFilePath, putExtra, callback)
+                    accResumeUploader.putFile(accUploadToken, key, testFilePath, putExtra, callback)
                 );
 
                 const checkFunc = ({ data }) => {
@@ -603,17 +619,13 @@ describe('test resume up', function () {
                     .then(() => promises.native)
                     .then(checkFunc)
                     .then(() => {
-                        keysToDelete.push(key);
+                        accKeysToDelete.push(key);
                     });
             });
 
             it(`upload acc network error fallback to src; ${msg}`, function () {
                 const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
 
-                const putPolicy = new qiniu.rs.PutPolicy({
-                    scope: bucketNameWithoutAcc
-                });
-                const uploadToken = putPolicy.uploadToken(mac);
                 const r1 = Region.fromRegionId('z0');
                 r1.services[SERVICE_NAME.UP_ACC] = [
                     new Endpoint('qiniu-acc.fake.qiniu.com'),
@@ -622,7 +634,7 @@ describe('test resume up', function () {
                 accConfig.regionsProvider = r1;
 
                 const promises = doAndWrapResultPromises(callback =>
-                    accResumeUploader.putFile(uploadToken, key, testFilePath, putExtra)
+                    accResumeUploader.putFile(accUploadToken, key, testFilePath, putExtra)
                 );
 
                 const checkFunc = ({ data }) => {
@@ -634,7 +646,7 @@ describe('test resume up', function () {
                     .then(() => promises.native)
                     .then(checkFunc)
                     .then(() => {
-                        keysToDelete.push(key);
+                        accKeysToDelete.push(key);
                     });
             });
         });

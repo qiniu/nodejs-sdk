@@ -186,9 +186,9 @@ describe('test Config class', function () {
                     .then(endpoints => {
                         const endpointsValues = endpoints.map(e => e.getValue());
                         should.deepEqual(endpointsValues, [
+                            `${preferredScheme}://uc.qiniuapi.com`,
                             `${preferredScheme}://kodo-config.qiniuapi.com`,
-                            `${preferredScheme}://uc.qbox.me`,
-                            `${preferredScheme}://api.qiniu.com`
+                            `${preferredScheme}://uc.qbox.me`
                         ]);
                     });
             });
