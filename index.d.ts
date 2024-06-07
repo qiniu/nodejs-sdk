@@ -643,17 +643,17 @@ export declare namespace httpc {
         middlewares?: middleware.Middleware[];
     }
 
-    interface GetOptions<T = any> extends ReqOpts<T> {
+    interface GetOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         params: Record<string, string>;
         headers: Record<string, string>;
     }
 
-    interface PostOptions<T = any> extends ReqOpts<T> {
+    interface PostOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         data: string | Buffer | Readable;
         headers: Record<string, string>;
     }
 
-    interface PutOptions<T = any> extends ReqOpts<T> {
+    interface PutOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         data: string | Buffer | Readable;
         headers: Record<string, string>
     }
@@ -664,9 +664,9 @@ export declare namespace httpc {
         middlewares: middleware.Middleware[];
         constructor(options: HttpClientOptions)
         sendRequest(requestOptions: ReqOpts): Promise<ResponseWrapper>
-        get(getOptions: GetOptions): Promise<ResponseWrapper>
-        post(postOptions: PostOptions): Promise<ResponseWrapper>
-        put(putOptions: PutOptions): Promise<ResponseWrapper>
+        get(getOptions: GetOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+        post(postOptions: PostOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+        put(putOptions: PutOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
     }
 
     // endpoint.js
