@@ -132,6 +132,7 @@ describe('test resume up', function () {
         scope: bucketName
     };
     const putPolicy = new qiniu.rs.PutPolicy(options);
+    putPolicy.expires = 7200;
     putPolicy.returnBody = '{"key":$(key),"hash":$(etag),"fname":$(fname),"var_1":$(x:var_1),"var_2":$(x:var_2)}';
     const uploadToken = putPolicy.uploadToken(mac);
     const resumeUploader = new qiniu.resume_up.ResumeUploader(config);
@@ -388,7 +389,7 @@ describe('test resume up', function () {
     });
 
     describe('test resume up#putFile resume', function () {
-        const testParams = parametrize(
+        const testResumeParams = parametrize(
             {
                 name: 'version',
                 values: [
@@ -411,7 +412,6 @@ describe('test resume up', function () {
             {
                 name: 'resumeRecorderOption',
                 values: [
-                    undefined, // resume record is disabled, default
                     {
                         baseDirPath: path.join(os.tmpdir(), 'SDKCustomDir'),
                         resumeKey: undefined
@@ -421,15 +421,35 @@ describe('test resume up', function () {
                         resumeKey: 'some-resume-key.json'
                     }
                 ]
-            },
-            {
-                name: 'resumeRecordFile',
-                values: [
-                    undefined,
-                    path.join(os.tmpdir(), 'some-resume-record-file.json')
-                ]
             }
-        );
+        )
+            .concat(parametrize(
+                {
+                    name: 'version',
+                    values: [
+                        undefined,
+                        'v1',
+                        'v2'
+                    ]
+                },
+                {
+                    name: 'partSize',
+                    values: [
+                        undefined,
+                        6 * 1024 * 1024
+                    ]
+                },
+                {
+                    name: 'fileSizeMB',
+                    values: [2, 4, 6, 10]
+                },
+                {
+                    name: 'resumeRecordFile',
+                    values: [
+                        path.join(os.tmpdir(), 'some-resume-record-file.json')
+                    ]
+                }
+            ));
 
         const filepathListToDelete = [];
         after(function () {
@@ -447,7 +467,7 @@ describe('test resume up', function () {
             );
         });
 
-        testParams.forEach(testParam => {
+        testResumeParams.forEach(testParam => {
             const {
                 version,
                 partSize,
@@ -602,7 +622,8 @@ describe('test resume up', function () {
         const bucketNameWithoutAcc = 'bucket-without-acc-' + Math.floor(Math.random() * 100000);
         const accKeysToDelete = [];
         const accPutPolicy = new qiniu.rs.PutPolicy({
-            scope: bucketNameWithoutAcc
+            scope: bucketNameWithoutAcc,
+            expires: 7200
         });
         const accUploadToken = accPutPolicy.uploadToken(mac);
 
@@ -612,7 +633,7 @@ describe('test resume up', function () {
 
         after(function () {
             if (!accKeysToDelete.length) {
-                return;
+                return bucketManager.deleteBucket(bucketNameWithoutAcc);
             }
             return bucketManager.batch(accKeysToDelete.map(k => qiniu.rs.deleteOp(bucketNameWithoutAcc, k)))
                 .then(({ data, resp }) => {
