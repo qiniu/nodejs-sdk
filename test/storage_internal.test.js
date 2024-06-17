@@ -19,6 +19,20 @@ const {
 describe('test upload internal module', function () {
     describe('test TokenExpiredRetryPolicy', function () {
         const resumeRecordFilePath = path.join(process.cwd(), 'fake-progress-record');
+        const recordExistsHandler = () => {
+            try {
+                return fs.existsSync(resumeRecordFilePath);
+            } catch (_err) {
+                return false;
+            }
+        };
+        const recordDeleteHandler = () => {
+            try {
+                fs.unlinkSync(resumeRecordFilePath);
+            } catch (_err) {
+                // pass;
+            }
+        };
 
         beforeEach(function () {
             const fd = fs.openSync(resumeRecordFilePath, 'w');
@@ -36,7 +50,8 @@ describe('test upload internal module', function () {
         it('test TokenExpiredRetryPolicy should not retry', function () {
             const tokenExpiredRetryPolicy = new TokenExpiredRetryPolicy({
                 uploadApiVersion: 'v1',
-                resumeRecordFilePath
+                recordDeleteHandler,
+                recordExistsHandler
             });
 
             const mockedContext = {};
@@ -57,7 +72,8 @@ describe('test upload internal module', function () {
         it('test TokenExpiredRetryPolicy should not by maxRetriedTimes', function () {
             const tokenExpiredRetryPolicy = new TokenExpiredRetryPolicy({
                 uploadApiVersion: 'v1',
-                resumeRecordFilePath,
+                recordDeleteHandler,
+                recordExistsHandler,
                 maxRetryTimes: 2
             });
 
@@ -89,7 +105,8 @@ describe('test upload internal module', function () {
         it('test TokenExpiredRetryPolicy should retry v1', function () {
             const tokenExpiredRetryPolicy = new TokenExpiredRetryPolicy({
                 uploadApiVersion: 'v1',
-                resumeRecordFilePath
+                recordDeleteHandler,
+                recordExistsHandler
             });
             const mockedContext = {};
 
@@ -113,7 +130,8 @@ describe('test upload internal module', function () {
         it('test TokenExpiredRetryPolicy should retry v2', function () {
             const tokenExpiredRetryPolicy = new TokenExpiredRetryPolicy({
                 uploadApiVersion: 'v2',
-                resumeRecordFilePath
+                recordDeleteHandler,
+                recordExistsHandler
             });
             const mockedContext = {};
 
