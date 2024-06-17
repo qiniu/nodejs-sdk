@@ -2,8 +2,6 @@
 // DO NOT use this file, unless you know what you're doing.
 // Because its API may make broken change for internal usage.
 
-const fs = require('fs');
-
 const { RetryPolicy } = require('../retry');
 
 // --- split to files --- //
@@ -18,30 +16,21 @@ const { RetryPolicy } = require('../retry');
  * @extends RetryPolicy
  * @param {Object} options
  * @param {string} options.uploadApiVersion
- * @param {string} options.resumeRecordFilePath
+ * @param {function} options.recordDeleteHandler
+ * @param {function} options.recordExistsHandler
  * @param {number} [options.maxRetryTimes]
  * @constructor
  */
 function TokenExpiredRetryPolicy (options) {
     this.id = Symbol(this.constructor.name);
     this.uploadApiVersion = options.uploadApiVersion;
-    this.resumeRecordFilePath = options.resumeRecordFilePath;
+    this.recordDeleteHandler = options.recordDeleteHandler;
+    this.recordExistsHandler = options.recordExistsHandler;
     this.maxRetryTimes = options.maxRetryTimes || 1;
 }
 
 TokenExpiredRetryPolicy.prototype = Object.create(RetryPolicy.prototype);
 TokenExpiredRetryPolicy.prototype.constructor = TokenExpiredRetryPolicy;
-
-/**
- * @param {string} resumeRecordFilePath
- * @returns {boolean}
- */
-TokenExpiredRetryPolicy.prototype.isResumedUpload = function (resumeRecordFilePath) {
-    if (!resumeRecordFilePath) {
-        return false;
-    }
-    return fs.existsSync(resumeRecordFilePath);
-};
 
 /**
  * @param {Object} context
@@ -50,8 +39,7 @@ TokenExpiredRetryPolicy.prototype.isResumedUpload = function (resumeRecordFilePa
 TokenExpiredRetryPolicy.prototype.initContext = function (context) {
     context[this.id] = {
         retriedTimes: 0,
-        uploadApiVersion: this.uploadApiVersion,
-        resumeRecordFilePath: this.resumeRecordFilePath
+        uploadApiVersion: this.uploadApiVersion
     };
     return Promise.resolve();
 };
@@ -63,13 +51,12 @@ TokenExpiredRetryPolicy.prototype.initContext = function (context) {
 TokenExpiredRetryPolicy.prototype.shouldRetry = function (context) {
     const {
         retriedTimes,
-        uploadApiVersion,
-        resumeRecordFilePath
+        uploadApiVersion
     } = context[this.id];
 
     if (
         retriedTimes >= this.maxRetryTimes ||
-        !this.isResumedUpload(resumeRecordFilePath)
+        !this.recordExistsHandler()
     ) {
         return false;
     }
@@ -99,15 +86,13 @@ TokenExpiredRetryPolicy.prototype.shouldRetry = function (context) {
  */
 TokenExpiredRetryPolicy.prototype.prepareRetry = function (context) {
     context[this.id].retriedTimes += 1;
-    const resumeRecordFilePath = context[this.id].resumeRecordFilePath;
     return new Promise(resolve => {
-        if (!resumeRecordFilePath) {
+        if (!this.recordExistsHandler()) {
             resolve();
             return;
         }
-        fs.unlink(resumeRecordFilePath, _err => {
-            resolve();
-        });
+        this.recordDeleteHandler();
+        resolve();
     });
 };
 

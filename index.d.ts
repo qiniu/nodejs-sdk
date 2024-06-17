@@ -421,13 +421,14 @@ export declare namespace resume_up {
 
         /**
          * @default null
+         * @deprecated 使用 `resumeRecorder` 与 `resumeKey` 代替
          */
-        resumeRecordFile?: string
+        resumeRecordFile?: string | null
 
         /**
          * @default null
          */
-        progressCallback?: (uploadBytes: number, totalBytes: number) => void
+        progressCallback?: ((uploadBytes: number, totalBytes: number) => void) | null
 
         /**
          * @default v1
@@ -445,6 +446,18 @@ export declare namespace resume_up {
         metadata?: Record<string, string>
 
         /**
+         * 断点续传记录器，请通过 `createResumeRecorder` 或 `createResumeRecorderSync` 获取，优先级比 `resumeRecordFile` 低
+         * @default null
+         */
+        resumeRecorder?: ResumeRecorder
+
+        /**
+         * 断点续传记录文件的具体文件名，不设置时会由当次上传自动生成
+         * @default null
+         */
+        resumeKey?: string | null
+
+        /**
          * 上传可选参数
          * @param fname 请求体中的文件的名称
          * @param params 额外参数设置，参数名称必须以x:开头
@@ -454,11 +467,32 @@ export declare namespace resume_up {
          * @param partSize 分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
          * @param version 分片上传版本 目前支持v1/v2版本 默认v1
          * @param metadata 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+         * @param resumeRecorder 断点续传记录器，请通过 `createResumeRecorder` 或 `createResumeRecorderSync` 获取，优先级比 `resumeRecordFile` 低
+         * @param resumeKey 断点续传记录文件的具体文件名，不设置时会由当次上传自动生成，推荐不设置
          */
         constructor(fname?: string, params?: Record<string, string>, mimeType?: string, resumeRecordFile?: string,
                     progressCallback?: (uploadBytes: number, totalBytes: number) => void,
-                    partSize?:number, version?:string, metadata?: Record<string, string>);
+                    partSize?:number, version?:string, metadata?: Record<string, string>,
+                    resumeRecorder?: ResumeRecorder, resumeKey?: string);
     }
+
+    /**
+     * 当前仅支持了同步调用这一不推荐的使用方式，暂不公开具体内部信息，仅供类型匹配使用
+     */
+    abstract class ResumeRecorder {
+    }
+
+    /**
+     *
+     * @param baseDirPath 默认值为 `os.tmpdir()`
+     */
+    function createResumeRecorder (baseDirPath?: string): Promise<ResumeRecorder>
+
+    /**
+     * TODO: 是否公开这个不推荐的同步实现？
+     * `createResumeRecorder` 的同步版本
+     */
+    function createResumeRecorderSync (baseDirPath?: string): ResumeRecorder
 }
 
 export declare namespace util {

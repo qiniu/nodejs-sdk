@@ -22,6 +22,7 @@ const {
     doAndWrapResultPromises,
     parametrize
 } = require('./conftest');
+const { createResumeRecorderSync } = require('../qiniu/storage/resume');
 
 const testFilePath = path.join(os.tmpdir(), 'nodejs-sdk-test.bin');
 
@@ -406,20 +407,43 @@ describe('test resume up', function () {
             {
                 name: 'fileSizeMB',
                 values: [2, 4, 6, 10]
+            },
+            {
+                name: 'resumeRecorderOption',
+                values: [
+                    undefined, // resume record is disabled, default
+                    {
+                        baseDirPath: path.join(os.tmpdir(), 'SDKCustomDir'),
+                        resumeKey: undefined
+                    },
+                    {
+                        baseDirPath: path.join(os.tmpdir(), 'SDKCustomDir'),
+                        resumeKey: 'some-resume-key.json'
+                    }
+                ]
+            },
+            {
+                name: 'resumeRecordFile',
+                values: [
+                    undefined,
+                    path.join(os.tmpdir(), 'some-resume-record-file.json')
+                ]
             }
         );
 
         const filepathListToDelete = [];
         after(function () {
             return Promise.all(
-                filepathListToDelete.map(p => new Promise(resolve => {
-                    fs.unlink(p, err => {
-                        if (err && err.code !== 'ENOENT') {
-                            console.log(`unlink ${p} failed`, err);
-                        }
-                        resolve();
-                    });
-                }))
+                filepathListToDelete
+                    .filter(p => p)
+                    .map(p => new Promise(resolve => {
+                        fs.unlink(p, err => {
+                            if (err && err.code !== 'ENOENT') {
+                                console.log(`unlink ${p} failed`, err);
+                            }
+                            resolve();
+                        });
+                    }))
             );
         });
 
@@ -427,7 +451,9 @@ describe('test resume up', function () {
             const {
                 version,
                 partSize,
-                fileSizeMB
+                fileSizeMB,
+                resumeRecorderOption,
+                resumeRecordFile
             } = testParam;
             const msg = `params(${JSON.stringify(testParam)})`;
 
@@ -446,7 +472,16 @@ describe('test resume up', function () {
                 const key = 'storage_putStream_resume_test' + Math.floor(Math.random() * 100000);
 
                 const putExtra = new qiniu.resume_up.PutExtra();
-                putExtra.resumeRecordFile = path.join(os.tmpdir(), key + '.resume.json');
+
+                if (resumeRecordFile) {
+                    putExtra.resumeRecordFile = resumeRecordFile;
+                }
+
+                if (resumeRecorderOption) {
+                    putExtra.resumeRecorder = createResumeRecorderSync(resumeRecorderOption.baseDirPath);
+                    putExtra.resumeKey = resumeRecorderOption.resumeKey;
+                }
+
                 if (version !== undefined) {
                     putExtra.version = version;
                 }
@@ -479,9 +514,19 @@ describe('test resume up', function () {
                     })
                     .then(() => {
                         // try to upload from resume point
+                        const couldResume = Boolean(putExtra.resumeRecordFile || putExtra.resumeRecorder);
+                        let isFirstPart = true;
                         putExtra.progressCallback = (uploaded, _total) => {
-                            if (uploaded / partSize <= 1) {
-                                throw new Error('not resumed');
+                            if (!isFirstPart) {
+                                return;
+                            }
+                            isFirstPart = false;
+                            if (couldResume && uploaded / partSize <= 1) {
+                                throw new Error('should resume');
+                            }
+                            if (!couldResume && uploaded / partSize > 1) {
+                                console.log('lihs debug:', { couldResume, uploaded });
+                                throw new Error('should not resume');
                             }
                         };
                         return doAndWrapResultPromises(callback =>
@@ -497,6 +542,40 @@ describe('test resume up', function () {
 
                 const checkFunc = ({ data }) => {
                     data.should.have.keys('key', 'hash');
+                    if (resumeRecordFile) {
+                        should.ok(!fs.existsSync(putExtra.resumeRecordFile));
+                    } else if (resumeRecorderOption) {
+                        if (resumeRecorderOption.resumeKey) {
+                            should.ok(!fs.existsSync(
+                                path.join(
+                                    resumeRecorderOption.baseDirPath,
+                                    resumeRecorderOption.resumeKey
+                                )
+                            ));
+                        } else {
+                            should.exist(putExtra.resumeRecorder);
+                            let fileLastModify;
+                            try {
+                                fileLastModify = filepath && fs.statSync(filepath).mtimeMs.toString();
+                            } catch (_err) {
+                                fileLastModify = '';
+                            }
+                            const recordValuesToHash = [
+                                putExtra.version,
+                                accessKey,
+                                `${bucketName}:${key}`,
+                                filepath,
+                                fileLastModify
+                            ];
+                            const expectResumeKey = putExtra.resumeRecorder.generateKey(recordValuesToHash);
+                            should.ok(!fs.existsSync(
+                                path.join(
+                                    resumeRecorderOption.baseDirPath,
+                                    expectResumeKey
+                                )
+                            ));
+                        }
+                    }
                 };
 
                 let promises = null;

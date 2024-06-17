@@ -58,6 +58,7 @@
     "encodeurl": "^1.0.1",
     "formstream": "^1.1.0",
     "mime": "^2.4.4",
+    "mkdirp": "^0.5.5",
     "mockdate": "^3.0.5",
     "tunnel-agent": "^0.6.0",
     "typescript": "^4.9.4",

@@ -1,10 +1,14 @@
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const mime = require('mime');
 const getCrc32 = require('crc32');
 const destroy = require('destroy');
 const BlockStream = require('block-stream2');
+// use the native option `recursive` when min version of Node.js update to ≥ v10.12.0
+const mkdirp = require('mkdirp');
 
 const conf = require('../conf');
 const util = require('../util');
@@ -26,6 +30,8 @@ const {
 
 exports.ResumeUploader = ResumeUploader;
 exports.PutExtra = PutExtra;
+exports.createResumeRecorder = createResumeRecorder;
+exports.createResumeRecorderSync = createResumeRecorderSync;
 
 /**
  * @param {conf.Config} [config]
@@ -57,11 +63,13 @@ function ResumeUploader (config) {
  * @param {string} [fname]                      请求体中的文件的名称
  * @param {Object} [params]                     额外参数设置，参数名称必须以x:开头
  * @param {string | null} [mimeType]            指定文件的mimeType
- * @param {string | null} [resumeRecordFile]    断点续传的已上传的部分信息记录文件路径
+ * @param {string | null} [resumeRecordFile]    DEPRECATED: 使用 `` 与 `` 代替；断点续传的已上传的部分信息记录文件路径
  * @param {function(number, number):void} [progressCallback] 上传进度回调，回调参数为 (uploadBytes, totalBytes)
  * @param {number} [partSize]                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
  * @param {'v1' | 'v2'} [version]               分片上传版本 目前支持v1/v2版本 默认v1
  * @param {Object} [metadata]                   元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+ * @param {JsonFileRecorder} [resumeRecorder]   通过 `createResumeRecorder` 或 `createResumeRecorderSync` 获取，优先级比 `resumeRecordFile` 低
+ * @param {string} [resumeKey]                  断点续传记录文件的具体文件名，不设置时会由当次上传自动生成
  */
 function PutExtra (
     fname,
@@ -71,7 +79,9 @@ function PutExtra (
     progressCallback,
     partSize,
     version,
-    metadata
+    metadata,
+    resumeRecorder,
+    resumeKey
 ) {
     this.fname = fname || '';
     this.params = params || {};
@@ -81,6 +91,8 @@ function PutExtra (
     this.partSize = partSize || conf.BLOCK_SIZE;
     this.version = version || 'v1';
     this.metadata = metadata || {};
+    this.resumeRecorder = resumeRecorder || null;
+    this.resumeKey = resumeKey || null;
 }
 
 /**
@@ -89,8 +101,9 @@ function PutExtra (
  * @param {string} options.accessKey
  * @param {string} options.bucketName
  * @param {boolean} [options.retryable]
- * @param {'v1' | 'v2' | string} options.uploadApiVersion
- * @param {string} [options.resumeRecordFilePath]
+ * @param {'v1' | 'v2' | string} [options.uploadApiVersion]
+ * @param {JsonFileRecorder} [options.resumeRecorder]
+ * @param {string} [options.resumeKey]
  */
 function _getRegionsRetrier (options) {
     const {
@@ -99,16 +112,19 @@ function _getRegionsRetrier (options) {
         retryable = true,
 
         uploadApiVersion,
-        resumeRecordFilePath
+        resumeRecorder,
+        resumeKey
     } = options;
 
     const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
-
-    const resumeInfo = getResumeRecordInfo(resumeRecordFilePath);
     let preferredEndpoints;
-    if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
-        preferredEndpoints = resumeInfo.upDomains.map(d =>
-            new Endpoint(d, { defaultScheme: preferredScheme }));
+    const isResumeAvailable = Boolean(resumeRecorder && resumeKey);
+    if (isResumeAvailable) {
+        const resumeInfo = resumeRecorder.getSync(resumeKey);
+        if (resumeInfo && Array.isArray(resumeInfo.upDomains)) {
+            preferredEndpoints = resumeInfo.upDomains.map(d =>
+                new Endpoint(d, { defaultScheme: preferredScheme }));
+        }
     }
 
     return this.config.getRegionsProvider({
@@ -123,7 +139,18 @@ function _getRegionsRetrier (options) {
                 new AccUnavailableRetryPolicy(),
                 new TokenExpiredRetryPolicy({
                     uploadApiVersion,
-                    resumeRecordFilePath
+                    recordExistsHandler: () => {
+                        if (!isResumeAvailable) {
+                            return;
+                        }
+                        resumeRecorder.hasSync(resumeKey);
+                    },
+                    recordDeleteHandler: () => {
+                        if (!isResumeAvailable) {
+                            return;
+                        }
+                        resumeRecorder.deleteSync(resumeKey);
+                    }
                 }),
                 new EndpointsRetryPolicy({
                     skipInitContext: true
@@ -132,11 +159,10 @@ function _getRegionsRetrier (options) {
                     regionsProvider,
                     serviceNames,
                     onChangedRegion: () => {
-                        try {
-                            fs.unlinkSync(resumeRecordFilePath);
-                        } catch (_e) {
-                            // ignore
+                        if (!isResumeAvailable) {
+                            return;
                         }
+                        resumeRecorder.deleteSync(resumeKey);
                     },
                     preferredEndpoints
                 })
@@ -199,11 +225,10 @@ ResumeUploader.prototype.putStream = function (
     const result = _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken),
-        retryable: false,
+        retryable: false
 
         // useless by not retryable
-        uploadApiVersion: putExtra.version,
-        resumeRecordFilePath: putExtra.resumeRecordFile
+        // uploadApiVersion: putExtra.version,
     })
         .then(retrier => Promise.all([
             retrier,
@@ -226,25 +251,6 @@ ResumeUploader.prototype.putStream = function (
 
     return result;
 };
-
-/**
- * @param {string} resumeRecordFilePath
- * @returns {undefined | Object.<string, any>}
- */
-function getResumeRecordInfo (resumeRecordFilePath) {
-    // get resume record info
-    let result;
-    // read resumeRecordFile
-    if (resumeRecordFilePath) {
-        try {
-            const resumeRecords = fs.readFileSync(resumeRecordFilePath).toString();
-            result = JSON.parse(resumeRecords);
-        } catch (e) {
-            e.code !== 'ENOENT' && console.error(e);
-        }
-    }
-    return result;
-}
 
 /**
  * @param {Endpoint} upEndpoint
@@ -271,7 +277,7 @@ function putReq (
     }));
 
     // get resume record info
-    const blkputRets = getResumeRecordInfo(putExtra.resumeRecordFile);
+    const blkputRets = putExtra.resumeRecorder && putExtra.resumeRecorder.getSync(putExtra.resumeKey);
     const totalBlockNum = Math.ceil(rsStreamLen / putExtra.partSize);
 
     // select upload version
@@ -310,14 +316,13 @@ function putReq (
                     reject(err);
                     return;
                 }
-                if (info.statusCode === 200 && putExtra.resumeRecordFile) {
-                    try {
-                        fs.unlinkSync(putExtra.resumeRecordFile);
-                    } catch (_e) {
-                        // ignore
-                    }
+                if (info.statusCode === 200 && putExtra.resumeRecorder && putExtra.resumeKey) {
+                    putExtra.resumeRecorder.deleteSync(putExtra.resumeKey);
                 }
-                resolve(new ResponseWrapper({ data: ret, resp: info }));
+                resolve(new ResponseWrapper({
+                    data: ret,
+                    resp: info
+                }));
             }
         );
     });
@@ -428,11 +433,8 @@ function putReqV1 (sourceOptions, uploadOptions, callbackFunc) {
                         const blkputRet = respBody;
                         finishedCtxList.push(blkputRet.ctx);
                         finishedBlkPutRets.parts.push(blkputRet);
-                        if (putExtra.resumeRecordFile) {
-                            const contents = JSON.stringify(finishedBlkPutRets);
-                            fs.writeFileSync(putExtra.resumeRecordFile, contents, {
-                                encoding: 'utf-8'
-                            });
+                        if (putExtra.resumeRecorder && putExtra.resumeKey) {
+                            putExtra.resumeRecorder.setSync(putExtra.resumeKey, finishedBlkPutRets);
                         }
                         if (putExtra.progressCallback) {
                             try {
@@ -707,11 +709,8 @@ function resumeUploadV2 (
                             partNumber: partNumber
                         };
                         finishedEtags.etags.push(blockStatus);
-                        if (putExtra.resumeRecordFile) {
-                            const contents = JSON.stringify(finishedEtags);
-                            fs.writeFileSync(putExtra.resumeRecordFile, contents, {
-                                encoding: 'utf-8'
-                            });
+                        if (putExtra.resumeRecorder && putExtra.resumeKey) {
+                            putExtra.resumeRecorder.setSync(putExtra.resumeKey, finishedEtags);
                         }
                         if (putExtra.progressCallback) {
                             try {
@@ -839,19 +838,25 @@ ResumeUploader.prototype.putFile = function (
         putExtra.fname = path.basename(localFile);
     }
 
+    const akFromToken = util.getAKFromUptoken(uploadToken);
+    const bucketFromToken = util.getBucketFromUptoken(uploadToken);
     putExtra = getDefaultPutExtra(
         putExtra,
         {
-            key
+            accessKey: akFromToken,
+            bucketName: bucketFromToken,
+            key,
+            filePath: localFile
         }
     );
 
     const result = _getRegionsRetrier.call(this, {
-        bucketName: util.getBucketFromUptoken(uploadToken),
-        accessKey: util.getAKFromUptoken(uploadToken),
+        accessKey: akFromToken,
+        bucketName: bucketFromToken,
 
         uploadApiVersion: putExtra.version,
-        resumeRecordFilePath: putExtra.resumeRecordFile
+        resumeRecorder: putExtra.resumeRecorder,
+        resumeKey: putExtra.resumeKey
     })
         .then(retrier => Promise.all([
             retrier,
@@ -909,13 +914,17 @@ ResumeUploader.prototype.putFileWithoutKey = function (
 /**
  * @param {PutExtra} putExtra
  * @param {Object} options
+ * @param {string} [options.accessKey]
+ * @param {string} [options.bucketName]
  * @param {string | null} [options.key]
+ * @param {string} [options.filePath]
  * @returns {PutExtra}
  */
 function getDefaultPutExtra (putExtra, options) {
     options = options || {};
 
-    putExtra = putExtra || new PutExtra();
+    // assign to a new object to make the modification later
+    putExtra = Object.assign(new PutExtra(), putExtra);
     if (!putExtra.mimeType) {
         putExtra.mimeType = 'application/octet-stream';
     }
@@ -928,5 +937,161 @@ function getDefaultPutExtra (putExtra, options) {
         putExtra.version = 'v1';
     }
 
+    if (putExtra.resumeRecordFile) {
+        const parsedPath = path.parse(path.resolve(putExtra.resumeRecordFile));
+        putExtra.resumeRecorder = createResumeRecorderSync(parsedPath.dir);
+        putExtra.resumeKey = parsedPath.name;
+    }
+
+    // generate `resumeKey` if not exists
+    if (
+        putExtra.resumeRecorder &&
+        !putExtra.resumeKey &&
+        options.filePath &&
+        options.accessKey &&
+        options.bucketName
+    ) {
+        let fileLastModify;
+        try {
+            fileLastModify = options.filePath && fs.statSync(options.filePath).mtimeMs.toString();
+        } catch (_err) {
+            fileLastModify = '';
+        }
+        const recordValuesToHash = [
+            putExtra.version,
+            options.accessKey,
+            `${options.bucketName}:${options.key}`,
+            options.filePath,
+            fileLastModify
+        ];
+        putExtra.resumeKey = putExtra.resumeRecorder.generateKey(recordValuesToHash);
+    }
+
     return putExtra;
+}
+
+/**
+ * @class
+ * @param {string} baseDirPath
+ * @constructor
+ */
+function JsonFileRecorder (baseDirPath) {
+    this.baseDirPath = baseDirPath;
+}
+
+/**
+ * @param {string} key
+ * @param {Object.<string, any>} data
+ */
+JsonFileRecorder.prototype.setSync = function (key, data) {
+    const filePath = path.join(this.baseDirPath, key);
+    const contents = JSON.stringify(data);
+    fs.writeFileSync(
+        filePath,
+        contents,
+        {
+            encoding: 'utf-8',
+            mode: 0o600
+        }
+    );
+};
+
+/**
+ * @param key
+ * @returns {undefined | Object.<string, any>}
+ */
+JsonFileRecorder.prototype.getSync = function (key) {
+    const filePath = path.join(this.baseDirPath, key);
+    let result;
+    try {
+        const recordContent = fs.readFileSync(
+            filePath,
+            {
+                encoding: 'utf-8'
+            }
+        ).toString();
+        result = JSON.parse(recordContent);
+    } catch (_err) {
+        // pass
+    }
+    return result;
+};
+
+JsonFileRecorder.prototype.hasSync = function (key) {
+    const filePath = path.join(this.baseDirPath, key);
+    try {
+        return fs.existsSync(filePath);
+    } catch (_err) {
+        return false;
+    }
+};
+
+JsonFileRecorder.prototype.deleteSync = function (key) {
+    const filePath = path.join(this.baseDirPath, key);
+    try {
+        fs.unlinkSync(filePath);
+    } catch (_err) {
+        // pass
+    }
+};
+
+JsonFileRecorder.prototype.generateKey = function (fields) {
+    const h = crypto.createHash('sha1');
+    fields.forEach(v => {
+        h.update(v);
+    });
+    return `qn-resume-${h.digest('hex')}.json`;
+};
+
+function createResumeRecorder (baseDirPath) {
+    if (baseDirPath) {
+        // make baseDirPath absolute
+        baseDirPath = path.resolve(baseDirPath);
+    } else {
+        // set default baseDirPath to os temp
+        baseDirPath = os.tmpdir();
+    }
+    // with mkdirp on Windows the root-level ENOENT errors can lead to infinite regress
+    // remove the fs.access when instead mkdirp with the native option `recursive`
+    return new Promise((resolve, reject) => {
+        fs.access(
+            path.parse(baseDirPath).root,
+            fs.constants.R_OK | fs.constants.W_OK,
+            err => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve();
+            }
+        );
+    })
+        .then(() => new Promise((resolve, reject) => {
+            mkdirp(baseDirPath, { mode: 0o700 }, err => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve();
+            });
+        }))
+        .then(() => new JsonFileRecorder(baseDirPath));
+}
+
+function createResumeRecorderSync (baseDirPath) {
+    if (baseDirPath) {
+        // make baseDirPath absolute
+        baseDirPath = path.resolve(baseDirPath);
+    } else {
+        // set default baseDirPath to os temp
+        baseDirPath = os.tmpdir();
+    }
+    // with mkdirp on Windows the root-level ENOENT errors can lead to infinite regress
+    // remove the fs.access when instead mkdirp with the native option `recursive`
+    fs.accessSync(
+        path.parse(baseDirPath).root,
+        fs.constants.F_OK
+    );
+    mkdirp.sync(baseDirPath, { mode: 0o700 });
+    return new JsonFileRecorder(baseDirPath);
 }

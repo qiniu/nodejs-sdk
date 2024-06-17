@@ -380,3 +380,7 @@ exports.prepareZone = function (ctx, accessKey, bucket, callback) {
         });
     }
 };
+
+exports.writeOrCreateSync = function () {
+
+};
