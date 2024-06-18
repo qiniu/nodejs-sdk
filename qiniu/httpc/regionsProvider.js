@@ -694,6 +694,7 @@ const QueryRegionsProvider = (function () {
                     );
                 }
                 try {
+                    console.log('debug action: query regions request:\n---headers---\n', respWrapper.resp.headers, '\n---body---\n', respWrapper.data);
                     const hosts = respWrapper.data.hosts;
                     return hosts.map(data => getRegionFromQuery(data, {
                         preferredScheme: this.preferredScheme

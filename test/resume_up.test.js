@@ -545,7 +545,6 @@ describe('test resume up', function () {
                                 throw new Error('should resume');
                             }
                             if (!couldResume && uploaded / partSize > 1) {
-                                console.log('lihs debug:', { couldResume, uploaded });
                                 throw new Error('should not resume');
                             }
                         };

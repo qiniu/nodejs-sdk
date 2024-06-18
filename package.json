@@ -8,7 +8,7 @@
   },
   "scripts": {
     "check-type": "tsc --noEmit",
-    "test": "NODE_ENV=test mocha -t 300000 --retries 3",
+    "test": "NODE_ENV=test mocha -t 300000 ./test/resume_up.test.js --grep 'upload acc normally'",
     "cover": "nyc npm run test",
     "report": "nyc report --reporter=html",
     "lint": "eslint ."

@@ -270,6 +270,8 @@ function putReq (
     rsStreamLen,
     putExtra
 ) {
+    console.log('action debug: request endpoint', upEndpoint);
+
     // make block stream
     const blkStream = rsStream.pipe(new BlockStream({
         size: putExtra.partSize,
