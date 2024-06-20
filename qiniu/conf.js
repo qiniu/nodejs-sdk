@@ -64,7 +64,7 @@ const Config = (function () {
      * @constructor
      * @param {Object} [options]
      * @param {boolean} [options.useHttpsDomain]
-     * @param {boolean} [options.accelerateUploading] should active the domains before using
+     * @param {boolean} [options.accelerateUploading] enable accelerate uploading. should active the domains in portal before using
      * @param {EndpointsProvider} [options.ucEndpointsProvider]
      * @param {EndpointsProvider} [options.queryRegionsEndpointsProvider]
      * @param {RegionsProvider} [options.regionsProvider]

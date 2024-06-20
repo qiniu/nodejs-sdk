@@ -194,7 +194,7 @@ RegionsRetryPolicy.prototype._initRegions = function (options) {
         });
         context.alternativeRegions = regions;
     } else {
-        // preferred endpoints is a region, then reorder the regions and services
+        // preferred endpoints in a known region, then reorder the regions and services
         context.alternativeRegions = regions;
         [context.region] = context.alternativeRegions.splice(preferredRegionIndex, 1);
         context.alternativeServiceNames = this.serviceNames.slice();

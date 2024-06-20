@@ -283,6 +283,7 @@ Region.merge = function (...regions) {
     const [source, ...rest] = regions;
     const target = source.clone();
     rest.forEach(s => {
+    // use Object.values when min version of Node.js update to ≥ v7.5.0
         Object.keys(s.services).forEach(n => {
             if (!target.services[n]) {
                 target.services[n] = s.services[n].map(endpoint => endpoint.clone());
@@ -306,6 +307,7 @@ Region.prototype.getRegions = function () {
 };
 
 Region.prototype.clone = function () {
+    // use Object.entries when min version of Node.js update to ≥ v7.5.0
     const services = Object.keys(this.services).reduce((s, n) => {
         s[n] = this.services[n].map(endpoint => endpoint.clone());
         return s;
