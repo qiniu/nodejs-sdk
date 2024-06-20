@@ -477,20 +477,20 @@ export declare namespace resume_up {
     }
 
     /**
-     * 当前仅支持了同步调用这一不推荐的使用方式，暂不公开具体内部信息，仅供类型匹配使用
+     * 历史原因其方法当前仅支持了同步调用这一不推荐的使用方式，暂不公开具体内部信息，仅供 TypeScript 类型检查使用。
+     * 实际不存在这个类，未来会变更为 interface。
      */
     abstract class ResumeRecorder {
     }
 
     /**
      *
-     * @param baseDirPath 默认值为 `os.tmpdir()`
+     * @param baseDirPath 默认值为 `os.tmpdir()`，该方法若 baseDirPath 不存在将自动创建
      */
     function createResumeRecorder (baseDirPath?: string): Promise<ResumeRecorder>
 
     /**
-     * TODO: 是否公开这个不推荐的同步实现？
-     * `createResumeRecorder` 的同步版本
+     * `createResumeRecorder` 的同步版本，不推荐使用
      */
     function createResumeRecorderSync (baseDirPath?: string): ResumeRecorder
 }
@@ -700,17 +700,17 @@ export declare namespace httpc {
         middlewares?: middleware.Middleware[];
     }
 
-    interface GetOptions<T = any> extends ReqOpts<T> {
+    interface GetOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         params: Record<string, string>;
         headers: Record<string, string>;
     }
 
-    interface PostOptions<T = any> extends ReqOpts<T> {
+    interface PostOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         data: string | Buffer | Readable;
         headers: Record<string, string>;
     }
 
-    interface PutOptions<T = any> extends ReqOpts<T> {
+    interface PutOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         data: string | Buffer | Readable;
         headers: Record<string, string>
     }
@@ -721,9 +721,9 @@ export declare namespace httpc {
         middlewares: middleware.Middleware[];
         constructor(options: HttpClientOptions)
         sendRequest(requestOptions: ReqOpts): Promise<ResponseWrapper>
-        get(getOptions: GetOptions): Promise<ResponseWrapper>
-        post(postOptions: PostOptions): Promise<ResponseWrapper>
-        put(putOptions: PutOptions): Promise<ResponseWrapper>
+        get(getOptions: GetOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+        post(postOptions: PostOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+        put(putOptions: PutOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
     }
 
     // endpoint.js
@@ -1353,6 +1353,7 @@ export declare namespace rs {
          * @param callbackFunc
          */
         listBucket(callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
+        listBucket(options: { shared: string, tagCondition: Record<string, string> }, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
 
         /**
          * 创建空间
