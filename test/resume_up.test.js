@@ -509,21 +509,39 @@ describe('test resume up', function () {
                     putExtra.partSize = partSize;
                 }
 
-                const filepath = path.join(os.tmpdir(), key);
-                const result = createRandomFile(filepath, fileSizeMB * (1 << 20))
+                let upHosts = [];
+                const filePath = path.join(os.tmpdir(), key);
+                const result = createRandomFile(filePath, fileSizeMB * (1 << 20))
+                    // mock file
                     .then(() => {
                         // add to auto clean file
-                        filepathListToDelete.push(filepath);
+                        filepathListToDelete.push(filePath);
                         filepathListToDelete.push(putExtra.resumeRecordFile);
 
                         // upload and abort
                         putExtra.progressCallback = (_uploaded, _total) => {
                             throw new Error('mocked error');
                         };
+                    })
+                    // get up hosts for generating resume key later
+                    .then(() => resumeUploader.config.getRegionsProvider({
+                        accessKey: accessKey,
+                        bucketName: bucketName
+                    }))
+                    .then(regionsProvider => regionsProvider.getRegions())
+                    .then(regions => {
+                        const serviceName = resumeUploader.config.accelerateUploading
+                            ? SERVICE_NAME.UP_ACC
+                            : SERVICE_NAME.UP;
+                        upHosts = regions[0].services[serviceName].map(e => e.host);
+                    })
+                    // get up hosts end
+                    // mock upload failed
+                    .then(() => {
                         return resumeUploader.putFile(
                             uploadToken,
                             key,
-                            filepath,
+                            filePath,
                             putExtra
                         )
                             .catch(err => {
@@ -532,8 +550,8 @@ describe('test resume up', function () {
                                 }
                             });
                     })
+                    // try to upload from resume point
                     .then(() => {
-                        // try to upload from resume point
                         const couldResume = Boolean(putExtra.resumeRecordFile || putExtra.resumeRecorder);
                         let isFirstPart = true;
                         putExtra.progressCallback = (uploaded, _total) => {
@@ -545,7 +563,6 @@ describe('test resume up', function () {
                                 throw new Error('should resume');
                             }
                             if (!couldResume && uploaded / partSize > 1) {
-                                console.log('lihs debug:', { couldResume, uploaded });
                                 throw new Error('should not resume');
                             }
                         };
@@ -553,7 +570,7 @@ describe('test resume up', function () {
                             resumeUploader.putFile(
                                 uploadToken,
                                 key,
-                                filepath,
+                                filePath,
                                 putExtra,
                                 callback
                             )
@@ -574,20 +591,15 @@ describe('test resume up', function () {
                             ));
                         } else {
                             should.exist(putExtra.resumeRecorder);
-                            let fileLastModify;
-                            try {
-                                fileLastModify = filepath && fs.statSync(filepath).mtimeMs.toString();
-                            } catch (_err) {
-                                fileLastModify = '';
-                            }
-                            const recordValuesToHash = [
-                                putExtra.version,
+                            const expectResumeKey = putExtra.resumeRecorder.generateKeySync({
+                                hosts: upHosts,
                                 accessKey,
-                                `${bucketName}:${key}`,
-                                filepath,
-                                fileLastModify
-                            ];
-                            const expectResumeKey = putExtra.resumeRecorder.generateKey(recordValuesToHash);
+                                bucketName,
+                                key,
+                                filePath,
+                                version: version || 'v1',
+                                partSize: partSize || qiniu.conf.BLOCK_SIZE
+                            });
                             should.ok(!fs.existsSync(
                                 path.join(
                                     resumeRecorderOption.baseDirPath,

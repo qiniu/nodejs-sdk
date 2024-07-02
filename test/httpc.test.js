@@ -617,7 +617,7 @@ describe('test http module', function () {
                         return Promise.all(endpointsProviders.map(e => e.getEndpoints()));
                     })
                     .then(regionsEndpoints => {
-                        // use `Array.prototype.flat` if migrate to node v11.15
+                        // use `Array.prototype.flat` when min version of Node.js update to ≥ v11.15
                         const regionsEndpointValues = regionsEndpoints.map(
                             endpoints =>
                                 endpoints.map(e => e.getValue())
