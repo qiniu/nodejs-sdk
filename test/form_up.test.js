@@ -7,6 +7,12 @@ const fs = require('fs');
 const qiniu = require('../index.js');
 
 const {
+    Endpoint,
+    Region,
+    SERVICE_NAME
+} = qiniu.httpc;
+
+const {
     getEnvConfig,
     checkEnvConfigAndExit,
     createRandomFile,
@@ -60,6 +66,10 @@ describe('test form up', function () {
     // delete all the files uploaded
     const keysToDelete = [];
     after(function () {
+        if (!keysToDelete.length) {
+            return;
+        }
+
         const deleteOps = keysToDelete.map(k =>
             qiniu.rs.deleteOp(bucketName, k)
         );
@@ -435,6 +445,112 @@ describe('test form up', function () {
                 .then(checkFunc)
                 .then(() => {
                     keysToDelete.push(key);
+                });
+        });
+    });
+
+    describe('test form up#accelerateUploading', function () {
+        const accConfig = new qiniu.conf.Config();
+        accConfig.useHttpsDomain = true;
+        accConfig.accelerateUploading = true;
+        const bucketNameWithoutAcc = 'bucket-without-acc-' + Math.floor(Math.random() * 100000);
+        const accPutPolicy = new qiniu.rs.PutPolicy({
+            scope: bucketNameWithoutAcc
+        });
+        const accUploadToken = accPutPolicy.uploadToken(mac);
+        const accFormUploader = new qiniu.form_up.FormUploader(accConfig);
+        const accKeysToDelete = [];
+
+        before(function () {
+            return bucketManager.createBucket(bucketNameWithoutAcc);
+        });
+
+        after(function () {
+            if (!accKeysToDelete.length) {
+                return;
+            }
+            return bucketManager.batch(accKeysToDelete.map(k => qiniu.rs.deleteOp(bucketNameWithoutAcc, k)))
+                .then(({ data, resp }) => {
+                    if (!Array.isArray(data)) {
+                        console.log(resp);
+                    }
+                    return bucketManager.deleteBucket(bucketNameWithoutAcc);
+                });
+        });
+
+        it('upload acc normally', function () {
+            const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+            const promises = doAndWrapResultPromises(callback =>
+                accFormUploader.putFile(uploadToken, key, testFilePath2, putExtra, callback)
+            );
+
+            const checkFunc = ({ data, resp }) => {
+                const isAccelerateUploading = (resp.requestUrls || []).some(url => url.includes('kodo-accelerate'));
+                should.ok(isAccelerateUploading, `should using acc host, but requestUrls: ${JSON.stringify(resp.requestUrls)}`);
+                data.should.have.keys('key', 'hash');
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc)
+                .then(() => {
+                    keysToDelete.push(key);
+                });
+        });
+
+        it('upload acc unavailable fallback to src', function () {
+            const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+            const r1 = Region.fromRegionId('z0');
+            r1.services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint(`${bucketNameWithoutAcc}.kodo-accelerate.cn-east-1.qiniucs.com`),
+                new Endpoint('qn-up-acc.fake.qiniu.com')
+            ];
+            accConfig.regionsProvider = r1;
+
+            const promises = doAndWrapResultPromises(callback =>
+                accFormUploader.putFile(accUploadToken, key, testFilePath2, putExtra, callback)
+            );
+
+            const checkFunc = ({ data }) => {
+                data.should.have.keys('key', 'hash');
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc)
+                .then(() => {
+                    accKeysToDelete.push(key);
+                });
+        });
+
+        it('upload acc network error fallback to src', function () {
+            const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+            const r1 = Region.fromRegionId('z0');
+            r1.services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint('qiniu-acc.fake.qiniu.com'),
+                new Endpoint('qn-up-acc.fake.qiniu.com')
+            ];
+            accConfig.regionsProvider = r1;
+
+            const promises = doAndWrapResultPromises(callback =>
+                accFormUploader.putFile(accUploadToken, key, testFilePath2, putExtra)
+            );
+
+            const checkFunc = ({ data }) => {
+                data.should.have.keys('key', 'hash');
+            };
+
+            return promises.native
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc)
+                .then(() => {
+                    accKeysToDelete.push(key);
                 });
         });
     });

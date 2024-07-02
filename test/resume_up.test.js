@@ -7,6 +7,13 @@ const crypto = require('crypto');
 const http = require('http');
 
 const qiniu = require('../index.js');
+
+const {
+    Endpoint,
+    Region,
+    SERVICE_NAME
+} = qiniu.httpc;
+
 const {
     getEnvConfig,
     checkEnvConfigAndExit,
@@ -15,6 +22,7 @@ const {
     doAndWrapResultPromises,
     parametrize
 } = require('./conftest');
+const { createResumeRecorderSync } = require('../qiniu/storage/resume');
 
 const testFilePath = path.join(os.tmpdir(), 'nodejs-sdk-test.bin');
 
@@ -100,13 +108,13 @@ describe('test resume up', function () {
 
     const keysToDelete = [];
     after(function () {
+        if (!keysToDelete.length) {
+            return;
+        }
+
         const deleteOps = keysToDelete.map(k =>
             qiniu.rs.deleteOp(bucketName, k)
         );
-
-        if (!deleteOps.length) {
-            return;
-        }
 
         return bucketManager.batch(deleteOps)
             .then(({ data, resp }) => {
@@ -124,6 +132,7 @@ describe('test resume up', function () {
         scope: bucketName
     };
     const putPolicy = new qiniu.rs.PutPolicy(options);
+    putPolicy.expires = 7200;
     putPolicy.returnBody = '{"key":$(key),"hash":$(etag),"fname":$(fname),"var_1":$(x:var_1),"var_2":$(x:var_2)}';
     const uploadToken = putPolicy.uploadToken(mac);
     const resumeUploader = new qiniu.resume_up.ResumeUploader(config);
@@ -380,7 +389,7 @@ describe('test resume up', function () {
     });
 
     describe('test resume up#putFile resume', function () {
-        const testParams = parametrize(
+        const testResumeParams = parametrize(
             {
                 name: 'version',
                 values: [
@@ -399,28 +408,72 @@ describe('test resume up', function () {
             {
                 name: 'fileSizeMB',
                 values: [2, 4, 6, 10]
+            },
+            {
+                name: 'resumeRecorderOption',
+                values: [
+                    {
+                        baseDirPath: path.join(os.tmpdir(), 'SDKCustomDir'),
+                        resumeKey: undefined
+                    },
+                    {
+                        baseDirPath: path.join(os.tmpdir(), 'SDKCustomDir'),
+                        resumeKey: 'some-resume-key.json'
+                    }
+                ]
             }
-        );
+        )
+            .concat(parametrize(
+                {
+                    name: 'version',
+                    values: [
+                        undefined,
+                        'v1',
+                        'v2'
+                    ]
+                },
+                {
+                    name: 'partSize',
+                    values: [
+                        undefined,
+                        6 * 1024 * 1024
+                    ]
+                },
+                {
+                    name: 'fileSizeMB',
+                    values: [2, 4, 6, 10]
+                },
+                {
+                    name: 'resumeRecordFile',
+                    values: [
+                        path.join(os.tmpdir(), 'some-resume-record-file.json')
+                    ]
+                }
+            ));
 
         const filepathListToDelete = [];
         after(function () {
             return Promise.all(
-                filepathListToDelete.map(p => new Promise(resolve => {
-                    fs.unlink(p, err => {
-                        if (err && err.code !== 'ENOENT') {
-                            console.log(`unlink ${p} failed`, err);
-                        }
-                        resolve();
-                    });
-                }))
+                filepathListToDelete
+                    .filter(p => p)
+                    .map(p => new Promise(resolve => {
+                        fs.unlink(p, err => {
+                            if (err && err.code !== 'ENOENT') {
+                                console.log(`unlink ${p} failed`, err);
+                            }
+                            resolve();
+                        });
+                    }))
             );
         });
 
-        testParams.forEach(testParam => {
+        testResumeParams.forEach(testParam => {
             const {
                 version,
                 partSize,
-                fileSizeMB
+                fileSizeMB,
+                resumeRecorderOption,
+                resumeRecordFile
             } = testParam;
             const msg = `params(${JSON.stringify(testParam)})`;
 
@@ -439,7 +492,16 @@ describe('test resume up', function () {
                 const key = 'storage_putStream_resume_test' + Math.floor(Math.random() * 100000);
 
                 const putExtra = new qiniu.resume_up.PutExtra();
-                putExtra.resumeRecordFile = path.join(os.tmpdir(), key + '.resume.json');
+
+                if (resumeRecordFile) {
+                    putExtra.resumeRecordFile = resumeRecordFile;
+                }
+
+                if (resumeRecorderOption) {
+                    putExtra.resumeRecorder = createResumeRecorderSync(resumeRecorderOption.baseDirPath);
+                    putExtra.resumeKey = resumeRecorderOption.resumeKey;
+                }
+
                 if (version !== undefined) {
                     putExtra.version = version;
                 }
@@ -447,21 +509,39 @@ describe('test resume up', function () {
                     putExtra.partSize = partSize;
                 }
 
-                const filepath = path.join(os.tmpdir(), key);
-                const result = createRandomFile(filepath, fileSizeMB * (1 << 20))
+                let upHosts = [];
+                const filePath = path.join(os.tmpdir(), key);
+                const result = createRandomFile(filePath, fileSizeMB * (1 << 20))
+                    // mock file
                     .then(() => {
                         // add to auto clean file
-                        filepathListToDelete.push(filepath);
+                        filepathListToDelete.push(filePath);
                         filepathListToDelete.push(putExtra.resumeRecordFile);
 
                         // upload and abort
                         putExtra.progressCallback = (_uploaded, _total) => {
                             throw new Error('mocked error');
                         };
+                    })
+                    // get up hosts for generating resume key later
+                    .then(() => resumeUploader.config.getRegionsProvider({
+                        accessKey: accessKey,
+                        bucketName: bucketName
+                    }))
+                    .then(regionsProvider => regionsProvider.getRegions())
+                    .then(regions => {
+                        const serviceName = resumeUploader.config.accelerateUploading
+                            ? SERVICE_NAME.UP_ACC
+                            : SERVICE_NAME.UP;
+                        upHosts = regions[0].services[serviceName].map(e => e.host);
+                    })
+                    // get up hosts end
+                    // mock upload failed
+                    .then(() => {
                         return resumeUploader.putFile(
                             uploadToken,
                             key,
-                            filepath,
+                            filePath,
                             putExtra
                         )
                             .catch(err => {
@@ -470,18 +550,27 @@ describe('test resume up', function () {
                                 }
                             });
                     })
+                    // try to upload from resume point
                     .then(() => {
-                        // try to upload from resume point
+                        const couldResume = Boolean(putExtra.resumeRecordFile || putExtra.resumeRecorder);
+                        let isFirstPart = true;
                         putExtra.progressCallback = (uploaded, _total) => {
-                            if (uploaded / partSize <= 1) {
-                                throw new Error('not resumed');
+                            if (!isFirstPart) {
+                                return;
+                            }
+                            isFirstPart = false;
+                            if (couldResume && uploaded / partSize <= 1) {
+                                throw new Error('should resume');
+                            }
+                            if (!couldResume && uploaded / partSize > 1) {
+                                throw new Error('should not resume');
                             }
                         };
                         return doAndWrapResultPromises(callback =>
                             resumeUploader.putFile(
                                 uploadToken,
                                 key,
-                                filepath,
+                                filePath,
                                 putExtra,
                                 callback
                             )
@@ -490,6 +579,35 @@ describe('test resume up', function () {
 
                 const checkFunc = ({ data }) => {
                     data.should.have.keys('key', 'hash');
+                    if (resumeRecordFile) {
+                        should.ok(!fs.existsSync(putExtra.resumeRecordFile));
+                    } else if (resumeRecorderOption) {
+                        if (resumeRecorderOption.resumeKey) {
+                            should.ok(!fs.existsSync(
+                                path.join(
+                                    resumeRecorderOption.baseDirPath,
+                                    resumeRecorderOption.resumeKey
+                                )
+                            ));
+                        } else {
+                            should.exist(putExtra.resumeRecorder);
+                            const expectResumeKey = putExtra.resumeRecorder.generateKeySync({
+                                hosts: upHosts,
+                                accessKey,
+                                bucketName,
+                                key,
+                                filePath,
+                                version: version || 'v1',
+                                partSize: partSize || qiniu.conf.BLOCK_SIZE
+                            });
+                            should.ok(!fs.existsSync(
+                                path.join(
+                                    resumeRecorderOption.baseDirPath,
+                                    expectResumeKey
+                                )
+                            ));
+                        }
+                    }
                 };
 
                 let promises = null;
@@ -503,6 +621,151 @@ describe('test resume up', function () {
                     .then(checkFunc)
                     .then(() => {
                         keysToDelete.push(key);
+                    });
+            });
+        });
+    });
+
+    describe('test resume up#accelerateUploading', function () {
+        let accConfig = new qiniu.conf.Config();
+        accConfig.useHttpsDomain = true;
+        accConfig.accelerateUploading = true;
+        let accResumeUploader = new qiniu.resume_up.ResumeUploader(accConfig);
+        const bucketNameWithoutAcc = 'bucket-without-acc-' + Math.floor(Math.random() * 100000);
+        const accKeysToDelete = [];
+        const accPutPolicy = new qiniu.rs.PutPolicy({
+            scope: bucketNameWithoutAcc,
+            expires: 7200
+        });
+        const accUploadToken = accPutPolicy.uploadToken(mac);
+
+        before(function () {
+            return bucketManager.createBucket(bucketNameWithoutAcc);
+        });
+
+        beforeEach(function () {
+            accConfig = new qiniu.conf.Config();
+            accConfig.useHttpsDomain = true;
+            accConfig.accelerateUploading = true;
+            accResumeUploader = new qiniu.resume_up.ResumeUploader(accConfig);
+        });
+
+        after(function () {
+            if (!accKeysToDelete.length) {
+                return bucketManager.deleteBucket(bucketNameWithoutAcc);
+            }
+            return bucketManager.batch(accKeysToDelete.map(k => qiniu.rs.deleteOp(bucketNameWithoutAcc, k)))
+                .then(({ data, resp }) => {
+                    if (!Array.isArray(data)) {
+                        console.log(resp);
+                    }
+                    return bucketManager.deleteBucket(bucketNameWithoutAcc);
+                });
+        });
+
+        testParams.forEach(function (testParam) {
+            const {
+                version,
+                partSize,
+                mimeType
+            } = testParam;
+            const msg = `params(${JSON.stringify(testParam)})`;
+
+            // default is v1. v1 not support setting part size, skipping.
+            if (
+                (
+                    version === undefined ||
+                    version === 'v1'
+                ) &&
+                partSize !== undefined
+            ) {
+                return;
+            }
+
+            const putExtra = new qiniu.resume_up.PutExtra();
+            if (version !== undefined) {
+                putExtra.version = version;
+            }
+            if (partSize !== undefined) {
+                putExtra.partSize = partSize;
+            }
+            if (mimeType !== undefined) {
+                putExtra.mimeType = mimeType;
+            }
+
+            it(`upload acc normally; ${msg}`, function () {
+                const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+                const promises = doAndWrapResultPromises(callback =>
+                    accResumeUploader.putFile(uploadToken, key, testFilePath, putExtra, callback)
+                );
+
+                const checkFunc = ({ data, resp }) => {
+                    const isAccelerateUploading = (resp.requestUrls || []).some(url => url.includes('kodo-accelerate'));
+                    should.ok(isAccelerateUploading, `should using acc host, but requestUrls: ${JSON.stringify(resp.requestUrls)}`);
+                    data.should.have.keys('key', 'hash');
+                };
+
+                return promises.callback
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc)
+                    .then(() => {
+                        keysToDelete.push(key);
+                    });
+            });
+
+            it(`upload acc unavailable fallback to src; ${msg}`, function () {
+                const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+                const r1 = Region.fromRegionId('z0');
+                r1.services[SERVICE_NAME.UP_ACC] = [
+                    new Endpoint(`${bucketNameWithoutAcc}.kodo-accelerate.cn-east-1.qiniucs.com`),
+                    new Endpoint('qn-up-acc.fake.qiniu.com')
+                ];
+                accConfig.regionsProvider = r1;
+
+                const promises = doAndWrapResultPromises(callback =>
+                    accResumeUploader.putFile(accUploadToken, key, testFilePath, putExtra, callback)
+                );
+
+                const checkFunc = ({ data }) => {
+                    data.should.have.keys('key', 'hash');
+                };
+
+                return promises.callback
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc)
+                    .then(() => {
+                        accKeysToDelete.push(key);
+                    });
+            });
+
+            it(`upload acc network error fallback to src; ${msg}`, function () {
+                const key = 'storage_putFile_acc_test' + Math.floor(Math.random() * 100000);
+
+                const r1 = Region.fromRegionId('z0');
+                r1.services[SERVICE_NAME.UP_ACC] = [
+                    new Endpoint('qiniu-acc.fake.qiniu.com'),
+                    new Endpoint('qn-up-acc.fake.qiniu.com')
+                ];
+                accConfig.regionsProvider = r1;
+
+                const promises = doAndWrapResultPromises(callback =>
+                    accResumeUploader.putFile(accUploadToken, key, testFilePath, putExtra)
+                );
+
+                const checkFunc = ({ data }) => {
+                    data.should.have.keys('key', 'hash');
+                };
+
+                return promises.native
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc)
+                    .then(() => {
+                        accKeysToDelete.push(key);
                     });
             });
         });

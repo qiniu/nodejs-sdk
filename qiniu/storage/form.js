@@ -14,7 +14,10 @@ const { ResponseWrapper } = require('../httpc/responseWrapper');
 const { EndpointsRetryPolicy } = require('../httpc/endpointsRetryPolicy');
 const { RegionsRetryPolicy } = require('../httpc/regionsRetryPolicy');
 const { Retrier } = require('../retry');
-const { wrapTryCallback } = require('./internal');
+const {
+    AccUnavailableRetryPolicy,
+    handleReqCallback
+} = require('./internal');
 
 exports.FormUploader = FormUploader;
 exports.PutExtra = PutExtra;
@@ -48,19 +51,41 @@ function _getRegionsRetrier (options) {
         accessKey
     })
         .then(regionsProvider => {
-            const retryPolicies = [
-                new EndpointsRetryPolicy({
-                    skipInitContext: true
-                }),
-                new RegionsRetryPolicy({
-                    regionsProvider,
-                    serviceName: SERVICE_NAME.UP
-                })
-            ];
+            let retryPolicies;
+            if (this.config.accelerateUploading) {
+                retryPolicies = [
+                    new AccUnavailableRetryPolicy(),
+                    new EndpointsRetryPolicy({
+                        skipInitContext: true
+                    }),
+                    new RegionsRetryPolicy({
+                        regionsProvider,
+                        serviceNames: [SERVICE_NAME.UP_ACC, SERVICE_NAME.UP]
+                    })
+                ];
+            } else {
+                retryPolicies = [
+                    new EndpointsRetryPolicy({
+                        skipInitContext: true
+                    }),
+                    new RegionsRetryPolicy({
+                        regionsProvider,
+                        serviceNames: [SERVICE_NAME.UP]
+                    })
+                ];
+            }
 
             return new Retrier({
                 retryPolicies,
-                onBeforeRetry: context => retryable && context.result.needRetry()
+                onBeforeRetry: (context, policy) => {
+                    if (context.error) {
+                        return retryable;
+                    }
+                    if (policy instanceof AccUnavailableRetryPolicy) {
+                        return true;
+                    }
+                    return retryable && context.result && context.result.needRetry();
+                }
             });
         });
 };
@@ -101,18 +126,12 @@ function PutExtra (
  */
 
 /**
- * @typedef UploadResult
- * @property {any} data
- * @property {http.IncomingMessage} resp
- */
-
-/**
  * @param {string} uploadToken
  * @param {string | null} key
  * @param {stream.Readable} fsStream
  * @param {PutExtra | null} putExtra
  * @param {reqCallback} callbackFunc
- * @returns {Promise<UploadResult>}
+ * @returns {Promise<ResponseWrapper>}
  */
 FormUploader.prototype.putStream = function (
     uploadToken,
@@ -134,7 +153,7 @@ FormUploader.prototype.putStream = function (
     // Why need retrier even if retryable is false?
     // Because the retrier is used to get the endpoints,
     // which will be initialed by region policy.
-    return _getRegionsRetrier.call(this, {
+    const result = _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken),
         retryable: false
@@ -149,11 +168,12 @@ FormUploader.prototype.putStream = function (
                 uploadToken,
                 key,
                 fsStream,
-                putExtra,
-                callbackFunc
+                putExtra
             ),
             context
         }));
+    handleReqCallback(result, callbackFunc);
+    return result;
 };
 
 /**
@@ -162,15 +182,14 @@ FormUploader.prototype.putStream = function (
  * @param {string} key
  * @param {Readable} fsStream
  * @param {PutExtra} putExtra
- * @param {reqCallback} callbackFunc
+ * @returns {Promise<any>}
  */
 function putReq (
     upDomain,
     uploadToken,
     key,
     fsStream,
-    putExtra,
-    callbackFunc
+    putExtra
 ) {
     const postForm = createMultipartForm(
         uploadToken,
@@ -178,7 +197,6 @@ function putReq (
         fsStream,
         putExtra
     );
-    const wrappedCallback = wrapTryCallback(callbackFunc);
     return new Promise((resolve, reject) => {
         rpc.postMultipart(
             upDomain,
@@ -187,14 +205,12 @@ function putReq (
                 if (err) {
                     err.resp = resp;
                     reject(err);
-                    wrappedCallback(err, data, resp);
                     return;
                 }
                 resolve(new ResponseWrapper({
                     data,
                     resp
                 }));
-                wrappedCallback(err, data, resp);
             }
         );
     });
@@ -226,12 +242,8 @@ FormUploader.prototype.put = function (
         }
     );
 
-    const fsStream = new Readable();
-    fsStream.push(body);
-    fsStream.push(null);
-
     // initial retrier and try upload
-    return _getRegionsRetrier.call(this, {
+    const result = _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
     })
@@ -250,12 +262,13 @@ FormUploader.prototype.put = function (
                     uploadToken,
                     key,
                     fsStream,
-                    putExtra,
-                    callbackFunc
+                    putExtra
                 );
             },
             context
         }));
+    handleReqCallback(result, callbackFunc);
+    return result;
 };
 
 /**
@@ -338,7 +351,7 @@ function createMultipartForm (uploadToken, key, fsStream, putExtra) {
  * @param {string | null} key 目标文件名
  * @param {string} localFile 本地文件路径
  * @param {PutExtra | null} putExtra 额外选项
- * @param callbackFunc 回调函数
+ * @param {reqCallback} [callbackFunc] 回调函数
  * @returns {Promise<UploadResult>}
  */
 FormUploader.prototype.putFile = function (
@@ -368,7 +381,7 @@ FormUploader.prototype.putFile = function (
     );
 
     // initial retrier and try upload
-    return _getRegionsRetrier.call(this, {
+    const result = _getRegionsRetrier.call(this, {
         bucketName: util.getBucketFromUptoken(uploadToken),
         accessKey: util.getAKFromUptoken(uploadToken)
     })
@@ -379,18 +392,18 @@ FormUploader.prototype.putFile = function (
         .then(([retrier, context]) => retrier.retry({
             func: context => {
                 const fsStream = fs.createReadStream(localFile);
-
                 return putReq(
                     context.endpoint.getValue({ scheme: preferredScheme }),
                     uploadToken,
                     key,
                     fsStream,
-                    putExtra,
-                    callbackFunc
+                    putExtra
                 );
             },
             context
         }));
+    handleReqCallback(result, callbackFunc);
+    return result;
 };
 
 /** 上传本地文件

@@ -427,7 +427,7 @@ describe('test start bucket manager', function () {
         });
     });
 
-    describe('test listBucket', function () {
+    describe('test listBuckets', function () {
         it('test listBucket', function () {
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.listBucket(callback)
@@ -443,6 +443,64 @@ describe('test start bucket manager', function () {
                 .then(() => promises.native)
                 .then(checkFunc);
         });
+
+        it('test listBucket shared', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.listBucket(
+                    {
+                        shared: 'rd'
+                    },
+                    callback
+                )
+            );
+
+            const checkFunc = ({ data, resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                data.should.containEql(bucketName);
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        const testParams4TagCondition = [
+            {
+                sdk: 'nodejs'
+            },
+            {
+                sdk: '',
+                lang: null
+            },
+            {
+                sdk: 'nodejs',
+                lang: 'javascript'
+            }
+        ];
+
+        testParams4TagCondition.forEach(cond => {
+            it(`test listBucket tagCondition(${JSON.stringify(cond)})`, function () {
+                const promises = doAndWrapResultPromises(callback =>
+                    bucketManager.listBucket(
+                        {
+                            tagCondition: cond
+                        },
+                        callback
+                    )
+                );
+
+                const checkFunc = ({ data, resp }) => {
+                    should.equal(resp.statusCode, 200, JSON.stringify(resp));
+                    data.should.containEql(bucketName);
+                };
+
+                return promises.callback
+                    .then(checkFunc)
+                    .then(() => promises.native)
+                    .then(checkFunc);
+            });
+        });
     });
 
     describe('test bucketInfo', function () {
@@ -452,6 +510,54 @@ describe('test start bucket manager', function () {
             );
 
             const checkFunc = ({ resp }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+    });
+
+    describe('test createBucket and deleteBucket', function () {
+        const targetBucketName = bucketName + 'creating' + Math.floor(Math.random() * 100000);
+        it('test createBucket', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.createBucket(
+                    targetBucketName,
+                    {
+                        regionId: 'z0'
+                    },
+                    callback
+                )
+            );
+
+            const checkFunc = ({
+                _,
+                resp
+            }) => {
+                should.equal(resp.statusCode, 200, JSON.stringify(resp));
+            };
+
+            return promises.callback
+                .then(checkFunc)
+                .then(() => promises.native)
+                .then(checkFunc);
+        });
+
+        it('test deleteBucket', function () {
+            const promises = doAndWrapResultPromises(callback =>
+                bucketManager.deleteBucket(
+                    targetBucketName,
+                    callback
+                )
+            );
+
+            const checkFunc = ({
+                _,
+                resp
+            }) => {
                 should.equal(resp.statusCode, 200, JSON.stringify(resp));
             };
 
@@ -736,14 +842,22 @@ describe('test start bucket manager', function () {
     });
 
     describe('test events', function () {
+        const bucketName4Test = 'event-test-bucket' + Math.floor(Math.random() * 100000);
         const eventName = 'event_test' + Math.floor(Math.random() * 100000);
 
         before(function () {
-            return bucketManager.deleteBucketEvent(
-                bucketName,
-                eventName
-            )
-                .catch(() => {});
+            return bucketManager.createBucket(
+                bucketName4Test,
+                {
+                    regionId: 'z0'
+                }
+            );
+        });
+
+        after(function () {
+            return bucketManager.deleteBucket(
+                bucketName4Test
+            );
         });
 
         it('test addEvents', function () {
@@ -755,7 +869,7 @@ describe('test start bucket manager', function () {
 
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.putBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     options,
                     callback
                 )
@@ -780,7 +894,7 @@ describe('test start bucket manager', function () {
 
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.updateBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     options,
                     callback
                 )
@@ -799,7 +913,7 @@ describe('test start bucket manager', function () {
         it('test getEvents', function () {
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.getBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     callback
                 )
             );
@@ -817,7 +931,7 @@ describe('test start bucket manager', function () {
         it('test deleteEvents', function () {
             const promises = doAndWrapResultPromises(callback =>
                 bucketManager.deleteBucketEvent(
-                    bucketName,
+                    bucketName4Test,
                     eventName,
                     callback
                 )
