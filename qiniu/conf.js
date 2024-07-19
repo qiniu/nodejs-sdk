@@ -44,11 +44,13 @@ Object.defineProperty(exports, 'QUERY_REGION_HOST', {
         QUERY_REGION_BACKUP_HOSTS = [];
     }
 });
-let UC_HOST = 'uc.qbox.me';
+let UC_BACKUP_HOSTS = QUERY_REGION_BACKUP_HOSTS.slice();
+let UC_HOST = QUERY_REGION_HOST;
 Object.defineProperty(exports, 'UC_HOST', {
     get: () => UC_HOST,
     set: v => {
         UC_HOST = v;
+        UC_BACKUP_HOSTS = [];
         QUERY_REGION_HOST = v;
         QUERY_REGION_BACKUP_HOSTS = [];
     }
@@ -108,11 +110,10 @@ const Config = (function () {
             return this.ucEndpointsProvider;
         }
 
-        return new Endpoint(
-            UC_HOST,
-            {
+        return new StaticEndpointsProvider(
+            [UC_HOST].concat(UC_BACKUP_HOSTS).map(h => new Endpoint(h, {
                 defaultScheme: this.useHttpsDomain ? 'https' : 'http'
-            }
+            }))
         );
     };
 
