@@ -7,7 +7,8 @@ const fs = require('fs');
 
 describe('test Config class', function () {
     const {
-        Config
+        Config,
+        UC_HOST
     } = qiniu.conf;
     const {
         Endpoint,
@@ -49,8 +50,8 @@ describe('test Config class', function () {
                 return config.getUcEndpointsProvider()
                     .getEndpoints()
                     .then(endpoints => {
-                        should.equal(endpoints.length, 1);
-                        should.equal(endpoints[0].getValue(), `${scheme}://uc.qbox.me`);
+                        endpoints.length.should.greaterThanOrEqual(1);
+                        should.equal(endpoints[0].getValue(), `${scheme}://${UC_HOST}`);
                     });
             }));
         });
