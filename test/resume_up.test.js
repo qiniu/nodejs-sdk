@@ -509,19 +509,13 @@ describe('test resume up', function () {
                     putExtra.partSize = partSize;
                 }
 
-                let upHosts = [];
+                let recordPersistPath = '';
                 const filePath = path.join(os.tmpdir(), key);
                 const result = createRandomFile(filePath, fileSizeMB * (1 << 20))
                     // mock file
                     .then(() => {
                         // add to auto clean file
                         filepathListToDelete.push(filePath);
-                        filepathListToDelete.push(putExtra.resumeRecordFile);
-
-                        // upload and abort
-                        putExtra.progressCallback = (_uploaded, _total) => {
-                            throw new Error('mocked error');
-                        };
                     })
                     // get up hosts for generating resume key later
                     .then(() => resumeUploader.config.getRegionsProvider({
@@ -530,14 +524,49 @@ describe('test resume up', function () {
                     }))
                     .then(regionsProvider => regionsProvider.getRegions())
                     .then(regions => {
-                        const serviceName = resumeUploader.config.accelerateUploading
-                            ? SERVICE_NAME.UP_ACC
-                            : SERVICE_NAME.UP;
-                        upHosts = regions[0].services[serviceName].map(e => e.host);
+                        /** @type {string[]} */
+                        const upAccEndpoints = regions[0].services[SERVICE_NAME.UP_ACC] || [];
+                        const upEndpoints = regions[0].services[SERVICE_NAME.UP] || [];
+                        const upHosts = upAccEndpoints.concat(upEndpoints).map(e => e.host);
+                        return Promise.resolve(upHosts);
                     })
                     // get up hosts end
+                    // get record file path
+                    .then(upHosts => {
+                        if (resumeRecordFile) {
+                            recordPersistPath = putExtra.resumeRecordFile;
+                        } else if (resumeRecorderOption) {
+                            if (resumeRecorderOption.resumeKey) {
+                                recordPersistPath = path.join(
+                                    resumeRecorderOption.baseDirPath,
+                                    resumeRecorderOption.resumeKey
+                                );
+                            } else if (putExtra.resumeRecorder) {
+                                const expectResumeKey = putExtra.resumeRecorder.generateKeySync({
+                                    hosts: upHosts,
+                                    accessKey,
+                                    bucketName,
+                                    key,
+                                    filePath,
+                                    version: version || 'v1',
+                                    partSize: partSize || qiniu.conf.BLOCK_SIZE
+                                });
+                                recordPersistPath = path.join(
+                                    resumeRecorderOption.baseDirPath,
+                                    expectResumeKey
+                                );
+                            }
+                        }
+                        if (recordPersistPath) {
+                            filepathListToDelete.push(recordPersistPath);
+                        }
+                    })
                     // mock upload failed
                     .then(() => {
+                        // upload and abort
+                        putExtra.progressCallback = (_uploaded, _total) => {
+                            throw new Error('mocked error');
+                        };
                         return resumeUploader.putFile(
                             uploadToken,
                             key,
@@ -550,19 +579,29 @@ describe('test resume up', function () {
                                 }
                             });
                     })
+                    // check record file
+                    .then(() => {
+                        if (putExtra.resumeRecordFile || putExtra.resumeRecorder) {
+                            should.exists(recordPersistPath);
+                            should.ok(fs.existsSync(recordPersistPath), 'record file should exists');
+                        }
+                    })
                     // try to upload from resume point
                     .then(() => {
                         const couldResume = Boolean(putExtra.resumeRecordFile || putExtra.resumeRecorder);
-                        let isFirstPart = true;
+                        let isFirstPart = true; // 是否首次片上传请求成功，断点续传时是从断点开始首次上传成功的片计算
                         putExtra.progressCallback = (uploaded, _total) => {
                             if (!isFirstPart) {
                                 return;
                             }
+                            const partNumber = partSize
+                                ? uploaded / partSize
+                                : uploaded / (4 * 1024 * 1024);
                             isFirstPart = false;
-                            if (couldResume && uploaded / partSize <= 1) {
+                            if (couldResume && partNumber <= 1) {
                                 throw new Error('should resume');
                             }
-                            if (!couldResume && uploaded / partSize > 1) {
+                            if (!couldResume && partNumber > 1) {
                                 throw new Error('should not resume');
                             }
                         };
@@ -579,34 +618,9 @@ describe('test resume up', function () {
 
                 const checkFunc = ({ data }) => {
                     data.should.have.keys('key', 'hash');
-                    if (resumeRecordFile) {
-                        should.ok(!fs.existsSync(putExtra.resumeRecordFile));
-                    } else if (resumeRecorderOption) {
-                        if (resumeRecorderOption.resumeKey) {
-                            should.ok(!fs.existsSync(
-                                path.join(
-                                    resumeRecorderOption.baseDirPath,
-                                    resumeRecorderOption.resumeKey
-                                )
-                            ));
-                        } else {
-                            should.exist(putExtra.resumeRecorder);
-                            const expectResumeKey = putExtra.resumeRecorder.generateKeySync({
-                                hosts: upHosts,
-                                accessKey,
-                                bucketName,
-                                key,
-                                filePath,
-                                version: version || 'v1',
-                                partSize: partSize || qiniu.conf.BLOCK_SIZE
-                            });
-                            should.ok(!fs.existsSync(
-                                path.join(
-                                    resumeRecorderOption.baseDirPath,
-                                    expectResumeKey
-                                )
-                            ));
-                        }
+                    if (putExtra.resumeRecordFile || putExtra.resumeRecorder) {
+                        should.exists(recordPersistPath);
+                        should.ok(!fs.existsSync(recordPersistPath));
                     }
                 };
 

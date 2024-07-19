@@ -970,7 +970,7 @@ function getDefaultPutExtra (putExtra, options) {
     if (putExtra.resumeRecordFile) {
         const parsedPath = path.parse(path.resolve(putExtra.resumeRecordFile));
         putExtra.resumeRecorder = createResumeRecorderSync(parsedPath.dir);
-        putExtra.resumeKey = parsedPath.name;
+        putExtra.resumeKey = parsedPath.base;
     }
 
     return putExtra;
