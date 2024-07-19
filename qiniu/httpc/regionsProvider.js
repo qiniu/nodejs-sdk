@@ -687,9 +687,9 @@ const QueryRegionsProvider = (function () {
                 if (!respWrapper.ok()) {
                     return Promise.reject(
                         new Error(
-                            'Query regions failed with' +
+                            'Query regions failed with ' +
                             `HTTP Status Code ${respWrapper.resp.statusCode}, ` +
-                            `Body ${respWrapper.data}`
+                            `Body ${JSON.stringify(respWrapper.resp.data)}`
                         )
                     );
                 }
