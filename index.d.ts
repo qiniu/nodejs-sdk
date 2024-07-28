@@ -189,6 +189,10 @@ export declare namespace conf {
     }
     class Config {
         useHttpsDomain: boolean;
+        accelerateUploading: boolean;
+        /**
+         * @deprecated 实际已无加速上传能力，使用 accelerateUploading 代替
+         */
         useCdnDomain: boolean;
         ucEndpointsProvider?: httpc.EndpointsProvider | null;
         queryRegionsEndpointsProvider?: httpc.EndpointsProvider | null;
@@ -346,7 +350,7 @@ export declare namespace form_up {
 export declare namespace resume_up {
     type UploadResult = {
         data: any;
-        resp: IncomingMessage;
+        resp: Omit<IncomingMessage, 'url'> & { requestUrls: string[] };
     }
 
     class ResumeUploader {
@@ -588,7 +592,7 @@ export declare namespace httpc {
     // responseWrapper.js
     interface ResponseWrapperOptions<T = any> {
         data: T;
-        resp: IncomingMessage;
+        resp: Omit<IncomingMessage, 'url'> & { requestUrls: string[] };
     }
 
     interface ResponseError {
@@ -598,7 +602,7 @@ export declare namespace httpc {
 
     class ResponseWrapper<T = any> {
         data: T extends void ? undefined | ResponseError : T & ResponseError;
-        resp: IncomingMessage;
+        resp: Omit<IncomingMessage, 'url'> & { requestUrls: string[] };
         constructor(options: ResponseWrapperOptions);
         ok(): boolean;
         needRetry(): boolean;
