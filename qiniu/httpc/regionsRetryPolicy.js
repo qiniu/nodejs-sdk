@@ -89,22 +89,22 @@ RegionsRetryPolicy.prototype.shouldRetry = function (context) {
  * @returns {Promise<void>}
  */
 RegionsRetryPolicy.prototype.prepareRetry = function (context) {
+    let handleChangedRegionPromise = Promise.resolve();
     if (context.alternativeServiceNames.length) {
         context.serviceName = context.alternativeServiceNames.shift();
     } else if (context.alternativeRegions.length) {
         context.region = context.alternativeRegions.shift();
         [context.serviceName, ...context.alternativeServiceNames] = this.serviceNames;
+        if (typeof this.onChangedRegion === 'function') {
+            handleChangedRegionPromise = this.onChangedRegion(context);
+        }
     } else {
         return Promise.reject(
             new Error('There isn\'t available region or service for next try')
         );
     }
-    return this._prepareEndpoints(context)
-        .then(() => {
-            if (typeof this.onChangedRegion === 'function') {
-                return this.onChangedRegion(context);
-            }
-        });
+    return handleChangedRegionPromise
+        .then(() => this._prepareEndpoints(context));
 };
 
 /**
@@ -211,6 +211,7 @@ RegionsRetryPolicy.prototype._initRegions = function (options) {
  * @protected
  */
 RegionsRetryPolicy.prototype._prepareEndpoints = function (context) {
+    let handleChangedRegionsPromise = Promise.resolve();
     [context.endpoint, ...context.alternativeEndpoints] = context.region.services[context.serviceName] || [];
     while (!context.endpoint) {
         if (context.alternativeServiceNames.length) {
@@ -224,6 +225,9 @@ RegionsRetryPolicy.prototype._prepareEndpoints = function (context) {
             // compatible, remove when make break changes
             this.serviceName = context.serviceName;
             [context.endpoint, ...context.alternativeEndpoints] = context.region.services[context.serviceName] || [];
+            if (typeof this.onChangedRegion === 'function') {
+                handleChangedRegionsPromise = this.onChangedRegion(context);
+            }
         } else {
             return Promise.reject(new Error(
                 'There isn\'t available endpoint for ' +
@@ -232,7 +236,7 @@ RegionsRetryPolicy.prototype._prepareEndpoints = function (context) {
             ));
         }
     }
-    return Promise.resolve();
+    return handleChangedRegionsPromise;
 };
 
 exports.RegionsRetryPolicy = RegionsRetryPolicy;

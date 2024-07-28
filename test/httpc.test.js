@@ -1308,7 +1308,7 @@ describe('test http module', function () {
                 });
         });
 
-        it('test onChangedRegion', function () {
+        it('test onChangedRegion should call', function () {
             let regionChangedTimes = 0;
             const regionsRetryPolicy = new RegionsRetryPolicy({
                 regionsProvider: regionsProvider,
@@ -1340,6 +1340,39 @@ describe('test http module', function () {
                 })
                 .then(() => {
                     should.equal(regionChangedTimes, 2);
+                });
+        });
+
+        it('test onChangedRegion should not call', function () {
+            const regions = [
+                Region.fromRegionId('z0'),
+                Region.fromRegionId('z1')
+            ];
+            regions[0].services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint(`${bucketName}.kodo-accelerate.cn-east-1.qiniucs.com`)
+            ];
+            const regionsProvider = new StaticRegionsProvider(regions);
+            let regionChangedTimes = 0;
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceNames: [SERVICE_NAME.UP_ACC, SERVICE_NAME.UP],
+                onChangedRegion: () => {
+                    regionChangedTimes++;
+                    return Promise.resolve();
+                }
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    return regionsRetryPolicy.prepareRetry(mockedContext);
+                })
+                .then(() => {
+                    should.equal(regionChangedTimes, 0);
                 });
         });
 
