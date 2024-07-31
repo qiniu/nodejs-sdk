@@ -393,6 +393,7 @@ describe('test http module', function () {
                     'https://up.qiniup.com',
                     'https://up.qbox.me'
                 ],
+                [SERVICE_NAME.UP_ACC]: [],
                 [SERVICE_NAME.IO]: [
                     'https://iovip.qiniuio.com',
                     'https://iovip.qbox.me'
@@ -456,6 +457,7 @@ describe('test http module', function () {
                     `${preferredScheme}://up-z1.qbox.me`,
                     `${preferredScheme}://upload-z1.qiniup.com`
                 ],
+                [SERVICE_NAME.UP_ACC]: [],
                 [SERVICE_NAME.IO]: [
                     `${preferredScheme}://iovip-z1.qiniuio.com`,
                     `${preferredScheme}://iovip-z1.qbox.me`
@@ -483,6 +485,100 @@ describe('test http module', function () {
             should.deepEqual(servicesEndpointValues, expectedServicesEndpointValues);
             should.equal(regionZ1.ttl, -1);
             should.equal(regionZ1.createTime.getTime(), 0);
+        });
+
+        it('test clone', function () {
+            const r = Region.fromRegionId('z0');
+
+            const rCloned = r.clone();
+
+            rCloned.regionId = 'z1';
+            rCloned.services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint('fake-endpoint.qiniu.com')
+            ];
+
+            r.regionId.should.eql('z0');
+            r.services[SERVICE_NAME.UP_ACC].should.deepEqual([]);
+        });
+
+        it('test static merge', function () {
+            const r1 = Region.fromRegionId('z0');
+            const r2 = new Region({
+                regionId: 'faker2',
+                s3RegionId: 'z',
+                services: {
+                    [SERVICE_NAME.UC]: [
+                        new Endpoint('fake-uc.qiniu.com')
+                    ],
+                    'custom-service': [
+                        new Endpoint('custom-service.example.com')
+                    ]
+                },
+                createTime: new Date(Date.now() - 86400 * 1000),
+                ttl: 3600
+            });
+            const regions = [
+                r1,
+                r2
+            ];
+
+            const rMerged = Region.merge(...regions);
+            rMerged.regionId.should.eql(r1.regionId);
+            rMerged.s3RegionId.should.eql(r1.s3RegionId);
+            rMerged.createTime.should.eql(r1.createTime);
+            rMerged.ttl.should.eql(r1.ttl);
+            Object.keys(rMerged.services).forEach(serviceName => {
+                if (serviceName === SERVICE_NAME.UC) {
+                    rMerged.services[serviceName].should.deepEqual([
+                        ...r1.services[serviceName],
+                        ...r2.services[serviceName]
+                    ]);
+                    return;
+                }
+                if (serviceName === 'custom-service') {
+                    rMerged.services[serviceName].should.deepEqual(r2.services[serviceName]);
+                    return;
+                }
+                rMerged.services[serviceName].should.deepEqual(r1.services[serviceName]);
+            });
+        });
+
+        it('test merge', function () {
+            const r1 = Region.fromRegionId('z0');
+            const r2 = new Region({
+                regionId: 'faker2',
+                s3RegionId: 'z',
+                services: {
+                    [SERVICE_NAME.UC]: [
+                        new Endpoint('fake-uc.qiniu.com')
+                    ],
+                    'custom-service': [
+                        new Endpoint('custom-service.example.com')
+                    ]
+                },
+                createTime: new Date(Date.now() - 86400 * 1000),
+                ttl: 3600
+            });
+
+            const rMerged = r1.merge(r2);
+            rMerged.regionId.should.eql(r1.regionId);
+            rMerged.s3RegionId.should.eql(r1.s3RegionId);
+            rMerged.createTime.should.eql(r1.createTime);
+            rMerged.ttl.should.eql(r1.ttl);
+            Object.keys(rMerged.services).forEach(serviceName => {
+                if (serviceName === SERVICE_NAME.UC) {
+                    rMerged.services[serviceName].should.deepEqual([
+                        ...r1.services[serviceName],
+                        ...r2.services[serviceName]
+                    ]);
+                    return;
+                }
+                if (serviceName === 'custom-service') {
+                    rMerged.services[serviceName].should.deepEqual(r2.services[serviceName]);
+                    return;
+                }
+                rMerged.services[serviceName].should.deepEqual(r1.services[serviceName]);
+            });
         });
     });
 
@@ -521,7 +617,7 @@ describe('test http module', function () {
                         return Promise.all(endpointsProviders.map(e => e.getEndpoints()));
                     })
                     .then(regionsEndpoints => {
-                        // use `Array.prototype.flat` if migrate to node v11.15
+                        // use `Array.prototype.flat` when min version of Node.js update to ≥ v11.15
                         const regionsEndpointValues = regionsEndpoints.map(
                             endpoints =>
                                 endpoints.map(e => e.getValue())
@@ -1108,7 +1204,7 @@ describe('test http module', function () {
                 });
         });
 
-        it('test shouldRetry', function () {
+        it('test shouldRetry(legacy)', function () {
             const regionsRetryPolicy = new RegionsRetryPolicy({
                 regionsProvider: regionsProvider,
                 serviceName: SERVICE_NAME.UP
@@ -1125,7 +1221,46 @@ describe('test http module', function () {
                 });
         });
 
-        it('test prepareRetry', function () {
+        it('test shouldRetry(alternativeServiceNames)', function () {
+            const accRegion = Region.fromRegionId('z0');
+            accRegion.services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint(`${bucketName}.kodo-accelerate.cn-east-1.qiniucs.com`)
+            ];
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: accRegion,
+                serviceNames: [SERVICE_NAME.UP_ACC, SERVICE_NAME.UP]
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.ok(regionsRetryPolicy.shouldRetry(mockedContext));
+                });
+        });
+
+        it('test not shouldRetry(alternativeServiceNames)', function () {
+            const accRegion = Region.fromRegionId('z0');
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: accRegion,
+                serviceNames: [SERVICE_NAME.UP_ACC, SERVICE_NAME.UP]
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    should.ok(!regionsRetryPolicy.shouldRetry(mockedContext));
+                });
+        });
+
+        it('test shouldRetry(alternativeRegions)', function () {
             const regionsRetryPolicy = new RegionsRetryPolicy({
                 regionsProvider: regionsProvider,
                 serviceName: SERVICE_NAME.UP
@@ -1138,27 +1273,42 @@ describe('test http module', function () {
 
             return regionsRetryPolicy.initContext(mockedContext)
                 .then(() => {
-                    return regions
-                        .reduce((promise, expectedRegion, currentIndex) => {
-                            return promise
-                                .then(() => {
-                                    const isLastOne = currentIndex === regions.length - 1;
-                                    should.equal(mockedContext.region.regionId, expectedRegion.regionId);
-                                    should.deepEqual(mockedContext.endpoint, expectedRegion.services[SERVICE_NAME.UP][0]);
-                                    should.deepEqual(mockedContext.alternativeEndpoints, expectedRegion.services[SERVICE_NAME.UP].slice(1));
-                                    if (isLastOne) {
-                                        return Promise.resolve();
-                                    }
-                                    return regionsRetryPolicy.prepareRetry(mockedContext);
-                                });
-                        }, Promise.resolve());
-                })
+                    should.equal(regionsRetryPolicy.shouldRetry(mockedContext), true);
+                });
+        });
+
+        it('test prepareRetry(legacy', function () {
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceName: SERVICE_NAME.UP
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => regions.reduce(
+                    (promise, expectedRegion, currentIndex) =>
+                        promise.then(() => {
+                            const isLastOne = currentIndex === regions.length - 1;
+                            should.equal(mockedContext.region.regionId, expectedRegion.regionId);
+                            should.deepEqual(mockedContext.endpoint, expectedRegion.services[SERVICE_NAME.UP][0]);
+                            should.deepEqual(mockedContext.alternativeEndpoints, expectedRegion.services[SERVICE_NAME.UP].slice(1));
+                            if (isLastOne) {
+                                return Promise.resolve();
+                            }
+                            return regionsRetryPolicy.prepareRetry(mockedContext);
+                        }),
+                    Promise.resolve()
+                ))
                 .then(() => {
                     should.equal(regionsRetryPolicy.shouldRetry(mockedContext), false);
                 });
         });
 
-        it('test onChangedRegion', function () {
+        it('test onChangedRegion should call', function () {
             let regionChangedTimes = 0;
             const regionsRetryPolicy = new RegionsRetryPolicy({
                 regionsProvider: regionsProvider,
@@ -1190,6 +1340,39 @@ describe('test http module', function () {
                 })
                 .then(() => {
                     should.equal(regionChangedTimes, 2);
+                });
+        });
+
+        it('test onChangedRegion should not call', function () {
+            const regions = [
+                Region.fromRegionId('z0'),
+                Region.fromRegionId('z1')
+            ];
+            regions[0].services[SERVICE_NAME.UP_ACC] = [
+                new Endpoint(`${bucketName}.kodo-accelerate.cn-east-1.qiniucs.com`)
+            ];
+            const regionsProvider = new StaticRegionsProvider(regions);
+            let regionChangedTimes = 0;
+            const regionsRetryPolicy = new RegionsRetryPolicy({
+                regionsProvider: regionsProvider,
+                serviceNames: [SERVICE_NAME.UP_ACC, SERVICE_NAME.UP],
+                onChangedRegion: () => {
+                    regionChangedTimes++;
+                    return Promise.resolve();
+                }
+            });
+
+            const mockedContext = {
+                error: null,
+                retried: false
+            };
+
+            return regionsRetryPolicy.initContext(mockedContext)
+                .then(() => {
+                    return regionsRetryPolicy.prepareRetry(mockedContext);
+                })
+                .then(() => {
+                    should.equal(regionChangedTimes, 0);
                 });
         });
 

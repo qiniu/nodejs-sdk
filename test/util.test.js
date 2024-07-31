@@ -488,4 +488,36 @@ describe('test util functions', function () {
             });
         });
     });
+
+    describe('test isQiniuCallback', function () {
+        const mac = new qiniu.auth.digest.Mac(
+            'abcdefghklmnopq',
+            '1234567890'
+        );
+        it('test Qbox verification', () => {
+            const ok = qiniu.util.isQiniuCallback(
+                mac,
+                'https://test.qiniu.com/callback',
+                'name=sunflower.jpg&hash=Fn6qeQi4VDLQ347NiRm-RlQx_4O2&location=Shanghai&price=1500.00&uid=123',
+                'QBox abcdefghklmnopq:T7F-SjxX7X2zI4Fc1vANiNt1AUE='
+            );
+            should.ok(ok);
+        });
+        it('test Qiniu verification', () => {
+            const ok = qiniu.util.isQiniuCallback(
+                mac,
+                'https://test.qiniu.com/callback',
+                'name=sunflower.jpg&hash=Fn6qeQi4VDLQ347NiRm-RlQx_4O2&location=Shanghai&price=1500.00&uid=123',
+                'Qiniu abcdefghklmnopq:ZqS7EZuAKrhZaEIxqNGxDJi41IQ=',
+                {
+                    reqMethod: 'GET',
+                    reqContentType: 'application/x-www-form-urlencoded',
+                    reqHeaders: {
+                        'X-Qiniu-Bbb': 'BBB'
+                    }
+                }
+            );
+            should.ok(ok);
+        });
+    });
 });

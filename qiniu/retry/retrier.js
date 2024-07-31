@@ -63,16 +63,16 @@ Retrier.prototype.retry = function (options) {
             if (!retryPolicy) {
                 retryPolicy = this.retryPolicies.find(p => p.shouldRetry(context));
             }
-            const shouldRetryPromise = this.onBeforeRetry
+            const couldRetryPromise = this.onBeforeRetry
                 ? this.onBeforeRetry(context, retryPolicy)
                 : retryPolicy !== undefined;
             return Promise.all([
-                shouldRetryPromise,
+                couldRetryPromise,
                 retryPolicy
             ]);
         })
-        .then(([shouldRetry, retryPolicy]) => {
-            if (!shouldRetry) {
+        .then(([couldRetry, retryPolicy]) => {
+            if (!couldRetry || !retryPolicy) {
                 return;
             }
             context.error = null;

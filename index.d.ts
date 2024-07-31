@@ -148,6 +148,14 @@ export declare namespace conf {
         useHttpsDomain?: boolean;
 
         /**
+         * 在使用前需要提前开通加速域名
+         * 详见：https://developer.qiniu.com/kodo/12656/transfer-acceleration
+         * @default false
+         */
+        accelerateUploading?: boolean;
+
+        /**
+         * @deprecated 实际已无加速上传能力，使用 accelerateUploading 代替
          * @default true
          */
         useCdnDomain?: boolean;
@@ -181,10 +189,15 @@ export declare namespace conf {
     }
     class Config {
         useHttpsDomain: boolean;
+        accelerateUploading: boolean;
+        /**
+         * @deprecated 实际已无加速上传能力，使用 accelerateUploading 代替
+         */
         useCdnDomain: boolean;
         ucEndpointsProvider?: httpc.EndpointsProvider | null;
         queryRegionsEndpointsProvider?: httpc.EndpointsProvider | null;
         regionsProvider?: httpc.RegionsProvider | null;
+        regionsQueryResultCachePath?: string | null;
         zone?: Zone | null;
         zoneExpire?: number;
 
@@ -337,7 +350,7 @@ export declare namespace form_up {
 export declare namespace resume_up {
     type UploadResult = {
         data: any;
-        resp: IncomingMessage;
+        resp: Omit<IncomingMessage, 'url'> & { requestUrls: string[] };
     }
 
     class ResumeUploader {
@@ -412,13 +425,14 @@ export declare namespace resume_up {
 
         /**
          * @default null
+         * @deprecated 使用 `resumeRecorder` 与 `resumeKey` 代替
          */
-        resumeRecordFile?: string
+        resumeRecordFile?: string | null
 
         /**
          * @default null
          */
-        progressCallback?: (uploadBytes: number, totalBytes: number) => void
+        progressCallback?: ((uploadBytes: number, totalBytes: number) => void) | null
 
         /**
          * @default v1
@@ -436,6 +450,18 @@ export declare namespace resume_up {
         metadata?: Record<string, string>
 
         /**
+         * 断点续传记录器，请通过 `createResumeRecorder` 或 `createResumeRecorderSync` 获取，优先级比 `resumeRecordFile` 低
+         * @default null
+         */
+        resumeRecorder?: ResumeRecorder
+
+        /**
+         * 断点续传记录文件的具体文件名，不设置时会由当次上传自动生成
+         * @default null
+         */
+        resumeKey?: string | null
+
+        /**
          * 上传可选参数
          * @param fname 请求体中的文件的名称
          * @param params 额外参数设置，参数名称必须以x:开头
@@ -445,11 +471,32 @@ export declare namespace resume_up {
          * @param partSize 分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
          * @param version 分片上传版本 目前支持v1/v2版本 默认v1
          * @param metadata 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+         * @param resumeRecorder 断点续传记录器，请通过 `createResumeRecorder` 或 `createResumeRecorderSync` 获取，优先级比 `resumeRecordFile` 低
+         * @param resumeKey 断点续传记录文件的具体文件名，不设置时会由当次上传自动生成，推荐不设置
          */
         constructor(fname?: string, params?: Record<string, string>, mimeType?: string, resumeRecordFile?: string,
                     progressCallback?: (uploadBytes: number, totalBytes: number) => void,
-                    partSize?:number, version?:string, metadata?: Record<string, string>);
+                    partSize?:number, version?:string, metadata?: Record<string, string>,
+                    resumeRecorder?: ResumeRecorder, resumeKey?: string);
     }
+
+    /**
+     * 历史原因其方法当前仅支持了同步调用这一不推荐的使用方式，暂不公开具体内部信息，仅供 TypeScript 类型检查使用。
+     * 实际不存在这个类，未来会变更为 interface。
+     */
+    abstract class ResumeRecorder {
+    }
+
+    /**
+     *
+     * @param baseDirPath 默认值为 `os.tmpdir()`，该方法若 baseDirPath 不存在将自动创建
+     */
+    function createResumeRecorder (baseDirPath?: string): Promise<ResumeRecorder>
+
+    /**
+     * `createResumeRecorder` 的同步版本，不推荐使用
+     */
+    function createResumeRecorderSync (baseDirPath?: string): ResumeRecorder
 }
 
 export declare namespace util {
@@ -514,8 +561,22 @@ export declare namespace util {
      * @param requestURI 回调的URL中的requestURI
      * @param reqBody 回调的URL中的requestURI 请求Body，仅当请求的ContentType为application/x-www-form-urlencoded时才需要传入该参数
      * @param callbackAuth 回调时请求的Authorization头部值
+     * @param extra 当回调为 Qiniu 签名时需要传入
+     * @param extra.reqMethod 请求方法，例如 GET，POST
+     * @param extra.reqContentType 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
+     * @param extra.reqHeaders 请求头部
      */
-    function isQiniuCallback(mac: auth.digest.Mac, requestURI: string, reqBody: string | null, callbackAuth: string): boolean;
+    function isQiniuCallback(
+        mac: auth.digest.Mac,
+        requestURI: string,
+        reqBody: string | null,
+        callbackAuth: string,
+        extra?: {
+            reqMethod: string,
+            reqContentType?: string,
+            reqHeaders?: Record<string, string>
+        }
+    ): boolean;
 }
 
 export declare namespace httpc {
@@ -531,7 +592,7 @@ export declare namespace httpc {
     // responseWrapper.js
     interface ResponseWrapperOptions<T = any> {
         data: T;
-        resp: IncomingMessage;
+        resp: Omit<IncomingMessage, 'url'> & { requestUrls: string[] };
     }
 
     interface ResponseError {
@@ -541,7 +602,7 @@ export declare namespace httpc {
 
     class ResponseWrapper<T = any> {
         data: T extends void ? undefined | ResponseError : T & ResponseError;
-        resp: IncomingMessage;
+        resp: Omit<IncomingMessage, 'url'> & { requestUrls: string[] };
         constructor(options: ResponseWrapperOptions);
         ok(): boolean;
         needRetry(): boolean;
@@ -643,17 +704,17 @@ export declare namespace httpc {
         middlewares?: middleware.Middleware[];
     }
 
-    interface GetOptions<T = any> extends ReqOpts<T> {
+    interface GetOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         params: Record<string, string>;
         headers: Record<string, string>;
     }
 
-    interface PostOptions<T = any> extends ReqOpts<T> {
+    interface PostOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         data: string | Buffer | Readable;
         headers: Record<string, string>;
     }
 
-    interface PutOptions<T = any> extends ReqOpts<T> {
+    interface PutOptions<T = any> extends Omit<ReqOpts<T>, 'urllibOptions'> {
         data: string | Buffer | Readable;
         headers: Record<string, string>
     }
@@ -664,9 +725,9 @@ export declare namespace httpc {
         middlewares: middleware.Middleware[];
         constructor(options: HttpClientOptions)
         sendRequest(requestOptions: ReqOpts): Promise<ResponseWrapper>
-        get(getOptions: GetOptions): Promise<ResponseWrapper>
-        post(postOptions: PostOptions): Promise<ResponseWrapper>
-        put(putOptions: PutOptions): Promise<ResponseWrapper>
+        get(getOptions: GetOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+        post(postOptions: PostOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+        put(putOptions: PutOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
     }
 
     // endpoint.js
@@ -688,12 +749,15 @@ export declare namespace httpc {
         getValue(options?: {scheme?: string}): string;
 
         getEndpoints(): Promise<httpc.Endpoint[]>;
+
+        clone(): Endpoint;
     }
 
     // region.js
     enum SERVICE_NAME {
         UC = 'uc',
         UP = 'up',
+        UP_ACC = 'up_acc',
         IO = 'io',
         RS = 'rs',
         RSF = 'rsf',
@@ -764,6 +828,7 @@ export declare namespace httpc {
     class Region implements RegionsProvider {
         static fromZone(zone: conf.Zone, options?: RegionFromZoneOptions): Region;
         static fromRegionId(regionId: string, options?: RegionFromRegionIdOptions): Region;
+        static merge(...r: Region[]): Region;
 
         // non-unique
         regionId?: string;
@@ -776,6 +841,10 @@ export declare namespace httpc {
         constructor(options: RegionOptions);
 
         getRegions(): Promise<httpc.Region[]>;
+
+        clone(): Region;
+
+        merge(...r: Region[]): Region;
 
         get isLive(): boolean;
     }
@@ -1288,6 +1357,32 @@ export declare namespace rs {
          * @param callbackFunc
          */
         listBucket(callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
+        listBucket(options: { shared: string, tagCondition: Record<string, string> }, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
+
+        /**
+         * 创建空间
+         * @param bucket 空间名
+         * @param options 选项
+         * @param options.regionId 区域 ID
+         * @param callbackFunc 回调函数
+         */
+        createBucket(
+            bucket: string,
+            options: {
+                regionId: string
+            },
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
+
+        /**
+         * 删除空间
+         * @param bucket 空间名
+         * @param callbackFunc 回调函数
+         */
+        deleteBucket(
+            bucket: string,
+            callbackFunc?: callback
+        ): Promise<httpc.ResponseWrapper<void>>
 
         /**
          * 获取空间详情

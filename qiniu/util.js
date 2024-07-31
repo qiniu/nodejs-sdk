@@ -115,16 +115,16 @@ exports.getMd5 = function (data) {
 // @param reqBody    请求Body，仅当请求的 ContentType 为
 //                   application/x-www-form-urlencoded时才需要传入该参数
 exports.generateAccessToken = function (mac, requestURI, reqBody) {
-    var u = new url.URL(requestURI);
-    var path = u.pathname + u.search;
-    var access = path + '\n';
+    const u = new url.URL(requestURI);
+    const path = u.pathname + u.search;
+    let access = path + '\n';
 
     if (reqBody) {
         access += reqBody;
     }
 
-    var digest = exports.hmacSha1(access, mac.secretKey);
-    var safeDigest = exports.base64ToUrlSafe(digest);
+    const digest = exports.hmacSha1(access, mac.secretKey);
+    const safeDigest = exports.base64ToUrlSafe(digest);
     return 'QBox ' + mac.accessKey + ':' + safeDigest;
 };
 
@@ -311,8 +311,39 @@ exports.generateAccessTokenV2 = function (mac, requestURI, reqMethod, reqContent
 // @param reqBody      请求Body，仅当请求的ContentType为
 //                     application/x-www-form-urlencoded时才需要传入该参数
 // @param callbackAuth 回调时请求的Authorization头部值
-exports.isQiniuCallback = function (mac, requestURI, reqBody, callbackAuth) {
-    var auth = exports.generateAccessToken(mac, requestURI, reqBody);
+
+/**
+ * @param {Mac} mac AK&SK对象
+ * @param {string} requestURI 请求URL
+ * @param {string | Buffer} reqBody 请求Body，仅当请求的 ContentType 为 application/json 或 application/x-www-form-urlencoded 时才需要传入该参数
+ * @param {string} callbackAuth 回调时请求的 Authorization 头部值
+ * @param {Object} [extra] 当回调为 Qiniu 签名时需要传入
+ * @param {string} extra.reqMethod 请求方法，例如 GET，POST
+ * @param {string} [extra.reqContentType] 请求类型，例如 application/json 或者  application/x-www-form-urlencoded
+ * @param {Object.<string, string>} [extra.reqHeaders] 请求头部
+ * @return {boolean}
+ */
+exports.isQiniuCallback = function (
+    mac,
+    requestURI,
+    reqBody,
+    callbackAuth,
+    extra
+) {
+    let auth;
+    if (callbackAuth.startsWith('Qiniu')) {
+        auth = exports.generateAccessTokenV2(
+            mac,
+            requestURI,
+            extra.reqMethod,
+            extra.reqContentType,
+            reqBody,
+            extra.reqHeaders
+        );
+    } else {
+        auth = exports.generateAccessToken(mac, requestURI, reqBody);
+    }
+
     return auth === callbackAuth;
 };
 

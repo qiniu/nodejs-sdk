@@ -2,12 +2,7 @@
 // DO NOT use this file, unless you know what you're doing.
 // Because its API may make broken change for internal usage.
 
-const fs = require('fs');
-
 const { RetryPolicy } = require('../retry');
-
-exports.TokenExpiredRetryPolicy = TokenExpiredRetryPolicy;
-exports.wrapTryCallback = wrapTryCallback;
 
 // --- split to files --- //
 /**
@@ -21,30 +16,21 @@ exports.wrapTryCallback = wrapTryCallback;
  * @extends RetryPolicy
  * @param {Object} options
  * @param {string} options.uploadApiVersion
- * @param {string} options.resumeRecordFilePath
+ * @param {function} options.recordDeleteHandler
+ * @param {function} options.recordExistsHandler
  * @param {number} [options.maxRetryTimes]
  * @constructor
  */
 function TokenExpiredRetryPolicy (options) {
     this.id = Symbol(this.constructor.name);
     this.uploadApiVersion = options.uploadApiVersion;
-    this.resumeRecordFilePath = options.resumeRecordFilePath;
+    this.recordDeleteHandler = options.recordDeleteHandler;
+    this.recordExistsHandler = options.recordExistsHandler;
     this.maxRetryTimes = options.maxRetryTimes || 1;
 }
 
 TokenExpiredRetryPolicy.prototype = Object.create(RetryPolicy.prototype);
 TokenExpiredRetryPolicy.prototype.constructor = TokenExpiredRetryPolicy;
-
-/**
- * @param {string} resumeRecordFilePath
- * @returns {boolean}
- */
-TokenExpiredRetryPolicy.prototype.isResumedUpload = function (resumeRecordFilePath) {
-    if (!resumeRecordFilePath) {
-        return false;
-    }
-    return fs.existsSync(resumeRecordFilePath);
-};
 
 /**
  * @param {Object} context
@@ -53,8 +39,7 @@ TokenExpiredRetryPolicy.prototype.isResumedUpload = function (resumeRecordFilePa
 TokenExpiredRetryPolicy.prototype.initContext = function (context) {
     context[this.id] = {
         retriedTimes: 0,
-        uploadApiVersion: this.uploadApiVersion,
-        resumeRecordFilePath: this.resumeRecordFilePath
+        uploadApiVersion: this.uploadApiVersion
     };
     return Promise.resolve();
 };
@@ -66,13 +51,12 @@ TokenExpiredRetryPolicy.prototype.initContext = function (context) {
 TokenExpiredRetryPolicy.prototype.shouldRetry = function (context) {
     const {
         retriedTimes,
-        uploadApiVersion,
-        resumeRecordFilePath
+        uploadApiVersion
     } = context[this.id];
 
     if (
         retriedTimes >= this.maxRetryTimes ||
-        !this.isResumedUpload(resumeRecordFilePath)
+        !this.recordExistsHandler()
     ) {
         return false;
     }
@@ -102,17 +86,78 @@ TokenExpiredRetryPolicy.prototype.shouldRetry = function (context) {
  */
 TokenExpiredRetryPolicy.prototype.prepareRetry = function (context) {
     context[this.id].retriedTimes += 1;
-    const resumeRecordFilePath = context[this.id].resumeRecordFilePath;
     return new Promise(resolve => {
-        if (!resumeRecordFilePath) {
+        if (!this.recordExistsHandler()) {
             resolve();
             return;
         }
-        fs.unlink(resumeRecordFilePath, _err => {
-            resolve();
-        });
+        this.recordDeleteHandler();
+        resolve();
     });
 };
+
+exports.TokenExpiredRetryPolicy = TokenExpiredRetryPolicy;
+
+/**
+ * @class
+ * @extends RetryPolicy
+ * @constructor
+ */
+function AccUnavailableRetryPolicy () {
+}
+
+AccUnavailableRetryPolicy.prototype = Object.create(RetryPolicy.prototype);
+AccUnavailableRetryPolicy.prototype.constructor = AccUnavailableRetryPolicy;
+
+AccUnavailableRetryPolicy.prototype.initContext = function (context) {
+    return Promise.resolve();
+};
+
+AccUnavailableRetryPolicy.prototype.isAccNotAvailable = function (context) {
+    try {
+        return context.result.resp.statusCode === 400 &&
+            context.result.resp.data.error.includes('transfer acceleration is not configured on this bucket');
+    } catch (_err) {
+        return false;
+    }
+};
+
+AccUnavailableRetryPolicy.prototype.shouldRetry = function (context) {
+    if (!context.result) {
+        return false;
+    }
+    if (!context.alternativeServiceNames.length) {
+        return false;
+    }
+    const [nextServiceName] = context.alternativeServiceNames;
+    if (
+        !context.region.services[nextServiceName] ||
+        !context.region.services[nextServiceName].length
+    ) {
+        return false;
+    }
+    return this.isAccNotAvailable(context);
+};
+
+AccUnavailableRetryPolicy.prototype.prepareRetry = function (context) {
+    if (!context.alternativeServiceNames.length) {
+        return Promise.reject(new Error(
+            'No alternative service available.'
+        ));
+    }
+
+    context.serviceName = context.alternativeServiceNames.shift();
+    [context.endpoint, ...context.alternativeEndpoints] = context.region.services[context.serviceName];
+    if (!context.endpoint) {
+        return Promise.reject(new Error(
+            'No alternative endpoint available.'
+        ));
+    }
+
+    return Promise.resolve();
+};
+
+exports.AccUnavailableRetryPolicy = AccUnavailableRetryPolicy;
 
 /**
  * @param {Error} err
@@ -147,3 +192,23 @@ function wrapTryCallback (fn) {
         }
     };
 }
+
+/**
+ * Compatible with callback style
+ * Could be removed when make break changes.
+ */
+function handleReqCallback (responseWrapperPromise, callbackFunc) {
+    if (typeof callbackFunc !== 'function') {
+        return;
+    }
+    const wrappedCallback = wrapTryCallback(callbackFunc);
+    responseWrapperPromise
+        .then(({ data, resp }) => {
+            wrappedCallback(null, data, resp);
+        })
+        .catch(err => {
+            wrappedCallback(err, null, err.resp);
+        });
+}
+
+exports.handleReqCallback = handleReqCallback;

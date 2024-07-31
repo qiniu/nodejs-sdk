@@ -687,9 +687,9 @@ const QueryRegionsProvider = (function () {
                 if (!respWrapper.ok()) {
                     return Promise.reject(
                         new Error(
-                            'Query regions failed with' +
+                            'Query regions failed with ' +
                             `HTTP Status Code ${respWrapper.resp.statusCode}, ` +
-                            `Body ${respWrapper.data}`
+                            `Body ${JSON.stringify(respWrapper.resp.data)}`
                         )
                     );
                 }
@@ -752,6 +752,7 @@ const QueryRegionsProvider = (function () {
         let services = {
             [SERVICE_NAME.UC]: convertToEndpoints(data.uc.domains),
             [SERVICE_NAME.UP]: convertToEndpoints(data.up.domains),
+            [SERVICE_NAME.UP_ACC]: convertToEndpoints(data.up.acc_domains),
             [SERVICE_NAME.IO]: convertToEndpoints(data.io.domains),
             [SERVICE_NAME.RS]: convertToEndpoints(data.rs.domains),
             [SERVICE_NAME.RSF]: convertToEndpoints(data.rsf.domains),

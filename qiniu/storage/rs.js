@@ -11,7 +11,7 @@ const { RegionsRetryPolicy } = require('../httpc/regionsRetryPolicy');
 const { Retrier } = require('../retry');
 const pkg = require('../../package.json');
 
-const { wrapTryCallback } = require('./internal');
+const { handleReqCallback } = require('./internal');
 
 exports.BucketManager = BucketManager;
 exports.PutPolicy = PutPolicy;
@@ -75,7 +75,7 @@ function _getRetryPolicies (options) {
         }),
         new RegionsRetryPolicy({
             regionsProvider,
-            serviceName
+            serviceNames: [serviceName]
         })
     ];
 }
@@ -103,7 +103,12 @@ function _getRegionsRetrier (options) {
             });
             return new Retrier({
                 retryPolicies,
-                onBeforeRetry: context => context.result && context.result.needRetry()
+                onBeforeRetry: context => {
+                    if (context.error) {
+                        return true;
+                    }
+                    return context.result && context.result.needRetry();
+                }
             });
         });
 }
@@ -135,8 +140,12 @@ function _getUcRetrier () {
         retryPolicies: _getUcRetryPolices.call(this, {
             ucProvider
         }),
-        onBeforeRetry: context =>
-            context.result.needRetry()
+        onBeforeRetry: context => {
+            if (context.error) {
+                return true;
+            }
+            return context.result && context.result.needRetry();
+        }
     });
 }
 
@@ -144,6 +153,7 @@ function _getUcRetrier () {
  * @param {string} [options.bucketName]
  * @param {SERVICE_NAME} options.serviceName
  * @param {function(RegionsRetryPolicyContext | EndpointsRetryPolicyContext): Promise<any>} options.func
+ * @param {BucketOperationCallback} [options.callbackFunc]
  * @returns {Promise<any>}
  * @private
  */
@@ -151,23 +161,26 @@ function _tryReq (options) {
     const {
         bucketName,
         serviceName,
-        func
+        func,
+        callbackFunc
     } = options;
 
     if (serviceName === SERVICE_NAME.UC) {
         const retrier = _getUcRetrier.call(this);
-        return retrier.initContext()
+        const result = retrier.initContext()
             .then(context => retrier.retry({
                 func,
                 context
             }));
+        handleReqCallback(result, callbackFunc);
+        return result;
     }
 
     if (!bucketName) {
         return Promise.reject(new Error('Must provide bucket name for non-uc services'));
     }
 
-    return _getRegionsRetrier.call(this, {
+    const result = _getRegionsRetrier.call(this, {
         bucketName,
         serviceName
     })
@@ -179,6 +192,8 @@ function _tryReq (options) {
             func,
             context
         }));
+    handleReqCallback(result, callbackFunc);
+    return result;
 }
 
 /**
@@ -197,10 +212,10 @@ BucketManager.prototype.stat = function (bucket, key, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + statOp;
             return this._httpClient.get({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -226,10 +241,10 @@ BucketManager.prototype.changeMime = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + changeMimeOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -255,10 +270,10 @@ BucketManager.prototype.changeHeaders = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + changeHeadersOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -289,10 +304,10 @@ BucketManager.prototype.move = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + moveOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -323,10 +338,10 @@ BucketManager.prototype.copy = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + copyOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -346,10 +361,10 @@ BucketManager.prototype.delete = function (bucket, key, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + deleteOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -375,10 +390,10 @@ BucketManager.prototype.deleteAfterDays = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + deleteAfterDaysOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -413,10 +428,10 @@ BucketManager.prototype.setObjectLifeCycle = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + setObjectLifecycleOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -440,10 +455,10 @@ BucketManager.prototype.fetch = function (resUrl, bucket, key, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + fetchOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -464,10 +479,10 @@ BucketManager.prototype.prefetch = function (bucket, key, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + prefetchOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -493,10 +508,10 @@ BucketManager.prototype.changeType = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + changeTypeOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -527,10 +542,10 @@ BucketManager.prototype.image = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -548,10 +563,10 @@ BucketManager.prototype.unimage = function (bucket, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -608,10 +623,10 @@ BucketManager.prototype.listPrefix = function (bucket, options, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -670,14 +685,14 @@ BucketManager.prototype.listPrefixV2 = function (bucket, options, callbackFunc) 
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post(
                 {
-                    url: requestURL,
-                    callback: wrapTryCallback(callbackFunc)
+                    url: requestURL
                 },
                 {
                     dataType: 'text'
                 }
             );
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -726,10 +741,10 @@ BucketManager.prototype.batch = function (operations, callbackFunc) {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqData,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqData
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -950,36 +965,119 @@ BucketManager.prototype.updateObjectStatus = function (
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + changeStatusOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
 /**
  * 列举 bucket
  * @link https://developer.qiniu.com/kodo/3926/get-service
+ * @param {Object.<string, string>} [options]
+ * @param {string} [options.shared] 可传入 `'rd'` 列举出读权限的空间
+ * @param {Object.<string, string>} [options.tagCondition] 过滤空间的标签或标签值条件，指定多个标签或标签值时同时满足条件的空间才会返回
  * @param {BucketOperationCallback} [callbackFunc] 回调函数
  * @returns {Promise<any>}
  */
-BucketManager.prototype.listBucket = function (callbackFunc) {
-    const listBucketOp = '/buckets';
+BucketManager.prototype.listBucket = function (options, callbackFunc) {
+    let shared;
+    let tagCondition;
+    if (typeof options === 'function') {
+        callbackFunc = options;
+    } else {
+        options = options || {};
+        shared = options.shared;
+        tagCondition = options.tagCondition;
+    }
+
+    const reqParams = {};
+    if (shared) {
+        reqParams.shared = shared;
+    }
+    if (tagCondition) {
+        reqParams.tagCondition = util.urlsafeBase64Encode(
+            // use Object.entries when min version of Node.js update to ≥ v7.5.0
+            // the `querystring.stringify` will convert unsafe characters to percent encode,
+            // so stringify with below
+            Object.keys(tagCondition)
+                .map(k => {
+                    let cond = 'key=' + k;
+                    if (tagCondition[k]) {
+                        cond += '&value=' + tagCondition[k];
+                    }
+                    return cond;
+                })
+                .join(';')
+        );
+    }
+    const reqSpec = Object.keys(reqParams).length > 0
+        ? '?' + querystring.stringify(reqParams)
+        : '';
+    const listBucketOp = '/buckets' + reqSpec;
 
     return _tryReq.call(this, {
         serviceName: SERVICE_NAME.UC,
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + listBucketOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
 /**
- * 获取bucket信息
+ * 创建 bucket
+ * @param {string} bucket 空间名
+ * @param {Object} [options] 选项
+ * @param {string} [options.regionId] 区域 ID
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.createBucket = function (bucket, options, callbackFunc) {
+    options = options || {};
+    let createBucketOp = `/mkbucketv3/${bucket}`;
+    if (options.regionId) {
+        createBucketOp += `/region/${options.regionId}`;
+    }
+    return _tryReq.call(this, {
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + createBucketOp;
+            return this._httpClient.post({
+                url: requestURL
+            });
+        },
+        callbackFunc
+    });
+};
+
+/**
+ * 删除 bucket
+ * @param {string} bucket 空间名
+ * @param {BucketOperationCallback} [callbackFunc] 回调函数
+ * @returns {Promise<any>}
+ */
+BucketManager.prototype.deleteBucket = function (bucket, callbackFunc) {
+    const deleteBucketOp = `/drop/${bucket}`;
+
+    return _tryReq.call(this, {
+        serviceName: SERVICE_NAME.UC,
+        func: context => {
+            const requestURL = _getEndpointVal.call(this, context.endpoint) + deleteBucketOp;
+            return this._httpClient.post({
+                url: requestURL
+            });
+        },
+        callbackFunc
+    });
+};
+
+/**
+ * 获取 bucket 信息
  * @param {string} bucket 空间名
  * @param {BucketOperationCallback} [callbackFunc] 回调函数
  * @returns {Promise<any>}
@@ -991,10 +1089,10 @@ BucketManager.prototype.getBucketInfo = function (bucket, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + bucketInfoOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1047,10 +1145,10 @@ BucketManager.prototype.putBucketLifecycleRule = function (
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqSpec,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqSpec
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1075,10 +1173,10 @@ BucketManager.prototype.deleteBucketLifecycleRule = function (bucket, name, call
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqSpec,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqSpec
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1117,10 +1215,10 @@ BucketManager.prototype.updateBucketLifecycleRule = function (bucket, options, c
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqSpec,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqSpec
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1138,10 +1236,10 @@ BucketManager.prototype.getBucketLifecycleRule = function (bucket, callbackFunc)
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.get({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1188,10 +1286,10 @@ BucketManager.prototype.putBucketEvent = function (bucket, options, callbackFunc
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqSpec,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqSpec
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1225,10 +1323,10 @@ BucketManager.prototype.updateBucketEvent = function (bucket, options, callbackF
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqSpec,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqSpec
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1245,10 +1343,10 @@ BucketManager.prototype.getBucketEvent = function (bucket, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.get({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1273,10 +1371,10 @@ BucketManager.prototype.deleteBucketEvent = function (bucket, name, callbackFunc
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqSpec,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqSpec
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1316,10 +1414,10 @@ BucketManager.prototype.putReferAntiLeech = function (bucket, options, callbackF
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1349,10 +1447,10 @@ BucketManager.prototype.putCorsRules = function (bucket, body, callbackFunc) {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
                 url: requestURL,
-                data: reqBody,
-                callback: wrapTryCallback(callbackFunc)
+                data: reqBody
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1369,10 +1467,10 @@ BucketManager.prototype.getCorsRules = function (bucket, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1390,10 +1488,10 @@ BucketManager.prototype.putBucketAccessStyleMode = function (bucket, mode, callb
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1421,10 +1519,10 @@ BucketManager.prototype.putBucketMaxAge = function (bucket, options, callbackFun
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1454,10 +1552,10 @@ BucketManager.prototype.putBucketAccessMode = function (bucket, options, callbac
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1495,10 +1593,10 @@ BucketManager.prototype.putBucketQuota = function (bucket, options, callbackFunc
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1515,10 +1613,10 @@ BucketManager.prototype.getBucketQuota = function (bucket, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1536,10 +1634,10 @@ BucketManager.prototype.listBucketDomains = function (bucket, callbackFunc) {
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + reqOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 
@@ -1560,10 +1658,10 @@ BucketManager.prototype.restoreAr = function (entry, freezeAfterDays, callbackFu
         func: context => {
             const requestURL = _getEndpointVal.call(this, context.endpoint) + restoreArOp;
             return this._httpClient.post({
-                url: requestURL,
-                callback: wrapTryCallback(callbackFunc)
+                url: requestURL
             });
-        }
+        },
+        callbackFunc
     });
 };
 

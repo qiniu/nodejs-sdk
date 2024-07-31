@@ -27,8 +27,8 @@ exports.FormMimeRaw = 'application/octet-stream';
 exports.RS_HOST = 'rs.qiniu.com';
 exports.RPC_TIMEOUT = 600000; // 600s
 let QUERY_REGION_BACKUP_HOSTS = [
-    'uc.qbox.me',
-    'api.qiniu.com'
+    'kodo-config.qiniuapi.com',
+    'uc.qbox.me'
 ];
 Object.defineProperty(exports, 'QUERY_REGION_BACKUP_HOSTS', {
     get: () => QUERY_REGION_BACKUP_HOSTS,
@@ -36,7 +36,7 @@ Object.defineProperty(exports, 'QUERY_REGION_BACKUP_HOSTS', {
         QUERY_REGION_BACKUP_HOSTS = v;
     }
 });
-let QUERY_REGION_HOST = 'kodo-config.qiniuapi.com';
+let QUERY_REGION_HOST = 'uc.qiniuapi.com';
 Object.defineProperty(exports, 'QUERY_REGION_HOST', {
     get: () => QUERY_REGION_HOST,
     set: v => {
@@ -44,11 +44,13 @@ Object.defineProperty(exports, 'QUERY_REGION_HOST', {
         QUERY_REGION_BACKUP_HOSTS = [];
     }
 });
-let UC_HOST = 'uc.qbox.me';
+let UC_BACKUP_HOSTS = QUERY_REGION_BACKUP_HOSTS.slice();
+let UC_HOST = QUERY_REGION_HOST;
 Object.defineProperty(exports, 'UC_HOST', {
     get: () => UC_HOST,
     set: v => {
         UC_HOST = v;
+        UC_BACKUP_HOSTS = [];
         QUERY_REGION_HOST = v;
         QUERY_REGION_BACKUP_HOSTS = [];
     }
@@ -64,27 +66,37 @@ const Config = (function () {
      * @constructor
      * @param {Object} [options]
      * @param {boolean} [options.useHttpsDomain]
-     * @param {boolean} [options.useCdnDomain]
+     * @param {boolean} [options.accelerateUploading] enable accelerate uploading. should active the domains in portal before using
      * @param {EndpointsProvider} [options.ucEndpointsProvider]
      * @param {EndpointsProvider} [options.queryRegionsEndpointsProvider]
      * @param {RegionsProvider} [options.regionsProvider]
-     * @param {Zone} [options.zone]
-     * @param {number} [options.zoneExpire]
+     * @param {string} [options.regionsQueryResultCachePath]
+     *
+     * @param {boolean} [options.useCdnDomain] DEPRECATED: use accelerateUploading instead
+     * @param {Zone} [options.zone] DEPRECATED: use RegionsProvider instead
+     * @param {number} [options.zoneExpire] DEPRECATED
      */
     function Config (options) {
         options = options || {};
         // use http or https protocol
         this.useHttpsDomain = !!(options.useHttpsDomain || false);
-        // use cdn accelerated domains, this is not work with auto query region
-        this.useCdnDomain = !!(options.useCdnDomain && true);
+
+        // use accelerate upload domains
+        this.accelerateUploading = !!(options.accelerateUploading || false);
+
         // custom uc endpoints
         this.ucEndpointsProvider = options.ucEndpointsProvider || null;
         // custom query region endpoints
         this.queryRegionsEndpointsProvider = options.queryRegionsEndpointsProvider || null;
         // custom regions
         this.regionsProvider = options.regionsProvider || null;
+        // custom cache persisting path for regions query result
+        // only worked with default CachedRegionsProvider
+        this.regionsQueryResultCachePath = options.regionsQueryResultCachePath;
 
         // deprecated
+        // use cdn accelerated domains, this is not work with auto query region
+        this.useCdnDomain = !!(options.useCdnDomain && true);
         // zone of the bucket
         this.zone = options.zone || null;
         this.zoneExpire = options.zoneExpire || -1;
@@ -98,11 +110,10 @@ const Config = (function () {
             return this.ucEndpointsProvider;
         }
 
-        return new Endpoint(
-            UC_HOST,
-            {
+        return new StaticEndpointsProvider(
+            [UC_HOST].concat(UC_BACKUP_HOSTS).map(h => new Endpoint(h, {
                 defaultScheme: this.useHttpsDomain ? 'https' : 'http'
-            }
+            }))
         );
     };
 
@@ -216,9 +227,11 @@ const Config = (function () {
                 const cacheKey = [
                     endpointsMd5,
                     accessKey,
-                    bucketName
+                    bucketName,
+                    this.accelerateUploading.toString()
                 ].join(':');
                 return new CachedRegionsProvider({
+                    persistPath: this.regionsQueryResultCachePath,
                     cacheKey,
                     baseRegionsProvider: new QueryRegionsProvider({
                         accessKey: accessKey,
