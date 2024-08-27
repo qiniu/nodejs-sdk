@@ -222,7 +222,7 @@ function putReq (
  * @param {string | null} key
  * @param {any} body
  * @param {PutExtra | null} putExtra
- * @param {reqCallback} callbackFunc
+ * @param {reqCallback} [callbackFunc]
  * @returns {Promise<UploadResult>}
  */
 FormUploader.prototype.put = function (

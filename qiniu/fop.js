@@ -11,25 +11,41 @@ function OperationManager (mac, config) {
     this.config = config || new conf.Config();
 }
 
-// 发送持久化数据处理请求
-// @param bucket - 空间名称
-// @param key  - 文件名称
-// @param fops - 处理指令集合
-// @param pipeline - 处理队列名称
-// @param options - 可选参数
-//                  notifyURL 回调业务服务器，通知处理结果
-//                  force     结果是否强制覆盖已有的同名文件
-// @param callbackFunc(err, respBody, respInfo) - 回调函数
-OperationManager.prototype.pfop = function (bucket, key, fops, pipeline,
-    options, callbackFunc) {
+/**
+ * @typedef {function(Error, any, IncomingMessage)} OperationCallback
+ */
+
+/**
+ * @param {string} bucket 空间名称
+ * @param {string} key 文件名称
+ * @param {string[]} fops 处理指令
+ * @param {string} pipeline 队列名称
+ * @param {object} options 可选参数
+ * @param {string} [options.notifyURL] 回调业务服务器，通知处理结果
+ * @param {boolean} [options.force] 是否强制覆盖已有的同名文件
+ * @param {string} [options.type] 为 `1` 时，开启闲时任务
+ * @param {OperationCallback} callbackFunc 回调函数
+ */
+OperationManager.prototype.pfop = function (
+    bucket,
+    key,
+    fops,
+    pipeline,
+    options,
+    callbackFunc
+) {
     options = options || {};
     // 必须参数
-    var reqParams = {
+    const reqParams = {
         bucket: bucket,
         key: key,
-        pipeline: pipeline,
         fops: fops.join(';')
     };
+
+    // pipeline
+    if (!pipeline) {
+        delete reqParams.pipeline;
+    }
 
     // notifyURL
     if (options.notifyURL) {
@@ -39,6 +55,11 @@ OperationManager.prototype.pfop = function (bucket, key, fops, pipeline,
     // force
     if (options.force) {
         reqParams.force = 1;
+    }
+
+    const persistentType = parseInt(options.type, 10);
+    if (!isNaN(persistentType)) {
+        reqParams.type = options.type;
     }
 
     util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {
@@ -51,27 +72,32 @@ OperationManager.prototype.pfop = function (bucket, key, fops, pipeline,
 };
 
 function pfopReq (mac, config, reqParams, callbackFunc) {
-    var scheme = config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + config.zone.apiHost + '/pfop/';
-    var reqBody = querystring.stringify(reqParams);
-    var auth = util.generateAccessToken(mac, requestURI, reqBody);
+    const scheme = config.useHttpsDomain ? 'https://' : 'http://';
+    const requestURI = scheme + config.zone.apiHost + '/pfop/';
+    const reqBody = querystring.stringify(reqParams);
+    const auth = util.generateAccessToken(mac, requestURI, reqBody);
     rpc.postWithForm(requestURI, reqBody, auth, callbackFunc);
 }
 
-// 查询持久化数据处理进度
-// @param persistentId
-// @callbackFunc(err, respBody, respInfo) - 回调函数
-OperationManager.prototype.prefop = function (persistentId, callbackFunc) {
-    var apiHost = 'api.qiniu.com';
+/**
+ * 查询持久化数据处理进度
+ * @param {string} persistentId
+ * @param {OperationCallback} callbackFunc 回调函数
+ */
+OperationManager.prototype.prefop = function (
+    persistentId,
+    callbackFunc
+) {
+    let apiHost = 'api.qiniu.com';
     if (this.config.zone) {
         apiHost = this.config.zone.apiHost;
     }
 
-    var scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
-    var requestURI = scheme + apiHost + '/status/get/prefop';
-    var reqParams = {
+    const scheme = this.config.useHttpsDomain ? 'https://' : 'http://';
+    const requestURI = scheme + apiHost + '/status/get/prefop';
+    const reqParams = {
         id: persistentId
     };
-    var reqBody = querystring.stringify(reqParams);
+    const reqBody = querystring.stringify(reqParams);
     rpc.postWithForm(requestURI, reqBody, null, callbackFunc);
 };
