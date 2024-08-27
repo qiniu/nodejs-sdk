@@ -16,7 +16,7 @@ const {
 
 const {
     getEnvConfig,
-    checkEnvConfigAndExit,
+    checkEnvConfigOrExit,
     createRandomFile,
     createRandomStreamAndMD5,
     doAndWrapResultPromises,
@@ -67,7 +67,7 @@ function getRemoteObjectHeadersAndMD5 (url) {
 }
 
 before(function () {
-    checkEnvConfigAndExit();
+    checkEnvConfigOrExit();
 
     return Promise.all([
         createRandomFile(testFilePath, (1 << 20) * 10)

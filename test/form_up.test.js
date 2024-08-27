@@ -14,7 +14,7 @@ const {
 
 const {
     getEnvConfig,
-    checkEnvConfigAndExit,
+    checkEnvConfigOrExit,
     createRandomFile,
     doAndWrapResultPromises
 } = require('./conftest');
@@ -24,7 +24,7 @@ const testFilePath1 = path.join(os.tmpdir(), 'nodejs-sdk-test-1.bin');
 const testFilePath2 = path.join(os.tmpdir(), 'nodejs-sdk-test-2.bin');
 
 before(function () {
-    checkEnvConfigAndExit();
+    checkEnvConfigOrExit();
 
     return Promise.all([
         createRandomFile(testFilePath1, (1 << 20) * 10),

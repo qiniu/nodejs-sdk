@@ -12,7 +12,7 @@ function getEnvConfig () {
 }
 exports.getEnvConfig = getEnvConfig;
 
-function checkEnvConfigAndExit () {
+function checkEnvConfigOkOrExit () {
     const envConfig = getEnvConfig();
     if (
         Object.keys(envConfig).some(k => !envConfig[k])
@@ -21,7 +21,7 @@ function checkEnvConfigAndExit () {
         process.exit(0);
     }
 }
-exports.checkEnvConfigAndExit = checkEnvConfigAndExit;
+exports.checkEnvConfigOrExit = checkEnvConfigOkOrExit;
 
 /**
  * @typedef Param

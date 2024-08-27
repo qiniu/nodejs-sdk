@@ -6,12 +6,12 @@ const qiniu = require('../index.js');
 
 const {
     getEnvConfig,
-    checkEnvConfigAndExit,
+    checkEnvConfigOrExit,
     doAndWrapResultPromises
 } = require('./conftest');
 
 before(function () {
-    checkEnvConfigAndExit();
+    checkEnvConfigOrExit();
 });
 
 describe('test start bucket manager', function () {
