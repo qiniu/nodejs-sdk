@@ -1,74 +1,182 @@
-const qiniu = require('../index.js');
-const should = require('should');
-const proc = require('process');
-const console = require('console');
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
 
-// eslint-disable-next-line no-undef
-before(function (done) {
-    if (!process.env.QINIU_ACCESS_KEY || !process.env.QINIU_SECRET_KEY || !process.env.QINIU_TEST_BUCKET || !process.env.QINIU_TEST_DOMAIN) {
-        console.log('should run command `source test-env.sh` first\n');
-        process.exit(0);
-    }
-    done();
+const should = require('should');
+const qiniu = require('../index.js');
+const {
+    checkEnvConfigOrExit,
+    getEnvConfig,
+    parametrize,
+    createRandomFile
+} = require('./conftest');
+
+// file to upload
+const testFilePath = path.join(os.tmpdir(), 'nodejs-sdk-test-fop.bin');
+
+before(function () {
+    checkEnvConfigOrExit();
+    return Promise.all([
+        createRandomFile(testFilePath, (1 << 20) * 5)
+    ]);
 });
 
-// eslint-disable-next-line no-undef
+after(() => {
+    return Promise.all(
+        [
+            testFilePath
+        ].map(p => new Promise(resolve => {
+            fs.unlink(p, err => {
+                if (err && err.code !== 'ENOENT') {
+                    console.log(`unlink ${p} failed`, err);
+                }
+                resolve();
+            });
+        }))
+    );
+});
+
 describe('test start fop', function () {
     this.timeout(0);
 
-    var accessKey = proc.env.QINIU_ACCESS_KEY;
-    var secretKey = proc.env.QINIU_SECRET_KEY;
-    var srcBucket = proc.env.QINIU_TEST_BUCKET;
-    var mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-    var config = new qiniu.conf.Config();
+    const {
+        accessKey,
+        secretKey,
+        bucketName
+    } = getEnvConfig();
+    const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+    const config = new qiniu.conf.Config();
     config.useHttpsDomain = true;
-    config.zone = qiniu.zone.Zone_z0;
+    config.zone = qiniu.zone.Zone_na0;
 
-    var persistentId;
+    let persistentId;
 
-    it('test video fop', function (done) {
-        console.log(srcBucket);
+    const testParams = parametrize(
+        {
+            name: 'persistentType',
+            values: [
+                undefined,
+                0,
+                1
+            ]
+        }
+    );
 
-        var pipeline = 'sdktest';
-        var srcKey = 'qiniu.mp4';
-        var operManager = new qiniu.fop.OperationManager(mac, config);
+    testParams.forEach(function (testParam) {
+        const {
+            persistentType
+        } = testParam;
+        const msg = `params(${JSON.stringify(testParam)})`;
 
-        // 处理指令集合
-        var saveBucket = srcBucket;
-        var fops = [
-            'avthumb/mp4/s/480x320/vb/150k|saveas/' + qiniu.util.urlsafeBase64Encode(
-                saveBucket + ':qiniu_480x320.mp4'),
-            'vframe/jpg/offset/10|saveas/' + qiniu.util.urlsafeBase64Encode(
-                saveBucket +
-          ':qiniu_frame1.jpg')
-        ];
+        it(`test video fop; ${msg}`, function (done) {
+            let pipeline = 'sdktest';
+            const srcKey = 'qiniu.mp4';
+            const operationManager = new qiniu.fop.OperationManager(mac, config);
 
-        var options = {
-            notifyURL: 'http://api.example.com/pfop/callback',
-            force: false
-        };
+            // 处理指令集合
+            const srcBucket = bucketName;
+            const saveBucket = bucketName;
+            const fop1 = [
+                'avthumb/mp4/s/480x320/vb/150k|saveas/',
+                qiniu.util.urlsafeBase64Encode(
+                    `${saveBucket}:qiniu_480x320.mp4`
+                )
+            ].join('');
+            const fop2 = [
+                'vframe/jpg/offset/10|saveas/',
+                qiniu.util.urlsafeBase64Encode(
+                    `${saveBucket}:qiniu_frame1.jpg`
+                )
+            ].join('');
+            const fops = [fop1, fop2];
 
-        // 持久化数据处理返回的是任务的persistentId，可以根据这个id查询处理状态
-        operManager.pfop(srcBucket, srcKey, fops, pipeline, options,
-            function (err, respBody, respInfo) {
-                console.log(respBody, respInfo);
-                should.not.exist(err);
-                respBody.should.have.keys('persistentId');
-                persistentId = respBody.persistentId;
-                done();
-            });
-    });
+            const options = {
+                notifyURL: 'http://api.example.com/pfop/callback',
+                force: false
+            };
 
-    it('test video prefop', function (done) {
-        var operManager = new qiniu.fop.OperationManager(mac, config);
-        // 查询处理状态
-        operManager.prefop(persistentId,
-            function (err, respBody, respInfo) {
-                console.log(respBody, respInfo);
-                should.not.exist(err);
-                respBody.should.have.keys('id', 'pipeline', 'inputBucket', 'inputKey');
-                respBody.should.have.property('id', persistentId);
-                done();
-            });
+            if (persistentType !== undefined) {
+                options.type = persistentType;
+                pipeline = null;
+            }
+
+            // 持久化数据处理返回的是任务的persistentId，可以根据这个id查询处理状态
+            operationManager.pfop(srcBucket, srcKey, fops, pipeline, options,
+                function (err, respBody, respInfo) {
+                    console.log(respBody, respInfo);
+                    should.not.exist(err);
+                    respBody.should.have.keys('persistentId');
+                    persistentId = respBody.persistentId;
+                    done();
+                });
+        });
+
+        it(`test video prefop; ${msg}`, function (done) {
+            const operationManager = new qiniu.fop.OperationManager(mac, config);
+            // 查询处理状态
+            operationManager.prefop(persistentId,
+                function (err, respBody, respInfo) {
+                    console.log(respBody, respInfo);
+                    should.not.exist(err);
+                    respBody.should.have.keys('id', 'pipeline', 'inputBucket', 'inputKey');
+                    respBody.should.have.property('id', persistentId);
+                    if (persistentType) {
+                        should.equal(respBody.type, persistentType);
+                    }
+                    done();
+                });
+        });
+
+        it(`test pfop with upload; ${msg}`, function () {
+            const formUploader = new qiniu.form_up.FormUploader(config);
+            const key = 'qiniu-pfop-upload-file';
+            const persistentKey = [
+                'qiniu-pfop-by-upload',
+                'persistentType',
+                persistentType
+            ].join('_');
+
+            const fop1 = [
+                'avinfo|saveas/',
+                qiniu.util.urlsafeBase64Encode(
+                    `${bucketName}:${persistentKey}`
+                )
+            ].join('');
+            const options = {
+                scope: bucketName,
+                persistentOps: [
+                    fop1
+                ].join(';'),
+                persistentType
+            };
+            const putPolicy = new qiniu.rs.PutPolicy(options);
+            const uploadToken = putPolicy.uploadToken(mac);
+            const putExtra = new qiniu.form_up.PutExtra();
+
+            return formUploader.put(uploadToken, key, testFilePath, putExtra)
+                .then(({ data }) => {
+                    data.should.have.keys('key', 'persistentId');
+
+                    return new Promise((resolve, reject) => {
+                        new qiniu.fop.OperationManager(mac, config)
+                            .prefop(
+                                data.persistentId,
+                                function (err, respBody, respInfo) {
+                                    if (err) {
+                                        reject(err);
+                                        return;
+                                    }
+                                    resolve({ data: respBody, resp: respInfo });
+                                }
+                            );
+                    });
+                })
+                .then(({ data }) => {
+                    data.should.have.keys('creationDate');
+                    if (persistentType) {
+                        should.equal(data.type, persistentType);
+                    }
+                });
+        });
     });
 });

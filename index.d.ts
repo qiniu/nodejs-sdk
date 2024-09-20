@@ -20,7 +20,7 @@ import {
     StatObjectResult
 } from "./StorageResponseInterface";
 
-export declare type callback = (e?: Error, respBody?: any, respInfo?: any) => void;
+export declare type callback<T = any> = (e?: Error, respBody?: T, respInfo?: any) => void;
 
 export declare namespace auth {
     namespace digest {
@@ -1050,6 +1050,11 @@ export declare namespace fop {
          * 结果是否强制覆盖已有的同名文件
          */
         force?: boolean;
+
+        /**
+         * 为 `1` 时开启闲时任务
+         */
+        type?: number;
     }
     class OperationManager {
         mac: auth.digest.Mac;
@@ -1066,14 +1071,44 @@ export declare namespace fop {
          * @param options
          * @param callback
          */
-        pfop(bucket: string, key: string, fops: string[], pipeline: string, options: PfopOptions | null, callback: callback): void;
+        pfop(
+            bucket: string,
+            key: string,
+            fops: string[],
+            pipeline: string,
+            options: PfopOptions | null,
+            callback: callback<{
+                persistentId: string
+            }>
+        ): void;
 
         /**
          * 查询持久化数据处理进度
-         * @param persistentId pfop操作返回的持久化处理ID
+         * @param persistentId pfop 操作返回的持久化处理ID
          * @param callback
          */
-        prefop(persistentId: string, callback: callback): void;
+        prefop(
+            persistentId: string,
+            callback: callback<{
+                id: string,
+                pipeline: string,
+                code: number,
+                desc: string,
+                reqid: string,
+                inputBucket: string,
+                inputKey: string,
+                creationDate: string,
+                type: number,
+                items: {
+                    cmd: string,
+                    code: number,
+                    desc: string,
+                    returnOld: number,
+                    error?: string,
+                    hash?: string,
+                }[]
+            }>
+        ): void;
     }
 }
 
@@ -1744,6 +1779,7 @@ export declare namespace rs {
         persistentOps?: string;
         persistentNotifyUrl?: string;
         persistentPipeline?: string;
+        persistentType?: string;
 
         fsizeLimit?: number;
         fsizeMin?: number;
