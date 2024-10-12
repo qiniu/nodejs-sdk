@@ -1695,7 +1695,7 @@ function _putPolicyBuildInKeys () {
  * @property {string} [persistentOps]
  * @property {string} [persistentNotifyUrl]
  * @property {string} [persistentPipeline]
- * @property {string} [persistentType]
+ * @property {number} [persistentType]
  * @property {number} [fsizeLimit]
  * @property {number} [fsizeMin]
  * @property {string} [mimeLimit]

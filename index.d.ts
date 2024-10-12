@@ -1779,7 +1779,7 @@ export declare namespace rs {
         persistentOps?: string;
         persistentNotifyUrl?: string;
         persistentPipeline?: string;
-        persistentType?: string;
+        persistentType?: number;
 
         fsizeLimit?: number;
         fsizeMin?: number;
