@@ -1055,6 +1055,11 @@ export declare namespace fop {
          * 为 `1` 时开启闲时任务
          */
         type?: number;
+
+        /**
+         * 工作流模版 ID，与函数参数中的 fops 参数二选一
+         */
+        workflowTemplateID?: string
     }
     class OperationManager {
         mac: auth.digest.Mac;
@@ -1066,7 +1071,7 @@ export declare namespace fop {
          * 发送持久化数据处理请求
          * @param bucket 空间名称
          * @param key 文件名称
-         * @param fops 处理指令集合
+         * @param fops 处理指令集合，与 options.workflowTemplateID 二选一
          * @param pipeline 处理队列名称
          * @param options
          * @param callback
@@ -1097,8 +1102,9 @@ export declare namespace fop {
                 reqid: string,
                 inputBucket: string,
                 inputKey: string,
-                creationDate: string,
-                type: number,
+                creationDate?: string,
+                type?: number,
+                taskFrom?: string,
                 items: {
                     cmd: string,
                     code: number,
@@ -1106,6 +1112,7 @@ export declare namespace fop {
                     returnOld: number,
                     error?: string,
                     hash?: string,
+                    key?: string,
                 }[]
             }>
         ): void;
@@ -1780,6 +1787,7 @@ export declare namespace rs {
         persistentNotifyUrl?: string;
         persistentPipeline?: string;
         persistentType?: number;
+        persistentWorkflowTemplateID?: string;
 
         fsizeLimit?: number;
         fsizeMin?: number;

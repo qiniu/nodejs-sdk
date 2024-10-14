@@ -129,10 +129,10 @@ describe('test start fop', function () {
 
         it(`test pfop with upload; ${msg}`, function () {
             const formUploader = new qiniu.form_up.FormUploader(config);
-            const key = 'qiniu-pfop-upload-file';
+            const key = 'test-pfop/upload-file';
             const persistentKey = [
-                'qiniu-pfop-by-upload',
-                'persistentType',
+                'test-pfop/test-pfop-by-upload',
+                'type',
                 persistentType
             ].join('_');
 
@@ -178,5 +178,88 @@ describe('test start fop', function () {
                     }
                 });
         });
+    });
+
+    it('test pfop by templateID with api', function () {
+        const srcKey = 'qiniu.mp4';
+        const srcBucket = bucketName;
+
+        const templateID = 'test-workflow';
+        const operationManager = new qiniu.fop.OperationManager(mac, config);
+
+        new Promise((resolve, reject) => {
+            operationManager.pfop(
+                srcBucket,
+                srcKey,
+                null,
+                null,
+                { workflowTemplateID: templateID },
+                function (err, respBody, respInfo) {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve({ data: respBody, resp: respInfo });
+                }
+            );
+        })
+            .then(({ data }) => {
+                data.should.have.keys('persistentId');
+                return new Promise((resolve, reject) => {
+                    operationManager.prefop(
+                        data.persistentId,
+                        function (err, respBody, respInfo) {
+                            if (err) {
+                                reject(err);
+                                return;
+                            }
+                            resolve({ data: respBody, resp: respInfo });
+                        }
+                    );
+                });
+            })
+            .then(({ data }) => {
+                data.should.have.keys(
+                    'creationDate',
+                    'taskFrom'
+                );
+            });
+    });
+
+    it('test pfop by templateID with upload', function () {
+        const formUploader = new qiniu.form_up.FormUploader(config);
+        const key = 'qiniu-pfop-tplid-upload-file';
+        const templateID = 'test-workflow';
+        const options = {
+            scope: bucketName,
+            persistentWorkflowTemplateID: templateID
+        };
+        const putPolicy = new qiniu.rs.PutPolicy(options);
+        const uploadToken = putPolicy.uploadToken(mac);
+        const putExtra = new qiniu.form_up.PutExtra();
+
+        return formUploader.put(uploadToken, key, testFilePath, putExtra)
+            .then(({ data }) => {
+                data.should.have.keys('key', 'persistentId');
+                return new Promise((resolve, reject) => {
+                    new qiniu.fop.OperationManager(mac, config)
+                        .prefop(
+                            data.persistentId,
+                            function (err, respBody, respInfo) {
+                                if (err) {
+                                    reject(err);
+                                    return;
+                                }
+                                resolve({ data: respBody, resp: respInfo });
+                            }
+                        );
+                });
+            })
+            .then(({ data }) => {
+                data.should.have.keys(
+                    'creationDate',
+                    'taskFrom'
+                );
+            });
     });
 });
