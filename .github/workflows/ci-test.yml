@@ -32,3 +32,5 @@ jobs:
           QINIU_TEST_DOMAIN: ${{ secrets.QINIU_TEST_DOMAIN }}
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

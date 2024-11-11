@@ -24,6 +24,7 @@ function OperationManager (mac, config) {
  * @param {string} [options.notifyURL] 回调业务服务器，通知处理结果
  * @param {boolean} [options.force] 是否强制覆盖已有的同名文件
  * @param {string} [options.type] 为 `1` 时，开启闲时任务
+ * @param {string} [options.workflowTemplateID] 工作流模板 ID
  * @param {OperationCallback} callbackFunc 回调函数
  */
 OperationManager.prototype.pfop = function (
@@ -38,9 +39,12 @@ OperationManager.prototype.pfop = function (
     // 必须参数
     const reqParams = {
         bucket: bucket,
-        key: key,
-        fops: fops.join(';')
+        key: key
     };
+    // `fops` is optional by could use `options.workflowTemplateID` to work
+    if (Array.isArray(fops)) {
+        reqParams.fops = fops.join(';');
+    }
 
     // pipeline
     if (!pipeline) {
@@ -57,9 +61,14 @@ OperationManager.prototype.pfop = function (
         reqParams.force = 1;
     }
 
+    // workflowTemplateID
+    if (options.workflowTemplateID) {
+        reqParams.workflowTemplateID = options.workflowTemplateID;
+    }
+
     const persistentType = parseInt(options.type, 10);
     if (!isNaN(persistentType)) {
-        reqParams.type = options.type;
+        reqParams.type = persistentType;
     }
 
     util.prepareZone(this, this.mac.accessKey, bucket, function (err, ctx) {

@@ -1692,10 +1692,11 @@ function _putPolicyBuildInKeys () {
  * @property {string} [callbackBody]
  * @property {string} [callbackBodyType]
  * @property {number} [callbackFetchKey]
- * @property {string} [persistentOps]
+ * @property {string} [persistentOps] conflict with `persistentWorkflowTemplateID`
  * @property {string} [persistentNotifyUrl]
  * @property {string} [persistentPipeline]
- * @property {string} [persistentType]
+ * @property {number} [persistentType]
+ * @property {string} [persistentWorkflowTemplateID] conflict with `persistentOps`
  * @property {number} [fsizeLimit]
  * @property {number} [fsizeMin]
  * @property {string} [mimeLimit]
