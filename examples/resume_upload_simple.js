@@ -30,8 +30,11 @@ putExtra.progressCallback = function (uploadBytes, totalBytes) {
 };
 
 // file
-resumeUploader.putFile(uploadToken, null, localFile, putExtra)
-    .then(({ data, resp }) => {
+resumeUploader.putFileV2(uploadToken, null, localFile, putExtra)
+    .then(({
+        data,
+        resp
+    }) => {
         if (resp.statusCode === 200) {
             console.log(data);
         } else {

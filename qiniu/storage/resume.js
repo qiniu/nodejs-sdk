@@ -13,6 +13,7 @@ const mkdirp = require('mkdirp');
 const conf = require('../conf');
 const util = require('../util');
 const rpc = require('../rpc');
+const libUtil = require('util');
 
 const { SERVICE_NAME } = require('../httpc/region');
 const { ResponseWrapper } = require('../httpc/responseWrapper');
@@ -30,7 +31,10 @@ const {
 } = require('./internal');
 
 exports.ResumeUploader = ResumeUploader;
-exports.PutExtra = PutExtra;
+exports.PutExtra = libUtil.deprecate(
+    PutExtra,
+    'PutExtra constructor is deprecated. Use PutExtra.create() for v2 uploads or explicitly specify version parameter.'
+);
 exports.createResumeRecorder = createResumeRecorder;
 exports.createResumeRecorderSync = createResumeRecorderSync;
 
@@ -58,13 +62,13 @@ function ResumeUploader (config) {
  */
 
 /**
- * 上传可选参数
+ * 上传可选参数，分片上传默认使用 v1 版本
  * @class
  * @constructor
  * @param {string} [fname]                      请求体中的文件的名称
  * @param {Object} [params]                     额外参数设置，参数名称必须以x:开头
  * @param {string | null} [mimeType]            指定文件的mimeType
- * @param {string | null} [resumeRecordFile]    DEPRECATED: 使用 `` 与 `` 代替；断点续传的已上传的部分信息记录文件路径
+ * @param {string | null} [resumeRecordFile]    DEPRECATED: 使用 `resumeRecorder` 与 `resumeKey` 代替；断点续传的已上传的部分信息记录文件路径
  * @param {function(number, number):void} [progressCallback] 上传进度回调，回调参数为 (uploadBytes, totalBytes)
  * @param {number} [partSize]                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
  * @param {'v1' | 'v2'} [version]               分片上传版本 目前支持v1/v2版本 默认v1
@@ -96,6 +100,39 @@ function PutExtra (
     this.resumeRecorder = resumeRecorder || null;
     this.resumeKey = resumeKey || null;
 }
+
+/**
+ * 上传可选参数，分片上传默认使用 v2 版本
+ * @class
+ * @constructor
+ * @param {string} [fname]                      请求体中的文件的名称
+ * @param {Object} [params]                     额外参数设置，参数名称必须以x:开头
+ * @param {string | null} [mimeType]            指定文件的mimeType
+ * @param {string | null} [resumeRecordFile]    DEPRECATED: 使用 `resumeRecorder` 与 `resumeKey` 代替；断点续传的已上传的部分信息记录文件路径
+ * @param {function(number, number):void} [progressCallback] 上传进度回调，回调参数为 (uploadBytes, totalBytes)
+ * @param {number} [partSize]                   分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
+ * @param {'v1' | 'v2'} [version]               分片上传版本 目前支持v1/v2版本 默认v2
+ * @param {Object} [metadata]                   元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+ * @param {JsonFileRecorder} [resumeRecorder]   通过 `createResumeRecorder` 或 `createResumeRecorderSync` 获取，优先级比 `resumeRecordFile` 低
+ * @param {string} [resumeKey]                  断点续传记录文件的具体文件名，不设置时会由当次上传自动生成
+ */
+PutExtra.create = function (
+    fname,
+    params,
+    mimeType,
+    resumeRecordFile,
+    progressCallback,
+    partSize,
+    version,
+    metadata,
+    resumeRecorder,
+    resumeKey) {
+    return new PutExtra(
+        fname, params, mimeType, resumeRecordFile,
+        progressCallback, partSize, version || 'v2',
+        metadata, resumeRecorder, resumeKey
+    );
+};
 
 /**
  * @private
@@ -222,6 +259,7 @@ function _getRegionsRetrier (options) {
  */
 
 /**
+ * @deprecated use putStreamV2 instead
  * @param {string} uploadToken
  * @param {string | null} key
  * @param {stream.Readable} rsStream
@@ -238,10 +276,44 @@ ResumeUploader.prototype.putStream = function (
     putExtra,
     callbackFunc
 ) {
+    // PutExtra
+    putExtra = getDefaultPutExtra(
+        putExtra,
+        {
+            key
+        }
+    );
+    return this.putStreamV2(
+        uploadToken,
+        key,
+        rsStream,
+        rsStreamLen,
+        putExtra,
+        callbackFunc
+    );
+};
+
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {stream.Readable} rsStream
+ * @param {number} rsStreamLen
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} [callbackFunc]
+ * @returns {Promise<UploadResult>}
+ */
+ResumeUploader.prototype.putStreamV2 = function (
+    uploadToken,
+    key,
+    rsStream,
+    rsStreamLen,
+    putExtra,
+    callbackFunc
+) {
     const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
 
     // PutExtra
-    putExtra = getDefaultPutExtra(
+    putExtra = getDefaultPutExtraV2(
         putExtra,
         {
             key
@@ -847,6 +919,7 @@ function completeParts (
 }
 
 /**
+ * @deprecated Use putFileV2 instead
  * @param {string} uploadToken
  * @param {string | null} key
  * @param {string} localFile
@@ -861,10 +934,30 @@ ResumeUploader.prototype.putFile = function (
     putExtra,
     callbackFunc
 ) {
+    // PutExtra
+    putExtra = putExtra || new PutExtra();
+    return this.putFileV2(uploadToken, key, localFile, putExtra, callbackFunc);
+};
+
+/**
+ * @param {string} uploadToken
+ * @param {string | null} key
+ * @param {string} localFile
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} [callbackFunc]
+ * @returns {Promise<UploadResult>}
+ */
+ResumeUploader.prototype.putFileV2 = function (
+    uploadToken,
+    key,
+    localFile,
+    putExtra,
+    callbackFunc
+) {
     const preferredScheme = this.config.useHttpsDomain ? 'https' : 'http';
 
     // PutExtra
-    putExtra = putExtra || new PutExtra();
+    putExtra = putExtra || PutExtra.create();
     if (!putExtra.mimeType) {
         putExtra.mimeType = mime.getType(localFile);
     }
@@ -929,6 +1022,7 @@ ResumeUploader.prototype.putFile = function (
 };
 
 /**
+ * @deprecated use putFileWithoutKeyV2 instead
  * @param {string} uploadToken
  * @param {string} localFile
  * @param {PutExtra} putExtra
@@ -942,6 +1036,22 @@ ResumeUploader.prototype.putFileWithoutKey = function (
     callbackFunc
 ) {
     return this.putFile(uploadToken, null, localFile, putExtra, callbackFunc);
+};
+
+/**
+ * @param {string} uploadToken
+ * @param {string} localFile
+ * @param {PutExtra} putExtra
+ * @param {reqCallback} [callbackFunc]
+ * @returns {Promise<UploadResult>}
+ */
+ResumeUploader.prototype.putFileWithoutKeyV2 = function (
+    uploadToken,
+    localFile,
+    putExtra,
+    callbackFunc
+) {
+    return this.putFileV2(uploadToken, null, localFile, putExtra, callbackFunc);
 };
 
 /**
@@ -974,6 +1084,17 @@ function getDefaultPutExtra (putExtra, options) {
     }
 
     return putExtra;
+}
+
+/**
+ * @param {PutExtra} putExtra
+ * @param {Object} options
+ * @param {string | null} [options.key]
+ * @returns {PutExtra}
+ */
+function getDefaultPutExtraV2 (putExtra, options) {
+    putExtra = putExtra || PutExtra.create();
+    return getDefaultPutExtra(putExtra, options);
 }
 
 /**

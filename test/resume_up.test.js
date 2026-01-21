@@ -200,7 +200,7 @@ describe('test resume up', function () {
                 }
 
                 const promises = doAndWrapResultPromises(callback =>
-                    resumeUploader.putFileWithoutKey(
+                    resumeUploader.putFileWithoutKeyV2(
                         uploadToken,
                         testFilePath,
                         putExtra,
@@ -270,7 +270,7 @@ describe('test resume up', function () {
                 const key = 'storage_putFile_test' + Math.floor(Math.random() * 100000);
 
                 const promises = doAndWrapResultPromises(callback =>
-                    resumeUploader.putFile(
+                    resumeUploader.putFileV2(
                         uploadToken,
                         key,
                         testFilePath,
@@ -331,7 +331,7 @@ describe('test resume up', function () {
             }
 
             it(`test resume up#putStream; ${msg}`, function () {
-                const putExtra = new qiniu.resume_up.PutExtra();
+                const putExtra = qiniu.resume_up.PutExtra.create();
                 if (version !== undefined) {
                     putExtra.version = version;
                 }
@@ -351,7 +351,7 @@ describe('test resume up', function () {
                 } = createRandomStreamAndMD5(streamSize);
 
                 const promises = doAndWrapResultPromises(callback =>
-                    resumeUploader.putStream(
+                    resumeUploader.putStreamV2(
                         uploadToken,
                         key,
                         stream,
@@ -567,7 +567,7 @@ describe('test resume up', function () {
                         putExtra.progressCallback = (_uploaded, _total) => {
                             throw new Error('mocked error');
                         };
-                        return resumeUploader.putFile(
+                        return resumeUploader.putFileV2(
                             uploadToken,
                             key,
                             filePath,
