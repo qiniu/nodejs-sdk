@@ -2,10 +2,10 @@
  * typescript definition for qiniu 7.x
  * @author xialeistudio<xialeistudio@gmail.com>
  */
-import { Callback, RequestOptions } from 'urllib';
-import { Agent as HttpAgent, IncomingMessage} from 'http';
-import { Agent as HttpsAgent } from 'https';
-import { Readable } from "stream";
+import {Callback, RequestOptions} from 'urllib';
+import {Agent as HttpAgent, IncomingMessage} from 'http';
+import {Agent as HttpsAgent} from 'https';
+import {Readable} from "stream";
 import {
     BatchOpsResult,
     FetchObjectResult,
@@ -187,6 +187,7 @@ export declare namespace conf {
          */
         regionsProvider?: httpc.RegionsProvider;
     }
+
     class Config {
         useHttpsDomain: boolean;
         accelerateUploading: boolean;
@@ -202,7 +203,9 @@ export declare namespace conf {
         zoneExpire?: number;
 
         constructor(options?: ConfigOptions);
+
         getUcEndpointsProvider(): httpc.EndpointsProvider;
+
         getRegionsProvider(options?: getRegionsProviderOptions): Promise<httpc.RegionsProvider>
     }
 
@@ -359,6 +362,8 @@ export declare namespace resume_up {
         constructor(config?: conf.Config);
 
         /**
+         * 通过数据流的方式上传一个文件，如果不指定文件保存的 key，服务会自动生成一个key；
+         * 如果 putExtra 为 null，则默认使用使用分片 v2 进行上传
          *
          * @param uploadToken
          * @param key
@@ -377,6 +382,28 @@ export declare namespace resume_up {
         ): Promise<UploadResult>;
 
         /**
+         * 通过数据流的方式上传一个文件，如果不指定文件保存的 key，服务会自动生成一个key；
+         * 如果 putExtra 为 null，则默认使用使用分片 v2 进行上传
+         *
+         * @param uploadToken
+         * @param key
+         * @param rsStream
+         * @param rsStreamLen
+         * @param putExtra
+         * @param callback
+         */
+        putStreamV2(
+            uploadToken: string,
+            key: string | null,
+            rsStream: NodeJS.ReadableStream,
+            rsStreamLen: number,
+            putExtra: PutExtra | null,
+            callback?: callback
+        ): Promise<UploadResult>;
+
+        /**
+         * 上传一个文件，如果不指定文件保存的 key，服务会自动生成一个key；
+         * 如果 putExtra 为 null，则默认使用使用分片 v2 进行上传
          *
          * @param uploadToken
          * @param key
@@ -393,6 +420,24 @@ export declare namespace resume_up {
         ): Promise<UploadResult>;
 
         /**
+         * 上传一个文件，不指定文件保存的 key，服务会自动生成一个key；
+         * 如果 putExtra 为 null，则默认使用使用分片 v2 进行上传
+         *
+         * @param uploadToken
+         * @param key
+         * @param localFile
+         * @param putExtra
+         * @param callback
+         */
+        putFileV2(
+            uploadToken: string,
+            key: string | null,
+            localFile: string,
+            putExtra: PutExtra | null,
+            callback?: callback
+        ): Promise<UploadResult>;
+
+        /**
          *
          * @param uploadToken
          * @param localFile
@@ -400,6 +445,22 @@ export declare namespace resume_up {
          * @param callback
          */
         putFileWithoutKey(
+            uploadToken: string,
+            localFile: string,
+            putExtra: PutExtra | null,
+            callback?: callback
+        ): Promise<UploadResult>;
+
+        /**
+         * 上传一个文件，不指定文件保存的 key，服务会自动生成一个key；
+         * 如果 putExtra 为 null，则默认使用使用分片 v2 进行上传
+         *
+         * @param uploadToken
+         * @param localFile
+         * @param putExtra
+         * @param callback
+         */
+        putFileWithoutKeyV2(
             uploadToken: string,
             localFile: string,
             putExtra: PutExtra | null,
@@ -476,8 +537,26 @@ export declare namespace resume_up {
          */
         constructor(fname?: string, params?: Record<string, string>, mimeType?: string, resumeRecordFile?: string,
                     progressCallback?: (uploadBytes: number, totalBytes: number) => void,
-                    partSize?:number, version?:string, metadata?: Record<string, string>,
+                    partSize?: number, version?: string, metadata?: Record<string, string>,
                     resumeRecorder?: ResumeRecorder, resumeKey?: string);
+
+        /**
+         * 上传可选参数
+         * @param fname 请求体中的文件的名称
+         * @param params 额外参数设置，参数名称必须以x:开头
+         * @param mimeType 指定文件的mimeType
+         * @param resumeRecordFile
+         * @param progressCallback
+         * @param partSize 分片上传v2必传字段 默认大小为4MB 分片大小范围为1 MB - 1 GB
+         * @param version 分片上传版本 目前支持v1/v2版本 默认v2
+         * @param metadata 元数据设置，参数名称必须以 x-qn-meta-${name}: 开头
+         * @param resumeRecorder 断点续传记录器，请通过 `createResumeRecorder` 或 `createResumeRecorderSync` 获取，优先级比 `resumeRecordFile` 低
+         * @param resumeKey 断点续传记录文件的具体文件名，不设置时会由当次上传自动生成，推荐不设置
+         */
+        static create(fname?: string, params?: Record<string, string>, mimeType?: string, resumeRecordFile?: string,
+                      progressCallback?: (uploadBytes: number, totalBytes: number) => void,
+                      partSize?: number, version?: string, metadata?: Record<string, string>,
+                      resumeRecorder?: ResumeRecorder, resumeKey?: string): PutExtra;
     }
 
     /**
@@ -491,12 +570,12 @@ export declare namespace resume_up {
      *
      * @param baseDirPath 默认值为 `os.tmpdir()`，该方法若 baseDirPath 不存在将自动创建
      */
-    function createResumeRecorder (baseDirPath?: string): Promise<ResumeRecorder>
+    function createResumeRecorder(baseDirPath?: string): Promise<ResumeRecorder>
 
     /**
      * `createResumeRecorder` 的同步版本，不推荐使用
      */
-    function createResumeRecorderSync (baseDirPath?: string): ResumeRecorder
+    function createResumeRecorderSync(baseDirPath?: string): ResumeRecorder
 }
 
 export declare namespace util {
@@ -603,8 +682,11 @@ export declare namespace httpc {
     class ResponseWrapper<T = any> {
         data: T extends void ? undefined | ResponseError : T & ResponseError;
         resp: Omit<IncomingMessage, 'url'> & { requestUrls: string[] };
+
         constructor(options: ResponseWrapperOptions);
+
         ok(): boolean;
+
         needRetry(): boolean;
     }
 
@@ -632,6 +714,7 @@ export declare namespace httpc {
          */
         class UserAgentMiddleware implements Middleware {
             constructor(sdkVersion: string);
+
             send<T>(
                 request: httpc.ReqOpts<T>,
                 next: (reqOpts: httpc.ReqOpts<T>) => Promise<httpc.ResponseWrapper<T>>
@@ -723,10 +806,15 @@ export declare namespace httpc {
         httpAgent: HttpAgent;
         httpsAgent: HttpsAgent;
         middlewares: middleware.Middleware[];
+
         constructor(options: HttpClientOptions)
+
         sendRequest(requestOptions: ReqOpts): Promise<ResponseWrapper>
+
         get(getOptions: GetOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+
         post(postOptions: PostOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
+
         put(putOptions: PutOptions, urllibOptions?: RequestOptions): Promise<ResponseWrapper>
     }
 
@@ -746,7 +834,7 @@ export declare namespace httpc {
 
         constructor(host: string, options?: EndpointOptions);
 
-        getValue(options?: {scheme?: string}): string;
+        getValue(options?: { scheme?: string }): string;
 
         getEndpoints(): Promise<httpc.Endpoint[]>;
 
@@ -827,7 +915,9 @@ export declare namespace httpc {
 
     class Region implements RegionsProvider {
         static fromZone(zone: conf.Zone, options?: RegionFromZoneOptions): Region;
+
         static fromRegionId(regionId: string, options?: RegionFromRegionIdOptions): Region;
+
         static merge(...r: Region[]): Region;
 
         // non-unique
@@ -872,7 +962,7 @@ export declare namespace httpc {
     }
 
     interface MutableRegionsProvider extends RegionsProvider {
-       setRegions(regions: Region[]): Promise<void>
+        setRegions(regions: Region[]): Promise<void>
     }
 
     // StaticRegionsProvider
@@ -1061,6 +1151,7 @@ export declare namespace fop {
          */
         workflowTemplateID?: string
     }
+
     class OperationManager {
         mac: auth.digest.Mac;
         config: conf.Config;
@@ -1190,7 +1281,9 @@ export declare namespace rs {
          * @param headers Headers对象
          * @param callback
          */
-        changeHeaders(bucket: string, key: string, headers: { [k: string]: string }, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
+        changeHeaders(bucket: string, key: string, headers: {
+            [k: string]: string
+        }, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 移动或重命名文件，当bucketSrc==bucketDest相同的时候，就是重命名文件操作
@@ -1203,7 +1296,9 @@ export declare namespace rs {
          * @param options
          * @param callback
          */
-        move(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: { force?: boolean } | null, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
+        move(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: {
+            force?: boolean
+        } | null, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 复制文件
@@ -1216,7 +1311,9 @@ export declare namespace rs {
          * @param options
          * @param callback
          */
-        copy(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: { force?: boolean } | null, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
+        copy(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options: {
+            force?: boolean
+        } | null, callback?: callback): Promise<httpc.ResponseWrapper<void>>;
 
         /**
          * 删除资源
@@ -1399,7 +1496,10 @@ export declare namespace rs {
          * @param callbackFunc
          */
         listBucket(callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
-        listBucket(options: { shared: string, tagCondition: Record<string, string> }, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
+        listBucket(options: {
+            shared: string,
+            tagCondition: Record<string, string>
+        }, callbackFunc?: callback): Promise<httpc.ResponseWrapper<GetBucketsResult>>
 
         /**
          * 创建空间
@@ -1644,12 +1744,12 @@ export declare namespace rs {
         putBucketAccessStyleMode(bucket: string, mode: number, callbackFunc?: callback): Promise<httpc.ResponseWrapper<void>>
 
         /**
-          * 设置缓存策略的 max-age 属性
-          * @param bucket
-          * @param options
-          * @param options.maxAge 为 0 或者负数表示为默认值（31536000）
-          * @param callbackFunc 回调函数
-          */
+         * 设置缓存策略的 max-age 属性
+         * @param bucket
+         * @param options
+         * @param options.maxAge 为 0 或者负数表示为默认值（31536000）
+         * @param callbackFunc 回调函数
+         */
         putBucketMaxAge(
             bucket: string,
             options: {
@@ -1755,7 +1855,9 @@ export declare namespace rs {
      * @param destKey
      * @param options
      */
-    function moveOp(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options?: { force?: boolean }): string;
+    function moveOp(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options?: {
+        force?: boolean
+    }): string;
 
     /**
      *
@@ -1765,7 +1867,9 @@ export declare namespace rs {
      * @param destKey
      * @param options
      */
-    function copyOp(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options?: { force?: boolean }): string;
+    function copyOp(srcBucket: string, srcKey: string, destBucket: string, destKey: string, options?: {
+        force?: boolean
+    }): string;
 
     interface PutPolicyOptions {
         scope?: string;
@@ -1806,6 +1910,7 @@ export declare namespace rs {
 
         [key: string]: string | number | boolean | undefined;
     }
+
     class PutPolicy {
         [k: string]: string | number | boolean | Function;
 
@@ -1818,73 +1923,73 @@ export declare namespace rs {
 }
 
 export declare namespace sms {
-  namespace message {
-    /**
-     * 发送短信 (POST Message)
-     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#1
-     * @param reqBody
-     * @param mac
-     * @param callback
-     */
-    function sendMessage(
-      reqBody: {
-        "template_id": string,
-        "mobiles": string[],
-        "parameters"?: Record<string, string>
-      },
-      mac: auth.digest.Mac,
-      callback: Callback<{ job_id: string }>
-    ): void;
+    namespace message {
+        /**
+         * 发送短信 (POST Message)
+         * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#1
+         * @param reqBody
+         * @param mac
+         * @param callback
+         */
+        function sendMessage(
+            reqBody: {
+                "template_id": string,
+                "mobiles": string[],
+                "parameters"?: Record<string, string>
+            },
+            mac: auth.digest.Mac,
+            callback: Callback<{ job_id: string }>
+        ): void;
 
-    /**
-     * 发送单条短信 (POST Single Message)
-     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#2
-     * @param reqBody
-     * @param mac
-     * @param callback
-     */
-    function sendSingleMessage(
-      reqBody: {
-        "template_id": string,
-        "mobile": string,
-        "parameters"?: Record<string, string>
-      },
-      mac: auth.digest.Mac,
-      callback: Callback<{ message_id: string }>
-    ): void;
+        /**
+         * 发送单条短信 (POST Single Message)
+         * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#2
+         * @param reqBody
+         * @param mac
+         * @param callback
+         */
+        function sendSingleMessage(
+            reqBody: {
+                "template_id": string,
+                "mobile": string,
+                "parameters"?: Record<string, string>
+            },
+            mac: auth.digest.Mac,
+            callback: Callback<{ message_id: string }>
+        ): void;
 
-    /**
-     * 发送国际/港澳台短信 (POST Oversea Message)
-     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#3
-     * @param reqBody
-     * @param mac
-     * @param callback
-     */
-    function sendOverseaMessage(
-      reqBody: {
-        "template_id": string,
-        "mobile": string,
-        "parameters"?: Record<string, string>
-      },
-      mac: auth.digest.Mac,
-      callback: Callback<{ message_id: string }>
-    ): void;
+        /**
+         * 发送国际/港澳台短信 (POST Oversea Message)
+         * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#3
+         * @param reqBody
+         * @param mac
+         * @param callback
+         */
+        function sendOverseaMessage(
+            reqBody: {
+                "template_id": string,
+                "mobile": string,
+                "parameters"?: Record<string, string>
+            },
+            mac: auth.digest.Mac,
+            callback: Callback<{ message_id: string }>
+        ): void;
 
-    /**
-     * 发送全文本短信(不需要传模版 ID) (POST Fulltext Message)
-     * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#4
-     * @param reqBody
-     * @param mac
-     * @param callback
-     */
-    function sendFulltextMessage(
-      reqBody: {
-        "mobiles": string[],
-        "content": string,
-        "template_type": string
-      },
-      mac: auth.digest.Mac,
-      callback: Callback<{ job_id: string }>
-    ): void;
-  }
+        /**
+         * 发送全文本短信(不需要传模版 ID) (POST Fulltext Message)
+         * @link https://developer.qiniu.com/sms/5897/sms-api-send-message#4
+         * @param reqBody
+         * @param mac
+         * @param callback
+         */
+        function sendFulltextMessage(
+            reqBody: {
+                "mobiles": string[],
+                "content": string,
+                "template_type": string
+            },
+            mac: auth.digest.Mac,
+            callback: Callback<{ job_id: string }>
+        ): void;
+    }
 }
