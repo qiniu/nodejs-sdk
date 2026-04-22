@@ -25,3 +25,5 @@ coverage/
 .nyc_output/
 .idea
 yarn.lock
+
+.claude/settings.local.json
