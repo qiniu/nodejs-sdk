@@ -47,8 +47,8 @@ OperationManager.prototype.pfop = function (
     }
 
     // pipeline
-    if (!pipeline) {
-        delete reqParams.pipeline;
+    if (pipeline) {
+        reqParams.pipeline = pipeline;
     }
 
     // notifyURL
