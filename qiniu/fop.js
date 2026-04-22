@@ -19,7 +19,7 @@ function OperationManager (mac, config) {
  * @param {string} bucket 空间名称
  * @param {string} key 文件名称
  * @param {string[]} fops 处理指令
- * @param {string} pipeline 队列名称
+ * @param {string} [pipeline] 队列名称
  * @param {object} options 可选参数
  * @param {string} [options.notifyURL] 回调业务服务器，通知处理结果
  * @param {boolean} [options.force] 是否强制覆盖已有的同名文件
