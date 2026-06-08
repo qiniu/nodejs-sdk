@@ -28,5 +28,11 @@ module.exports = {
     Credentials: require('./qiniu/rtc/credentials.js'),
     sms: {
         message: require('./qiniu/sms/message.js')
-    }
+    },
+    sandbox: require('./qiniu/sandbox.js')
 };
+
+module.exports.Sandbox = module.exports.sandbox.Sandbox;
+module.exports.SandboxClient = module.exports.sandbox.SandboxClient;
+module.exports.CommandExitError = module.exports.sandbox.CommandExitError;
+module.exports.SandboxError = module.exports.sandbox.SandboxError;
