@@ -259,7 +259,7 @@ Git.prototype.deleteBranch = function (repoPath, branch, opts) {
 Git.prototype.remoteAdd = function (repoPath, name, repoUrl, opts) {
     opts = opts || {};
     const add = () => this._runGit(repoPath, ['remote', 'add', shellQuote(name), shellQuote(repoUrl)], opts);
-    const afterAdd = result => opts.fetch ? this._runGit(repoPath, ['fetch', shellQuote(name)], opts) : result;
+    const afterAdd = result => opts.fetch && (!result || result.exitCode === 0) ? this._runGit(repoPath, ['fetch', shellQuote(name)], opts) : result;
     if (opts.overwrite) {
         return this._runGit(repoPath, ['remote', 'remove', shellQuote(name)], opts)
             .then(add, add)
@@ -297,7 +297,7 @@ Git.prototype.getConfig = function () {
     }
     args.push('--get', shellQuote(normalized.key));
     return this._runGit(normalized.repoPath, args, opts)
-        .then(result => result.stdout.trim());
+        .then(result => result.exitCode ? undefined : result.stdout.trim());
 };
 
 Git.prototype.configureUser = function () {

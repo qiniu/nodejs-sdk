@@ -176,8 +176,8 @@ describe('test sandbox module', function () {
             .then(() => client.getSandboxesMetrics().then(() => {
                 throw new Error('expected empty metrics ids to fail');
             }, err => {
-                err.name.should.eql('TypeError');
-                err.message.should.match(/No valid sandbox IDs/);
+                err.name.should.eql('SandboxError');
+                err.message.should.match(/At least one sandbox ID/);
             }))
             .then(() => client.getSandboxesMetrics('sbx_one'))
             .then(() => client.getSandboxesMetrics({ sandboxId: 'sbx_object' }))
@@ -205,6 +205,12 @@ describe('test sandbox module', function () {
             err.name.should.eql('SandboxError');
             err.message.should.eql('Qiniu Mac credentials (accessKey/secretKey) are required for this operation');
         }
+
+        (() => new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key',
+            accessKey: 'ak'
+        })).should.throw(/Both accessKey and secretKey/);
     });
 
     it('requires Qiniu AK/SK before creating sandboxes with Kodo resources', function () {
@@ -1167,12 +1173,17 @@ describe('test sandbox module', function () {
                 endpoint: fixture.endpoint
             });
 
-            return client.list({
+            return client.deleteSandbox().then(() => {
+                throw new Error('expected missing sandboxID to fail');
+            }, err => {
+                err.name.should.eql('SandboxError');
+                err.message.should.match(/sandboxID is required/);
+            }).then(() => client.list({
                 metadata: 'user=alice',
                 state: ['running', 'paused'],
                 limit: 10,
                 nextToken: 'n1'
-            }).then(() => client.getInfo('sbx_1'))
+            })).then(() => client.getInfo('sbx_1'))
                 .then(() => client.connect('sbx_1', { timeoutMs: 20000 }))
                 .then(() => client.setTimeout('sbx_1', { timeoutMs: 30000 }))
                 .then(() => client.refreshSandbox('sbx_1', { duration: 60 }))
@@ -1448,11 +1459,13 @@ describe('test sandbox module', function () {
                 .setEnvs({ NODE_ENV: 'production', PORT: '8080' })
                 .pipInstall(['numpy', 'pandas'], { g: false })
                 .pipInstall({ g: false })
+                .pipInstall([], { g: false })
                 .npmInstall('typescript', { dev: true })
                 .npmInstall('tsx', { g: true })
                 .npmInstall({ dev: true })
                 .bunInstall(['elysia'], { dev: true })
                 .bunInstall({ dev: true })
+                .bunInstall([])
                 .aptInstall(['curl'], { noInstallRecommends: true, fixMissing: true })
                 .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk dir', {
                     branch: 'sandbox',
@@ -1483,10 +1496,12 @@ describe('test sandbox module', function () {
                         { type: 'ENV', args: ['NODE_ENV', 'production', 'PORT', '8080'] },
                         { type: 'RUN', args: ['pip install --user \'numpy\' \'pandas\''] },
                         { type: 'RUN', args: ['pip install --user .'] },
+                        { type: 'RUN', args: ['pip install --user .'] },
                         { type: 'RUN', args: ['npm install --save-dev \'typescript\''] },
                         { type: 'RUN', args: ['npm install -g \'tsx\'', 'root'] },
                         { type: 'RUN', args: ['npm install --save-dev'] },
                         { type: 'RUN', args: ['bun add --dev \'elysia\''] },
+                        { type: 'run', cmd: 'bun install' },
                         { type: 'run', cmd: 'bun install' },
                         { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing \'curl\'', 'root'] },
                         { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\' \'/src/sdk dir\'', 'root'] },
@@ -2720,6 +2735,26 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('does not fetch after git remote add fails', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd) {
+                commandsSeen.push(cmd);
+                if (cmd.indexOf(' remote add ') >= 0) {
+                    return Promise.resolve({ stdout: '', stderr: 'bad remote', exitCode: 1 });
+                }
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.remoteAdd('/repo', 'origin', 'bad-url', { fetch: true }).then(result => {
+            result.exitCode.should.eql(1);
+            commandsSeen.should.eql([
+                'git remote add \'origin\' \'bad-url\''
+            ]);
+        });
+    });
+
     it('passes git push credentials through a helper when push fails', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
@@ -2983,9 +3018,13 @@ describe('test sandbox module', function () {
 
     it('normalizes git config helpers when options are omitted', function () {
         const commandsSeen = [];
+        let missingConfig = false;
         const git = new qiniu.sandbox.Git({
             run: function (cmd, opts) {
                 commandsSeen.push({ cmd, opts });
+                if (missingConfig && cmd.indexOf(' config --get ') >= 0) {
+                    return Promise.resolve({ stdout: '', stderr: '', exitCode: 1 });
+                }
                 return Promise.resolve({ stdout: 'Alice\n', stderr: '', exitCode: 0 });
             }
         });
@@ -2997,12 +3036,20 @@ describe('test sandbox module', function () {
                 return git.configureUser('Alice', 'alice@example.com');
             })
             .then(() => {
+                missingConfig = true;
+                return git.getConfig('missing.name');
+            })
+            .then(value => {
+                should.not.exist(value);
+            })
+            .then(() => {
                 const shellQuote = require('../qiniu/sandbox/util').shellQuote;
                 commandsSeen.map(item => item.cmd).should.eql([
                     'git config ' + shellQuote('user.name') + ' ' + shellQuote('Alice'),
                     'git config --get ' + shellQuote('user.name'),
                     'git config ' + shellQuote('user.name') + ' ' + shellQuote('Alice'),
-                    'git config ' + shellQuote('user.email') + ' ' + shellQuote('alice@example.com')
+                    'git config ' + shellQuote('user.email') + ' ' + shellQuote('alice@example.com'),
+                    'git config --get ' + shellQuote('missing.name')
                 ]);
                 commandsSeen.forEach(item => {
                     should.not.exist(item.opts.cwd);

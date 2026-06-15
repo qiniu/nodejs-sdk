@@ -97,6 +97,9 @@ function normalizeSandboxListOptions (opts) {
 
 function normalizeClientOptions (opts) {
     opts = opts || {};
+    if ((opts.accessKey && !opts.secretKey) || (!opts.accessKey && opts.secretKey)) {
+        throw new SandboxError('Both accessKey and secretKey must be provided');
+    }
     const mac = opts.mac || (opts.accessKey || opts.secretKey
         ? new digest.Mac(opts.accessKey, opts.secretKey, opts.macOptions)
         : null);
@@ -238,7 +241,7 @@ SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
         return value && (value.sandboxId || value.sandboxID || value.sandbox_id || value.id);
     }).filter(Boolean);
     if (!ids.length) {
-        return Promise.reject(new TypeError('No valid sandbox IDs found'));
+        return Promise.reject(new SandboxError('At least one sandbox ID must be provided'));
     }
     return this._request('GET', appendQuery('/sandboxes/metrics', { sandbox_ids: ids }));
 };
@@ -252,6 +255,9 @@ SandboxClient.prototype.getSandbox = function (sandboxID) {
 };
 
 SandboxClient.prototype.deleteSandbox = function (sandboxID) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
     return this._request('DELETE', `/sandboxes/${encodePath(sandboxID)}`, { empty: true });
 };
 

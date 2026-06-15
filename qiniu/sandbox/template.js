@@ -445,7 +445,8 @@ Template.prototype.pipInstall = function (packages, options) {
     if (options.g === false) {
         args.push('--user');
     }
-    if (packages) {
+    const hasPackages = packages && (!Array.isArray(packages) || packages.length > 0);
+    if (hasPackages) {
         args.push.apply(args, asArray(packages).map(shellQuote));
     } else {
         args.push('.');
@@ -478,7 +479,8 @@ Template.prototype.bunInstall = function (packages, options) {
         packages = undefined;
     }
     options = options || {};
-    if (packages) {
+    const hasPackages = packages && (!Array.isArray(packages) || packages.length > 0);
+    if (hasPackages) {
         const args = ['bun', 'add'];
         if (options.g) {
             args.push('-g');
