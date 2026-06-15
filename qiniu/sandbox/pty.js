@@ -53,7 +53,9 @@ LivePtyHandle.prototype.kill = function () {
 
 LivePtyHandle.prototype.disconnect = function () {
     if (this._request) {
+        this._disconnected = true;
         this._request.destroy();
+        this._request = null;
     }
     return Promise.resolve();
 };
@@ -103,6 +105,13 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
 
         function fail (err) {
             cleanupStartTimer();
+            if (handle && handle._disconnected) {
+                if (result.exitCode === -1) {
+                    result.exitCode = 0;
+                }
+                resolveWait(result);
+                return;
+            }
             if (!settled) {
                 settled = true;
                 reject(err);

@@ -4043,6 +4043,52 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('does not reject PTY wait after disconnecting the live stream', function () {
+        let ptyResponse;
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                ptyResponse = res;
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.write(encodeConnectEnvelope({ event: { start: { pid: 48 } } }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_disconnect',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24
+            }).then(handle => {
+                return handle.disconnect()
+                    .then(() => handle.wait())
+                    .then(result => {
+                        result.exitCode.should.eql(0);
+                    });
+            }).then(() => {
+                if (ptyResponse) {
+                    ptyResponse.end();
+                }
+                return closeServer(fixture.server);
+            }, err => {
+                if (ptyResponse) {
+                    ptyResponse.end();
+                }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('rejects oversized PTY stream envelopes', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
