@@ -108,7 +108,7 @@ async function useSandboxTypes () {
         .runCmd(['echo one', 'echo two'], { user: 'root' });
     await template.build({ client, name: 'typed-template:test' });
     await sandbox.updateNetwork({ allowOut: [qiniu.sandbox.ALL_TRAFFIC] });
-    await qiniu.CommandExitError;
+    qiniu.CommandExitError.name;
     bytes.length;
     text.length;
     stream.read;
