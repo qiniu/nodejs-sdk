@@ -5,7 +5,7 @@ const { HttpClient } = require('../httpc/client');
 const { QiniuAuthMiddleware } = require('../httpc/middleware/qiniuAuth');
 const digest = require('../auth/digest');
 const { DEFAULT_TEMPLATE } = require('./constants');
-const { SandboxError } = require('./errors');
+const { SandboxError, TemplateBuildError } = require('./errors');
 const {
     appendQuery,
     copyDefined,
@@ -114,10 +114,10 @@ function SandboxClient (opts) {
     this.apiKey = normalized.apiKey;
     this.accessToken = normalized.accessToken;
     this.mac = normalized.mac;
+    this.timeout = normalized.timeout;
     this.httpClient = new HttpClient({
         httpAgent: normalized.httpAgent,
-        httpsAgent: normalized.httpsAgent,
-        timeout: normalized.timeout
+        httpsAgent: normalized.httpsAgent
     });
 }
 
@@ -166,6 +166,9 @@ SandboxClient.prototype._request = function (method, path, options) {
         gzip: true,
         followRedirect: true
     };
+    if (this.timeout !== undefined) {
+        urllibOptions.timeout = this.timeout;
+    }
 
     if (hasBody) {
         urllibOptions.content = JSON.stringify(body);
@@ -215,7 +218,7 @@ SandboxClient.prototype.createSandbox = function (opts) {
 };
 
 SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
-    const ids = Array.isArray(sandboxIDs) ? sandboxIDs : sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs;
+    const ids = Array.isArray(sandboxIDs) ? sandboxIDs : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs)) || [];
     return this._request('GET', appendQuery('/sandboxes/metrics', { sandbox_ids: ids }));
 };
 
@@ -402,6 +405,11 @@ SandboxClient.prototype.createAndWait = function (opts, pollOpts) {
 SandboxClient.prototype.waitForBuild = function (templateID, buildID, opts) {
     return poll(() => this.getTemplateBuildStatus(templateID, buildID), opts, info => {
         return info && (info.status === 'ready' || info.status === 'error');
+    }).then(info => {
+        if (info && info.status === 'error') {
+            throw new TemplateBuildError(info.error || info.message || 'Sandbox template build failed', { info });
+        }
+        return info;
     });
 };
 

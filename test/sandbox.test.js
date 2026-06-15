@@ -57,6 +57,14 @@ function encodeConnectEnvelope (message) {
     return Buffer.concat([header, payload]);
 }
 
+function encodeRawConnectEnvelope (payload) {
+    payload = Buffer.from(payload);
+    const header = Buffer.alloc(5);
+    header[0] = 0;
+    header.writeUInt32BE(payload.length, 1);
+    return Buffer.concat([header, payload]);
+}
+
 describe('test sandbox module', function () {
     it('creates sandbox with E2B compatible options and API key auth', function () {
         return startServer((req, res) => {
@@ -119,6 +127,32 @@ describe('test sandbox module', function () {
                 });
             });
         });
+    });
+
+    it('passes client timeout to urllib requests and handles empty metrics ids', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key',
+            timeout: 1234
+        });
+        const urls = [];
+        client.httpClient.sendRequest = req => {
+            urls.push(req.url);
+            req.urllibOptions.timeout.should.eql(1234);
+            return Promise.resolve({
+                ok: () => true,
+                data: { ok: true }
+            });
+        };
+
+        return client.listSandboxes()
+            .then(() => client.getSandboxesMetrics())
+            .then(() => {
+                urls.should.eql([
+                    'http://sandbox.test/sandboxes',
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids='
+                ]);
+            });
     });
 
     it('keeps Qiniu sandbox extensions in create body', function () {
@@ -641,6 +675,48 @@ describe('test sandbox module', function () {
             throw new Error('expected watchDir to reject');
         }, err => {
             err.message.should.match(/recursive watching/i);
+        });
+    });
+
+    it('rejects malformed filesystem watch stream payloads', function () {
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: {} } }),
+                    encodeRawConnectEnvelope('not-json')
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_bad_json',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+            let handle;
+
+            return sandbox.files.watchDir('/workspace', () => {}, {
+                recursive: true,
+                onExit: err => {
+                    err.message.should.match(/Unexpected token/);
+                }
+            }).then(ret => {
+                handle = ret;
+                return new Promise(resolve => setTimeout(resolve, 20));
+            }).then(() => {
+                handle._stopped.should.eql(true);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
         });
     });
 
@@ -1196,6 +1272,15 @@ describe('test sandbox module', function () {
         ]);
     });
 
+    it('joins Dockerfile lines continued with backslash before parsing', function () {
+        const template = qiniu.sandbox.Template()
+            .fromDockerfile('FROM ubuntu:22.04\nRUN apt-get update && \\\n    apt-get install -y curl\nENV FOO=bar \\\n    BAZ=qux');
+        template.buildConfig.steps.should.eql([
+            { type: 'run', cmd: 'apt-get update &&  apt-get install -y curl' },
+            { type: 'ENV', args: ['FOO', 'bar', 'BAZ', 'qux'] }
+        ]);
+    });
+
     it('exposes network constants and maps updateNetwork to Qiniu API', function () {
         return startServer((req, res) => {
             res.statusCode = 200;
@@ -1475,6 +1560,12 @@ describe('test sandbox module', function () {
                 res.write(encodeConnectEnvelope({ event: { start: { pid: 88 } } }));
                 return;
             }
+            if (req.url === '/process.Process/SendSignal') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end('{}');
+                return;
+            }
             res.statusCode = 404;
             res.end();
         }).then(fixture => {
@@ -1489,10 +1580,15 @@ describe('test sandbox module', function () {
 
             return sandbox.commands.run('sleep 5', {
                 background: true,
+                user: 'root',
+                requestTimeoutMs: 1000,
                 onStdout: data => seen.push(data)
             }).then(handle => {
                 handle.pid.should.eql(88);
                 should.not.exist(handle.result);
+                return handle.kill().then(() => handle);
+            }).then(handle => {
+                fixture.requests[1].headers.authorization.should.eql('Basic ' + Buffer.from('root:').toString('base64'));
                 commandResponse.write(encodeConnectEnvelope({
                     event: {
                         data: {
@@ -1509,6 +1605,50 @@ describe('test sandbox module', function () {
                 if (commandResponse) {
                     commandResponse.end();
                 }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects malformed command stream and JSON fallback payloads', function () {
+        let calls = 0;
+        return startServer((req, res) => {
+            calls += 1;
+            if (req.url === '/process.Process/Start' && calls === 1) {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeRawConnectEnvelope('not-json'));
+                return;
+            }
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end('not-json');
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_bad_json',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('echo bad').then(() => {
+                throw new Error('expected command stream parse error');
+            }, err => {
+                err.message.should.match(/Unexpected token/);
+                return sandbox.commands.start('echo bad');
+            }).then(() => {
+                throw new Error('expected command JSON fallback parse error');
+            }, err => {
+                err.message.should.match(/Unexpected token/);
+            }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
                 });
@@ -1951,6 +2091,7 @@ describe('test sandbox module', function () {
                 .then(() => {
                     throw new Error('expected waitForReady timeout');
                 }, err => {
+                    err.name.should.eql('TimeoutError');
                     err.message.should.eql('Sandbox poll timed out');
                 })
                 .then(() => closeServer(fixture.server), err => {
@@ -1958,6 +2099,35 @@ describe('test sandbox module', function () {
                         throw err;
                     });
                 });
+        });
+    });
+
+    it('throws TemplateBuildError when a template build finishes with error status', function () {
+        return startServer((req, res) => {
+            if (req.url === '/templates/tpl_1/builds/bld_1/status') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ status: 'error', error: 'compile failed' }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                apiKey: 'sandbox-key'
+            });
+
+            return client.waitForBuild('tpl_1', 'bld_1', { interval: 1, timeout: 20 }).then(() => {
+                throw new Error('expected template build error');
+            }, err => {
+                err.name.should.eql('TemplateBuildError');
+                err.message.should.eql('compile failed');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
         });
     });
 
@@ -2249,10 +2419,16 @@ describe('test sandbox module', function () {
             return sandbox.pty.create({
                 cols: 80,
                 rows: 24,
+                user: 'root',
+                requestTimeoutMs: 1000,
                 onData: chunk => data.push(Buffer.from(chunk).toString())
             }).then(handle => {
                 handle.pid.should.eql(44);
-                return handle.wait();
+                return handle.kill().then(killed => {
+                    killed.should.eql(true);
+                    fixture.requests[1].headers.authorization.should.eql('Basic ' + Buffer.from('root:').toString('base64'));
+                    return handle.wait();
+                });
             }).then(() => sandbox.pty.connect(44, {
                 onData: chunk => data.push(Buffer.from(chunk).toString())
             })).then(handle => handle.wait())
@@ -2262,17 +2438,51 @@ describe('test sandbox module', function () {
                 .then(killed => {
                     killed.should.eql(true);
                     data.should.eql(['ok', 'ok']);
-                    const sendBody = JSON.parse(fixture.requests[2].body);
+                    const sendBody = JSON.parse(fixture.requests[3].body);
                     sendBody.input.pty.should.eql(Buffer.from('ls\n').toString('base64'));
-                    const resizeBody = JSON.parse(fixture.requests[3].body);
+                    const resizeBody = JSON.parse(fixture.requests[4].body);
                     resizeBody.pty.size.should.eql({ cols: 100, rows: 30 });
-                    const killBody = JSON.parse(fixture.requests[4].body);
+                    const killBody = JSON.parse(fixture.requests[5].body);
                     killBody.signal.should.eql('SIGNAL_SIGKILL');
                 }).then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
                         throw err;
                     });
                 });
+        });
+    });
+
+    it('rejects malformed live PTY stream payloads', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeRawConnectEnvelope('not-json'));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_bad_json',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24
+            }).then(() => {
+                throw new Error('expected pty stream parse error');
+            }, err => {
+                err.message.should.match(/Unexpected token/);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
         });
     });
 

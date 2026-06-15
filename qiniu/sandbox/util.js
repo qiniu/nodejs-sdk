@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const urllib = require('urllib');
 
 const { DEFAULT_ENDPOINT, DEFAULT_USER } = require('./constants');
-const { SandboxError } = require('./errors');
+const { SandboxError, TimeoutError } = require('./errors');
 
 function normalizeEndpoint (endpoint) {
     endpoint = endpoint || process.env.QINIU_SANDBOX_ENDPOINT || DEFAULT_ENDPOINT;
@@ -61,7 +61,7 @@ function poll (fn, opts, done) {
                 return value;
             }
             if (Date.now() - startedAt >= timeout) {
-                throw new SandboxError('Sandbox poll timed out');
+                throw new TimeoutError('Sandbox poll timed out');
             }
             return new Promise(resolve => setTimeout(resolve, interval)).then(tick);
         }, err => {

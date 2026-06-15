@@ -133,7 +133,7 @@ function multipartBody (boundary, parts) {
         chunks.push(Buffer.from(`--${boundary}\r\n`));
         chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"; filename="${part.filename}"\r\n`));
         chunks.push(Buffer.from('Content-Type: application/octet-stream\r\n\r\n'));
-        chunks.push(Buffer.isBuffer(part.data) ? part.data : Buffer.from(String(part.data)));
+        chunks.push(Buffer.isBuffer(part.data) ? part.data : Buffer.from(String(part.data || '')));
         chunks.push(Buffer.from('\r\n'));
     });
     chunks.push(Buffer.from(`--${boundary}--\r\n`));
@@ -394,7 +394,13 @@ function watchDir (sandbox, path, onEvent, opts) {
                     const payload = responseBuffer.slice(5, 5 + length).toString();
                     responseBuffer = responseBuffer.slice(5 + length);
                     if (!(flags & 2) && payload) {
-                        handleMessage(JSON.parse(payload));
+                        try {
+                            handleMessage(JSON.parse(payload));
+                        } catch (err) {
+                            fail(err);
+                            req.destroy();
+                            return;
+                        }
                     }
                 }
             });

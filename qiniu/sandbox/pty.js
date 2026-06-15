@@ -33,11 +33,12 @@ function dataToBuffer (value) {
     return Buffer.from(String(value || ''));
 }
 
-function LivePtyHandle (pty, pid, request, waitPromise) {
+function LivePtyHandle (pty, pid, request, waitPromise, opts) {
     this.pty = pty;
     this.pid = pid;
     this._request = request;
     this._waitPromise = waitPromise;
+    this.opts = opts || {};
     this.stdout = '';
     this.stderr = '';
 }
@@ -47,7 +48,12 @@ LivePtyHandle.prototype.wait = function () {
 };
 
 LivePtyHandle.prototype.kill = function () {
-    return this.pty.kill(this.pid);
+    return this.pty.kill(this.pid, {
+        user: this.opts.user,
+        requestTimeoutMs: this.opts.requestTimeoutMs,
+        timeoutMs: this.opts.timeoutMs,
+        timeout: this.opts.timeout
+    });
 };
 
 LivePtyHandle.prototype.disconnect = function () {
@@ -112,7 +118,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             const event = eventPayload(message);
             if (event.start && !handle) {
                 cleanupStartTimer();
-                handle = new LivePtyHandle(pty, event.start.pid, req, waitPromise);
+                handle = new LivePtyHandle(pty, event.start.pid, req, waitPromise, opts);
                 settled = true;
                 resolve(handle);
             }
@@ -161,7 +167,13 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                     const payload = responseBuffer.slice(5, 5 + length).toString();
                     responseBuffer = responseBuffer.slice(5 + length);
                     if (!(flags & 2) && payload) {
-                        handleMessage(JSON.parse(payload));
+                        try {
+                            handleMessage(JSON.parse(payload));
+                        } catch (err) {
+                            fail(err);
+                            req.destroy();
+                            return;
+                        }
                     }
                 }
             });

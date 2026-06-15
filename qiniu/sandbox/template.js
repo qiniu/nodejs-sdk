@@ -121,6 +121,24 @@ function parseEnvArgs (value) {
     return args;
 }
 
+function joinDockerfileLines (content) {
+    const lines = [];
+    let current = '';
+    String(content || '').split(/\r?\n/).forEach(rawLine => {
+        const line = rawLine.trim();
+        if (line.charAt(line.length - 1) === '\\') {
+            current += line.slice(0, -1) + ' ';
+            return;
+        }
+        lines.push(current + line);
+        current = '';
+    });
+    if (current) {
+        lines.push(current);
+    }
+    return lines;
+}
+
 Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
     const isPath = typeof dockerfileContentOrPath === 'string' &&
         dockerfileContentOrPath.length < 1024 &&
@@ -130,7 +148,7 @@ Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
     const content = isPath
         ? fs.readFileSync(dockerfileContentOrPath, 'utf8')
         : dockerfileContentOrPath;
-    content.split(/\r?\n/).forEach(line => {
+    joinDockerfileLines(content).forEach(line => {
         line = line.trim();
         if (!line || line[0] === '#') {
             return;

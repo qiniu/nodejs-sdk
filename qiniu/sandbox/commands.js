@@ -124,7 +124,12 @@ CommandHandle.prototype.wait = function () {
 };
 
 CommandHandle.prototype.kill = function () {
-    return this.commands.kill(this.pid);
+    return this.commands.kill(this.pid, {
+        user: this.opts.user,
+        requestTimeoutMs: this.opts.requestTimeoutMs,
+        timeoutMs: this.opts.timeoutMs,
+        timeout: this.opts.timeout
+    });
 };
 
 CommandHandle.prototype.disconnect = function () {
@@ -271,14 +276,26 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                     const payload = responseBuffer.slice(5, 5 + length).toString();
                     responseBuffer = responseBuffer.slice(5 + length);
                     if (!(flags & 2) && payload) {
-                        handleMessage(JSON.parse(payload));
+                        try {
+                            handleMessage(JSON.parse(payload));
+                        } catch (err) {
+                            fail(err);
+                            req.destroy();
+                            return;
+                        }
                     }
                 }
             });
             res.on('end', () => {
                 if (!isConnectStream) {
                     cleanupStartTimer();
-                    const events = eventListFromResponse(parseJSON(Buffer.concat(jsonChunks)));
+                    let events;
+                    try {
+                        events = eventListFromResponse(parseJSON(Buffer.concat(jsonChunks)));
+                    } catch (err) {
+                        fail(err);
+                        return;
+                    }
                     result = commandResultFromEvents(events, opts);
                     if (!result.pid && fallbackPid) {
                         result.pid = fallbackPid;
