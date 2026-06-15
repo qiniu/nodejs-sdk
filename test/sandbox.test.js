@@ -364,6 +364,34 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('keeps sandbox lifetime timeout separate from HTTP request timeout in static helpers', function () {
+        return startServer((req, res) => {
+            setTimeout(() => {
+                res.statusCode = 201;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                    sandboxID: 'sbx_timeout',
+                    domain: 'sbx.local',
+                    envdAccessToken: 'token'
+                }));
+            }, 40);
+        }).then(fixture => {
+            return qiniu.sandbox.Sandbox.create({
+                apiKey: 'sandbox-key',
+                endpoint: fixture.endpoint,
+                template: 'base',
+                timeout: 30
+            }).then(sandbox => {
+                sandbox.sandboxId.should.eql('sbx_timeout');
+                JSON.parse(fixture.requests[0].body).timeout.should.eql(30);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('exposes typed sandbox compatibility errors', function () {
         const err = new qiniu.sandbox.CommandExitError({
             command: 'false',
@@ -599,6 +627,41 @@ describe('test sandbox module', function () {
             return sandbox.files.write(unsafePath, 'hello')
                 .then(info => {
                     info.path.should.eql(unsafePath);
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('preserves falsy multipart payload values', function () {
+        return startServer((req, res) => {
+            const parsed = parseUrl(req.url);
+            if (req.method === 'POST' && parsed.pathname === '/files') {
+                parsed.searchParams.get('path').should.eql('/zero.txt');
+                req.body.should.containEql('\r\n0\r\n');
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify([{ name: 'zero.txt', path: '/zero.txt', type: 'file' }]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_multipart_falsy',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.5'
+                }
+            });
+
+            return sandbox.files.write('/zero.txt', 0)
+                .then(info => {
+                    info.path.should.eql('/zero.txt');
                 })
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
@@ -1434,6 +1497,19 @@ describe('test sandbox module', function () {
         const template = qiniu.sandbox.Template().fromDockerfile(content);
         template.buildConfig.fromImage.should.eql('node:22');
         template.buildConfig.steps[0].cmd.should.match(/^x+$/);
+    });
+
+    it('preserves octal permission strings in Template helpers', function () {
+        const template = qiniu.sandbox.Template()
+            .copy('app.js', '/app/', { mode: '755' })
+            .copy('bin.js', '/app/', { mode: '0o755' })
+            .makeDir('/app/cache', { mode: '0755' });
+
+        template.buildConfig.steps.should.eql([
+            { type: 'COPY', args: ['app.js', '/app/', '', '0755'] },
+            { type: 'COPY', args: ['bin.js', '/app/', '', '0755'] },
+            { type: 'RUN', args: ['mkdir -p -m 0755 \'/app/cache\''] }
+        ]);
     });
 
     it('parses escaped quotes in Dockerfile ENV values', function () {

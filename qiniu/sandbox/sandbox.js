@@ -131,11 +131,35 @@ function Sandbox (opts) {
     this.git = new Git(this.commands);
 }
 
+function sandboxClientOptions (opts) {
+    const clientOpts = {};
+    [
+        'endpoint',
+        'apiUrl',
+        'apiKey',
+        'accessToken',
+        'mac',
+        'accessKey',
+        'secretKey',
+        'macOptions',
+        'httpAgent',
+        'httpsAgent'
+    ].forEach(key => {
+        if (opts[key] !== undefined) {
+            clientOpts[key] = opts[key];
+        }
+    });
+    if (opts.requestTimeoutMs !== undefined) {
+        clientOpts.timeout = opts.requestTimeoutMs;
+    }
+    return clientOpts;
+}
+
 Sandbox.create = function (templateOrOpts, maybeOpts) {
     const opts = typeof templateOrOpts === 'string'
         ? Object.assign({}, maybeOpts || {}, { templateID: templateOrOpts })
         : (templateOrOpts || {});
-    const client = opts.client || new SandboxClient(opts);
+    const client = opts.client || new SandboxClient(sandboxClientOptions(opts));
     return client.createSandbox(opts).then(info => {
         const sandbox = new Sandbox({ client, info });
         return sandbox.refreshEnvdTokenIfNeeded();
@@ -144,7 +168,7 @@ Sandbox.create = function (templateOrOpts, maybeOpts) {
 
 Sandbox.connect = function (sandboxID, opts) {
     opts = opts || {};
-    const client = opts.client || new SandboxClient(opts);
+    const client = opts.client || new SandboxClient(sandboxClientOptions(opts));
     return client.connectSandbox(sandboxID, opts).then(info => {
         const sandbox = new Sandbox({
             client,

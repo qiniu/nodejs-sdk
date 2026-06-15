@@ -141,7 +141,8 @@ function multipartBody (boundary, parts) {
         chunks.push(Buffer.from(`--${boundary}\r\n`));
         chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"; filename="${multipartFilename(part.filename)}"\r\n`));
         chunks.push(Buffer.from('Content-Type: application/octet-stream\r\n\r\n'));
-        chunks.push(Buffer.isBuffer(part.data) ? part.data : Buffer.from(String(part.data || '')));
+        const data = part.data !== undefined && part.data !== null ? part.data : '';
+        chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(String(data)));
         chunks.push(Buffer.from('\r\n'));
     });
     chunks.push(Buffer.from(`--${boundary}--\r\n`));

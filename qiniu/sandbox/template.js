@@ -70,7 +70,10 @@ Template.prototype.fromTemplate = function (templateID) {
 };
 
 function padOctal (value) {
-    let text = Number(value).toString(8);
+    let text = typeof value === 'number' ? value.toString(8) : String(value || '');
+    if (text.startsWith('0o') || text.startsWith('0O')) {
+        text = text.slice(2);
+    }
     while (text.length < 4) {
         text = `0${text}`;
     }
