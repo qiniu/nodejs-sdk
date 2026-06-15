@@ -75,7 +75,7 @@ function commandResultFromEvents (events, callbacks) {
 
 function requestTimeout (opts) {
     opts = opts || {};
-    return opts.requestTimeoutMs || opts.timeoutMs || opts.timeout;
+    return opts.requestTimeoutMs || opts.timeoutMs || (opts.timeout ? opts.timeout * 1000 : undefined);
 }
 
 function encodeConnectEnvelope (message) {
@@ -308,6 +308,10 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             });
             res.on('error', fail);
             res.on('end', () => {
+                if (responseBuffer.length > 0) {
+                    fail(new Error('Sandbox envd stream truncated unexpectedly'));
+                    return;
+                }
                 if (!isConnectStream) {
                     cleanupStartTimer();
                     let events;

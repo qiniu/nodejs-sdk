@@ -310,7 +310,7 @@ Git.prototype.configureUser = function () {
 };
 
 Git.prototype.branches = function (repoPath, opts) {
-    return this._runGit(repoPath, ['branch', '--format=%(HEAD) %(refname:short)'], opts)
+    return this._runGit(repoPath, ['branch', shellQuote('--format=%(HEAD) %(refname:short)')], opts)
         .then(result => String(result.stdout || '').split(/\r?\n/)
             .filter(Boolean)
             .map(line => ({

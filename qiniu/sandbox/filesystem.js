@@ -331,11 +331,19 @@ function watchDir (sandbox, path, onEvent, opts) {
         let handle;
         let responseBuffer = Buffer.alloc(0);
         let startTimer;
+        let pendingCallbacks = 0;
+        let streamEnded = false;
 
         function cleanupStartTimer () {
             if (startTimer) {
                 clearTimeout(startTimer);
                 startTimer = null;
+            }
+        }
+
+        function finishIfIdle () {
+            if (streamEnded && handle && pendingCallbacks === 0) {
+                handle._finish();
             }
         }
 
@@ -364,11 +372,20 @@ function watchDir (sandbox, path, onEvent, opts) {
                 const type = normalizeFilesystemEventType(event.filesystem.type);
                 if (type) {
                     try {
-                        onEvent({
+                        pendingCallbacks += 1;
+                        Promise.resolve(onEvent({
                             name: event.filesystem.name,
                             type
+                        })).then(() => {
+                            pendingCallbacks -= 1;
+                            finishIfIdle();
+                        }, err => {
+                            pendingCallbacks -= 1;
+                            fail(err);
+                            req.destroy();
                         });
                     } catch (err) {
+                        pendingCallbacks -= 1;
                         fail(err);
                         req.destroy();
                     }
@@ -433,14 +450,17 @@ function watchDir (sandbox, path, onEvent, opts) {
             });
             res.on('error', fail);
             res.on('end', () => {
+                if (responseBuffer.length > 0) {
+                    fail(new SandboxError('Sandbox envd stream truncated unexpectedly'));
+                    return;
+                }
                 cleanupStartTimer();
                 if (!settled) {
                     fail(new Error('WatchDir stream ended before start event'));
                     return;
                 }
-                if (handle) {
-                    handle._finish();
-                }
+                streamEnded = true;
+                finishIfIdle();
             });
         });
         req.on('error', err => {

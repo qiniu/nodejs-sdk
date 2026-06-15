@@ -148,7 +148,13 @@ SandboxClient.prototype._headers = function (authType) {
 };
 
 SandboxClient.prototype._middlewares = function (authType) {
-    if (authType === 'qiniu' || (!this.apiKey && !this.accessToken && this.mac)) {
+    if (authType === 'qiniu') {
+        if (!this.mac) {
+            throw new SandboxError('Qiniu Mac credentials (accessKey/secretKey) are required for this operation');
+        }
+        return [new QiniuAuthMiddleware({ mac: this.mac })];
+    }
+    if (!this.apiKey && !this.accessToken && this.mac) {
         return [new QiniuAuthMiddleware({ mac: this.mac })];
     }
     return [];

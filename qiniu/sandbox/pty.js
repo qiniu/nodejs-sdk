@@ -23,11 +23,7 @@ function dataToBuffer (value) {
         return Buffer.from(value);
     }
     if (typeof value === 'string') {
-        const decoded = Buffer.from(value, 'base64');
-        if (decoded.length && decoded.toString('base64').replace(/=+$/, '') === value.replace(/=+$/, '')) {
-            return decoded;
-        }
-        return Buffer.from(value);
+        return Buffer.from(value, 'base64');
     }
     return Buffer.from(String(value || ''));
 }
@@ -198,6 +194,10 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             });
             res.on('error', fail);
             res.on('end', () => {
+                if (responseBuffer.length > 0) {
+                    fail(new Error('Sandbox envd stream truncated unexpectedly'));
+                    return;
+                }
                 if (!settled) {
                     fail(new Error('PTY stream ended before process start'));
                     return;

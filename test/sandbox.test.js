@@ -175,6 +175,21 @@ describe('test sandbox module', function () {
             });
     });
 
+    it('throws a clear error when Qiniu-auth APIs are called without AK/SK credentials', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key'
+        });
+
+        try {
+            client.listInjectionRules();
+            throw new Error('expected missing Qiniu credentials error');
+        } catch (err) {
+            err.name.should.eql('SandboxError');
+            err.message.should.eql('Qiniu Mac credentials (accessKey/secretKey) are required for this operation');
+        }
+    });
+
     it('keeps Qiniu sandbox extensions in create body', function () {
         return startServer((req, res) => {
             res.statusCode = 201;
@@ -1846,17 +1861,16 @@ describe('test sandbox module', function () {
             if (req.url === '/filesystem.Filesystem/WatchDir') {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/connect+json');
-                res.end(Buffer.concat([
-                    encodeConnectEnvelope({ event: { start: {} } }),
-                    encodeConnectEnvelope({
-                        event: {
-                            filesystem: {
-                                name: 'created.txt',
-                                type: 'EVENT_TYPE_CREATE'
-                            }
+                res.write(encodeConnectEnvelope({ event: { start: {} } }));
+                res.write(encodeConnectEnvelope({
+                    event: {
+                        filesystem: {
+                            name: 'created.txt',
+                            type: 'EVENT_TYPE_CREATE'
                         }
-                    })
-                ]));
+                    }
+                }));
+                setTimeout(() => res.end(), 50);
                 return;
             }
             res.statusCode = 404;
@@ -1883,6 +1897,97 @@ describe('test sandbox module', function () {
             }).then(handle => {
                 handle._stopped.should.eql(true);
                 exitError.message.should.eql('callback failed');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('fails watchDir when the event callback rejects asynchronously', function () {
+        let exitError;
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: {} } }),
+                    encodeConnectEnvelope({
+                        event: {
+                            filesystem: {
+                                name: 'created.txt',
+                                type: 'EVENT_TYPE_CREATE'
+                            }
+                        }
+                    })
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_async_callback',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', () => Promise.reject(new Error('async callback failed')), {
+                recursive: true,
+                onExit: err => {
+                    exitError = err;
+                }
+            }).then(handle => {
+                return new Promise(resolve => setTimeout(resolve, 20)).then(() => handle);
+            }).then(handle => {
+                handle._stopped.should.eql(true);
+                exitError.message.should.eql('async callback failed');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('fails watchDir when the live Connect stream ends with a partial frame after start', function () {
+        let exitError;
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: {} } }),
+                    encodeTruncatedConnectHeader()
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_truncated_tail',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', () => {}, {
+                recursive: true,
+                onExit: err => {
+                    exitError = err;
+                }
+            }).then(handle => {
+                return new Promise(resolve => setTimeout(resolve, 20)).then(() => handle);
+            }).then(handle => {
+                handle._stopped.should.eql(true);
+                exitError.message.should.eql('Sandbox envd stream truncated unexpectedly');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
@@ -1931,12 +2036,88 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('treats command timeout alias as seconds while waiting for stream start', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                setTimeout(() => {
+                    res.end(Buffer.concat([
+                        encodeConnectEnvelope({ event: { start: { pid: 81 } } }),
+                        encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
+                    ]));
+                }, 20);
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_timeout_seconds',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('sleep 1', {
+                timeout: 1
+            }).then(handle => {
+                handle.pid.should.eql(81);
+                return handle.wait();
+            }).then(result => {
+                result.exitCode.should.eql(0);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects command wait when the live Connect stream ends with a partial frame after start', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 82 } } }),
+                    encodeTruncatedConnectHeader()
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_truncated_tail',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('echo bad').then(handle => {
+                handle.pid.should.eql(82);
+                return handle.wait();
+            }).then(() => {
+                throw new Error('expected command wait to reject');
+            }, err => {
+                err.message.should.eql('Sandbox envd stream truncated unexpectedly');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('supports E2B git auth, branches, reset, restore, and safe remote cleanup', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
             run: function (cmd, opts) {
                 commandsSeen.push({ cmd, opts });
-                if (cmd.indexOf('branch --format') >= 0) {
+                if (cmd.indexOf('branch ') >= 0 && cmd.indexOf('%(refname:short)') >= 0) {
                     return Promise.resolve({ stdout: '* main\n  feature\n', exitCode: 0 });
                 }
                 if (cmd.indexOf('remote get-url') >= 0) {
@@ -1976,7 +2157,7 @@ describe('test sandbox module', function () {
                     GIT_USERNAME: 'u',
                     GIT_PASSWORD: 'p'
                 });
-                commandText.should.containEql('branch --format');
+                commandText.should.containEql('branch \'--format=%(HEAD) %(refname:short)\'');
                 commandText.should.containEql('reset --hard \'HEAD~1\'');
                 commandText.should.containEql('restore --staged -- \'a.txt\'');
                 commandText.should.containEql('remote remove \'origin\'');
@@ -2458,7 +2639,7 @@ describe('test sandbox module', function () {
             return sandbox.commands.run('echo bad').then(() => {
                 throw new Error('expected truncated stream error');
             }, err => {
-                err.message.should.eql('Command stream ended before process start');
+                err.message.should.eql('Sandbox envd stream truncated unexpectedly');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
@@ -2768,7 +2949,7 @@ describe('test sandbox module', function () {
                 res.setHeader('Content-Type', 'application/connect+json');
                 res.end(Buffer.concat([
                     encodeConnectEnvelope({ event: { start: { pid: 44 } } }),
-                    encodeConnectEnvelope({ event: { data: { pty: [111, 107] } } }),
+                    encodeConnectEnvelope({ event: { data: { pty: Buffer.from('ok').toString('base64') } } }),
                     encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
                 ]));
                 return;
@@ -2894,6 +3075,46 @@ describe('test sandbox module', function () {
             }, err => {
                 err.message.should.eql('pty failed');
                 err.code.should.eql('internal');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects PTY wait when the live Connect stream ends with a partial frame after start', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 46 } } }),
+                    encodeTruncatedConnectHeader()
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_truncated_tail',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24
+            }).then(handle => {
+                handle.pid.should.eql(46);
+                return handle.wait();
+            }).then(() => {
+                throw new Error('expected pty wait to reject');
+            }, err => {
+                err.message.should.eql('Sandbox envd stream truncated unexpectedly');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
