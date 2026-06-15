@@ -1620,6 +1620,20 @@ describe('test sandbox module', function () {
         (() => qiniu.sandbox.Template().fromDockerfile('/tmp/missing-qiniu-sdk-Dockerfile')).should.throw(/Dockerfile file not found/);
     });
 
+    it('reads existing custom Dockerfile paths', function () {
+        const file = `/tmp/qiniu-sdk-Containerfile-${Date.now()}`;
+        fs.writeFileSync(file, 'FROM node:22\nRUN echo ok');
+        try {
+            const template = qiniu.sandbox.Template().fromDockerfile(file);
+            template.buildConfig.fromImage.should.eql('node:22');
+            template.buildConfig.steps.should.eql([
+                { type: 'run', cmd: 'echo ok' }
+            ]);
+        } finally {
+            fs.unlinkSync(file);
+        }
+    });
+
     it('allows single-line Dockerfile comments as content', function () {
         const template = qiniu.sandbox.Template().fromDockerfile('# syntax=docker/dockerfile:1');
         template.buildConfig.steps.should.eql([]);
@@ -1853,6 +1867,16 @@ describe('test sandbox module', function () {
                 })
                 .then(entries => {
                     entries.map(entry => entry.path).should.eql(['/a.txt', '/b.txt']);
+                    return sandbox.files.writeFiles([
+                        { path: '/stream.txt', data: new stream.Readable() }
+                    ]).then(() => {
+                        throw new Error('expected writeFiles stream data to fail');
+                    }, err => {
+                        err.name.should.eql('TypeError');
+                        err.message.should.match(/Streams are not supported/);
+                    });
+                })
+                .then(() => {
                     return sandbox.files.exists('/missing.txt');
                 })
                 .then(exists => {
@@ -2472,6 +2496,49 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('does not reject command wait after disconnecting the live stream', function () {
+        let commandResponse;
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                commandResponse = res;
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.write(encodeConnectEnvelope({ event: { start: { pid: 83 } } }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_disconnect',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('sleep 30').then(handle => {
+                return handle.disconnect()
+                    .then(() => handle.wait())
+                    .then(result => {
+                        result.exitCode.should.eql(0);
+                    });
+            }).then(() => {
+                if (commandResponse) {
+                    commandResponse.end();
+                }
+                return closeServer(fixture.server);
+            }, err => {
+                if (commandResponse) {
+                    commandResponse.end();
+                }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('rejects command wait when the live Connect stream ends with a partial frame after start', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
@@ -2783,6 +2850,8 @@ describe('test sandbox module', function () {
             err.message.should.eql('push failed');
             commandsSeen.length.should.eql(1);
             commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.containEql('echo "username=$GIT_USERNAME"');
+            commandsSeen[0].cmd.should.containEql('echo "password=$GIT_PASSWORD"');
             commandsSeen[0].cmd.should.containEql('push \'origin\' \'main\'');
             commandsSeen[0].cmd.should.not.containEql('u:p');
             commandsSeen[0].opts.envs.should.eql({

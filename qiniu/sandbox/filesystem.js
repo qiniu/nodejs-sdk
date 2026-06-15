@@ -277,6 +277,12 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
 
 Filesystem.prototype.writeFiles = function (files, opts) {
     opts = opts || {};
+    for (let i = 0; i < files.length; i += 1) {
+        const file = files[i];
+        if (file && file.data && typeof file.data === 'object' && !Buffer.isBuffer(file.data) && typeof file.data.pipe === 'function') {
+            return Promise.reject(new TypeError('Streams are not supported as data in filesystem.writeFiles'));
+        }
+    }
     const boundary = `qiniu-sandbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const parts = files.map(file => ({
         field: 'file',

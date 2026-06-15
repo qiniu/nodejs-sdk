@@ -266,8 +266,9 @@ Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
     const hasNewlines = dockerfileContentOrPath.indexOf('\n') >= 0 || dockerfileContentOrPath.indexOf('\r') >= 0;
     const startsWithInstruction = /^\s*(ADD|ARG|CMD|COPY|ENTRYPOINT|ENV|EXPOSE|FROM|HEALTHCHECK|LABEL|ONBUILD|RUN|SHELL|STOPSIGNAL|USER|VOLUME|WORKDIR)\b/i.test(dockerfileContentOrPath);
     const startsWithComment = /^\s*#/.test(dockerfileContentOrPath);
+    const existingPath = dockerfileContentOrPath.length < 1024 && !hasNewlines && fs.existsSync(dockerfileContentOrPath);
     const looksLikePath = !startsWithComment && (/[\\/]/.test(dockerfileContentOrPath) || /(^|[\\/])Dockerfile(?:\.[^\\/]+)?$/i.test(dockerfileContentOrPath));
-    const isLikelyPath = dockerfileContentOrPath.length < 1024 && !hasNewlines && !startsWithInstruction && looksLikePath;
+    const isLikelyPath = existingPath || (dockerfileContentOrPath.length < 1024 && !hasNewlines && !startsWithInstruction && looksLikePath);
     if (isLikelyPath && !fs.existsSync(dockerfileContentOrPath)) {
         throw new Error(`Dockerfile file not found at path: ${dockerfileContentOrPath}`);
     }

@@ -136,6 +136,7 @@ CommandHandle.prototype.kill = function () {
 
 CommandHandle.prototype.disconnect = function () {
     if (this._request) {
+        this._disconnected = true;
         this._request.destroy();
         this._request = null;
     }
@@ -192,6 +193,13 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
 
         function fail (err) {
             cleanupStartTimer();
+            if (handle && handle._disconnected) {
+                if (result.exitCode === -1) {
+                    result.exitCode = 0;
+                }
+                resolveWait(result);
+                return;
+            }
             if (!settled) {
                 settled = true;
                 reject(err);
