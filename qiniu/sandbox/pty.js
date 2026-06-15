@@ -1,5 +1,5 @@
 const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
-const { millisecondsFromOptions, parseRequestUrl } = require('./util');
+const { agentFromClient, millisecondsFromOptions, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
 
@@ -73,7 +73,8 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             hostname: target.hostname,
             port: target.port,
             path: target.path,
-            headers
+            headers,
+            agent: agentFromClient(sandbox.client, target.protocol)
         });
 
         let settled = false;

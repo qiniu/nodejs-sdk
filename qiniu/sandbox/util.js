@@ -120,6 +120,14 @@ function rawRequest (requestUrl, options) {
     });
 }
 
+function agentFromClient (client, protocol) {
+    if (!client) {
+        return undefined;
+    }
+    const source = client.httpClient || client;
+    return protocol === 'https:' ? source.httpsAgent : source.httpAgent;
+}
+
 function parseRequestUrl (requestUrl) {
     const URLParser = (typeof URL !== 'undefined' && URL) || null;
     if (URLParser) {
@@ -191,6 +199,7 @@ exports.poll = poll;
 exports.basicAuth = basicAuth;
 exports.fileSignature = fileSignature;
 exports.rawRequest = rawRequest;
+exports.agentFromClient = agentFromClient;
 exports.parseRequestUrl = parseRequestUrl;
 exports.parseJSON = parseJSON;
 exports.shellQuote = shellQuote;

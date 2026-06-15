@@ -29,7 +29,7 @@ function authUrl (repoUrl, opts) {
     if (!opts.username || !opts.password) {
         throw new GitAuthError('Both username and password are required for git authentication');
     }
-    return repoUrl.replace(/^(https?):\/\//, `$1://${encodeURIComponent(opts.username)}:${encodeURIComponent(opts.password)}@`);
+    return stripAuth(repoUrl).replace(/^(https?):\/\//, `$1://${encodeURIComponent(opts.username)}:${encodeURIComponent(opts.password)}@`);
 }
 
 function stripAuth (repoUrl) {
@@ -333,7 +333,8 @@ Git.prototype.reset = function (repoPath, opts) {
     if (target) {
         args.push(shellQuote(target));
     }
-    const paths = opts.paths || opts.files || [];
+    const rawPaths = opts.paths || opts.files || [];
+    const paths = Array.isArray(rawPaths) ? rawPaths : [rawPaths];
     if (paths.length) {
         args.push('--');
         paths.forEach(path => args.push(shellQuote(path)));
@@ -360,7 +361,8 @@ Git.prototype.restore = function (repoPath, opts) {
     if (opts.source) {
         args.push('--source', shellQuote(opts.source));
     }
-    const paths = opts.paths || opts.files || [];
+    const rawPaths = opts.paths || opts.files || [];
+    const paths = Array.isArray(rawPaths) ? rawPaths : [rawPaths];
     if (paths.length) {
         args.push('--');
         paths.forEach(path => args.push(shellQuote(path)));

@@ -468,6 +468,7 @@ describe('test sandbox module', function () {
             if (req.method === 'POST' && parsed.pathname === '/files') {
                 parsed.searchParams.get('path').should.eql('/hello.txt');
                 should(req.headers['content-type']).startWith('multipart/form-data; boundary=');
+                req.body.should.containEql('filename="/hello.txt"');
                 req.body.should.containEql('hello');
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
@@ -553,6 +554,44 @@ describe('test sandbox module', function () {
                     } else {
                         Buffer.isBuffer(blob).should.eql(true);
                     }
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('escapes file paths in multipart filenames', function () {
+        const unsafePath = '/tmp/a"\r\nX-Injected: y.txt';
+        return startServer((req, res) => {
+            const parsed = parseUrl(req.url);
+            if (req.method === 'POST' && parsed.pathname === '/files') {
+                parsed.searchParams.get('path').should.eql(unsafePath);
+                req.body.should.containEql('filename="/tmp/a\\"%0D%0AX-Injected: y.txt"');
+                req.body.should.not.containEql('\r\nX-Injected');
+                req.body.should.not.containEql('a"\r\n');
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify([{ name: 'a.txt', path: unsafePath, type: 'file' }]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_multipart_safe',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.5'
+                }
+            });
+
+            return sandbox.files.write(unsafePath, 'hello')
+                .then(info => {
+                    info.path.should.eql(unsafePath);
                 })
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
@@ -731,6 +770,25 @@ describe('test sandbox module', function () {
         }).then(() => {
             throw new Error('expected watchDir to reject');
         }, err => {
+            err.message.should.match(/recursive watching/i);
+        });
+    });
+
+    it('rejects recursive directory watching when envd version is unknown', function () {
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'sbx_unknown_watch',
+            envdUrl: 'http://127.0.0.1:9',
+            info: {
+                envdAccessToken: 'token'
+            }
+        });
+
+        return sandbox.files.watchDir('/workspace', () => {}, {
+            recursive: true
+        }).then(() => {
+            throw new Error('expected watchDir to reject without envd version');
+        }, err => {
+            err.name.should.eql('SandboxError');
             err.message.should.match(/recursive watching/i);
         });
     });
@@ -2187,6 +2245,78 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('uses configured HTTP agents for live envd streams', function () {
+        const agent = new http.Agent();
+        const requestsThroughAgent = [];
+        const originalAddRequest = agent.addRequest;
+        agent.addRequest = function (req, options) {
+            requestsThroughAgent.push(options.path);
+            return originalAddRequest.call(this, req, options);
+        };
+
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 83 } } }),
+                    encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
+                ]));
+                return;
+            }
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeConnectEnvelope({ event: { start: {} } }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_agent',
+                envdUrl: fixture.endpoint,
+                httpAgent: agent,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.commands.start('echo ok')
+                .then(handle => handle.wait())
+                .then(() => sandbox.files.watchDir('/workspace', () => {}, {
+                    recursive: true
+                }))
+                .then(handle => {
+                    handle._stopped.should.eql(true);
+                    return sandbox.pty.create({
+                        cols: 80,
+                        rows: 24
+                    });
+                })
+                .then(handle => handle.wait())
+                .then(() => {
+                    requestsThroughAgent.should.eql([
+                        '/process.Process/Start',
+                        '/filesystem.Filesystem/WatchDir',
+                        '/process.Process/Start'
+                    ]);
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        }).then(result => {
+            agent.destroy();
+            return result;
+        }, err => {
+            agent.destroy();
+            throw err;
+        });
+    });
+
     it('supports E2B git auth, branches, reset, restore, and safe remote cleanup', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
@@ -2216,6 +2346,8 @@ describe('test sandbox module', function () {
                 return git.reset('/repo', { hard: true, ref: 'HEAD~1' });
             })
             .then(() => git.restore('/repo', { staged: true, paths: ['a.txt'] }))
+            .then(() => git.reset('/repo', { hard: true, ref: 'HEAD', paths: 'single.txt' }))
+            .then(() => git.restore('/repo', { files: 'restore.txt' }))
             .then(() => git.remoteAdd('/repo', 'origin', 'https://github.com/acme/repo.git', { overwrite: true, fetch: true }))
             .then(() => git.commit('/repo', 'msg', {
                 authorName: 'Alice',
@@ -2235,6 +2367,8 @@ describe('test sandbox module', function () {
                 commandText.should.containEql('branch \'--format=%(HEAD) %(refname:short)\'');
                 commandText.should.containEql('reset --hard \'HEAD~1\'');
                 commandText.should.containEql('restore --staged -- \'a.txt\'');
+                commandText.should.containEql('reset --hard \'HEAD\' -- \'single.txt\'');
+                commandText.should.containEql('restore --worktree -- \'restore.txt\'');
                 commandText.should.containEql('remote remove \'origin\'');
                 commandText.should.containEql('remote add \'origin\'');
                 commandText.should.containEql('fetch \'origin\'');
@@ -2394,6 +2528,28 @@ describe('test sandbox module', function () {
             throw new Error('expected missing author email');
         }, err => {
             err.name.should.eql('GitAuthError');
+        });
+    });
+
+    it('replaces existing git remote credentials when dangerously authenticating', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                if (cmd.indexOf('remote get-url') >= 0) {
+                    return Promise.resolve({
+                        stdout: 'https://old:secret@example.com/acme/repo.git\n',
+                        stderr: '',
+                        exitCode: 0
+                    });
+                }
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.dangerouslyAuthenticate('/repo', 'origin', 'new user', 'new/pass').then(() => {
+            commandsSeen[1].cmd.should.eql('git remote set-url \'origin\' \'https://new%20user:new%2Fpass@example.com/acme/repo.git\'');
+            commandsSeen[1].cmd.should.not.containEql('old:secret');
         });
     });
 

@@ -1,6 +1,6 @@
 const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
 const { SandboxError } = require('./errors');
-const { millisecondsFromOptions, parseRequestUrl, rawRequest } = require('./util');
+const { agentFromClient, millisecondsFromOptions, parseRequestUrl, rawRequest } = require('./util');
 const { Readable } = require('stream');
 const zlib = require('zlib');
 const http = require('http');
@@ -23,7 +23,7 @@ const ENVD_VERSION_RECURSIVE_WATCH = '0.1.4';
 
 function versionGte (version, minimum) {
     if (!version) {
-        return true;
+        return false;
     }
     const left = String(version).split('.').map(value => parseInt(value, 10) || 0);
     const right = String(minimum).split('.').map(value => parseInt(value, 10) || 0);
@@ -127,11 +127,19 @@ WatchHandle.prototype._finish = function (err) {
     }
 };
 
+function multipartFilename (value) {
+    return String(value || '')
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\r/g, '%0D')
+        .replace(/\n/g, '%0A');
+}
+
 function multipartBody (boundary, parts) {
     const chunks = [];
     parts.forEach(part => {
         chunks.push(Buffer.from(`--${boundary}\r\n`));
-        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"; filename="${part.filename}"\r\n`));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"; filename="${multipartFilename(part.filename)}"\r\n`));
         chunks.push(Buffer.from('Content-Type: application/octet-stream\r\n\r\n'));
         chunks.push(Buffer.isBuffer(part.data) ? part.data : Buffer.from(String(part.data || '')));
         chunks.push(Buffer.from('\r\n'));
@@ -324,7 +332,8 @@ function watchDir (sandbox, path, onEvent, opts) {
             hostname: target.hostname,
             port: target.port,
             path: target.path,
-            headers
+            headers,
+            agent: agentFromClient(sandbox.client, target.protocol)
         });
 
         let settled = false;

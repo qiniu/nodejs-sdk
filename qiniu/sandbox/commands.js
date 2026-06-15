@@ -1,6 +1,6 @@
 const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
 const { CommandExitError } = require('./errors');
-const { millisecondsFromOptions, parseJSON, parseRequestUrl } = require('./util');
+const { agentFromClient, millisecondsFromOptions, parseJSON, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
 
@@ -157,7 +157,8 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             hostname: target.hostname,
             port: target.port,
             path: target.path,
-            headers
+            headers,
+            agent: agentFromClient(commands.sandbox.client, target.protocol)
         });
 
         let settled = false;
@@ -343,7 +344,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             });
         });
         req.on('error', fail);
-        const startTimeout = opts.requestTimeoutMs || opts.timeoutMs || opts.timeout;
+        const startTimeout = requestTimeout(opts);
         if (startTimeout) {
             startTimer = setTimeout(() => {
                 fail(new Error('Command stream start timed out'));
