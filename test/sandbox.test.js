@@ -1332,12 +1332,25 @@ describe('test sandbox module', function () {
 
             return template.build({
                 apiKey: 'sandbox-key',
+                accessKey: 'ak',
+                secretKey: 'sk',
+                macOptions: {
+                    disableQiniuTimestampSignature: true
+                },
                 endpoint: fixture.endpoint,
+                timeout: 1000,
+                requestTimeoutMs: 1000,
                 name: 'node-template:test'
             }).then(result => {
                 result.templateID.should.eql('tpl_1');
                 const body = JSON.parse(fixture.requests[0].body);
                 body.name.should.eql('node-template:test');
+                should.not.exist(body.apiKey);
+                should.not.exist(body.accessKey);
+                should.not.exist(body.secretKey);
+                should.not.exist(body.macOptions);
+                should.not.exist(body.timeout);
+                should.not.exist(body.requestTimeoutMs);
                 body.buildConfig.fromImage.should.eql('ubuntu:22.04');
                 body.buildConfig.steps.should.eql([
                     { type: 'apt', packages: ['git'] },
@@ -1420,7 +1433,7 @@ describe('test sandbox module', function () {
                         { type: 'COPY', args: ['package.json', '/app/', '', ''] },
                         { type: 'COPY', args: ['package-lock.json', '/app/', '', ''] },
                         { type: 'RUN', args: ['rm -r -f \'/tmp/cache dir\' \'/tmp/old\'', 'root'] },
-                        { type: 'RUN', args: ['mv \'/tmp/a file\' \'/tmp/b file\' -f'] },
+                        { type: 'RUN', args: ['mv -f \'/tmp/a file\' \'/tmp/b file\''] },
                         { type: 'RUN', args: ['mkdir -p -m 0755 \'/app/data dir\' \'/app/logs\''] },
                         { type: 'RUN', args: ['ln -s -f \'/usr/bin/node\' \'/usr/local/bin/node link\'', 'root'] },
                         { type: 'WORKDIR', args: ['/app'] },
@@ -1514,9 +1527,10 @@ describe('test sandbox module', function () {
 
     it('parses escaped quotes in Dockerfile ENV values', function () {
         const template = qiniu.sandbox.Template()
-            .fromDockerfile('FROM node:22\nENV FOO="bar\\"baz" QUOTED=\'it\\\'s ok\'');
+            .fromDockerfile('FROM node:22\nENV FOO="bar\\"baz" QUOTED=\'it\\\'s ok\'\nENV MY_VAR some=value');
         template.buildConfig.steps.should.eql([
-            { type: 'ENV', args: ['FOO', 'bar"baz', 'QUOTED', 'it\'s ok'] }
+            { type: 'ENV', args: ['FOO', 'bar"baz', 'QUOTED', 'it\'s ok'] },
+            { type: 'ENV', args: ['MY_VAR', 'some=value'] }
         ]);
     });
 

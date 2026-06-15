@@ -106,11 +106,14 @@ function runShellStep (template, command, options) {
 
 function parseEnvArgs (value) {
     const args = [];
-    if (value.indexOf('=') < 0) {
-        const index = value.search(/\s+/);
-        if (index > 0) {
-            args.push(value.slice(0, index).trim(), unquoteDockerfileValue(value.slice(index + 1).trim()));
+    const index = value.search(/\s+/);
+    if (index > 0) {
+        const firstWord = value.slice(0, index);
+        if (firstWord.indexOf('=') < 0) {
+            args.push(firstWord.trim(), unquoteDockerfileValue(value.slice(index + 1).trim()));
+            return args;
         }
+    } else if (value.indexOf('=') < 0) {
         return args;
     }
     const pattern = /([A-Za-z_][A-Za-z0-9_]*)=("(\\.|[^"\\])*"|'(\\.|[^'\\])*'|\S+)/g;
@@ -373,10 +376,11 @@ Template.prototype.remove = function (path, options) {
 
 Template.prototype.rename = function (src, dest, options) {
     options = options || {};
-    const args = ['mv', shellQuote(src), shellQuote(dest)];
+    const args = ['mv'];
     if (options.force) {
         args.push('-f');
     }
+    args.push(shellQuote(src), shellQuote(dest));
     return this.runCmd(args.join(' '), { user: options.user });
 };
 
@@ -499,9 +503,33 @@ Template.prototype.setReadyCmd = function (cmd) {
     return this;
 };
 
+function templateClientOptions (opts) {
+    const clientOpts = {};
+    [
+        'endpoint',
+        'apiUrl',
+        'apiKey',
+        'accessToken',
+        'mac',
+        'accessKey',
+        'secretKey',
+        'macOptions',
+        'httpAgent',
+        'httpsAgent'
+    ].forEach(key => {
+        if (opts[key] !== undefined) {
+            clientOpts[key] = opts[key];
+        }
+    });
+    if (opts.requestTimeoutMs !== undefined) {
+        clientOpts.timeout = opts.requestTimeoutMs;
+    }
+    return clientOpts;
+}
+
 Template.prototype.build = function (opts) {
     opts = opts || {};
-    const client = opts.client || new SandboxClient(opts);
+    const client = opts.client || new SandboxClient(templateClientOptions(opts));
     const body = Object.assign({}, opts, {
         buildConfig: this.buildConfig
     });
@@ -511,6 +539,13 @@ Template.prototype.build = function (opts) {
     delete body.apiKey;
     delete body.accessToken;
     delete body.mac;
+    delete body.accessKey;
+    delete body.secretKey;
+    delete body.macOptions;
+    delete body.httpAgent;
+    delete body.httpsAgent;
+    delete body.timeout;
+    delete body.requestTimeoutMs;
     return client.createTemplateV3(body);
 };
 
