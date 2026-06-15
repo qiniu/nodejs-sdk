@@ -180,12 +180,14 @@ describe('test sandbox module', function () {
                 err.message.should.match(/At least one sandbox ID/);
             }))
             .then(() => client.getSandboxesMetrics('sbx_one'))
+            .then(() => client.getSandboxesMetrics({ sandbox_ids: 'sbx_field' }))
             .then(() => client.getSandboxesMetrics({ sandboxId: 'sbx_object' }))
             .then(() => client.getSandboxesMetrics([{ sandboxID: 'sbx_array_object' }, 'sbx_array_string']))
             .then(() => {
                 urls.should.eql([
                     'http://sandbox.test/sandboxes',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_one',
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_field',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_object',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_array_object%2Csbx_array_string'
                 ]);
@@ -198,19 +200,18 @@ describe('test sandbox module', function () {
             apiKey: 'sandbox-key'
         });
 
-        try {
-            client.listInjectionRules();
-            throw new Error('expected missing Qiniu credentials error');
-        } catch (err) {
-            err.name.should.eql('SandboxError');
-            err.message.should.eql('Qiniu Mac credentials (accessKey/secretKey) are required for this operation');
-        }
-
         (() => new qiniu.sandbox.SandboxClient({
             endpoint: 'http://sandbox.test',
             apiKey: 'sandbox-key',
             accessKey: 'ak'
         })).should.throw(/Both accessKey and secretKey/);
+
+        return client.listInjectionRules().then(() => {
+            throw new Error('expected missing Qiniu credentials rejection');
+        }, err => {
+            err.name.should.eql('SandboxError');
+            err.message.should.eql('Qiniu Mac credentials (accessKey/secretKey) are required for this operation');
+        });
     });
 
     it('requires Qiniu AK/SK before creating sandboxes with Kodo resources', function () {
@@ -219,20 +220,19 @@ describe('test sandbox module', function () {
             apiKey: 'sandbox-key'
         });
 
-        try {
-            client.createSandbox({
-                template: 'base',
-                resources: [{
-                    type: 'kodo',
-                    bucket: 'bucket',
-                    mountPath: '/workspace/kodo'
-                }]
-            });
+        return client.createSandbox({
+            template: 'base',
+            resources: [{
+                type: 'kodo',
+                bucket: 'bucket',
+                mountPath: '/workspace/kodo'
+            }]
+        }).then(() => {
             throw new Error('expected missing Qiniu credentials error');
-        } catch (err) {
+        }, err => {
             err.name.should.eql('SandboxError');
             err.message.should.eql('Qiniu Mac credentials (accessKey/secretKey) are required for this operation');
-        }
+        });
     });
 
     it('keeps Qiniu sandbox extensions in create body', function () {
@@ -1618,6 +1618,11 @@ describe('test sandbox module', function () {
 
     it('throws when Dockerfile path does not exist', function () {
         (() => qiniu.sandbox.Template().fromDockerfile('/tmp/missing-qiniu-sdk-Dockerfile')).should.throw(/Dockerfile file not found/);
+    });
+
+    it('allows single-line Dockerfile comments as content', function () {
+        const template = qiniu.sandbox.Template().fromDockerfile('# syntax=docker/dockerfile:1');
+        template.buildConfig.steps.should.eql([]);
     });
 
     it('preserves octal permission strings in Template helpers', function () {

@@ -191,9 +191,16 @@ SandboxClient.prototype._request = function (method, path, options) {
         urllibOptions.headers['Content-Length'] = '0';
     }
 
+    let middlewares;
+    try {
+        middlewares = this._middlewares(options.authType);
+    } catch (err) {
+        return Promise.reject(err);
+    }
+
     return this.httpClient.sendRequest({
         url: this.endpoint + path,
-        middlewares: this._middlewares(options.authType),
+        middlewares,
         urllibOptions
     }).then(wrapper => this._handleResponse(wrapper, options.empty));
 };
@@ -231,9 +238,10 @@ SandboxClient.prototype.createSandbox = function (opts) {
 };
 
 SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
-    const values = Array.isArray(sandboxIDs)
-        ? sandboxIDs
-        : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs)) || [sandboxIDs];
+    const raw = (sandboxIDs && !Array.isArray(sandboxIDs) && typeof sandboxIDs === 'object')
+        ? sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs || sandboxIDs
+        : sandboxIDs;
+    const values = Array.isArray(raw) ? raw : [raw];
     const ids = values.map(value => {
         if (typeof value === 'string') {
             return value;
