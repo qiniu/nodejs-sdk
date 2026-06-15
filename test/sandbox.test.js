@@ -1684,6 +1684,9 @@ describe('test sandbox module', function () {
             }
             if (req.method === 'POST' && parsed.pathname === '/files') {
                 parsed.searchParams.get('path') === null ? true.should.eql(true) : false.should.eql(true);
+                parsed.searchParams.get('username').should.eql('user');
+                should(parsed.searchParams.get('signature')).startWith('v1_');
+                Number(parsed.searchParams.get('signature_expiration')).should.be.above(Math.floor(Date.now() / 1000));
                 req.body.should.containEql('/a.txt');
                 req.body.should.containEql('/b.txt');
                 res.statusCode = 200;
@@ -1723,7 +1726,7 @@ describe('test sandbox module', function () {
                     return sandbox.files.writeFiles([
                         { path: '/a.txt', data: 'a' },
                         { path: '/b.txt', data: 'b' }
-                    ]);
+                    ], { user: 'user' });
                 })
                 .then(entries => {
                     entries.map(entry => entry.path).should.eql(['/a.txt', '/b.txt']);

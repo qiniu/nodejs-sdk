@@ -345,10 +345,24 @@ Sandbox.prototype.uploadUrl = function (path, opts) {
 
 Sandbox.prototype.UploadURL = Sandbox.prototype.uploadUrl;
 
-Sandbox.prototype.batchUploadUrl = function (user) {
-    return this.envdUrl() + appendQuery('/files', {
-        username: user || DEFAULT_USER
-    });
+Sandbox.prototype.batchUploadUrl = function (opts) {
+    if (typeof opts === 'string') {
+        opts = { user: opts };
+    }
+    opts = opts || {};
+    const user = opts.user || DEFAULT_USER;
+    const query = {
+        username: user
+    };
+    if (this.envdAccessToken) {
+        let expiration = opts.signatureExpiration || opts.signature_expiration || 300;
+        if (expiration < 1000000000) {
+            expiration = Math.floor(Date.now() / 1000) + expiration;
+        }
+        query.signature = fileSignature('', 'write', user, this.envdAccessToken, expiration);
+        query.signature_expiration = expiration;
+    }
+    return this.envdUrl() + appendQuery('/files', query);
 };
 
 exports.Sandbox = Sandbox;

@@ -248,7 +248,7 @@ Filesystem.prototype.writeFiles = function (files, opts) {
         data: file.data
     }));
 
-    return rawRequest(this.sandbox.batchUploadUrl(opts.user), {
+    return rawRequest(this.sandbox.batchUploadUrl(opts), {
         method: 'POST',
         content: multipartBody(boundary, parts),
         dataType: 'json',
