@@ -449,8 +449,15 @@ describe('test sandbox module', function () {
         parsed.pathname.should.eql('/files');
         parsed.searchParams.get('path').should.eql('/home/user/a.txt');
         parsed.searchParams.get('username').should.eql('admin');
-        parsed.searchParams.get('signature_expiration').should.eql('60');
+        const expiration = Number(parsed.searchParams.get('signature_expiration'));
+        expiration.should.be.above(Math.floor(Date.now() / 1000));
+        expiration.should.be.below(Math.floor(Date.now() / 1000) + 120);
         should(parsed.searchParams.get('signature')).startWith('v1_');
+
+        const absolute = parseUrl(sandbox.uploadUrl('/home/user/a.txt', {
+            signatureExpiration: 2000000000
+        }));
+        absolute.searchParams.get('signature_expiration').should.eql('2000000000');
     });
 
     it('reads and writes files through envd HTTP API', function () {
@@ -1359,7 +1366,7 @@ describe('test sandbox module', function () {
                         { type: 'RUN', args: ['pip install --user \'numpy\' \'pandas\''] },
                         { type: 'RUN', args: ['npm install --save-dev \'typescript\''] },
                         { type: 'RUN', args: ['npm install -g \'tsx\'', 'root'] },
-                        { type: 'RUN', args: ['bun install --dev \'elysia\''] },
+                        { type: 'RUN', args: ['bun add --dev \'elysia\''] },
                         { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing \'curl\'', 'root'] },
                         { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\' \'/src/sdk dir\'', 'root'] },
                         { type: 'RUN', args: ['echo one && echo two', 'root'] }
@@ -2377,6 +2384,26 @@ describe('test sandbox module', function () {
             });
     });
 
+    it('returns git remote add result when fetch is not requested', function () {
+        const git = new qiniu.sandbox.Git({
+            run: function () {
+                return Promise.resolve({
+                    stdout: 'added',
+                    stderr: '',
+                    exitCode: 0
+                });
+            }
+        });
+
+        return git.remoteAdd('/repo', 'origin', 'https://github.com/acme/repo.git').then(result => {
+            result.should.eql({
+                stdout: 'added',
+                stderr: '',
+                exitCode: 0
+            });
+        });
+    });
+
     it('passes git push credentials through a helper when push fails', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
@@ -2900,6 +2927,53 @@ describe('test sandbox module', function () {
                         throw err;
                     });
                 });
+        });
+    });
+
+    it('treats envd RPC timeout alias as seconds', function () {
+        const envd = require('../qiniu/sandbox/envd');
+        return startServer((req, res) => {
+            if (req.url === '/test.RPC/Call') {
+                setTimeout(() => {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ result: { ok: true } }));
+                }, 20);
+                return;
+            }
+            if (req.url === '/test.RPC/Stream') {
+                setTimeout(() => {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/connect+json');
+                    res.end(encodeConnectEnvelope({ event: { ok: true } }));
+                }, 20);
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_envd_timeout_seconds',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return envd.connectRPC(sandbox, '/test.RPC/Call', {}, {
+                timeout: 1
+            }).then(result => {
+                result.should.eql({ ok: true });
+                return envd.connectStreamRPC(sandbox, '/test.RPC/Stream', {}, {
+                    timeout: 1
+                });
+            }).then(events => {
+                events.should.eql([{ event: { ok: true } }]);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
         });
     });
 

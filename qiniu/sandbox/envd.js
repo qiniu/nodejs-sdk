@@ -1,4 +1,4 @@
-const { basicAuth, parseJSON, rawRequest } = require('./util');
+const { basicAuth, millisecondsFromOptions, parseJSON, rawRequest } = require('./util');
 
 const MAX_CONNECT_ENVELOPE_BYTES = 10 * 1024 * 1024;
 
@@ -33,7 +33,9 @@ function connectRPC (sandbox, procedure, body, opts) {
         content: JSON.stringify(body || {}),
         dataType: 'text',
         headers,
-        timeout: opts.requestTimeoutMs || opts.timeoutMs || opts.timeout
+        timeout: opts.requestTimeoutMs !== undefined
+            ? opts.requestTimeoutMs
+            : millisecondsFromOptions(opts, 'timeout')
     }).then(({ data }) => parseConnectResponse(parseJSON(data)));
 }
 
@@ -117,7 +119,9 @@ function connectStreamRPC (sandbox, procedure, body, opts) {
         content: encodeConnectEnvelope(body),
         dataType: 'buffer',
         headers,
-        timeout: opts.requestTimeoutMs || opts.timeoutMs || opts.timeout
+        timeout: opts.requestTimeoutMs !== undefined
+            ? opts.requestTimeoutMs
+            : millisecondsFromOptions(opts, 'timeout')
     }).then(({ data, resp }) => {
         const contentType = (resp.headers && resp.headers['content-type']) || '';
         if (contentType.indexOf('application/connect+json') >= 0) {

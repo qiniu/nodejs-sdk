@@ -436,15 +436,20 @@ Template.prototype.npmInstall = function (packages, options) {
 
 Template.prototype.bunInstall = function (packages, options) {
     options = options || {};
-    const args = ['bun', 'install'];
-    if (options.g) {
-        args.push('-g');
+    if (packages) {
+        const args = ['bun', 'add'];
+        if (options.g) {
+            args.push('-g');
+        }
+        if (options.dev) {
+            args.push('--dev');
+        }
+        args.push.apply(args, asArray(packages).map(shellQuote));
+        return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
     }
+    const args = ['bun', 'install'];
     if (options.dev) {
         args.push('--dev');
-    }
-    if (packages) {
-        args.push.apply(args, asArray(packages).map(shellQuote));
     }
     return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
 };

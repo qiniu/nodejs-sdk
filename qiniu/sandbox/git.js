@@ -258,7 +258,7 @@ Git.prototype.deleteBranch = function (repoPath, branch, opts) {
 Git.prototype.remoteAdd = function (repoPath, name, repoUrl, opts) {
     opts = opts || {};
     const add = () => this._runGit(repoPath, ['remote', 'add', shellQuote(name), shellQuote(repoUrl)], opts);
-    const afterAdd = () => opts.fetch ? this._runGit(repoPath, ['fetch', shellQuote(name)], opts) : null;
+    const afterAdd = result => opts.fetch ? this._runGit(repoPath, ['fetch', shellQuote(name)], opts) : result;
     if (opts.overwrite) {
         return this._runGit(repoPath, ['remote', 'remove', shellQuote(name)], opts)
             .then(add, add)

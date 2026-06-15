@@ -299,7 +299,10 @@ Sandbox.prototype.fileUrl = function (path, operation, opts) {
         username: user
     };
     if (this.envdAccessToken) {
-        const expiration = opts.signatureExpiration || opts.signature_expiration || 300;
+        let expiration = opts.signatureExpiration || opts.signature_expiration || 300;
+        if (expiration < 1000000000) {
+            expiration = Math.floor(Date.now() / 1000) + expiration;
+        }
         query.signature = fileSignature(path, operation, user, this.envdAccessToken, expiration);
         query.signature_expiration = expiration;
     }
