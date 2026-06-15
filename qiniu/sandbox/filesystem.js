@@ -135,14 +135,26 @@ function multipartFilename (value) {
         .replace(/\n/g, '%0A');
 }
 
+function dataToUploadBuffer (data) {
+    if (Buffer.isBuffer(data)) {
+        return data;
+    }
+    if (data instanceof Uint8Array) {
+        return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+    }
+    if (data instanceof ArrayBuffer) {
+        return Buffer.from(data);
+    }
+    return Buffer.from(String(data !== undefined && data !== null ? data : ''));
+}
+
 function multipartBody (boundary, parts) {
     const chunks = [];
     parts.forEach(part => {
         chunks.push(Buffer.from(`--${boundary}\r\n`));
         chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"; filename="${multipartFilename(part.filename)}"\r\n`));
         chunks.push(Buffer.from('Content-Type: application/octet-stream\r\n\r\n'));
-        const data = part.data !== undefined && part.data !== null ? part.data : '';
-        chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(String(data)));
+        chunks.push(dataToUploadBuffer(part.data));
         chunks.push(Buffer.from('\r\n'));
     });
     chunks.push(Buffer.from(`--${boundary}--\r\n`));
@@ -227,7 +239,7 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
         const headers = {
             'Content-Type': 'application/octet-stream'
         };
-        const content = Buffer.isBuffer(dataOrOpts) ? dataOrOpts : Buffer.from(String(dataOrOpts !== undefined && dataOrOpts !== null ? dataOrOpts : ''));
+        const content = dataToUploadBuffer(dataOrOpts);
         const compressed = opts.gzip && supportsEncodedUpload
             ? gzipAsync(content).then(result => {
                 headers['Content-Encoding'] = 'gzip';
@@ -285,7 +297,7 @@ Filesystem.prototype.writeFiles = function (files, opts) {
         if (!file || typeof file !== 'object') {
             return Promise.reject(new TypeError('Each file must be an object'));
         }
-        if (file && file.data && typeof file.data === 'object' && !Buffer.isBuffer(file.data) && typeof file.data.pipe === 'function') {
+        if (file.data && typeof file.data === 'object' && !Buffer.isBuffer(file.data) && typeof file.data.pipe === 'function') {
             return Promise.reject(new TypeError('Streams are not supported as data in filesystem.writeFiles'));
         }
     }

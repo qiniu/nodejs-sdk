@@ -259,6 +259,9 @@ SandboxClient.prototype.getSandboxLogs = function (sandboxID, opts) {
 };
 
 SandboxClient.prototype.getSandbox = function (sandboxID) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
     return this._request('GET', `/sandboxes/${encodePath(sandboxID)}`);
 };
 

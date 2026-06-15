@@ -1237,6 +1237,13 @@ describe('test sandbox module', function () {
                     JSON.parse(fixture.requests[0].body).should.eql({ timeout: 15 });
                     err.name.should.eql('SandboxError');
                     err.message.should.containEql('teapot');
+                    return client.getSandbox('');
+                })
+                .then(() => {
+                    throw new Error('expected missing sandboxID to fail');
+                }, err => {
+                    err.name.should.eql('SandboxError');
+                    err.message.should.eql('sandboxID is required');
                 })
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
@@ -1836,6 +1843,8 @@ describe('test sandbox module', function () {
                 Number(parsed.searchParams.get('signature_expiration')).should.be.above(Math.floor(Date.now() / 1000));
                 req.body.should.containEql('/a.txt');
                 req.body.should.containEql('/b.txt');
+                req.rawBody.includes(Buffer.from([1, 2, 3])).should.eql(true);
+                req.rawBody.includes(Buffer.from([4, 5, 6])).should.eql(true);
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify([
@@ -1871,8 +1880,8 @@ describe('test sandbox module', function () {
                     Buffer.isBuffer(data).should.eql(true);
                     data.length.should.eql(3);
                     return sandbox.files.writeFiles([
-                        { path: '/a.txt', data: 'a' },
-                        { path: '/b.txt', data: 'b' }
+                        { path: '/a.txt', data: new Uint8Array([1, 2, 3]) },
+                        { path: '/b.txt', data: new Uint8Array([4, 5, 6]).buffer }
                     ], { user: 'user' });
                 })
                 .then(entries => {
@@ -3950,6 +3959,45 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('uses live PTY creation when args are provided without size or data callbacks', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                const body = decodeConnectEnvelope(req.rawBody);
+                body.process.cmd.should.eql('node');
+                body.process.args.should.eql(['-i']);
+                should.exist(body.pty);
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 49 } } }),
+                    encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_args',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({ cmd: 'node', args: ['-i'] })
+                .then(handle => handle.wait())
+                .then(result => {
+                    result.exitCode.should.eql(0);
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
     it('rejects PTY wait when Connect end-stream carries an error', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
@@ -4245,7 +4293,7 @@ describe('test sandbox module', function () {
                 req.headers['content-type'].should.eql('application/octet-stream');
                 req.headers['content-encoding'].should.eql('gzip');
                 parsed.searchParams.get('path').should.eql('/zip.txt');
-                zlib.gunzipSync(req.rawBody).toString().should.eql('0');
+                Array.from(zlib.gunzipSync(req.rawBody)).should.eql([1, 2, 3]);
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify([{ name: 'zip.txt', path: '/zip.txt', type: 'file' }]));
@@ -4266,7 +4314,7 @@ describe('test sandbox module', function () {
             return sandbox.files.read('/zip.txt', { gzip: true })
                 .then(text => {
                     text.should.eql('zip');
-                    return sandbox.files.write('/zip.txt', 0, {
+                    return sandbox.files.write('/zip.txt', new Uint8Array([1, 2, 3]), {
                         gzip: true,
                         useOctetStream: true
                     });
