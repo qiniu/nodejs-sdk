@@ -1436,6 +1436,7 @@ describe('test sandbox module', function () {
                 .setUser('node')
                 .setEnvs({ NODE_ENV: 'production', PORT: '8080' })
                 .pipInstall(['numpy', 'pandas'], { g: false })
+                .pipInstall({ g: false })
                 .npmInstall('typescript', { dev: true })
                 .npmInstall('tsx', { g: true })
                 .bunInstall(['elysia'], { dev: true })
@@ -1465,6 +1466,7 @@ describe('test sandbox module', function () {
                         { type: 'USER', args: ['node'] },
                         { type: 'ENV', args: ['NODE_ENV', 'production', 'PORT', '8080'] },
                         { type: 'RUN', args: ['pip install --user \'numpy\' \'pandas\''] },
+                        { type: 'RUN', args: ['pip install --user .'] },
                         { type: 'RUN', args: ['npm install --save-dev \'typescript\''] },
                         { type: 'RUN', args: ['npm install -g \'tsx\'', 'root'] },
                         { type: 'RUN', args: ['bun add --dev \'elysia\''] },

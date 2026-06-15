@@ -422,6 +422,10 @@ Template.prototype.setUser = function (user) {
 };
 
 Template.prototype.pipInstall = function (packages, options) {
+    if (packages && typeof packages === 'object' && !Array.isArray(packages) && !Buffer.isBuffer(packages) && options === undefined) {
+        options = packages;
+        packages = undefined;
+    }
     options = options || {};
     const args = ['pip', 'install'];
     if (options.g === false) {
