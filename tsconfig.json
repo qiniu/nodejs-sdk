@@ -108,5 +108,6 @@
   },
   "include": [
     "index.d.ts",
+    "test/sandbox_types.ts",
   ]
 }

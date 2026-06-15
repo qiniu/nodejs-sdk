@@ -6,46 +6,42 @@ const qiniu = require('../index');
 const { shellQuote } = require('../qiniu/sandbox/util');
 
 function loadDotEnvIfPresent () {
-    const filepath = path.join(process.cwd(), '.env');
-    if (!fs.existsSync(filepath)) {
-        return;
-    }
+    [
+        path.join(process.cwd(), '.env')
+    ].forEach(filepath => {
+        if (!fs.existsSync(filepath)) {
+            return;
+        }
 
-    fs.readFileSync(filepath, 'utf8')
-        .split(/\r?\n/)
-        .forEach(line => {
-            line = line.trim();
-            if (!line || line[0] === '#') {
-                return;
-            }
-            const index = line.indexOf('=');
-            if (index < 0) {
-                return;
-            }
-            const key = line.slice(0, index).trim();
-            let value = line.slice(index + 1).trim();
-            if (
-                (value[0] === '"' && value[value.length - 1] === '"') ||
-                (value[0] === '\'' && value[value.length - 1] === '\'')
-            ) {
-                value = value.slice(1, -1);
-            }
-            if (process.env[key] === undefined) {
-                process.env[key] = value;
-            }
-        });
+        fs.readFileSync(filepath, 'utf8')
+            .split(/\r?\n/)
+            .forEach(line => {
+                line = line.trim();
+                if (!line || line[0] === '#') {
+                    return;
+                }
+                const index = line.indexOf('=');
+                if (index < 0) {
+                    return;
+                }
+                const key = line.slice(0, index).trim();
+                let value = line.slice(index + 1).trim();
+                if (
+                    (value[0] === '"' && value[value.length - 1] === '"') ||
+                    (value[0] === '\'' && value[value.length - 1] === '\'')
+                ) {
+                    value = value.slice(1, -1);
+                }
+                if (process.env[key] === undefined) {
+                    process.env[key] = value;
+                }
+            });
+    });
 }
 
 loadDotEnvIfPresent();
 
-function truthy (value) {
-    return ['1', 'true', 'yes', 'on'].indexOf(String(value || '').toLowerCase()) >= 0;
-}
-
 function integrationLog () {
-    if (!truthy(process.env.QINIU_SANDBOX_INTEGRATION_VERBOSE)) {
-        return;
-    }
     const args = Array.prototype.slice.call(arguments);
     args.unshift('[sandbox integration]');
     console.log.apply(console, args);
@@ -53,13 +49,14 @@ function integrationLog () {
 
 function integrationConfig () {
     return {
-        enabled: truthy(process.env.QINIU_SANDBOX_INTEGRATION),
         endpoint: process.env.QINIU_SANDBOX_ENDPOINT,
         apiKey: process.env.QINIU_SANDBOX_API_KEY,
         template: process.env.QINIU_SANDBOX_TEMPLATE || 'base',
         accessKey: process.env.QINIU_SANDBOX_ACCESS_KEY,
         secretKey: process.env.QINIU_SANDBOX_SECRET_KEY,
-        testInjectionRules: truthy(process.env.QINIU_SANDBOX_TEST_INJECTION_RULES),
+        kodoBucket: process.env.QINIU_SANDBOX_KODO_BUCKET,
+        kodoPrefix: process.env.QINIU_SANDBOX_KODO_PREFIX,
+        kodoMountPath: process.env.QINIU_SANDBOX_KODO_MOUNT_PATH || '/mnt/qiniu-nodejs-sdk-it',
         gitRepoUrl: process.env.GIT_REPO_URL,
         gitUsername: process.env.GIT_USERNAME,
         gitPassword: process.env.GIT_PASSWORD
@@ -67,7 +64,7 @@ function integrationConfig () {
 }
 
 const config = integrationConfig();
-const describeIntegration = config.enabled && config.apiKey ? describe : describe.skip;
+const describeIntegration = config.apiKey ? describe : describe.skip;
 
 function authedGitUrl (repoUrl, username, password) {
     const parsed = new URL(repoUrl);
@@ -89,6 +86,18 @@ function scrubSecrets (text) {
 
 function hasGitCredentials () {
     return Boolean(config.gitRepoUrl && config.gitUsername && config.gitPassword);
+}
+
+function hasQiniuCredentials () {
+    return Boolean(config.accessKey && config.secretKey);
+}
+
+function sandboxClient (opts) {
+    opts = opts || {};
+    return new qiniu.sandbox.SandboxClient(Object.assign({
+        endpoint: config.endpoint,
+        apiKey: config.apiKey
+    }, opts));
 }
 
 function exerciseRemoteGitIfConfigured (sandbox, runID) {
@@ -241,8 +250,8 @@ describeIntegration('sandbox integration', function () {
         });
     });
 
-    it('creates and deletes an injection rule when AK/SK integration is enabled', function () {
-        if (!config.testInjectionRules || !config.accessKey || !config.secretKey) {
+    it('creates and deletes an injection rule when AK/SK is configured', function () {
+        if (!hasQiniuCredentials()) {
             this.skip();
         }
 
@@ -274,8 +283,159 @@ describeIntegration('sandbox integration', function () {
             return client.deleteInjectionRule(ruleID);
         });
     });
+
+    it('creates a sandbox with an injection rule when AK/SK is configured', function () {
+        if (!hasQiniuCredentials()) {
+            this.skip();
+        }
+
+        const client = sandboxClient({
+            mac: new qiniu.auth.digest.Mac(config.accessKey, config.secretKey)
+        });
+        const name = `nodejs-sdk-create-it-${Date.now()}`;
+        let ruleID;
+        let createdSandbox;
+
+        return client.createInjectionRule({
+            name,
+            injection: {
+                type: 'openai',
+                apiKey: 'test-key'
+            }
+        }).then(rule => {
+            ruleID = rule.id || rule.ruleID || rule.ruleId;
+            should(ruleID).be.ok();
+            return qiniu.sandbox.Sandbox.create({
+                client,
+                template: config.template,
+                timeout: 120,
+                injections: [
+                    {
+                        type: 'id',
+                        id: ruleID
+                    }
+                ],
+                metadata: {
+                    sdk: 'qiniu-nodejs-sdk',
+                    test: 'injection-create'
+                }
+            });
+        }).then(created => {
+            createdSandbox = created;
+            return createdSandbox.waitForReady({
+                interval: 3000,
+                timeout: 180000
+            });
+        }).then(info => {
+            info.state.should.eql('running');
+            integrationLog('created sandbox with injection rule', createdSandbox.sandboxId);
+        }).finally(() => {
+            const cleanup = [];
+            if (createdSandbox) {
+                cleanup.push(createdSandbox.kill().catch(() => null));
+            }
+            if (ruleID) {
+                cleanup.push(client.deleteInjectionRule(ruleID).catch(() => null));
+            }
+            return Promise.all(cleanup);
+        });
+    });
+
+    it('creates a sandbox with a Kodo resource mount when bucket is configured', function () {
+        if (!hasQiniuCredentials() || !config.kodoBucket) {
+            this.skip();
+        }
+
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: config.endpoint,
+            mac: new qiniu.auth.digest.Mac(config.accessKey, config.secretKey)
+        });
+        const runID = `nodejs-sdk-kodo-${Date.now()}`;
+        let kodoSandbox;
+        const resource = {
+            type: 'kodo',
+            bucket: config.kodoBucket,
+            mount_path: config.kodoMountPath
+        };
+        if (config.kodoPrefix) {
+            resource.prefix = config.kodoPrefix;
+        }
+
+        return qiniu.sandbox.Sandbox.create({
+            client,
+            template: config.template,
+            timeout: 300,
+            resources: [resource],
+            metadata: {
+                sdk: 'qiniu-nodejs-sdk',
+                test: runID
+            }
+        }).then(created => {
+            kodoSandbox = created;
+            return kodoSandbox.waitForReady({
+                interval: 3000,
+                timeout: 240000
+            });
+        }).then(info => {
+            info.state.should.eql('running');
+            return kodoSandbox.commands.run(`test -d ${shellQuote(config.kodoMountPath)}`);
+        }).then(result => {
+            result.exitCode.should.eql(0);
+            const filePath = path.posix.join(config.kodoMountPath, `${runID}.txt`);
+            return kodoSandbox.commands.run(`sh -c "echo ${shellQuote(runID)} > ${shellQuote(filePath)} && cat ${shellQuote(filePath)}"`)
+                .then(writeResult => {
+                    writeResult.exitCode.should.eql(0);
+                    writeResult.stdout.should.containEql(runID);
+                    return kodoSandbox.commands.run(`rm -f ${shellQuote(filePath)}`);
+                })
+                .then(removeResult => {
+                    removeResult.exitCode.should.eql(0);
+                });
+        }).finally(() => {
+            if (kodoSandbox) {
+                return kodoSandbox.kill().catch(() => null);
+            }
+            return null;
+        });
+    });
+
+    it('creates, inspects, and deletes a template', function () {
+        const client = sandboxClient();
+        const name = `nodejs-sdk-it-${Date.now()}`;
+        let templateID;
+        let buildID;
+        const template = qiniu.sandbox.Template()
+            .fromImage('ubuntu:22.04')
+            .runCmd('echo qiniu-nodejs-sdk');
+
+        return template.build({
+            client,
+            name,
+            tags: ['nodejs-sdk-it']
+        }).then(result => {
+            templateID = result.templateID || result.templateId || result.id || name;
+            buildID = result.buildID || result.buildId;
+            should(templateID).be.ok();
+            if (!buildID) {
+                return result;
+            }
+            return client.getTemplateBuildStatus(templateID, buildID)
+                .then(status => {
+                    should(status).be.ok();
+                    return client.getTemplateBuildLogs(templateID, buildID, { limit: 5 });
+                });
+        }).then(result => {
+            should(result).be.ok();
+            integrationLog('template integration completed', templateID, buildID);
+        }).finally(() => {
+            if (templateID) {
+                return client.deleteTemplate(templateID).catch(() => null);
+            }
+            return null;
+        });
+    });
 });
 
-if (!config.enabled || !config.apiKey) {
-    console.log('skip sandbox integration: set QINIU_SANDBOX_INTEGRATION=true and QINIU_SANDBOX_API_KEY to run');
+if (!config.apiKey) {
+    console.log('skip sandbox integration: set QINIU_SANDBOX_API_KEY to run');
 }

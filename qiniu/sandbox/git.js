@@ -281,7 +281,12 @@ Git.prototype._runGitWithTemporaryAuth = function (repoPath, args, opts) {
         return this._runGit(repoPath, ['remote', 'set-url', shellQuote(remote), shellQuote(authUrl(repoUrl, opts))], opts);
     }).then(() => this._runGit(repoPath, args, opts))
         .then(result => this._runGit(repoPath, ['remote', 'set-url', shellQuote(remote), shellQuote(stripAuth(originalUrl))], opts)
-            .then(() => result));
+            .then(() => result), err => this._runGit(repoPath, ['remote', 'set-url', shellQuote(remote), shellQuote(stripAuth(originalUrl))], opts)
+            .then(() => {
+                throw err;
+            }, () => {
+                throw err;
+            }));
 };
 
 function parseGitStatus (stdout) {

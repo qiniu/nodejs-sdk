@@ -40,6 +40,12 @@ function normalizeSandboxCreateOptions (opts) {
     return body;
 }
 
+function hasKodoResource (body) {
+    return Array.isArray(body.resources) && body.resources.some(resource => {
+        return resource && resource.type === 'kodo';
+    });
+}
+
 function normalizeInjection (injection) {
     if (!injection || typeof injection !== 'object' || Array.isArray(injection)) {
         return injection;
@@ -149,6 +155,7 @@ SandboxClient.prototype._request = function (method, path, options) {
         urllibOptions.content = JSON.stringify(body);
         urllibOptions.contentType = 'application/json';
     } else {
+        urllibOptions.contentType = urllibOptions.headers['Content-Type'];
         urllibOptions.headers['Content-Length'] = '0';
     }
 
@@ -184,8 +191,10 @@ SandboxClient.prototype.listSandboxesV2 = function (opts) {
 };
 
 SandboxClient.prototype.createSandbox = function (opts) {
+    const body = normalizeSandboxCreateOptions(opts);
     return this._request('POST', '/sandboxes', {
-        body: normalizeSandboxCreateOptions(opts)
+        authType: hasKodoResource(body) && this.mac ? 'qiniu' : undefined,
+        body
     });
 };
 

@@ -53,6 +53,23 @@ export declare namespace sandbox {
         httpsAgent?: HttpsAgent;
     }
 
+    interface GitRepositoryResource {
+        type: 'github_repository';
+        url: string;
+        mount_path: string;
+        authorization_token?: string;
+    }
+
+    interface KodoResource {
+        type: 'kodo';
+        bucket: string;
+        mount_path: string;
+        prefix?: string;
+        read_only?: boolean;
+    }
+
+    type SandboxResource = GitRepositoryResource | KodoResource;
+
     interface SandboxCreateOptions extends SandboxClientOptions {
         template?: string;
         templateID?: string;
@@ -68,7 +85,7 @@ export declare namespace sandbox {
         envs?: {[key: string]: string};
         mcp?: any;
         injections?: any[];
-        resources?: any[];
+        resources?: SandboxResource[];
         client?: SandboxClient;
     }
 

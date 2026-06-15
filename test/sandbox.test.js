@@ -152,6 +152,47 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('uses Qiniu AK/SK signing when creating sandbox with Kodo resources', function () {
+        return startServer((req, res) => {
+            res.statusCode = 201;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+                sandboxID: 'sbx_kodo',
+                domain: 'sbx.local',
+                envdAccessToken: 'token'
+            }));
+        }).then(fixture => {
+            const mac = new qiniu.auth.digest.Mac('ak', 'sk', {
+                disableQiniuTimestampSignature: true
+            });
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                apiKey: 'sandbox-key',
+                mac
+            });
+
+            return client.createSandbox({
+                template: 'base',
+                resources: [
+                    {
+                        type: 'kodo',
+                        bucket: 'bucket',
+                        mount_path: '/workspace/kodo',
+                        read_only: true
+                    }
+                ]
+            }).then(() => {
+                should(fixture.requests[0].headers.authorization).startWith('Qiniu ak:');
+                should.not.exist(fixture.requests[0].headers['x-api-key']);
+                JSON.parse(fixture.requests[0].body).resources[0].type.should.eql('kodo');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('exposes E2B style Sandbox.create and kill helpers', function () {
         return startServer((req, res) => {
             if (req.method === 'POST' && req.url === '/sandboxes') {
@@ -711,6 +752,40 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('surfaces sandbox API string errors and default connect timeout', function () {
+        return startServer((req, res) => {
+            if (req.method === 'POST' && req.url === '/sandboxes/sbx_default/connect') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ sandboxID: 'sbx_default' }));
+                return;
+            }
+            res.statusCode = 418;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify('teapot'));
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                apiKey: 'sandbox-key'
+            });
+
+            return client.connectSandbox('sbx_default')
+                .then(() => client.getSandbox('sbx_error'))
+                .then(() => {
+                    throw new Error('expected string error');
+                }, err => {
+                    JSON.parse(fixture.requests[0].body).should.eql({ timeout: 15 });
+                    err.name.should.eql('SandboxError');
+                    err.message.should.containEql('teapot');
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
     it('maps template, build, tag, and access-token APIs', function () {
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');
@@ -873,6 +948,31 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('supports Template.fromTemplate in builder payloads', function () {
+        return startServer((req, res) => {
+            res.statusCode = 201;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ templateID: 'tpl_child', buildID: 'bld_child' }));
+        }).then(fixture => {
+            return qiniu.sandbox.Template()
+                .fromTemplate('base-template')
+                .runCmd('echo child')
+                .build({
+                    apiKey: 'sandbox-key',
+                    endpoint: fixture.endpoint,
+                    name: 'child-template:test'
+                }).then(() => {
+                    const body = JSON.parse(fixture.requests[0].body);
+                    body.buildConfig.fromTemplate.should.eql('base-template');
+                    body.buildConfig.steps[0].cmd.should.eql('echo child');
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
     it('exposes network constants and maps updateNetwork to Qiniu API', function () {
         return startServer((req, res) => {
             res.statusCode = 200;
@@ -917,6 +1017,16 @@ describe('test sandbox module', function () {
         }, err => {
             err.name.should.eql('NotImplementedError');
             err.message.should.containEql('Volume');
+            return volume.delete();
+        }).then(() => {
+            throw new Error('expected volume.delete to fail');
+        }, err => {
+            err.name.should.eql('NotImplementedError');
+            return volume.list();
+        }).then(() => {
+            throw new Error('expected volume.list to fail');
+        }, err => {
+            err.name.should.eql('NotImplementedError');
         });
     });
 
@@ -1136,7 +1246,7 @@ describe('test sandbox module', function () {
                 if (cmd.indexOf('branch --format') >= 0) {
                     return Promise.resolve({ stdout: '* main\n  feature\n', exitCode: 0 });
                 }
-                if (cmd.indexOf('remote get-url origin') >= 0) {
+                if (cmd.indexOf('remote get-url') >= 0) {
                     return Promise.resolve({ stdout: 'https://github.com/acme/repo.git\n', exitCode: 0 });
                 }
                 return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
@@ -1177,6 +1287,112 @@ describe('test sandbox module', function () {
                 commandText.should.containEql('commit -m \'msg\' --author \'Alice <alice@example.com>\' --allow-empty');
                 commandText.should.containEql('config --global \'user.name\' \'Alice\'');
             });
+    });
+
+    it('cleans temporary git credentials when push fails', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                if (cmd.indexOf('remote get-url') >= 0) {
+                    return Promise.resolve({
+                        stdout: 'https://github.com/acme/repo.git\n',
+                        exitCode: 0
+                    });
+                }
+                if (cmd.indexOf('git push') >= 0) {
+                    return Promise.reject(new Error('push failed'));
+                }
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.push('/repo', {
+            username: 'u',
+            password: 'p',
+            remote: 'origin',
+            branch: 'main'
+        }).then(() => {
+            throw new Error('expected git push to fail');
+        }, err => {
+            err.message.should.eql('push failed');
+            commandsSeen.map(item => item.cmd).should.eql([
+                'git remote get-url \'origin\'',
+                'git remote set-url \'origin\' \'https://u:p@github.com/acme/repo.git\'',
+                'git push \'origin\' \'main\'',
+                'git remote set-url \'origin\' \'https://github.com/acme/repo.git\''
+            ]);
+        });
+    });
+
+    it('surfaces git upstream and validation errors on auth helpers', function () {
+        const git = new qiniu.sandbox.Git({
+            run: function () {
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 1 });
+            }
+        });
+
+        return git.push('/repo', {
+            username: 'u',
+            password: 'p'
+        }).then(() => {
+            throw new Error('expected missing upstream');
+        }, err => {
+            err.name.should.eql('GitUpstreamError');
+            return git.clone('https://github.com/acme/repo.git', '/repo', {
+                username: 'u'
+            });
+        }).then(() => {
+            throw new Error('expected missing password');
+        }, err => {
+            err.name.should.eql('GitAuthError');
+            return git.commit('/repo', 'msg', {
+                authorName: 'Alice'
+            });
+        }).then(() => {
+            throw new Error('expected missing author email');
+        }, err => {
+            err.name.should.eql('GitAuthError');
+        });
+    });
+
+    it('keeps original git push error when credential cleanup fails', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                if (cmd.indexOf('remote get-url') >= 0) {
+                    return Promise.resolve({
+                        stdout: 'https://github.com/acme/repo.git\n',
+                        exitCode: 0
+                    });
+                }
+                if (cmd.indexOf('git push') >= 0) {
+                    return Promise.reject(new Error('push failed'));
+                }
+                if (cmd.indexOf('remote set-url') >= 0 && commandsSeen.length > 3) {
+                    return Promise.reject(new Error('cleanup failed'));
+                }
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.push('/repo', {
+            username: 'u',
+            password: 'p',
+            remote: 'origin',
+            branch: 'main'
+        }).then(() => {
+            throw new Error('expected git push to fail');
+        }, err => {
+            err.message.should.eql('push failed');
+            commandsSeen.map(item => item.cmd).should.eql([
+                'git remote get-url \'origin\'',
+                'git remote set-url \'origin\' \'https://u:p@github.com/acme/repo.git\'',
+                'git push \'origin\' \'main\'',
+                'git remote set-url \'origin\' \'https://github.com/acme/repo.git\''
+            ]);
+        });
     });
 
     it('covers Sandbox.connect, Sandbox.list, wait polling, and stopped health checks', function () {
@@ -1248,6 +1464,32 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('rethrows non-502 envd health errors', function () {
+        return startServer((req, res) => {
+            res.statusCode = 500;
+            res.end('broken');
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_health_error',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.isRunning().then(() => {
+                throw new Error('expected health error');
+            }, err => {
+                err.name.should.eql('SandboxError');
+                err.message.should.containEql('500');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('supports JSON fallback for process stream responses and poll timeout errors', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
@@ -1290,6 +1532,58 @@ describe('test sandbox module', function () {
                     throw new Error('expected waitForReady timeout');
                 }, err => {
                     err.message.should.eql('Sandbox poll timed out');
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('supports process stream JSON array and single event fallback responses', function () {
+        let calls = 0;
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                calls += 1;
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                if (calls === 1) {
+                    res.end(JSON.stringify([
+                        { event: { start: { pid: 31 } } },
+                        { event: { data: { stdout: 'array' } } },
+                        { event: { end: { exitCode: 0 } } }
+                    ]));
+                    return;
+                }
+                res.end(JSON.stringify({
+                    event: {
+                        end: {
+                            exitCode: 0
+                        }
+                    }
+                }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_json_fallback',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.run('echo array')
+                .then(result => {
+                    result.pid.should.eql(31);
+                    result.stdout.should.eql('array');
+                    return sandbox.commands.run('true');
+                })
+                .then(result => {
+                    result.exitCode.should.eql(0);
                 })
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
