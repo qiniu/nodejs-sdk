@@ -164,6 +164,8 @@ describe('test sandbox module', function () {
         client.httpClient.sendRequest = req => {
             urls.push(req.url);
             req.urllibOptions.timeout.should.eql(1234);
+            should.not.exist(req.urllibOptions.headers['Content-Length']);
+            should.not.exist(req.urllibOptions.contentType);
             return Promise.resolve({
                 ok: () => true,
                 data: { ok: true }

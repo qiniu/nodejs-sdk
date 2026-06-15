@@ -468,7 +468,7 @@ export declare namespace sandbox {
         DownloadURL(path: string, options?: FileUrlOptions): string;
         uploadUrl(path: string, options?: FileUrlOptions): string;
         UploadURL(path: string, options?: FileUrlOptions): string;
-        batchUploadUrl(user?: string): string;
+        batchUploadUrl(options?: string | FileUrlOptions): string;
     }
 }
 

@@ -183,7 +183,7 @@ SandboxClient.prototype._request = function (method, path, options) {
     if (hasBody) {
         urllibOptions.content = JSON.stringify(body);
         urllibOptions.contentType = 'application/json';
-    } else {
+    } else if (method !== 'GET' && method !== 'HEAD') {
         urllibOptions.contentType = urllibOptions.headers['Content-Type'];
         urllibOptions.headers['Content-Length'] = '0';
     }
