@@ -237,6 +237,9 @@ SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
         }
         return value && (value.sandboxId || value.sandboxID || value.sandbox_id || value.id);
     }).filter(Boolean);
+    if (!ids.length) {
+        return Promise.reject(new TypeError('No valid sandbox IDs found'));
+    }
     return this._request('GET', appendQuery('/sandboxes/metrics', { sandbox_ids: ids }));
 };
 

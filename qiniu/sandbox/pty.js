@@ -295,7 +295,7 @@ Pty.prototype.sendInput = function (pid, data, opts) {
             selector: { pid }
         },
         input: {
-            pty: Buffer.isBuffer(data) ? data.toString('base64') : Buffer.from(data).toString('base64')
+            pty: Buffer.isBuffer(data) ? data.toString('base64') : Buffer.from(String(data)).toString('base64')
         }
     }, opts).then(() => null);
 };

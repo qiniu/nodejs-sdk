@@ -154,7 +154,7 @@ describe('test sandbox module', function () {
         });
     });
 
-    it('passes client timeout to urllib requests and handles empty metrics ids', function () {
+    it('passes client timeout to urllib requests and validates metrics ids', function () {
         const client = new qiniu.sandbox.SandboxClient({
             endpoint: 'http://sandbox.test',
             apiKey: 'sandbox-key',
@@ -173,14 +173,18 @@ describe('test sandbox module', function () {
         };
 
         return client.listSandboxes()
-            .then(() => client.getSandboxesMetrics())
+            .then(() => client.getSandboxesMetrics().then(() => {
+                throw new Error('expected empty metrics ids to fail');
+            }, err => {
+                err.name.should.eql('TypeError');
+                err.message.should.match(/No valid sandbox IDs/);
+            }))
             .then(() => client.getSandboxesMetrics('sbx_one'))
             .then(() => client.getSandboxesMetrics({ sandboxId: 'sbx_object' }))
             .then(() => client.getSandboxesMetrics([{ sandboxID: 'sbx_array_object' }, 'sbx_array_string']))
             .then(() => {
                 urls.should.eql([
                     'http://sandbox.test/sandboxes',
-                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_one',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_object',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_array_object%2Csbx_array_string'
@@ -1595,6 +1599,10 @@ describe('test sandbox module', function () {
         } finally {
             fs.readFileSync = originalReadFileSync;
         }
+    });
+
+    it('throws when Dockerfile path does not exist', function () {
+        (() => qiniu.sandbox.Template().fromDockerfile('/tmp/missing-qiniu-sdk-Dockerfile')).should.throw(/Dockerfile file not found/);
     });
 
     it('preserves octal permission strings in Template helpers', function () {
@@ -3742,14 +3750,14 @@ describe('test sandbox module', function () {
             }).then(() => sandbox.pty.connect(44, {
                 onData: chunk => data.push(Buffer.from(chunk).toString())
             })).then(handle => handle.wait())
-                .then(() => sandbox.pty.sendInput(44, Buffer.from('ls\n')))
+                .then(() => sandbox.pty.sendInput(44, 123))
                 .then(() => sandbox.pty.resize(44, { cols: 100, rows: 30 }))
                 .then(() => sandbox.pty.kill(44))
                 .then(killed => {
                     killed.should.eql(true);
                     data.should.eql(['ok', 'ok']);
                     const sendBody = JSON.parse(fixture.requests[3].body);
-                    sendBody.input.pty.should.eql(Buffer.from('ls\n').toString('base64'));
+                    sendBody.input.pty.should.eql(Buffer.from('123').toString('base64'));
                     const resizeBody = JSON.parse(fixture.requests[4].body);
                     resizeBody.pty.size.should.eql({ cols: 100, rows: 30 });
                     const killBody = JSON.parse(fixture.requests[5].body);

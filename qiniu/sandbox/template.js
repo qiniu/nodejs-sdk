@@ -260,11 +260,16 @@ function dockerfileFromImage (value) {
 }
 
 Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
-    const isPath = typeof dockerfileContentOrPath === 'string' &&
-        dockerfileContentOrPath.length < 1024 &&
-        dockerfileContentOrPath.indexOf('\n') < 0 &&
-        dockerfileContentOrPath.indexOf('\r') < 0 &&
-        fs.existsSync(dockerfileContentOrPath);
+    if (typeof dockerfileContentOrPath !== 'string') {
+        throw new TypeError('Dockerfile content or path must be a string');
+    }
+    const hasNewlines = dockerfileContentOrPath.indexOf('\n') >= 0 || dockerfileContentOrPath.indexOf('\r') >= 0;
+    const startsWithInstruction = /^\s*(ADD|ARG|CMD|COPY|ENTRYPOINT|ENV|EXPOSE|FROM|HEALTHCHECK|LABEL|ONBUILD|RUN|SHELL|STOPSIGNAL|USER|VOLUME|WORKDIR)\b/i.test(dockerfileContentOrPath);
+    const isLikelyPath = dockerfileContentOrPath.length < 1024 && !hasNewlines && !startsWithInstruction;
+    if (isLikelyPath && !fs.existsSync(dockerfileContentOrPath)) {
+        throw new Error(`Dockerfile file not found at path: ${dockerfileContentOrPath}`);
+    }
+    const isPath = isLikelyPath && fs.existsSync(dockerfileContentOrPath);
     let content = dockerfileContentOrPath;
     if (isPath) {
         try {
