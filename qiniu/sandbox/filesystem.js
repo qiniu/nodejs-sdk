@@ -123,7 +123,7 @@ WatchHandle.prototype._finish = function (err) {
     }
     this._stopped = true;
     if (this._onExit) {
-        this._onExit(err);
+        Promise.resolve(this._onExit(err)).catch(() => {});
     }
 };
 

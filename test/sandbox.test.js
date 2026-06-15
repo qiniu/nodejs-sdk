@@ -2183,6 +2183,46 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('handles rejected async watchDir onExit callbacks', function () {
+        let exitCalled = false;
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeConnectEnvelope({ event: { start: {} } }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_async_exit',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', () => {}, {
+                recursive: true,
+                onExit: () => {
+                    exitCalled = true;
+                    return Promise.reject(new Error('async exit failed'));
+                }
+            }).then(handle => {
+                return new Promise(resolve => setTimeout(resolve, 20)).then(() => handle);
+            }).then(handle => {
+                handle._stopped.should.eql(true);
+                exitCalled.should.eql(true);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('fails watchDir when the live Connect stream ends with a partial frame after start', function () {
         let exitError;
         return startServer((req, res) => {
