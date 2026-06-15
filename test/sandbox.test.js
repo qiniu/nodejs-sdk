@@ -1545,6 +1545,34 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('clears stale registry credentials when switching to a public image', function () {
+        return startServer((req, res) => {
+            res.statusCode = 201;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ templateID: 'tpl_public', buildID: 'bld_public' }));
+        }).then(fixture => {
+            return qiniu.sandbox.Template()
+                .fromImage('registry.example.com/private/app:latest', {
+                    username: 'alice',
+                    password: 'secret'
+                })
+                .fromImage('node:22')
+                .build({
+                    apiKey: 'sandbox-key',
+                    endpoint: fixture.endpoint,
+                    name: 'public-template:test'
+                }).then(() => {
+                    const body = JSON.parse(fixture.requests[0].body);
+                    body.buildConfig.fromImage.should.eql('node:22');
+                    should.not.exist(body.buildConfig.fromImageRegistry);
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
     it('treats long Dockerfile text as content instead of probing it as a path', function () {
         const content = 'FROM node:22\nRUN ' + new Array(1200).join('x');
         const template = qiniu.sandbox.Template().fromDockerfile(content);
@@ -2340,6 +2368,7 @@ describe('test sandbox module', function () {
                 commandResponse = res;
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/connect+json');
+                res.flushHeaders();
                 return;
             }
             res.statusCode = 404;
@@ -2869,6 +2898,28 @@ describe('test sandbox module', function () {
         return git.dangerouslyAuthenticate('/repo', 'origin', 'new user', 'new/pass').then(() => {
             commandsSeen[1].cmd.should.eql('git remote set-url \'origin\' \'https://new%20user:new%2Fpass@example.com/acme/repo.git\'');
             commandsSeen[1].cmd.should.not.containEql('old:secret');
+        });
+    });
+
+    it('replaces token-only git remote credentials when dangerously authenticating', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                if (cmd.indexOf('remote get-url') >= 0) {
+                    return Promise.resolve({
+                        stdout: 'https://old-token@example.com/acme/repo.git\n',
+                        stderr: '',
+                        exitCode: 0
+                    });
+                }
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.dangerouslyAuthenticate('/repo', 'origin', 'new user', 'new/pass').then(() => {
+            commandsSeen[1].cmd.should.eql('git remote set-url \'origin\' \'https://new%20user:new%2Fpass@example.com/acme/repo.git\'');
+            commandsSeen[1].cmd.should.not.containEql('old-token@');
         });
     });
 

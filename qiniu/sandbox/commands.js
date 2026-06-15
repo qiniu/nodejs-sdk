@@ -258,7 +258,6 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         }
 
         req.on('response', res => {
-            cleanupStartTimer();
             if (res.statusCode < 200 || res.statusCode >= 300) {
                 fail(new Error(`Sandbox envd request failed with status ${res.statusCode}`));
                 res.resume();
@@ -266,6 +265,9 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             }
             const contentType = (res.headers && res.headers['content-type']) || '';
             isConnectStream = contentType.indexOf('application/connect+json') >= 0;
+            if (!isConnectStream) {
+                cleanupStartTimer();
+            }
             res.on('data', chunk => {
                 if (!isConnectStream) {
                     jsonChunks.push(chunk);

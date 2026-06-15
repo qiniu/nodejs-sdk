@@ -21,6 +21,8 @@ Template.prototype.fromImage = function (image, credentials) {
             username: credentials.username,
             password: credentials.password
         };
+    } else {
+        delete this.buildConfig.fromImageRegistry;
     }
     if (this._forceNextLayer) {
         this.buildConfig.force = true;

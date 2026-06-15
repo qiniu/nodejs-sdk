@@ -33,7 +33,7 @@ function authUrl (repoUrl, opts) {
 }
 
 function stripAuth (repoUrl) {
-    return String(repoUrl || '').replace(/^(https?):\/\/[^/@]+:[^/@]+@/, '$1://');
+    return String(repoUrl || '').replace(/^(https?):\/\/[^/@]+@/, '$1://');
 }
 
 function credentialHelperArgs (opts) {
