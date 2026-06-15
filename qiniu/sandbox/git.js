@@ -35,11 +35,11 @@ function authUrl (repoUrl, opts) {
     if (!opts.username || !opts.password) {
         throw new GitAuthError('Both username and password are required for git authentication');
     }
-    return repoUrl.replace(/^https:\/\//, `https://${encodeURIComponent(opts.username)}:${encodeURIComponent(opts.password)}@`);
+    return repoUrl.replace(/^(https?):\/\//, `$1://${encodeURIComponent(opts.username)}:${encodeURIComponent(opts.password)}@`);
 }
 
 function stripAuth (repoUrl) {
-    return String(repoUrl || '').replace(/^https:\/\/[^/@]+:[^/@]+@/, 'https://');
+    return String(repoUrl || '').replace(/^(https?):\/\/[^/@]+:[^/@]+@/, '$1://');
 }
 
 function configScopeArg (opts) {

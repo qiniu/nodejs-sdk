@@ -156,7 +156,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         let settled = false;
         let handle;
         let responseBuffer = Buffer.alloc(0);
-        let jsonBuffer = Buffer.alloc(0);
+        const jsonChunks = [];
         let isConnectStream = true;
         let result = {
             pid: fallbackPid || 0,
@@ -258,7 +258,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             isConnectStream = contentType.indexOf('application/connect+json') >= 0;
             res.on('data', chunk => {
                 if (!isConnectStream) {
-                    jsonBuffer = Buffer.concat([jsonBuffer, chunk]);
+                    jsonChunks.push(chunk);
                     return;
                 }
                 responseBuffer = Buffer.concat([responseBuffer, chunk]);
@@ -278,7 +278,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             res.on('end', () => {
                 if (!isConnectStream) {
                     cleanupStartTimer();
-                    const events = eventListFromResponse(parseJSON(jsonBuffer));
+                    const events = eventListFromResponse(parseJSON(Buffer.concat(jsonChunks)));
                     result = commandResultFromEvents(events, opts);
                     if (!result.pid && fallbackPid) {
                         result.pid = fallbackPid;

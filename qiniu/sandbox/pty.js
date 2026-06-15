@@ -90,8 +90,17 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             rejectWait = reject;
         });
         waitPromise.catch(() => {});
+        let startTimer;
+
+        function cleanupStartTimer () {
+            if (startTimer) {
+                clearTimeout(startTimer);
+                startTimer = null;
+            }
+        }
 
         function fail (err) {
+            cleanupStartTimer();
             if (!settled) {
                 settled = true;
                 reject(err);
@@ -102,6 +111,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
         function handleMessage (message) {
             const event = eventPayload(message);
             if (event.start && !handle) {
+                cleanupStartTimer();
                 handle = new LivePtyHandle(pty, event.start.pid, req, waitPromise);
                 settled = true;
                 resolve(handle);
@@ -167,6 +177,13 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             });
         });
         req.on('error', fail);
+        const startTimeout = opts.requestTimeoutMs || opts.timeoutMs || opts.timeout;
+        if (startTimeout) {
+            startTimer = setTimeout(() => {
+                fail(new Error('PTY stream start timed out'));
+                req.destroy();
+            }, startTimeout);
+        }
         req.end(encodeConnectEnvelope(body));
     });
 }
@@ -214,7 +231,10 @@ Pty.prototype.create = function (opts) {
 
     return connectLivePty(this.sandbox, '/process.Process/Start', body, {
         user: opts.user,
-        onData: opts.onData
+        onData: opts.onData,
+        requestTimeoutMs: opts.requestTimeoutMs,
+        timeoutMs: opts.timeoutMs,
+        timeout: opts.timeout
     }, this);
 };
 
@@ -226,7 +246,10 @@ Pty.prototype.connect = function (pid, opts) {
         }
     }, {
         user: opts.user,
-        onData: opts.onData
+        onData: opts.onData,
+        requestTimeoutMs: opts.requestTimeoutMs,
+        timeoutMs: opts.timeoutMs,
+        timeout: opts.timeout
     }, this);
 };
 

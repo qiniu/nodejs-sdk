@@ -107,6 +107,21 @@ function rawRequest (requestUrl, options) {
 }
 
 function parseRequestUrl (requestUrl) {
+    const URLParser = (typeof URL !== 'undefined' && URL) || null;
+    if (URLParser) {
+        try {
+            const parsed = new URLParser(requestUrl);
+            return {
+                protocol: parsed.protocol,
+                hostname: parsed.hostname.replace(/^\[|\]$/g, ''),
+                port: parsed.port,
+                path: parsed.pathname + parsed.search
+            };
+        } catch (err) {
+            throw new SandboxError(`Invalid request URL: ${requestUrl}`);
+        }
+    }
+
     const match = String(requestUrl).match(/^(https?:)\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/);
     if (!match) {
         throw new SandboxError(`Invalid request URL: ${requestUrl}`);

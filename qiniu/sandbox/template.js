@@ -103,7 +103,7 @@ function runShellStep (template, command, options) {
 
 function parseEnvArgs (value) {
     const args = [];
-    const pattern = /([A-Za-z_][A-Za-z0-9_]*)=("[^"]*"|'[^']*'|\S+)/g;
+    const pattern = /([A-Za-z_][A-Za-z0-9_]*)=("(\\.|[^"\\])*"|'(\\.|[^'\\])*'|\S+)/g;
     let match;
     while ((match = pattern.exec(value))) {
         let envValue = match[2];
@@ -111,7 +111,10 @@ function parseEnvArgs (value) {
             (envValue[0] === '"' && envValue[envValue.length - 1] === '"') ||
             (envValue[0] === '\'' && envValue[envValue.length - 1] === '\'')
         ) {
-            envValue = envValue.slice(1, -1);
+            envValue = envValue.slice(1, -1)
+                .replace(/\\"/g, '"')
+                .replace(/\\'/g, '\'')
+                .replace(/\\\\/g, '\\');
         }
         args.push(match[1], envValue);
     }

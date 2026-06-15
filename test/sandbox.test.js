@@ -1188,6 +1188,14 @@ describe('test sandbox module', function () {
         template.buildConfig.steps[0].cmd.should.match(/^x+$/);
     });
 
+    it('parses escaped quotes in Dockerfile ENV values', function () {
+        const template = qiniu.sandbox.Template()
+            .fromDockerfile('FROM node:22\nENV FOO="bar\\"baz" QUOTED=\'it\\\'s ok\'');
+        template.buildConfig.steps.should.eql([
+            { type: 'ENV', args: ['FOO', 'bar"baz', 'QUOTED', 'it\'s ok'] }
+        ]);
+    });
+
     it('exposes network constants and maps updateNetwork to Qiniu API', function () {
         return startServer((req, res) => {
             res.statusCode = 200;
@@ -1651,6 +1659,27 @@ describe('test sandbox module', function () {
             commandsSeen.map(item => item.cmd).should.eql([
                 'git clone \'https://u:p@github.com/acme/private.git\'',
                 'git remote set-url origin \'https://github.com/acme/private.git\''
+            ]);
+            commandsSeen[1].opts.cwd.should.eql('private');
+        });
+    });
+
+    it('cleans http git clone credentials when using the default destination directory', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.clone('http://git.example.com/acme/private.git', {
+            username: 'u',
+            password: 'p'
+        }).then(() => {
+            commandsSeen.map(item => item.cmd).should.eql([
+                'git clone \'http://u:p@git.example.com/acme/private.git\'',
+                'git remote set-url origin \'http://git.example.com/acme/private.git\''
             ]);
             commandsSeen[1].opts.cwd.should.eql('private');
         });
@@ -2244,6 +2273,48 @@ describe('test sandbox module', function () {
                         throw err;
                     });
                 });
+        });
+    });
+
+    it('rejects live PTY start when the process stream does not start before timeout', function () {
+        let ptyResponse;
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                ptyResponse = res;
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_timeout',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24,
+                requestTimeoutMs: 5
+            }).then(() => {
+                throw new Error('expected pty start to time out');
+            }, err => {
+                err.message.should.eql('PTY stream start timed out');
+                if (ptyResponse) {
+                    ptyResponse.end();
+                }
+            }).then(() => closeServer(fixture.server), err => {
+                if (ptyResponse) {
+                    ptyResponse.end();
+                }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
         });
     });
 
