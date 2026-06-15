@@ -168,12 +168,14 @@ describe('test sandbox module', function () {
             .then(() => client.getSandboxesMetrics())
             .then(() => client.getSandboxesMetrics('sbx_one'))
             .then(() => client.getSandboxesMetrics({ sandboxId: 'sbx_object' }))
+            .then(() => client.getSandboxesMetrics([{ sandboxID: 'sbx_array_object' }, 'sbx_array_string']))
             .then(() => {
                 urls.should.eql([
                     'http://sandbox.test/sandboxes',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_one',
-                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_object'
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_object',
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_array_object%2Csbx_array_string'
                 ]);
             });
     });
@@ -2684,6 +2686,22 @@ describe('test sandbox module', function () {
                 GIT_USERNAME: 'u',
                 GIT_PASSWORD: 'p'
             });
+        });
+    });
+
+    it('keeps embedded git clone credentials when no helper credentials are provided', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.clone('https://u:p@github.com/acme/private.git').then(() => {
+            commandsSeen.length.should.eql(1);
+            commandsSeen[0].cmd.should.containEql('clone \'https://u:p@github.com/acme/private.git\'');
+            should.not.exist(commandsSeen[0].opts.envs);
         });
     });
 

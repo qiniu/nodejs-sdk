@@ -167,7 +167,8 @@ Git.prototype._runGit = function (repoPath, args, opts) {
 Git.prototype.clone = function (repoUrl, pathOrOpts, maybeOpts) {
     const normalized = pathAndOptions(pathOrOpts, maybeOpts);
     const opts = gitCredentialOptions(normalized.opts);
-    const args = gitConfigArgs(opts).concat(credentialHelperArgs(opts)).concat(['clone', shellQuote(stripAuth(repoUrl))]);
+    const targetUrl = opts.username || opts.password ? stripAuth(repoUrl) : repoUrl;
+    const args = gitConfigArgs(opts).concat(credentialHelperArgs(opts)).concat(['clone', shellQuote(targetUrl)]);
     if (opts.depth) {
         args.push('--depth', shellQuote(opts.depth));
     }

@@ -224,11 +224,15 @@ SandboxClient.prototype.createSandbox = function (opts) {
 };
 
 SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
-    const ids = Array.isArray(sandboxIDs)
+    const values = Array.isArray(sandboxIDs)
         ? sandboxIDs
-        : (typeof sandboxIDs === 'string'
-            ? [sandboxIDs]
-            : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs || (sandboxIDs.sandboxId || sandboxIDs.sandboxID ? [sandboxIDs.sandboxId || sandboxIDs.sandboxID] : null))) || []);
+        : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs)) || [sandboxIDs];
+    const ids = values.map(value => {
+        if (typeof value === 'string') {
+            return value;
+        }
+        return value && (value.sandboxId || value.sandboxID || value.sandbox_id || value.id);
+    }).filter(Boolean);
     return this._request('GET', appendQuery('/sandboxes/metrics', { sandbox_ids: ids }));
 };
 
