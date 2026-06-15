@@ -657,7 +657,7 @@ describe('test sandbox module', function () {
                 res.setHeader('Content-Type', 'application/connect+json');
                 res.end(Buffer.concat([
                     encodeConnectEnvelope({ event: { start: { pid: 101 } } }),
-                    encodeConnectEnvelope({ event: { data: { stdout: '## main\\n M a.txt\\n?? b.txt\\n' } } }),
+                    encodeConnectEnvelope({ event: { data: { stdout: Buffer.from('## main\n M a.txt\n?? b.txt\n').toString('base64') } } }),
                     encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
                 ]));
                 return;
@@ -1450,6 +1450,57 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('returns command background handles before the process stream ends', function () {
+        let commandResponse;
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                commandResponse = res;
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.write(encodeConnectEnvelope({ event: { start: { pid: 88 } } }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_live_cmd',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+            const seen = [];
+
+            return sandbox.commands.run('sleep 5', {
+                background: true,
+                onStdout: data => seen.push(data)
+            }).then(handle => {
+                handle.pid.should.eql(88);
+                should.not.exist(handle.result);
+                commandResponse.write(encodeConnectEnvelope({
+                    event: {
+                        data: {
+                            stdout: Buffer.from('ready').toString('base64')
+                        }
+                    }
+                }));
+                commandResponse.end(encodeConnectEnvelope({ event: { end: { exitCode: 0 } } }));
+                return handle.wait();
+            }).then(result => {
+                result.stdout.should.eql('ready');
+                seen.should.eql(['ready']);
+            }).then(() => closeServer(fixture.server), err => {
+                if (commandResponse) {
+                    commandResponse.end();
+                }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('supports E2B git auth, branches, reset, restore, and safe remote cleanup', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
@@ -1710,7 +1761,7 @@ describe('test sandbox module', function () {
                 res.end(JSON.stringify({
                     events: [
                         { event: { start: { pid: 22 } } },
-                        { event: { data: { stdout: 'ok' } } },
+                        { event: { data: { stdout: Buffer.from('ok').toString('base64') } } },
                         { event: { end: { exitCode: 0 } } }
                     ]
                 }));
@@ -1763,7 +1814,7 @@ describe('test sandbox module', function () {
                 if (calls === 1) {
                     res.end(JSON.stringify([
                         { event: { start: { pid: 31 } } },
-                        { event: { data: { stdout: 'array' } } },
+                        { event: { data: { stdout: Buffer.from('array').toString('base64') } } },
                         { event: { end: { exitCode: 0 } } }
                     ]));
                     return;
@@ -2222,7 +2273,7 @@ describe('test sandbox module', function () {
                 res.setHeader('Content-Type', 'application/connect+json');
                 res.end(Buffer.concat([
                     encodeConnectEnvelope({ event: { start: { pid: 55 } } }),
-                    encodeConnectEnvelope({ event: { data: { stdout: 'connected' } } }),
+                    encodeConnectEnvelope({ event: { data: { stdout: Buffer.from('connected').toString('base64') } } }),
                     encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
                 ]));
                 return;
