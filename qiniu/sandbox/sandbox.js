@@ -4,7 +4,7 @@ const { Filesystem } = require('./filesystem');
 const { Git } = require('./git');
 const { Pty } = require('./pty');
 const { SandboxClient } = require('./client');
-const { appendQuery, fileSignature, poll, rawRequest } = require('./util');
+const { agentFromClient, appendQuery, fileSignature, parseRequestUrl, poll, rawRequest } = require('./util');
 
 function getSandboxID (data) {
     return data && (data.sandboxID || data.sandboxId || data.sandbox_id || data.id);
@@ -289,9 +289,12 @@ Sandbox.prototype.waitForReady = function (opts) {
 };
 
 Sandbox.prototype.isRunning = function () {
-    return rawRequest(this.envdUrl() + '/health', {
+    const requestUrl = this.envdUrl() + '/health';
+    const target = parseRequestUrl(requestUrl);
+    return rawRequest(requestUrl, {
         method: 'GET',
-        dataType: 'text'
+        dataType: 'text',
+        agent: agentFromClient(this.client, target.protocol)
     }).then(() => true, err => {
         const resp = err.response || err.resp;
         if (resp && [502, 503, 504].indexOf(resp.statusCode) >= 0) {

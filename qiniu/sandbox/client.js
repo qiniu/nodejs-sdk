@@ -224,7 +224,11 @@ SandboxClient.prototype.createSandbox = function (opts) {
 };
 
 SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
-    const ids = Array.isArray(sandboxIDs) ? sandboxIDs : (typeof sandboxIDs === 'string' ? [sandboxIDs] : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs)) || []);
+    const ids = Array.isArray(sandboxIDs)
+        ? sandboxIDs
+        : (typeof sandboxIDs === 'string'
+            ? [sandboxIDs]
+            : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs || (sandboxIDs.sandboxId || sandboxIDs.sandboxID ? [sandboxIDs.sandboxId || sandboxIDs.sandboxID] : null))) || []);
     return this._request('GET', appendQuery('/sandboxes/metrics', { sandbox_ids: ids }));
 };
 
@@ -413,7 +417,10 @@ SandboxClient.prototype.waitForBuild = function (templateID, buildID, opts) {
         return info && (info.status === 'ready' || info.status === 'error');
     }).then(info => {
         if (info && info.status === 'error') {
-            throw new TemplateBuildError(info.error || info.message || 'Sandbox template build failed', { info });
+            const errorMessage = (info.error && typeof info.error === 'object' ? info.error.message : info.error) ||
+                info.message ||
+                'Sandbox template build failed';
+            throw new TemplateBuildError(errorMessage, { info });
         }
         return info;
     });

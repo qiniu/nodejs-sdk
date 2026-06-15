@@ -164,6 +164,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         let settled = false;
         let handle;
         let responseBuffer = Buffer.alloc(0);
+        let responseOffset = 0;
         const jsonChunks = [];
         let isConnectStream = true;
         let result = {
@@ -269,20 +270,23 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                     jsonChunks.push(chunk);
                     return;
                 }
-                responseBuffer = Buffer.concat([responseBuffer, chunk]);
-                while (responseBuffer.length >= 5) {
-                    const flags = responseBuffer[0];
-                    const length = responseBuffer.readUInt32BE(1);
+                responseBuffer = responseOffset < responseBuffer.length
+                    ? Buffer.concat([responseBuffer.slice(responseOffset), chunk])
+                    : chunk;
+                responseOffset = 0;
+                while (responseBuffer.length - responseOffset >= 5) {
+                    const flags = responseBuffer[responseOffset];
+                    const length = responseBuffer.readUInt32BE(responseOffset + 1);
                     if (length > MAX_CONNECT_ENVELOPE_BYTES) {
                         fail(new Error(`Sandbox envd stream envelope too large: ${length}`));
                         req.destroy();
                         return;
                     }
-                    if (responseBuffer.length < 5 + length) {
+                    if (responseBuffer.length - responseOffset < 5 + length) {
                         break;
                     }
-                    const payload = responseBuffer.slice(5, 5 + length).toString();
-                    responseBuffer = responseBuffer.slice(5 + length);
+                    const payload = responseBuffer.toString('utf8', responseOffset + 5, responseOffset + 5 + length);
+                    responseOffset += 5 + length;
                     if (flags & 2) {
                         try {
                             const err = connectEndStreamError(payload);
@@ -311,7 +315,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             });
             res.on('error', fail);
             res.on('end', () => {
-                if (responseBuffer.length > 0) {
+                if (responseBuffer.length - responseOffset > 0) {
                     fail(new Error('Sandbox envd stream truncated unexpectedly'));
                     return;
                 }

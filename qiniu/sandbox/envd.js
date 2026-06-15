@@ -1,4 +1,4 @@
-const { basicAuth, millisecondsFromOptions, parseJSON, rawRequest } = require('./util');
+const { agentFromClient, basicAuth, millisecondsFromOptions, parseJSON, parseRequestUrl, rawRequest } = require('./util');
 
 const MAX_CONNECT_ENVELOPE_BYTES = 10 * 1024 * 1024;
 
@@ -28,11 +28,14 @@ function connectRPC (sandbox, procedure, body, opts) {
         headers['Keepalive-Ping-Interval'] = '50';
     }
 
-    return rawRequest(sandbox.envdUrl() + procedure, {
+    const requestUrl = sandbox.envdUrl() + procedure;
+    const target = parseRequestUrl(requestUrl);
+    return rawRequest(requestUrl, {
         method: 'POST',
         content: JSON.stringify(body || {}),
         dataType: 'text',
         headers,
+        agent: agentFromClient(sandbox.client, target.protocol),
         timeout: opts.requestTimeoutMs !== undefined
             ? opts.requestTimeoutMs
             : millisecondsFromOptions(opts, 'timeout')
@@ -114,11 +117,14 @@ function connectStreamRPC (sandbox, procedure, body, opts) {
         headers['Keepalive-Ping-Interval'] = '50';
     }
 
-    return rawRequest(sandbox.envdUrl() + procedure, {
+    const requestUrl = sandbox.envdUrl() + procedure;
+    const target = parseRequestUrl(requestUrl);
+    return rawRequest(requestUrl, {
         method: 'POST',
         content: encodeConnectEnvelope(body),
         dataType: 'buffer',
         headers,
+        agent: agentFromClient(sandbox.client, target.protocol),
         timeout: opts.requestTimeoutMs !== undefined
             ? opts.requestTimeoutMs
             : millisecondsFromOptions(opts, 'timeout')

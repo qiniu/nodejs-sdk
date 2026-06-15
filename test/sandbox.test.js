@@ -1,5 +1,6 @@
 const should = require('should');
 const http = require('http');
+const fs = require('fs');
 
 const qiniu = require('../index');
 
@@ -166,11 +167,13 @@ describe('test sandbox module', function () {
         return client.listSandboxes()
             .then(() => client.getSandboxesMetrics())
             .then(() => client.getSandboxesMetrics('sbx_one'))
+            .then(() => client.getSandboxesMetrics({ sandboxId: 'sbx_object' }))
             .then(() => {
                 urls.should.eql([
                     'http://sandbox.test/sandboxes',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=',
-                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_one'
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_one',
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_object'
                 ]);
             });
     });
@@ -1415,6 +1418,7 @@ describe('test sandbox module', function () {
                 .npmInstall('typescript', { dev: true })
                 .npmInstall('tsx', { g: true })
                 .bunInstall(['elysia'], { dev: true })
+                .bunInstall(null, { g: true })
                 .aptInstall(['curl'], { noInstallRecommends: true, fixMissing: true })
                 .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk dir', {
                     branch: 'sandbox',
@@ -1443,6 +1447,7 @@ describe('test sandbox module', function () {
                         { type: 'RUN', args: ['npm install --save-dev \'typescript\''] },
                         { type: 'RUN', args: ['npm install -g \'tsx\'', 'root'] },
                         { type: 'RUN', args: ['bun add --dev \'elysia\''] },
+                        { type: 'run', cmd: 'bun install' },
                         { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing \'curl\'', 'root'] },
                         { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\' \'/src/sdk dir\'', 'root'] },
                         { type: 'RUN', args: ['echo one && echo two', 'root'] }
@@ -1510,6 +1515,21 @@ describe('test sandbox module', function () {
         const template = qiniu.sandbox.Template().fromDockerfile(content);
         template.buildConfig.fromImage.should.eql('node:22');
         template.buildConfig.steps[0].cmd.should.match(/^x+$/);
+    });
+
+    it('wraps Dockerfile path read errors with path context', function () {
+        const originalReadFileSync = fs.readFileSync;
+        fs.readFileSync = function (path) {
+            if (path === __filename) {
+                throw new Error('permission denied');
+            }
+            return originalReadFileSync.apply(this, arguments);
+        };
+        try {
+            (() => qiniu.sandbox.Template().fromDockerfile(__filename)).should.throw(/Failed to read Dockerfile/);
+        } finally {
+            fs.readFileSync = originalReadFileSync;
+        }
     });
 
     it('preserves octal permission strings in Template helpers', function () {
@@ -2370,6 +2390,33 @@ describe('test sandbox module', function () {
                 res.end(encodeConnectEnvelope({ event: { start: {} } }));
                 return;
             }
+            if (req.url === '/filesystem.Filesystem/Stat') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                    result: {
+                        entry: { name: 'agent.txt', path: '/agent.txt', type: 'FILE_TYPE_FILE', size: 5 }
+                    }
+                }));
+                return;
+            }
+            if (req.method === 'GET' && req.url.indexOf('/files') === 0) {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/octet-stream');
+                res.end('agent');
+                return;
+            }
+            if (req.method === 'POST' && req.url.indexOf('/files') === 0) {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify([{ name: 'agent.txt', path: '/agent.txt', type: 'file' }]));
+                return;
+            }
+            if (req.url === '/health') {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
             res.statusCode = 404;
             res.end();
         }).then(fixture => {
@@ -2390,6 +2437,22 @@ describe('test sandbox module', function () {
                 }))
                 .then(handle => {
                     handle._stopped.should.eql(true);
+                    return sandbox.files.getInfo('/agent.txt');
+                })
+                .then(info => {
+                    info.path.should.eql('/agent.txt');
+                    return sandbox.files.readText('/agent.txt');
+                })
+                .then(text => {
+                    text.should.eql('agent');
+                    return sandbox.files.write('/agent.txt', 'agent');
+                })
+                .then(info => {
+                    info.path.should.eql('/agent.txt');
+                    return sandbox.isRunning();
+                })
+                .then(running => {
+                    running.should.eql(true);
                     return sandbox.pty.create({
                         cols: 80,
                         rows: 24
@@ -2397,11 +2460,13 @@ describe('test sandbox module', function () {
                 })
                 .then(handle => handle.wait())
                 .then(() => {
-                    requestsThroughAgent.should.eql([
-                        '/process.Process/Start',
-                        '/filesystem.Filesystem/WatchDir',
-                        '/process.Process/Start'
-                    ]);
+                    requestsThroughAgent[0].should.eql('/process.Process/Start');
+                    requestsThroughAgent[1].should.eql('/filesystem.Filesystem/WatchDir');
+                    requestsThroughAgent[2].should.eql('/filesystem.Filesystem/Stat');
+                    requestsThroughAgent[3].should.startWith('/files?path=%2Fagent.txt&username=user&signature=');
+                    requestsThroughAgent[4].should.startWith('/files?path=%2Fagent.txt&username=user&signature=');
+                    requestsThroughAgent[5].should.eql('/health');
+                    requestsThroughAgent[6].should.eql('/process.Process/Start');
                 })
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
@@ -3113,7 +3178,7 @@ describe('test sandbox module', function () {
             if (req.url === '/templates/tpl_1/builds/bld_1/status') {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ status: 'error', error: 'compile failed' }));
+                res.end(JSON.stringify({ status: 'error', error: { message: 'compile failed' } }));
                 return;
             }
             res.statusCode = 404;

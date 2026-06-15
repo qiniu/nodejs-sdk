@@ -173,16 +173,22 @@ function formatReadResult (data, opts) {
     return buffer.toString();
 }
 
+function envdAgent (sandbox, requestUrl) {
+    return agentFromClient(sandbox.client, parseRequestUrl(requestUrl).protocol);
+}
+
 Filesystem.prototype.read = function (path, opts) {
     opts = opts || {};
     const headers = {};
     if (opts.gzip) {
         headers['Accept-Encoding'] = 'gzip';
     }
-    return rawRequest(this.sandbox.downloadUrl(path, opts), {
+    const requestUrl = this.sandbox.downloadUrl(path, opts);
+    return rawRequest(requestUrl, {
         method: 'GET',
         dataType: 'buffer',
         headers,
+        agent: envdAgent(this.sandbox, requestUrl),
         gzip: !!opts.gzip
     }).then(({ data }) => formatReadResult(data, opts));
 };
@@ -209,10 +215,12 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
             content = zlib.gzipSync(content);
         }
 
-        return rawRequest(this.sandbox.uploadUrl(path, opts), {
+        const requestUrl = this.sandbox.uploadUrl(path, opts);
+        return rawRequest(requestUrl, {
             method: 'POST',
             content,
             dataType: 'json',
+            agent: envdAgent(this.sandbox, requestUrl),
             headers
         }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
     }
@@ -231,10 +239,12 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
         body = zlib.gzipSync(body);
     }
 
-    return rawRequest(this.sandbox.uploadUrl(path, opts), {
+    const requestUrl = this.sandbox.uploadUrl(path, opts);
+    return rawRequest(requestUrl, {
         method: 'POST',
         content: body,
         dataType: 'json',
+        agent: envdAgent(this.sandbox, requestUrl),
         headers
     }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
 };
@@ -248,10 +258,12 @@ Filesystem.prototype.writeFiles = function (files, opts) {
         data: file.data
     }));
 
-    return rawRequest(this.sandbox.batchUploadUrl(opts), {
+    const requestUrl = this.sandbox.batchUploadUrl(opts);
+    return rawRequest(requestUrl, {
         method: 'POST',
         content: multipartBody(boundary, parts),
         dataType: 'json',
+        agent: envdAgent(this.sandbox, requestUrl),
         headers: {
             'Content-Type': `multipart/form-data; boundary=${boundary}`
         }

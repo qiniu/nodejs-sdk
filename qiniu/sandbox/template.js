@@ -255,9 +255,14 @@ Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
         dockerfileContentOrPath.indexOf('\n') < 0 &&
         dockerfileContentOrPath.indexOf('\r') < 0 &&
         fs.existsSync(dockerfileContentOrPath);
-    const content = isPath
-        ? fs.readFileSync(dockerfileContentOrPath, 'utf8')
-        : dockerfileContentOrPath;
+    let content = dockerfileContentOrPath;
+    if (isPath) {
+        try {
+            content = fs.readFileSync(dockerfileContentOrPath, 'utf8');
+        } catch (err) {
+            throw new Error(`Failed to read Dockerfile at ${dockerfileContentOrPath}: ${err.message}`);
+        }
+    }
     joinDockerfileLines(content).forEach(line => {
         line = line.trim();
         if (!line || line[0] === '#') {
@@ -458,7 +463,7 @@ Template.prototype.bunInstall = function (packages, options) {
     if (options.dev) {
         args.push('--dev');
     }
-    return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
+    return this.runCmd(args.join(' '));
 };
 
 Template.prototype.gitClone = function (url, path, options) {
