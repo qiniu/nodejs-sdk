@@ -1,6 +1,7 @@
 const should = require('should');
 const http = require('http');
 const fs = require('fs');
+const stream = require('stream');
 
 const qiniu = require('../index');
 
@@ -638,6 +639,24 @@ describe('test sandbox module', function () {
                         throw err;
                     });
                 });
+        });
+    });
+
+    it('rejects Readable streams passed directly to filesystem write', function () {
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'sbx_stream_write',
+            envdUrl: 'http://127.0.0.1:9',
+            info: {
+                envdAccessToken: 'token'
+            }
+        });
+
+        return sandbox.files.write('/stream.txt', new stream.Readable({
+            read: function () {}
+        })).then(() => {
+            throw new Error('expected stream write to reject');
+        }, err => {
+            err.message.should.eql('Streams are not supported as data in filesystem.write');
         });
     });
 
@@ -1436,8 +1455,8 @@ describe('test sandbox module', function () {
                     const body = JSON.parse(fixture.requests[0].body);
                     body.buildConfig.steps.should.eql([
                         { type: 'COPY', args: ['app.js', '/app/', 'root', '0755'] },
-                        { type: 'COPY', args: ['package.json', '/app/', '', ''] },
-                        { type: 'COPY', args: ['package-lock.json', '/app/', '', ''] },
+                        { type: 'COPY', args: ['package.json', '/app/'] },
+                        { type: 'COPY', args: ['package-lock.json', '/app/'] },
                         { type: 'RUN', args: ['rm -r -f \'/tmp/cache dir\' \'/tmp/old\'', 'root'] },
                         { type: 'RUN', args: ['mv -f \'/tmp/a file\' \'/tmp/b file\''] },
                         { type: 'RUN', args: ['mkdir -p -m 0755 \'/app/data dir\' \'/app/logs\''] },
@@ -1501,7 +1520,7 @@ describe('test sandbox module', function () {
                         { type: 'WORKDIR', args: ['/app'], force: true },
                         { type: 'ENV', args: ['NODE_ENV', 'production', 'PORT', '3000'], force: true },
                         { type: 'RUN', args: ['npm ci'], force: true },
-                        { type: 'COPY', args: ['package.json', '/app/', '', ''], force: true },
+                        { type: 'COPY', args: ['package.json', '/app/'], force: true },
                         { type: 'USER', args: ['node'], force: true }
                     ]);
                 }).then(() => closeServer(fixture.server), err => {
@@ -1564,7 +1583,7 @@ describe('test sandbox module', function () {
             { type: 'run', cmd: 'apt-get update &&  apt-get install -y curl' },
             { type: 'ENV', args: ['FOO', 'bar', 'BAZ', 'qux'] },
             { type: 'ENV', args: ['PORT', '3000'] },
-            { type: 'COPY', args: ['file name.txt', '/app/data dir/', '', ''] }
+            { type: 'COPY', args: ['file name.txt', '/app/data dir/'] }
         ]);
     });
 
@@ -1590,8 +1609,8 @@ describe('test sandbox module', function () {
         const template = qiniu.sandbox.Template()
             .fromDockerfile('FROM node:22\nCOPY ["file name.txt", "/app/data dir/"]\nCOPY --chown=node package.json /app/\nCOPY --from=builder /app/dist /app/dist');
         template.buildConfig.steps.should.eql([
-            { type: 'COPY', args: ['file name.txt', '/app/data dir/', '', ''] },
-            { type: 'COPY', args: ['package.json', '/app/', '', ''] }
+            { type: 'COPY', args: ['file name.txt', '/app/data dir/'] },
+            { type: 'COPY', args: ['package.json', '/app/'] }
         ]);
     });
 
@@ -3161,13 +3180,16 @@ describe('test sandbox module', function () {
             if (req.url === '/process.Process/Start') {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({
-                    events: [
-                        { event: { start: { pid: 22 } } },
-                        { event: { data: { stdout: Buffer.from('ok').toString('base64') } } },
-                        { event: { end: { exitCode: 0 } } }
-                    ]
-                }));
+                res.flushHeaders();
+                setTimeout(() => {
+                    res.end(JSON.stringify({
+                        events: [
+                            { event: { start: { pid: 22 } } },
+                            { event: { data: { stdout: Buffer.from('ok').toString('base64') } } },
+                            { event: { end: { exitCode: 0 } } }
+                        ]
+                    }));
+                }, 20);
                 return;
             }
             if (req.url === '/sandboxes/sbx_pending') {
@@ -3189,7 +3211,7 @@ describe('test sandbox module', function () {
                 info: {}
             });
 
-            return sandbox.commands.run('echo ok')
+            return sandbox.commands.run('echo ok', { timeoutMs: 5 })
                 .then(result => {
                     result.stdout.should.eql('ok');
                     return sandbox.waitForReady({ intervalMs: 1, timeoutMs: 5 });

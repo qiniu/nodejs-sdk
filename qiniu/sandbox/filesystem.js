@@ -204,6 +204,9 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
 
     const path = pathOrFiles;
     const opts = maybeOpts || {};
+    if (dataOrOpts && typeof dataOrOpts === 'object' && !Buffer.isBuffer(dataOrOpts) && typeof dataOrOpts.pipe === 'function') {
+        return Promise.reject(new TypeError('Streams are not supported as data in filesystem.write'));
+    }
     const supportsEncodedUpload = versionGte(this.sandbox.envdVersion, '0.5.7');
     if (opts.useOctetStream && supportsEncodedUpload) {
         const headers = {

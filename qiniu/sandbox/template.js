@@ -330,12 +330,15 @@ Template.prototype.runCmd = function (cmd, options) {
 Template.prototype.copy = function (src, dest, options) {
     if (Array.isArray(src) || options) {
         asArray(src).forEach(item => {
-            const args = [
-                item,
-                dest,
-                options && options.user ? options.user : '',
-                options && options.mode ? padOctal(options.mode) : ''
-            ];
+            const args = [item, dest];
+            if (options && options.user) {
+                args.push(options.user);
+            } else if (options && options.mode) {
+                args.push('');
+            }
+            if (options && options.mode) {
+                args.push(padOctal(options.mode));
+            }
             const extra = {};
             if (options && options.forceUpload) {
                 extra.forceUpload = options.forceUpload;
