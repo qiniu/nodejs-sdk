@@ -190,6 +190,28 @@ describe('test sandbox module', function () {
         }
     });
 
+    it('requires Qiniu AK/SK before creating sandboxes with Kodo resources', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key'
+        });
+
+        try {
+            client.createSandbox({
+                template: 'base',
+                resources: [{
+                    type: 'kodo',
+                    bucket: 'bucket',
+                    mountPath: '/workspace/kodo'
+                }]
+            });
+            throw new Error('expected missing Qiniu credentials error');
+        } catch (err) {
+            err.name.should.eql('SandboxError');
+            err.message.should.eql('Qiniu Mac credentials (accessKey/secretKey) are required for this operation');
+        }
+    });
+
     it('keeps Qiniu sandbox extensions in create body', function () {
         return startServer((req, res) => {
             res.statusCode = 201;
@@ -1369,6 +1391,24 @@ describe('test sandbox module', function () {
         ]);
     });
 
+    it('does not merge Dockerfile comments or blank lines that end with backslash', function () {
+        const template = qiniu.sandbox.Template()
+            .fromDockerfile('FROM node:22\n# ignored comment \\\nRUN echo ok\n\nRUN echo next');
+        template.buildConfig.steps.should.eql([
+            { type: 'run', cmd: 'echo ok' },
+            { type: 'run', cmd: 'echo next' }
+        ]);
+    });
+
+    it('parses JSON Dockerfile COPY args and skips unsupported COPY --from flags', function () {
+        const template = qiniu.sandbox.Template()
+            .fromDockerfile('FROM node:22\nCOPY ["file name.txt", "/app/data dir/"]\nCOPY --chown=node package.json /app/\nCOPY --from=builder /app/dist /app/dist');
+        template.buildConfig.steps.should.eql([
+            { type: 'COPY', args: ['file name.txt', '/app/data dir/', '', ''] },
+            { type: 'COPY', args: ['package.json', '/app/', '', ''] }
+        ]);
+    });
+
     it('exposes network constants and maps updateNetwork to Qiniu API', function () {
         return startServer((req, res) => {
             res.statusCode = 200;
@@ -1996,6 +2036,41 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('treats watchDir timeout alias as seconds while waiting for stream start', function () {
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                setTimeout(() => {
+                    res.end(encodeConnectEnvelope({ event: { start: {} } }));
+                }, 20);
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_timeout_seconds',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', () => {}, {
+                recursive: true,
+                timeout: 1
+            }).then(handle => {
+                handle._stopped.should.eql(true);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('rejects command start when the process stream does not start before timeout', function () {
         let commandResponse;
         return startServer((req, res) => {
@@ -2426,7 +2501,7 @@ describe('test sandbox module', function () {
                 return qiniu.sandbox.Sandbox.list({ client, limit: 1 });
             }).then(sandboxes => {
                 sandboxes[0].sandboxId.should.eql('sbx_9');
-                return client.createAndWait({ template: 'base' }, { interval: 1, timeout: 100 });
+                return client.createAndWait({ template: 'base' }, { intervalMs: 1, timeoutMs: 100 });
             }).then(sandbox => {
                 sandbox.sandboxId.should.eql('sbx_10');
                 sandbox.envdAccessToken.should.eql('token');
@@ -2477,8 +2552,52 @@ describe('test sandbox module', function () {
             });
 
             return sandbox.waitForReady({
-                interval: 1,
-                timeout: 50
+                intervalMs: 1,
+                timeoutMs: 50
+            }).then(info => {
+                info.state.should.eql('running');
+                infoCalls.should.eql(2);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('treats waitForReady timeout alias as seconds while polling', function () {
+        let infoCalls = 0;
+        return startServer((req, res) => {
+            if (req.method === 'GET' && req.url === '/sandboxes/sbx_poll_seconds') {
+                infoCalls += 1;
+                if (infoCalls === 1) {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ sandboxID: 'sbx_poll_seconds', state: 'starting' }));
+                    return;
+                }
+                setTimeout(() => {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ sandboxID: 'sbx_poll_seconds', state: 'running' }));
+                }, 20);
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_poll_seconds',
+                client: new qiniu.sandbox.SandboxClient({
+                    endpoint: fixture.endpoint,
+                    apiKey: 'sandbox-key'
+                }),
+                info: {}
+            });
+
+            return sandbox.waitForReady({
+                intervalMs: 1,
+                timeout: 1
             }).then(info => {
                 info.state.should.eql('running');
                 infoCalls.should.eql(2);
@@ -2507,7 +2626,7 @@ describe('test sandbox module', function () {
                 info: {}
             });
 
-            return sandbox.waitForReady({ interval: 1, timeout: 100 }).then(() => {
+            return sandbox.waitForReady({ intervalMs: 1, timeoutMs: 100 }).then(() => {
                 throw new Error('expected waitForReady to fail');
             }, err => {
                 err.response.statusCode.should.eql(404);
@@ -2520,8 +2639,20 @@ describe('test sandbox module', function () {
         });
     });
 
-    it('rethrows non-502 envd health errors', function () {
+    it('returns false for transient envd gateway health errors and rethrows others', function () {
+        let calls = 0;
         return startServer((req, res) => {
+            calls += 1;
+            if (calls === 1) {
+                res.statusCode = 503;
+                res.end('starting');
+                return;
+            }
+            if (calls === 2) {
+                res.statusCode = 504;
+                res.end('timeout');
+                return;
+            }
             res.statusCode = 500;
             res.end('broken');
         }).then(fixture => {
@@ -2533,7 +2664,13 @@ describe('test sandbox module', function () {
                 }
             });
 
-            return sandbox.isRunning().then(() => {
+            return sandbox.isRunning().then(running => {
+                running.should.eql(false);
+                return sandbox.isRunning();
+            }).then(running => {
+                running.should.eql(false);
+                return sandbox.isRunning();
+            }).then(() => {
                 throw new Error('expected health error');
             }, err => {
                 err.name.should.eql('SandboxError');
@@ -2594,7 +2731,7 @@ describe('test sandbox module', function () {
             return sandbox.commands.run('echo ok')
                 .then(result => {
                     result.stdout.should.eql('ok');
-                    return sandbox.waitForReady({ interval: 1, timeout: 5 });
+                    return sandbox.waitForReady({ intervalMs: 1, timeoutMs: 5 });
                 })
                 .then(() => {
                     throw new Error('expected waitForReady timeout');
@@ -2664,7 +2801,7 @@ describe('test sandbox module', function () {
                 apiKey: 'sandbox-key'
             });
 
-            return client.waitForBuild('tpl_1', 'bld_1', { interval: 1, timeout: 20 }).then(() => {
+            return client.waitForBuild('tpl_1', 'bld_1', { intervalMs: 1, timeoutMs: 20 }).then(() => {
                 throw new Error('expected template build error');
             }, err => {
                 err.name.should.eql('TemplateBuildError');
@@ -3192,6 +3329,47 @@ describe('test sandbox module', function () {
                 if (ptyResponse) {
                     ptyResponse.end();
                 }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('treats PTY timeout alias as seconds while waiting for stream start', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                setTimeout(() => {
+                    res.end(Buffer.concat([
+                        encodeConnectEnvelope({ event: { start: { pid: 47 } } }),
+                        encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
+                    ]));
+                }, 20);
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_timeout_seconds',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24,
+                timeout: 1
+            }).then(handle => {
+                handle.pid.should.eql(47);
+                return handle.wait();
+            }).then(result => {
+                result.exitCode.should.eql(0);
+            }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
                 });

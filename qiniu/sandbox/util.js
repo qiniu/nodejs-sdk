@@ -43,6 +43,18 @@ function timeoutSecondsFromOptions (opts) {
     return undefined;
 }
 
+function millisecondsFromOptions (opts, key, defaultValue) {
+    opts = opts || {};
+    const msKey = `${key}Ms`;
+    if (opts[msKey] !== undefined) {
+        return opts[msKey];
+    }
+    if (opts[key] !== undefined) {
+        return opts[key] * 1000;
+    }
+    return defaultValue;
+}
+
 function copyDefined (target, source, key, outKey) {
     if (source[key] !== undefined) {
         target[outKey || key] = source[key];
@@ -51,8 +63,8 @@ function copyDefined (target, source, key, outKey) {
 
 function poll (fn, opts, done) {
     opts = opts || {};
-    const interval = opts.interval || opts.intervalMs || 1000;
-    const timeout = opts.timeout || opts.timeoutMs || 60000;
+    const interval = millisecondsFromOptions(opts, 'interval', 1000);
+    const timeout = millisecondsFromOptions(opts, 'timeout', 60000);
     const startedAt = Date.now();
 
     function tick () {
@@ -173,6 +185,7 @@ exports.normalizeEndpoint = normalizeEndpoint;
 exports.encodePath = encodePath;
 exports.appendQuery = appendQuery;
 exports.timeoutSecondsFromOptions = timeoutSecondsFromOptions;
+exports.millisecondsFromOptions = millisecondsFromOptions;
 exports.copyDefined = copyDefined;
 exports.poll = poll;
 exports.basicAuth = basicAuth;

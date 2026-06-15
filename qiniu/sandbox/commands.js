@@ -1,6 +1,6 @@
 const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
 const { CommandExitError } = require('./errors');
-const { parseJSON, parseRequestUrl } = require('./util');
+const { millisecondsFromOptions, parseJSON, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
 
@@ -75,7 +75,9 @@ function commandResultFromEvents (events, callbacks) {
 
 function requestTimeout (opts) {
     opts = opts || {};
-    return opts.requestTimeoutMs || opts.timeoutMs || (opts.timeout ? opts.timeout * 1000 : undefined);
+    return opts.requestTimeoutMs !== undefined
+        ? opts.requestTimeoutMs
+        : millisecondsFromOptions(opts, 'timeout');
 }
 
 function encodeConnectEnvelope (message) {

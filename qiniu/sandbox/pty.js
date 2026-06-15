@@ -1,5 +1,5 @@
 const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
-const { parseRequestUrl } = require('./util');
+const { millisecondsFromOptions, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
 
@@ -209,7 +209,9 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             });
         });
         req.on('error', fail);
-        const startTimeout = opts.requestTimeoutMs || opts.timeoutMs || opts.timeout;
+        const startTimeout = opts.requestTimeoutMs !== undefined
+            ? opts.requestTimeoutMs
+            : millisecondsFromOptions(opts, 'timeout');
         if (startTimeout) {
             startTimer = setTimeout(() => {
                 fail(new Error('PTY stream start timed out'));

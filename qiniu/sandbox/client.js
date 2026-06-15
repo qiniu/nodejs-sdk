@@ -218,7 +218,7 @@ SandboxClient.prototype.listSandboxesV2 = function (opts) {
 SandboxClient.prototype.createSandbox = function (opts) {
     const body = normalizeSandboxCreateOptions(opts);
     return this._request('POST', '/sandboxes', {
-        authType: hasKodoResource(body) && this.mac ? 'qiniu' : undefined,
+        authType: hasKodoResource(body) ? 'qiniu' : undefined,
         body
     });
 };

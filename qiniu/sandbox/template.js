@@ -136,6 +136,14 @@ function joinDockerfileLines (content) {
     let current = '';
     String(content || '').split(/\r?\n/).forEach(rawLine => {
         const line = rawLine.trim();
+        if (!line || line[0] === '#') {
+            if (current) {
+                lines.push(current);
+                current = '';
+            }
+            lines.push(line);
+            return;
+        }
         if (line.charAt(line.length - 1) === '\\') {
             current += line.slice(0, -1) + ' ';
             return;
@@ -150,6 +158,17 @@ function joinDockerfileLines (content) {
 }
 
 function splitDockerfileArgs (value) {
+    value = String(value || '').trim();
+    if (value.charAt(0) === '[' && value.charAt(value.length - 1) === ']') {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return parsed.map(item => String(item));
+            }
+        } catch (err) {
+            // Fall through to the shell-style parser below.
+        }
+    }
     const args = [];
     let current = '';
     let quote = '';
@@ -191,6 +210,20 @@ function splitDockerfileArgs (value) {
     }
     if (current) {
         args.push(current);
+    }
+    return args;
+}
+
+function dockerfileCopyArgs (value) {
+    const args = splitDockerfileArgs(value);
+    while (args.length && /^--/.test(args[0])) {
+        const flag = args.shift();
+        if (/^--from(?:=|$)/i.test(flag)) {
+            return [];
+        }
+        if (flag.indexOf('=') < 0 && args.length > 2) {
+            args.shift();
+        }
     }
     return args;
 }
@@ -247,7 +280,7 @@ Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
                 addStep(this, 'ENV', args);
             }
         } else if (instruction === 'COPY' || instruction === 'ADD') {
-            const parts = splitDockerfileArgs(rest);
+            const parts = dockerfileCopyArgs(rest);
             if (parts.length >= 2) {
                 this.copy(parts.slice(0, -1), parts[parts.length - 1]);
             }

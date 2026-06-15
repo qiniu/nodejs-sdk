@@ -270,7 +270,7 @@ Sandbox.prototype.isRunning = function () {
         dataType: 'text'
     }).then(() => true, err => {
         const resp = err.response || err.resp;
-        if (resp && resp.statusCode === 502) {
+        if (resp && [502, 503, 504].indexOf(resp.statusCode) >= 0) {
             return false;
         }
         if (['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].indexOf(err.code) >= 0) {

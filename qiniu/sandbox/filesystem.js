@@ -1,6 +1,6 @@
 const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
 const { SandboxError } = require('./errors');
-const { parseRequestUrl, rawRequest } = require('./util');
+const { millisecondsFromOptions, parseRequestUrl, rawRequest } = require('./util');
 const { Readable } = require('stream');
 const zlib = require('zlib');
 const http = require('http');
@@ -393,7 +393,9 @@ function watchDir (sandbox, path, onEvent, opts) {
             }
         }
 
-        const startTimeout = opts.requestTimeoutMs || opts.timeoutMs || opts.timeout;
+        const startTimeout = opts.requestTimeoutMs !== undefined
+            ? opts.requestTimeoutMs
+            : millisecondsFromOptions(opts, 'timeout');
         if (startTimeout) {
             startTimer = setTimeout(() => {
                 fail(new SandboxError('Sandbox filesystem watch start timed out'));
