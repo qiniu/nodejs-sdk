@@ -9,6 +9,8 @@ module.exports = {
     ALL_TRAFFIC: network.ALL_TRAFFIC,
     SandboxClient: require('./client').SandboxClient,
     Sandbox: require('./sandbox').Sandbox,
+    SandboxPaginator: require('./sandbox').SandboxPaginator,
+    SnapshotPaginator: require('./sandbox').SnapshotPaginator,
     Filesystem: require('./filesystem').Filesystem,
     Commands: require('./commands').Commands,
     CommandHandle: require('./commands').CommandHandle,

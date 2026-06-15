@@ -106,6 +106,8 @@ export declare namespace sandbox {
         user?: string;
         signatureExpiration?: number;
         signature_expiration?: number;
+        gzip?: boolean;
+        useOctetStream?: boolean;
     }
 
     interface EntryInfo {
@@ -152,6 +154,32 @@ export declare namespace sandbox {
         raw: string;
     }
 
+    interface SnapshotInfo {
+        snapshotId?: string;
+        snapshotID?: string;
+        [key: string]: any;
+    }
+
+    class SandboxPaginator {
+        readonly hasNext: boolean;
+        readonly nextToken?: string;
+        nextItems(options?: SandboxClientOptions): Promise<Sandbox[]>;
+        then<TResult1 = Sandbox[], TResult2 = never>(
+            onfulfilled?: ((value: Sandbox[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+            onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
+        ): Promise<TResult1 | TResult2>;
+    }
+
+    class SnapshotPaginator {
+        readonly hasNext: boolean;
+        readonly nextToken?: string;
+        nextItems(options?: SandboxClientOptions): Promise<SnapshotInfo[]>;
+        then<TResult1 = SnapshotInfo[], TResult2 = never>(
+            onfulfilled?: ((value: SnapshotInfo[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+            onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
+        ): Promise<TResult1 | TResult2>;
+    }
+
     class Filesystem {
         read(path: string, options?: FileUrlOptions & {format?: string}): Promise<any>;
         readText(path: string, options?: FileUrlOptions): Promise<string>;
@@ -173,7 +201,8 @@ export declare namespace sandbox {
         pid: number;
         result?: CommandResult;
         wait(): Promise<CommandResult>;
-        kill(): Promise<null>;
+        kill(): Promise<null | boolean>;
+        disconnect(): Promise<void>;
     }
 
     class Commands {
@@ -210,7 +239,11 @@ export declare namespace sandbox {
     }
 
     class Pty {
-        create(options?: CommandOptions & {cmd?: string}): Promise<CommandHandle>;
+        create(options?: CommandOptions & {cmd?: string; args?: string[]; cols?: number; rows?: number; onData?: (data: Buffer) => void}): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandOptions & {onData?: (data: Buffer) => void}): Promise<CommandHandle>;
+        sendInput(pid: number, data: string | Buffer, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
+        resize(pid: number, size: {cols: number; rows: number}, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
+        kill(pid: number, options?: {user?: string; requestTimeoutMs?: number}): Promise<boolean>;
     }
 
     const DEFAULT_ENDPOINT: string;
@@ -314,6 +347,9 @@ export declare namespace sandbox {
         rebuildTemplate(templateID: string, options?: any): Promise<any>;
         startTemplateBuild(templateID: string, buildID: string, options?: any): Promise<null>;
         waitForBuild(templateID: string, buildID: string, options?: PollOptions): Promise<any>;
+        createSnapshot(sandboxID: string, options?: any): Promise<SnapshotInfo>;
+        listSnapshots(options?: any): Promise<any>;
+        deleteSnapshot(snapshotID: string): Promise<null>;
     }
 
     class Sandbox {
@@ -334,7 +370,7 @@ export declare namespace sandbox {
         static create(options?: SandboxCreateOptions): Promise<Sandbox>;
         static create(template: string, options?: SandboxCreateOptions): Promise<Sandbox>;
         static connect(sandboxID: string, options?: SandboxConnectOptions): Promise<Sandbox>;
-        static list(options?: SandboxClientOptions & {client?: SandboxClient}): Promise<Sandbox[] | any>;
+        static list(options?: SandboxClientOptions & {client?: SandboxClient; limit?: number; nextToken?: string; query?: any}): SandboxPaginator;
 
         kill(): Promise<null>;
         setTimeout(timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
@@ -344,6 +380,10 @@ export declare namespace sandbox {
         getInfo(): Promise<any>;
         getMetrics(options?: any): Promise<any>;
         getLogs(options?: any): Promise<any>;
+        createSnapshot(options?: any): Promise<SnapshotInfo>;
+        listSnapshots(options?: any): SnapshotPaginator;
+        getMcpUrl(): string;
+        getMcpToken(): Promise<string | undefined>;
         waitForReady(options?: PollOptions): Promise<any>;
         isRunning(): Promise<boolean>;
         getHost(port: number): string;
@@ -359,6 +399,8 @@ export declare namespace sandbox {
 
 export declare const Sandbox: typeof sandbox.Sandbox;
 export declare const SandboxClient: typeof sandbox.SandboxClient;
+export declare const SandboxPaginator: typeof sandbox.SandboxPaginator;
+export declare const SnapshotPaginator: typeof sandbox.SnapshotPaginator;
 export declare const CommandExitError: typeof sandbox.CommandExitError;
 export declare const SandboxError: typeof sandbox.SandboxError;
 

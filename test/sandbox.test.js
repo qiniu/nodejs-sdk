@@ -1709,6 +1709,238 @@ describe('test sandbox module', function () {
                 });
         });
     });
+
+    it('supports E2B style sandbox paginator, snapshots, and MCP helpers', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'GET' && req.url === '/v2/sandboxes?limit=2&nextToken=n1&metadata%5Buser%5D=alice&state=running') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                    items: [{ sandboxID: 'sbx_page', domain: 'page.example.com' }],
+                    nextToken: 'n2'
+                }));
+                return;
+            }
+            if (req.method === 'POST' && req.url === '/sandboxes/sbx_page/snapshots') {
+                res.statusCode = 201;
+                res.end(JSON.stringify({ snapshotID: 'snap_1', snapshotId: 'snap_1' }));
+                return;
+            }
+            if (req.method === 'GET' && req.url === '/snapshots?limit=1&sandboxId=sbx_page') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                    items: [{ snapshotID: 'snap_1', snapshotId: 'snap_1' }],
+                    nextToken: 'snap_next'
+                }));
+                return;
+            }
+            const parsed = parseUrl(req.url);
+            if (req.method === 'GET' && parsed.pathname === '/files' && parsed.searchParams.get('path') === '/etc/mcp-gateway/.token') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'text/plain');
+                res.end('mcp-token');
+                return;
+            }
+            res.statusCode = 404;
+            res.end(JSON.stringify({ message: req.method + ' ' + req.url }));
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                apiKey: 'sandbox-key'
+            });
+            const paginator = qiniu.sandbox.Sandbox.list({
+                client,
+                limit: 2,
+                nextToken: 'n1',
+                query: {
+                    metadata: { user: 'alice' },
+                    state: ['running']
+                }
+            });
+
+            return paginator.nextItems().then(items => {
+                items[0].sandboxId.should.eql('sbx_page');
+                paginator.hasNext.should.eql(true);
+                paginator.nextToken.should.eql('n2');
+                const sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'sbx_page',
+                    envdUrl: fixture.endpoint,
+                    info: {
+                        domain: 'page.example.com',
+                        envdAccessToken: 'token'
+                    },
+                    client
+                });
+                sandbox.getMcpUrl().should.eql('https://50005-sbx_page.page.example.com/mcp');
+                return sandbox.getMcpToken().then(token => {
+                    token.should.eql('mcp-token');
+                    return sandbox.createSnapshot({ name: 'snap' });
+                }).then(snapshot => {
+                    snapshot.snapshotId.should.eql('snap_1');
+                    return sandbox.listSnapshots({ limit: 1 }).nextItems();
+                });
+            }).then(snapshots => {
+                snapshots[0].snapshotId.should.eql('snap_1');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('supports E2B style PTY connect, input, resize, and kill operations', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start' || req.url === '/process.Process/Connect') {
+                const body = decodeConnectEnvelope(req.rawBody);
+                if (req.url === '/process.Process/Start') {
+                    body.pty.size.should.eql({ cols: 80, rows: 24 });
+                    body.process.envs.TERM.should.eql('xterm-256color');
+                } else {
+                    body.process.selector.pid.should.eql(44);
+                }
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 44 } } }),
+                    encodeConnectEnvelope({ event: { data: { pty: [111, 107] } } }),
+                    encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
+                ]));
+                return;
+            }
+            if (req.url === '/process.Process/SendInput' || req.url === '/process.Process/Update' || req.url === '/process.Process/SendSignal') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end('{}');
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+            const data = [];
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24,
+                onData: chunk => data.push(Buffer.from(chunk).toString())
+            }).then(handle => {
+                handle.pid.should.eql(44);
+                return handle.wait();
+            }).then(() => sandbox.pty.connect(44, {
+                onData: chunk => data.push(Buffer.from(chunk).toString())
+            })).then(handle => handle.wait())
+                .then(() => sandbox.pty.sendInput(44, Buffer.from('ls\n')))
+                .then(() => sandbox.pty.resize(44, { cols: 100, rows: 30 }))
+                .then(() => sandbox.pty.kill(44))
+                .then(killed => {
+                    killed.should.eql(true);
+                    data.should.eql(['ok', 'ok']);
+                    const sendBody = JSON.parse(fixture.requests[2].body);
+                    sendBody.input.pty.should.eql(Buffer.from('ls\n').toString('base64'));
+                    const resizeBody = JSON.parse(fixture.requests[3].body);
+                    resizeBody.pty.size.should.eql({ cols: 100, rows: 30 });
+                    const killBody = JSON.parse(fixture.requests[4].body);
+                    killBody.signal.should.eql('SIGNAL_SIGKILL');
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('supports filesystem gzip and octet-stream write compatibility options', function () {
+        return startServer((req, res) => {
+            const parsed = parseUrl(req.url);
+            if (req.method === 'GET' && parsed.pathname === '/files') {
+                req.headers['accept-encoding'].should.eql('gzip');
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'text/plain');
+                res.end('zip');
+                return;
+            }
+            if (req.method === 'POST' && parsed.pathname === '/files') {
+                req.headers['content-type'].should.eql('application/octet-stream');
+                req.headers['content-encoding'].should.eql('gzip');
+                parsed.searchParams.get('path').should.eql('/zip.txt');
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify([{ name: 'zip.txt', path: '/zip.txt', type: 'file' }]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_zip',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdVersion: '0.5.7',
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.files.read('/zip.txt', { gzip: true })
+                .then(text => {
+                    text.should.eql('zip');
+                    return sandbox.files.write('/zip.txt', 'zip', {
+                        gzip: true,
+                        useOctetStream: true
+                    });
+                })
+                .then(info => {
+                    info.path.should.eql('/zip.txt');
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('falls back to multipart uploads when envd does not support octet-stream', function () {
+        return startServer((req, res) => {
+            const parsed = parseUrl(req.url);
+            if (req.method === 'POST' && parsed.pathname === '/files') {
+                should(req.headers['content-type']).startWith('multipart/form-data; boundary=');
+                should.not.exist(req.headers['content-encoding']);
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify([{ name: 'zip.txt', path: '/zip.txt', type: 'file' }]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_zip_old',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdVersion: '0.5.5',
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.files.write('/zip.txt', 'zip', {
+                gzip: true,
+                useOctetStream: true
+            }).then(info => {
+                info.path.should.eql('/zip.txt');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
 });
 
 function handleGitAndPty (git, pty, commandsSeen) {

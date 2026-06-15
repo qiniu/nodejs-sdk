@@ -1,6 +1,27 @@
 const { connectRPC } = require('./envd');
 const { rawRequest } = require('./util');
 const { Readable } = require('stream');
+const zlib = require('zlib');
+
+function versionGte (version, minimum) {
+    if (!version) {
+        return true;
+    }
+    const left = String(version).split('.').map(value => parseInt(value, 10) || 0);
+    const right = String(minimum).split('.').map(value => parseInt(value, 10) || 0);
+    const length = Math.max(left.length, right.length);
+    for (let i = 0; i < length; i++) {
+        const a = left[i] || 0;
+        const b = right[i] || 0;
+        if (a > b) {
+            return true;
+        }
+        if (a < b) {
+            return false;
+        }
+    }
+    return true;
+}
 
 function normalizeFileType (type) {
     if (type === 'FILE_TYPE_DIRECTORY' || type === 'DIRECTORY' || type === 'dir') {
@@ -54,10 +75,14 @@ function formatReadResult (data, opts) {
 
 Filesystem.prototype.read = function (path, opts) {
     opts = opts || {};
+    const headers = {};
+    if (opts.gzip) {
+        headers['Accept-Encoding'] = 'gzip';
+    }
     return rawRequest(this.sandbox.downloadUrl(path, opts), {
         method: 'GET',
         dataType: 'buffer',
-        headers: {}
+        headers
     }).then(({ data }) => formatReadResult(data, opts));
 };
 
@@ -72,20 +97,44 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
 
     const path = pathOrFiles;
     const opts = maybeOpts || {};
+    const supportsEncodedUpload = versionGte(this.sandbox.envdVersion, '0.5.7');
+    if (opts.useOctetStream && supportsEncodedUpload) {
+        const headers = {
+            'Content-Type': 'application/octet-stream'
+        };
+        let content = Buffer.isBuffer(dataOrOpts) ? dataOrOpts : Buffer.from(String(dataOrOpts || ''));
+        if (opts.gzip && supportsEncodedUpload) {
+            headers['Content-Encoding'] = 'gzip';
+            content = zlib.gzipSync(content);
+        }
+
+        return rawRequest(this.sandbox.uploadUrl(path, opts), {
+            method: 'POST',
+            content,
+            dataType: 'json',
+            headers
+        }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
+    }
+
     const boundary = `qiniu-sandbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const body = multipartBody(boundary, [{
+    let body = multipartBody(boundary, [{
         field: 'file',
         filename: path,
         data: dataOrOpts
     }]);
+    const headers = {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`
+    };
+    if (opts.gzip && supportsEncodedUpload) {
+        headers['Content-Encoding'] = 'gzip';
+        body = zlib.gzipSync(body);
+    }
 
     return rawRequest(this.sandbox.uploadUrl(path, opts), {
         method: 'POST',
         content: body,
         dataType: 'json',
-        headers: {
-            'Content-Type': `multipart/form-data; boundary=${boundary}`
-        }
+        headers
     }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
 };
 

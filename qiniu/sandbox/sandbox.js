@@ -14,6 +14,104 @@ function getInfoValue (info, camelKey, snakeKey) {
     return info && (info[camelKey] !== undefined ? info[camelKey] : info[snakeKey]);
 }
 
+function normalizeItems (data) {
+    if (Array.isArray(data)) {
+        return {
+            items: data
+        };
+    }
+    data = data || {};
+    return {
+        items: data.items || data.sandboxes || data.snapshots || [],
+        nextToken: data.nextToken || data.next_token
+    };
+}
+
+function normalizeSnapshot (info) {
+    info = info || {};
+    if (info.snapshotId === undefined && info.snapshotID !== undefined) {
+        info.snapshotId = info.snapshotID;
+    }
+    if (info.snapshotID === undefined && info.snapshotId !== undefined) {
+        info.snapshotID = info.snapshotId;
+    }
+    return info;
+}
+
+function SandboxPaginator (opts) {
+    opts = opts || {};
+    this.client = opts.client || new SandboxClient(opts);
+    this.opts = Object.assign({}, opts);
+    delete this.opts.client;
+    this._nextToken = opts.nextToken;
+    this._hasNext = true;
+}
+
+Object.defineProperty(SandboxPaginator.prototype, 'nextToken', {
+    get: function () {
+        return this._nextToken;
+    }
+});
+
+Object.defineProperty(SandboxPaginator.prototype, 'hasNext', {
+    get: function () {
+        return !!this._nextToken || this._hasNext;
+    }
+});
+
+SandboxPaginator.prototype.nextItems = function (opts) {
+    const requestOpts = Object.assign({}, this.opts, opts || {});
+    if (this._nextToken && requestOpts.nextToken === undefined) {
+        requestOpts.nextToken = this._nextToken;
+    }
+    return this.client.listSandboxesV2(requestOpts).then(data => {
+        const page = normalizeItems(data);
+        this._nextToken = page.nextToken;
+        this._hasNext = !!page.nextToken;
+        return page.items.map(info => new Sandbox({ client: this.client, info }));
+    });
+};
+
+SandboxPaginator.prototype.then = function (resolve, reject) {
+    return this.nextItems().then(resolve, reject);
+};
+
+function SnapshotPaginator (client, opts) {
+    this.client = client;
+    this.opts = Object.assign({}, opts || {});
+    this._nextToken = this.opts.nextToken;
+    this._hasNext = true;
+}
+
+Object.defineProperty(SnapshotPaginator.prototype, 'nextToken', {
+    get: function () {
+        return this._nextToken;
+    }
+});
+
+Object.defineProperty(SnapshotPaginator.prototype, 'hasNext', {
+    get: function () {
+        return !!this._nextToken || this._hasNext;
+    }
+});
+
+SnapshotPaginator.prototype.nextItems = function (opts) {
+    const requestOpts = Object.assign({}, this.opts, opts || {});
+    if (this._nextToken && requestOpts.nextToken === undefined) {
+        requestOpts.nextToken = this._nextToken;
+    }
+    return this.client.listSnapshots(requestOpts).then(data => {
+        const page = normalizeItems(data);
+        this._nextToken = page.nextToken;
+        this._hasNext = !!page.nextToken;
+        return page.items.map(normalizeSnapshot);
+    });
+};
+
+SnapshotPaginator.prototype.then = function (resolve, reject) {
+    return this.nextItems().then(resolve, reject);
+};
+
 function Sandbox (opts) {
     opts = opts || {};
     this.client = opts.client || new SandboxClient(opts);
@@ -58,15 +156,7 @@ Sandbox.connect = function (sandboxID, opts) {
 };
 
 Sandbox.list = function (opts) {
-    const client = opts && opts.client ? opts.client : new SandboxClient(opts);
-    const params = Object.assign({}, opts || {});
-    delete params.client;
-    return client.listSandboxesV2(params).then(items => {
-        if (!Array.isArray(items)) {
-            return items;
-        }
-        return items.map(info => new Sandbox({ client, info }));
-    });
+    return new SandboxPaginator(opts);
 };
 
 Sandbox.prototype.kill = function () {
@@ -120,6 +210,32 @@ Sandbox.prototype.getMetrics = function (opts) {
 
 Sandbox.prototype.getLogs = function (opts) {
     return this.client.getSandboxLogs(this.sandboxId, opts);
+};
+
+Sandbox.prototype.createSnapshot = function (opts) {
+    return this.client.createSnapshot(this.sandboxId, opts).then(normalizeSnapshot);
+};
+
+Sandbox.prototype.listSnapshots = function (opts) {
+    return new SnapshotPaginator(this.client, Object.assign({}, opts || {}, {
+        sandboxId: this.sandboxId
+    }));
+};
+
+Sandbox.prototype.getMcpUrl = function () {
+    return `https://${this.getHost(50005)}/mcp`;
+};
+
+Sandbox.prototype.getMcpToken = function () {
+    if (this.mcpToken) {
+        return Promise.resolve(this.mcpToken);
+    }
+    return this.files.read('/etc/mcp-gateway/.token', {
+        user: 'root'
+    }).then(token => {
+        this.mcpToken = token;
+        return token;
+    });
 };
 
 Sandbox.prototype.waitForReady = function (opts) {
@@ -190,3 +306,5 @@ Sandbox.prototype.batchUploadUrl = function (user) {
 };
 
 exports.Sandbox = Sandbox;
+exports.SandboxPaginator = SandboxPaginator;
+exports.SnapshotPaginator = SnapshotPaginator;

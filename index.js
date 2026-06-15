@@ -34,5 +34,7 @@ module.exports = {
 
 module.exports.Sandbox = module.exports.sandbox.Sandbox;
 module.exports.SandboxClient = module.exports.sandbox.SandboxClient;
+module.exports.SandboxPaginator = module.exports.sandbox.SandboxPaginator;
+module.exports.SnapshotPaginator = module.exports.sandbox.SnapshotPaginator;
 module.exports.CommandExitError = module.exports.sandbox.CommandExitError;
 module.exports.SandboxError = module.exports.sandbox.SandboxError;

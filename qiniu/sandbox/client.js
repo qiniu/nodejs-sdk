@@ -75,6 +75,22 @@ function normalizeInjectionRuleOptions (opts) {
     return opts;
 }
 
+function normalizeSandboxListOptions (opts) {
+    opts = Object.assign({}, opts || {});
+    const query = opts.query;
+    delete opts.query;
+
+    if (query && query.metadata) {
+        Object.keys(query.metadata).forEach(key => {
+            opts[`metadata[${key}]`] = query.metadata[key];
+        });
+    }
+    if (query && query.state) {
+        opts.state = query.state;
+    }
+    return opts;
+}
+
 function normalizeClientOptions (opts) {
     opts = opts || {};
     const mac = opts.mac || (opts.accessKey || opts.secretKey
@@ -187,7 +203,7 @@ SandboxClient.prototype.listSandboxes = function (opts) {
 };
 
 SandboxClient.prototype.listSandboxesV2 = function (opts) {
-    return this._request('GET', appendQuery('/v2/sandboxes', opts));
+    return this._request('GET', appendQuery('/v2/sandboxes', normalizeSandboxListOptions(opts)));
 };
 
 SandboxClient.prototype.createSandbox = function (opts) {
@@ -257,6 +273,20 @@ SandboxClient.prototype.updateSandbox = function (sandboxID, opts) {
 
 SandboxClient.prototype.getSandboxMetrics = function (sandboxID, opts) {
     return this._request('GET', appendQuery(`/sandboxes/${encodePath(sandboxID)}/metrics`, opts));
+};
+
+SandboxClient.prototype.createSnapshot = function (sandboxID, opts) {
+    return this._request('POST', `/sandboxes/${encodePath(sandboxID)}/snapshots`, {
+        body: opts || {}
+    });
+};
+
+SandboxClient.prototype.listSnapshots = function (opts) {
+    return this._request('GET', appendQuery('/snapshots', opts));
+};
+
+SandboxClient.prototype.deleteSnapshot = function (snapshotID) {
+    return this._request('DELETE', `/snapshots/${encodePath(snapshotID)}`, { empty: true });
 };
 
 SandboxClient.prototype.createTemplate = function (opts) {

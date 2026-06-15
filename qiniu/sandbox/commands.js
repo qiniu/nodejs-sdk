@@ -64,6 +64,7 @@ function commandResultFromEvents (events, callbacks) {
         if (data) {
             const out = data.stdout !== undefined ? bytesToString(data.stdout) : '';
             const err = data.stderr !== undefined ? bytesToString(data.stderr) : '';
+            const pty = data.pty !== undefined ? data.pty : undefined;
             if (out) {
                 stdout += out;
                 if (callbacks.onStdout) {
@@ -75,6 +76,9 @@ function commandResultFromEvents (events, callbacks) {
                 if (callbacks.onStderr) {
                     callbacks.onStderr(err);
                 }
+            }
+            if (pty !== undefined && callbacks.onData) {
+                callbacks.onData(Buffer.isBuffer(pty) ? pty : Buffer.from(Array.isArray(pty) ? pty : bytesToString(pty)));
             }
         }
         if (end) {
@@ -107,6 +111,10 @@ CommandHandle.prototype.wait = function () {
 
 CommandHandle.prototype.kill = function () {
     return this.commands.kill(this.pid);
+};
+
+CommandHandle.prototype.disconnect = function () {
+    return Promise.resolve();
 };
 
 function Commands (sandbox) {
@@ -192,3 +200,4 @@ Commands.prototype.kill = function (pid, opts) {
 
 exports.Commands = Commands;
 exports.CommandHandle = CommandHandle;
+exports.commandResultFromEvents = commandResultFromEvents;
