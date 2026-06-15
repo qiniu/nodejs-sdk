@@ -1,4 +1,4 @@
-const { connectRPC, envdHeaders } = require('./envd');
+const { connectEndStreamError, connectRPC, envdHeaders } = require('./envd');
 const { SandboxError } = require('./errors');
 const { parseRequestUrl, rawRequest } = require('./util');
 const { Readable } = require('stream');
@@ -173,7 +173,8 @@ Filesystem.prototype.read = function (path, opts) {
     return rawRequest(this.sandbox.downloadUrl(path, opts), {
         method: 'GET',
         dataType: 'buffer',
-        headers
+        headers,
+        gzip: !!opts.gzip
     }).then(({ data }) => formatReadResult(data, opts));
 };
 
@@ -393,6 +394,21 @@ function watchDir (sandbox, path, onEvent, opts) {
                     }
                     const payload = responseBuffer.slice(5, 5 + length).toString();
                     responseBuffer = responseBuffer.slice(5 + length);
+                    if (flags & 2) {
+                        try {
+                            const err = connectEndStreamError(payload);
+                            if (err) {
+                                fail(err);
+                                req.destroy();
+                                return;
+                            }
+                        } catch (err) {
+                            fail(err);
+                            req.destroy();
+                            return;
+                        }
+                        continue;
+                    }
                     if (!(flags & 2) && payload) {
                         try {
                             handleMessage(JSON.parse(payload));
@@ -404,6 +420,7 @@ function watchDir (sandbox, path, onEvent, opts) {
                     }
                 }
             });
+            res.on('error', fail);
             res.on('end', () => {
                 cleanupStartTimer();
                 if (!settled) {

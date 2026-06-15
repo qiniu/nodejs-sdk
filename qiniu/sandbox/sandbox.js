@@ -239,12 +239,20 @@ Sandbox.prototype.getMcpToken = function () {
     if (this.mcpToken) {
         return Promise.resolve(this.mcpToken);
     }
-    return this.files.read('/etc/mcp-gateway/.token', {
+    if (this._mcpTokenPromise) {
+        return this._mcpTokenPromise;
+    }
+    this._mcpTokenPromise = this.files.read('/etc/mcp-gateway/.token', {
         user: 'root'
     }).then(token => {
         this.mcpToken = token;
+        this._mcpTokenPromise = null;
         return token;
+    }, err => {
+        this._mcpTokenPromise = null;
+        throw err;
     });
+    return this._mcpTokenPromise;
 };
 
 Sandbox.prototype.waitForReady = function (opts) {

@@ -1,5 +1,4 @@
-const { connectRPC } = require('./envd');
-const { envdHeaders } = require('./envd');
+const { connectEndStreamError, connectRPC, envdHeaders } = require('./envd');
 const { parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
@@ -166,6 +165,21 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                     }
                     const payload = responseBuffer.slice(5, 5 + length).toString();
                     responseBuffer = responseBuffer.slice(5 + length);
+                    if (flags & 2) {
+                        try {
+                            const err = connectEndStreamError(payload);
+                            if (err) {
+                                fail(err);
+                                req.destroy();
+                                return;
+                            }
+                        } catch (err) {
+                            fail(err);
+                            req.destroy();
+                            return;
+                        }
+                        continue;
+                    }
                     if (!(flags & 2) && payload) {
                         try {
                             handleMessage(JSON.parse(payload));
@@ -177,6 +191,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                     }
                 }
             });
+            res.on('error', fail);
             res.on('end', () => {
                 if (!settled) {
                     fail(new Error('PTY stream ended before process start'));

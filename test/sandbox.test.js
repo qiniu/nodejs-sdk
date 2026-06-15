@@ -57,12 +57,16 @@ function encodeConnectEnvelope (message) {
     return Buffer.concat([header, payload]);
 }
 
-function encodeRawConnectEnvelope (payload) {
+function encodeRawConnectEnvelope (payload, flags) {
     payload = Buffer.from(payload);
     const header = Buffer.alloc(5);
-    header[0] = 0;
+    header[0] = flags || 0;
     header.writeUInt32BE(payload.length, 1);
     return Buffer.concat([header, payload]);
+}
+
+function encodeConnectEndEnvelope (message) {
+    return encodeRawConnectEnvelope(JSON.stringify(message || {}), 2);
 }
 
 describe('test sandbox module', function () {
@@ -1274,10 +1278,11 @@ describe('test sandbox module', function () {
 
     it('joins Dockerfile lines continued with backslash before parsing', function () {
         const template = qiniu.sandbox.Template()
-            .fromDockerfile('FROM ubuntu:22.04\nRUN apt-get update && \\\n    apt-get install -y curl\nENV FOO=bar \\\n    BAZ=qux');
+            .fromDockerfile('FROM ubuntu:22.04\nRUN apt-get update && \\\n    apt-get install -y curl\nENV FOO=bar \\\n    BAZ=qux\nENV PORT 3000');
         template.buildConfig.steps.should.eql([
             { type: 'run', cmd: 'apt-get update &&  apt-get install -y curl' },
-            { type: 'ENV', args: ['FOO', 'bar', 'BAZ', 'qux'] }
+            { type: 'ENV', args: ['FOO', 'bar', 'BAZ', 'qux'] },
+            { type: 'ENV', args: ['PORT', '3000'] }
         ]);
     });
 
@@ -1656,6 +1661,86 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('rejects command wait when Connect end-stream carries an error', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 91 } } }),
+                    encodeConnectEndEnvelope({ error: { code: 'internal', message: 'stream failed' } })
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_trailer',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('echo bad').then(handle => {
+                handle.pid.should.eql(91);
+                return handle.wait();
+            }).then(() => {
+                throw new Error('expected command wait to reject');
+            }, err => {
+                err.message.should.eql('stream failed');
+                err.code.should.eql('internal');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('fails watchDir on Connect end-stream errors after start', function () {
+        let exitError;
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: {} } }),
+                    encodeConnectEndEnvelope({ error: { code: 'internal', message: 'watch failed' } })
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_trailer',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', () => {}, {
+                recursive: true,
+                onExit: err => {
+                    exitError = err;
+                }
+            }).then(handle => {
+                return new Promise(resolve => setTimeout(resolve, 20)).then(() => handle);
+            }).then(handle => {
+                handle._stopped.should.eql(true);
+                exitError.message.should.eql('watch failed');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('rejects command start when the process stream does not start before timeout', function () {
         let commandResponse;
         return startServer((req, res) => {
@@ -1734,8 +1819,13 @@ describe('test sandbox module', function () {
             .then(() => git.setConfig('/repo', 'user.name', 'Alice', { scope: 'global' }))
             .then(() => {
                 const commandText = commandsSeen.map(item => item.cmd).join('\n');
-                commandText.should.containEql('clone \'https://u:p@github.com/acme/repo.git\'');
-                commandText.should.containEql('remote set-url origin \'https://github.com/acme/repo.git\'');
+                commandText.should.containEql('credential.helper=');
+                commandText.should.containEql('clone \'https://github.com/acme/repo.git\'');
+                commandText.should.not.containEql('u:p');
+                commandsSeen[0].opts.envs.should.eql({
+                    GIT_USERNAME: 'u',
+                    GIT_PASSWORD: 'p'
+                });
                 commandText.should.containEql('branch --format');
                 commandText.should.containEql('reset --hard \'HEAD~1\'');
                 commandText.should.containEql('restore --staged -- \'a.txt\'');
@@ -1783,7 +1873,7 @@ describe('test sandbox module', function () {
         });
     });
 
-    it('cleans git clone credentials when using the default destination directory', function () {
+    it('passes git clone credentials through a helper instead of the command line', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
             run: function (cmd, opts) {
@@ -1796,15 +1886,18 @@ describe('test sandbox module', function () {
             username: 'u',
             password: 'p'
         }).then(() => {
-            commandsSeen.map(item => item.cmd).should.eql([
-                'git clone \'https://u:p@github.com/acme/private.git\'',
-                'git remote set-url origin \'https://github.com/acme/private.git\''
-            ]);
-            commandsSeen[1].opts.cwd.should.eql('private');
+            commandsSeen.length.should.eql(1);
+            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.containEql('clone \'https://github.com/acme/private.git\'');
+            commandsSeen[0].cmd.should.not.containEql('u:p');
+            commandsSeen[0].opts.envs.should.eql({
+                GIT_USERNAME: 'u',
+                GIT_PASSWORD: 'p'
+            });
         });
     });
 
-    it('cleans http git clone credentials when using the default destination directory', function () {
+    it('passes http git clone credentials through a helper instead of the command line', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
             run: function (cmd, opts) {
@@ -1817,11 +1910,14 @@ describe('test sandbox module', function () {
             username: 'u',
             password: 'p'
         }).then(() => {
-            commandsSeen.map(item => item.cmd).should.eql([
-                'git clone \'http://u:p@git.example.com/acme/private.git\'',
-                'git remote set-url origin \'http://git.example.com/acme/private.git\''
-            ]);
-            commandsSeen[1].opts.cwd.should.eql('private');
+            commandsSeen.length.should.eql(1);
+            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.containEql('clone \'http://git.example.com/acme/private.git\'');
+            commandsSeen[0].cmd.should.not.containEql('u:p');
+            commandsSeen[0].opts.envs.should.eql({
+                GIT_USERNAME: 'u',
+                GIT_PASSWORD: 'p'
+            });
         });
     });
 
@@ -2016,6 +2112,36 @@ describe('test sandbox module', function () {
             }).then(info => {
                 info.state.should.eql('running');
                 infoCalls.should.eql(2);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('does not retry fatal client errors while polling', function () {
+        let calls = 0;
+        return startServer((req, res) => {
+            calls += 1;
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ message: 'missing' }));
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_missing',
+                client: new qiniu.sandbox.SandboxClient({
+                    endpoint: fixture.endpoint,
+                    apiKey: 'sandbox-key'
+                }),
+                info: {}
+            });
+
+            return sandbox.waitForReady({ interval: 1, timeout: 100 }).then(() => {
+                throw new Error('expected waitForReady to fail');
+            }, err => {
+                err.response.statusCode.should.eql(404);
+                calls.should.eql(1);
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
@@ -2301,6 +2427,7 @@ describe('test sandbox module', function () {
     });
 
     it('supports E2B style sandbox paginator, snapshots, and MCP helpers', function () {
+        let tokenReads = 0;
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');
             if (req.method === 'GET' && req.url === '/v2/sandboxes?limit=2&nextToken=n1&metadata%5Buser%5D=alice&state=running') {
@@ -2326,6 +2453,7 @@ describe('test sandbox module', function () {
             }
             const parsed = parseUrl(req.url);
             if (req.method === 'GET' && parsed.pathname === '/files' && parsed.searchParams.get('path') === '/etc/mcp-gateway/.token') {
+                tokenReads += 1;
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'text/plain');
                 res.end('mcp-token');
@@ -2362,8 +2490,16 @@ describe('test sandbox module', function () {
                     client
                 });
                 sandbox.getMcpUrl().should.eql('https://50005-sbx_page.page.example.com/mcp');
-                return sandbox.getMcpToken().then(token => {
+                return Promise.all([
+                    sandbox.getMcpToken(),
+                    sandbox.getMcpToken()
+                ]).then(tokens => {
+                    tokens.should.eql(['mcp-token', 'mcp-token']);
+                    tokenReads.should.eql(1);
+                    return sandbox.getMcpToken();
+                }).then(token => {
                     token.should.eql('mcp-token');
+                    tokenReads.should.eql(1);
                     return sandbox.createSnapshot({ name: 'snap' });
                 }).then(snapshot => {
                     snapshot.snapshotId.should.eql('snap_1');
@@ -2478,6 +2614,47 @@ describe('test sandbox module', function () {
                 throw new Error('expected pty stream parse error');
             }, err => {
                 err.message.should.match(/Unexpected token/);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects PTY wait when Connect end-stream carries an error', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 45 } } }),
+                    encodeConnectEndEnvelope({ error: { code: 'internal', message: 'pty failed' } })
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_trailer',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24
+            }).then(handle => {
+                handle.pid.should.eql(45);
+                return handle.wait();
+            }).then(() => {
+                throw new Error('expected pty wait to reject');
+            }, err => {
+                err.message.should.eql('pty failed');
+                err.code.should.eql('internal');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;

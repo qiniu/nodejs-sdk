@@ -43,6 +43,21 @@ function encodeConnectEnvelope (message) {
     return Buffer.concat([header, payload]);
 }
 
+function connectEndStreamError (payload) {
+    if (!payload) {
+        return null;
+    }
+    const data = JSON.parse(String(payload));
+    if (!data || !data.error) {
+        return null;
+    }
+    const error = data.error;
+    const err = new Error(error.message || 'Sandbox envd stream failed');
+    err.code = error.code;
+    err.details = error.details;
+    return err;
+}
+
 function decodeConnectEnvelopes (data) {
     data = Buffer.isBuffer(data) ? data : Buffer.from(data || '');
     const messages = [];
@@ -57,6 +72,10 @@ function decodeConnectEnvelopes (data) {
         const payload = data.slice(offset, offset + length).toString();
         offset += length;
         if (flags & 2) {
+            const err = connectEndStreamError(payload);
+            if (err) {
+                throw err;
+            }
             continue;
         }
         if (payload) {
@@ -105,4 +124,5 @@ function connectStreamRPC (sandbox, procedure, body, opts) {
 
 exports.connectRPC = connectRPC;
 exports.connectStreamRPC = connectStreamRPC;
+exports.connectEndStreamError = connectEndStreamError;
 exports.envdHeaders = envdHeaders;

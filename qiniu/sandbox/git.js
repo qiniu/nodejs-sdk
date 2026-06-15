@@ -21,12 +21,6 @@ function pathAndOptions (pathOrOpts, maybeOpts) {
     return { path: opts.path, opts };
 }
 
-function cloneDirectoryName (repoUrl) {
-    const withoutQuery = String(repoUrl || '').split(/[?#]/)[0].replace(/\/+$/, '');
-    const name = withoutQuery.slice(withoutQuery.lastIndexOf('/') + 1).replace(/\.git$/, '');
-    return name || null;
-}
-
 function authUrl (repoUrl, opts) {
     opts = opts || {};
     if (!opts.username && !opts.password) {
@@ -40,6 +34,36 @@ function authUrl (repoUrl, opts) {
 
 function stripAuth (repoUrl) {
     return String(repoUrl || '').replace(/^(https?):\/\/[^/@]+:[^/@]+@/, '$1://');
+}
+
+function credentialHelperArgs (opts) {
+    opts = opts || {};
+    if (!opts.username && !opts.password) {
+        return [];
+    }
+    if (!opts.username || !opts.password) {
+        throw new GitAuthError('Both username and password are required for git authentication');
+    }
+    return [
+        '-c',
+        shellQuote('credential.helper=!f() { echo username=$GIT_USERNAME; echo password=$GIT_PASSWORD; }; f'),
+        '-c',
+        shellQuote('credential.useHttpPath=true')
+    ];
+}
+
+function gitCredentialOptions (opts) {
+    opts = Object.assign({}, opts || {});
+    if (opts.username || opts.password) {
+        if (!opts.username || !opts.password) {
+            throw new GitAuthError('Both username and password are required for git authentication');
+        }
+        opts.envs = Object.assign({}, opts.envs || {}, {
+            GIT_USERNAME: opts.username,
+            GIT_PASSWORD: opts.password
+        });
+    }
+    return opts;
 }
 
 function configScopeArg (opts) {
@@ -119,9 +143,8 @@ Git.prototype._runGit = function (repoPath, args, opts) {
 
 Git.prototype.clone = function (repoUrl, pathOrOpts, maybeOpts) {
     const normalized = pathAndOptions(pathOrOpts, maybeOpts);
-    const opts = normalized.opts;
-    const cloneUrl = authUrl(repoUrl, opts);
-    const args = gitConfigArgs(opts).concat(['clone', shellQuote(cloneUrl)]);
+    const opts = gitCredentialOptions(normalized.opts);
+    const args = gitConfigArgs(opts).concat(credentialHelperArgs(opts)).concat(['clone', shellQuote(stripAuth(repoUrl))]);
     if (opts.depth) {
         args.push('--depth', shellQuote(opts.depth));
     }
@@ -131,14 +154,7 @@ Git.prototype.clone = function (repoUrl, pathOrOpts, maybeOpts) {
     if (normalized.path) {
         args.push(shellQuote(normalized.path));
     }
-    return this.commands.run(`git ${args.join(' ')}`, opts).then(result => {
-        const clonePath = normalized.path || cloneDirectoryName(repoUrl);
-        if ((opts.username || opts.password) && !opts.dangerouslyStoreCredentials && clonePath) {
-            return this._runGit(clonePath, ['remote', 'set-url', 'origin', shellQuote(stripAuth(cloneUrl))], opts)
-                .then(() => result);
-        }
-        return result;
-    });
+    return this.commands.run(`git ${args.join(' ')}`, opts);
 };
 
 Git.prototype.init = function (repoPath, opts) {

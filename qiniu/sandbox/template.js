@@ -103,22 +103,32 @@ function runShellStep (template, command, options) {
 
 function parseEnvArgs (value) {
     const args = [];
+    if (value.indexOf('=') < 0) {
+        const index = value.search(/\s+/);
+        if (index > 0) {
+            args.push(value.slice(0, index).trim(), unquoteDockerfileValue(value.slice(index + 1).trim()));
+        }
+        return args;
+    }
     const pattern = /([A-Za-z_][A-Za-z0-9_]*)=("(\\.|[^"\\])*"|'(\\.|[^'\\])*'|\S+)/g;
     let match;
     while ((match = pattern.exec(value))) {
-        let envValue = match[2];
-        if (
-            (envValue[0] === '"' && envValue[envValue.length - 1] === '"') ||
-            (envValue[0] === '\'' && envValue[envValue.length - 1] === '\'')
-        ) {
-            envValue = envValue.slice(1, -1)
-                .replace(/\\"/g, '"')
-                .replace(/\\'/g, '\'')
-                .replace(/\\\\/g, '\\');
-        }
-        args.push(match[1], envValue);
+        args.push(match[1], unquoteDockerfileValue(match[2]));
     }
     return args;
+}
+
+function unquoteDockerfileValue (value) {
+    if (
+        (value[0] === '"' && value[value.length - 1] === '"') ||
+        (value[0] === '\'' && value[value.length - 1] === '\'')
+    ) {
+        return value.slice(1, -1)
+            .replace(/\\"/g, '"')
+            .replace(/\\'/g, '\'')
+            .replace(/\\\\/g, '\\');
+    }
+    return value;
 }
 
 function joinDockerfileLines (content) {

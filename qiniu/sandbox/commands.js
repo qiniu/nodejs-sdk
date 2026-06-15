@@ -1,4 +1,4 @@
-const { connectRPC, envdHeaders } = require('./envd');
+const { connectEndStreamError, connectRPC, envdHeaders } = require('./envd');
 const { CommandExitError } = require('./errors');
 const { parseJSON, parseRequestUrl } = require('./util');
 const http = require('http');
@@ -275,6 +275,21 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                     }
                     const payload = responseBuffer.slice(5, 5 + length).toString();
                     responseBuffer = responseBuffer.slice(5 + length);
+                    if (flags & 2) {
+                        try {
+                            const err = connectEndStreamError(payload);
+                            if (err) {
+                                fail(err);
+                                req.destroy();
+                                return;
+                            }
+                        } catch (err) {
+                            fail(err);
+                            req.destroy();
+                            return;
+                        }
+                        continue;
+                    }
                     if (!(flags & 2) && payload) {
                         try {
                             handleMessage(JSON.parse(payload));
@@ -286,6 +301,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                     }
                 }
             });
+            res.on('error', fail);
             res.on('end', () => {
                 if (!isConnectStream) {
                     cleanupStartTimer();
