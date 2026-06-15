@@ -69,9 +69,9 @@ async function useSandboxTypes () {
         password: 'p'
     });
     await sandbox.git.setConfig('user.name', 'Alice', { path: '/repo', scope: 'local' });
-    const gitUser: string = await sandbox.git.getConfig('user.name', { path: '/repo', scope: 'local' });
+    const gitUser: string | undefined = await sandbox.git.getConfig('user.name', { path: '/repo', scope: 'local' });
     await sandbox.git.configureUser('Alice', 'alice@example.com', { path: '/repo', scope: 'local' });
-    await sandbox.git.reset('/repo', { mode: 'hard', target: 'HEAD~1', paths: ['a.txt'] });
+    await sandbox.git.reset('/repo', { mode: 'hard', target: 'HEAD~1' });
     await sandbox.git.restore('/repo', { paths: ['a.txt'] });
     const template = qiniu.sandbox.Template()
         .fromImage('ubuntu:22.04')
@@ -97,9 +97,13 @@ async function useSandboxTypes () {
         .setWorkdir('/app')
         .setUser('node')
         .setEnvs({ NODE_ENV: 'production' })
+        .pipInstall({ g: false })
         .pipInstall(['numpy'], { g: false })
+        .npmInstall({ dev: true })
         .npmInstall('typescript', { dev: true })
+        .bunInstall({ dev: true })
         .bunInstall(undefined, { g: true })
+        .gitClone('https://github.com/qiniu/nodejs-sdk.git', { branch: 'sandbox', depth: 1 })
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', { branch: 'sandbox', depth: 1 })
         .runCmd(['echo one', 'echo two'], { user: 'root' });
     await template.build({ client, name: 'typed-template:test' });
@@ -110,7 +114,9 @@ async function useSandboxTypes () {
     stream.read;
     fileType.length;
     eventType.length;
-    gitUser.length;
+    if (gitUser) {
+        gitUser.length;
+    }
 }
 
 void useSandboxTypes;

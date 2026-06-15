@@ -268,8 +268,8 @@ export declare namespace sandbox {
         remoteGet(repoPath: string, name: string, options?: CommandOptions): Promise<string | undefined>;
         setConfig(repoPath: string, key: string, value: string, options?: CommandOptions & {scope?: 'local' | 'global' | 'system'}): Promise<CommandResult>;
         setConfig(key: string, value: string, options?: GitConfigOptions): Promise<CommandResult>;
-        getConfig(repoPath: string, key: string, options?: CommandOptions & {scope?: 'local' | 'global' | 'system'}): Promise<string>;
-        getConfig(key: string, options?: GitConfigOptions): Promise<string>;
+        getConfig(repoPath: string, key: string, options?: CommandOptions & {scope?: 'local' | 'global' | 'system'}): Promise<string | undefined>;
+        getConfig(key: string, options?: GitConfigOptions): Promise<string | undefined>;
         configureUser(repoPath: string, name: string, email: string, options?: CommandOptions): Promise<CommandResult>;
         configureUser(name: string, email: string, options?: GitConfigOptions): Promise<CommandResult>;
         dangerouslyAuthenticate(repoPath: string, remote: string, username: string, password: string, options?: CommandOptions): Promise<CommandResult>;
@@ -337,9 +337,13 @@ export declare namespace sandbox {
         makeSymlink(src: string, dest: string, options?: {force?: boolean; user?: string}): this;
         setWorkdir(workdir: string): this;
         setUser(user: string): this;
+        pipInstall(options?: {g?: boolean}): this;
         pipInstall(packages?: string | string[], options?: {g?: boolean}): this;
+        npmInstall(options?: {g?: boolean; dev?: boolean}): this;
         npmInstall(packages?: string | string[], options?: {g?: boolean; dev?: boolean}): this;
+        bunInstall(options?: {g?: boolean; dev?: boolean}): this;
         bunInstall(packages?: string | string[], options?: {g?: boolean; dev?: boolean}): this;
+        gitClone(url: string, options?: {branch?: string; depth?: number; user?: string}): this;
         gitClone(url: string, path?: string, options?: {branch?: string; depth?: number; user?: string}): this;
         setEnvs(envs: {[key: string]: string}): this;
         skipCache(): this;
