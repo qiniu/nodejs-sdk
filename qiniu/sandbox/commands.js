@@ -171,8 +171,18 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             resolveWait = resolve;
             rejectWait = reject;
         });
+        waitPromise.catch(() => {});
+        let startTimer;
+
+        function cleanupStartTimer () {
+            if (startTimer) {
+                clearTimeout(startTimer);
+                startTimer = null;
+            }
+        }
 
         function fail (err) {
+            cleanupStartTimer();
             if (!settled) {
                 settled = true;
                 reject(err);
@@ -182,6 +192,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
 
         function ensureHandle (pid) {
             if (!handle) {
+                cleanupStartTimer();
                 result.pid = pid || result.pid;
                 handle = new CommandHandle(commands, result.pid, null, opts, req, waitPromise);
                 settled = true;
@@ -266,6 +277,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             });
             res.on('end', () => {
                 if (!isConnectStream) {
+                    cleanupStartTimer();
                     const events = eventListFromResponse(parseJSON(jsonBuffer));
                     result = commandResultFromEvents(events, opts);
                     if (!result.pid && fallbackPid) {
@@ -287,6 +299,13 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             });
         });
         req.on('error', fail);
+        const startTimeout = opts.requestTimeoutMs || opts.timeoutMs || opts.timeout;
+        if (startTimeout) {
+            startTimer = setTimeout(() => {
+                fail(new Error('Command stream start timed out'));
+                req.destroy();
+            }, startTimeout);
+        }
         req.end(encodeConnectEnvelope(body));
     });
 }

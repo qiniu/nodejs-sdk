@@ -1181,6 +1181,13 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('treats long Dockerfile text as content instead of probing it as a path', function () {
+        const content = 'FROM node:22\nRUN ' + new Array(1200).join('x');
+        const template = qiniu.sandbox.Template().fromDockerfile(content);
+        template.buildConfig.fromImage.should.eql('node:22');
+        template.buildConfig.steps[0].cmd.should.match(/^x+$/);
+    });
+
     it('exposes network constants and maps updateNetwork to Qiniu API', function () {
         return startServer((req, res) => {
             res.statusCode = 200;
@@ -1501,6 +1508,46 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('rejects command start when the process stream does not start before timeout', function () {
+        let commandResponse;
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                commandResponse = res;
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_timeout',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('sleep 5', {
+                requestTimeoutMs: 5
+            }).then(() => {
+                throw new Error('expected command start to time out');
+            }, err => {
+                err.message.should.eql('Command stream start timed out');
+                if (commandResponse) {
+                    commandResponse.end();
+                }
+            }).then(() => closeServer(fixture.server), err => {
+                if (commandResponse) {
+                    commandResponse.end();
+                }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('supports E2B git auth, branches, reset, restore, and safe remote cleanup', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
@@ -1586,6 +1633,45 @@ describe('test sandbox module', function () {
                 'git remote set-url \'origin\' \'https://github.com/acme/repo.git\''
             ]);
         });
+    });
+
+    it('cleans git clone credentials when using the default destination directory', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.clone('https://github.com/acme/private.git', {
+            username: 'u',
+            password: 'p'
+        }).then(() => {
+            commandsSeen.map(item => item.cmd).should.eql([
+                'git clone \'https://u:p@github.com/acme/private.git\'',
+                'git remote set-url origin \'https://github.com/acme/private.git\''
+            ]);
+            commandsSeen[1].opts.cwd.should.eql('private');
+        });
+    });
+
+    it('rejects unsafe git reset modes', function () {
+        const git = new qiniu.sandbox.Git({
+            run: function () {
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        try {
+            git.reset('/repo', {
+                mode: 'hard; touch /tmp/pwned'
+            });
+            throw new Error('expected git reset to reject unsafe mode');
+        } catch (err) {
+            err.name.should.eql('InvalidArgumentError');
+            err.message.should.match(/Invalid git reset mode/);
+        }
     });
 
     it('surfaces git upstream and validation errors on auth helpers', function () {
@@ -1720,6 +1806,48 @@ describe('test sandbox module', function () {
                 running.should.eql(false);
                 return closeServer(fixture.server);
             }, err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('retries transient waitForReady polling errors before timeout', function () {
+        let infoCalls = 0;
+        return startServer((req, res) => {
+            if (req.method === 'GET' && req.url === '/sandboxes/sbx_retry') {
+                infoCalls += 1;
+                if (infoCalls === 1) {
+                    res.statusCode = 502;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ message: 'temporary' }));
+                    return;
+                }
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ sandboxID: 'sbx_retry', state: 'running' }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_retry',
+                client: new qiniu.sandbox.SandboxClient({
+                    endpoint: fixture.endpoint,
+                    apiKey: 'sandbox-key'
+                }),
+                info: {}
+            });
+
+            return sandbox.waitForReady({
+                interval: 1,
+                timeout: 50
+            }).then(info => {
+                info.state.should.eql('running');
+                infoCalls.should.eql(2);
+            }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
                 });

@@ -1,5 +1,5 @@
 const { shellQuote } = require('./util');
-const { GitAuthError, GitUpstreamError } = require('./errors');
+const { GitAuthError, GitUpstreamError, InvalidArgumentError } = require('./errors');
 
 function Git (commands) {
     this.commands = commands;
@@ -19,6 +19,12 @@ function pathAndOptions (pathOrOpts, maybeOpts) {
     }
     const opts = Object.assign({}, pathOrOpts || {});
     return { path: opts.path, opts };
+}
+
+function cloneDirectoryName (repoUrl) {
+    const withoutQuery = String(repoUrl || '').split(/[?#]/)[0].replace(/\/+$/, '');
+    const name = withoutQuery.slice(withoutQuery.lastIndexOf('/') + 1).replace(/\.git$/, '');
+    return name || null;
 }
 
 function authUrl (repoUrl, opts) {
@@ -126,8 +132,9 @@ Git.prototype.clone = function (repoUrl, pathOrOpts, maybeOpts) {
         args.push(shellQuote(normalized.path));
     }
     return this.commands.run(`git ${args.join(' ')}`, opts).then(result => {
-        if ((opts.username || opts.password) && !opts.dangerouslyStoreCredentials && normalized.path) {
-            return this._runGit(normalized.path, ['remote', 'set-url', 'origin', shellQuote(stripAuth(cloneUrl))], opts)
+        const clonePath = normalized.path || cloneDirectoryName(repoUrl);
+        if ((opts.username || opts.password) && !opts.dangerouslyStoreCredentials && clonePath) {
+            return this._runGit(clonePath, ['remote', 'set-url', 'origin', shellQuote(stripAuth(cloneUrl))], opts)
                 .then(() => result);
         }
         return result;
@@ -278,6 +285,9 @@ Git.prototype.reset = function (repoPath, opts) {
     const args = ['reset'];
     const mode = opts.mode || (opts.hard ? 'hard' : null) || (opts.soft ? 'soft' : null) || (opts.mixed ? 'mixed' : null);
     if (mode) {
+        if (['soft', 'mixed', 'hard', 'merge', 'keep'].indexOf(mode) === -1) {
+            throw new InvalidArgumentError(`Invalid git reset mode: ${mode}`);
+        }
         args.push(`--${mode}`);
     }
     const target = opts.target || opts.ref;

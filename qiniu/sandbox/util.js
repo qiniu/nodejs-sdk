@@ -64,6 +64,11 @@ function poll (fn, opts, done) {
                 throw new SandboxError('Sandbox poll timed out');
             }
             return new Promise(resolve => setTimeout(resolve, interval)).then(tick);
+        }, err => {
+            if (Date.now() - startedAt >= timeout) {
+                throw err;
+            }
+            return new Promise(resolve => setTimeout(resolve, interval)).then(tick);
         });
     }
 

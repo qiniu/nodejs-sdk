@@ -89,6 +89,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             resolveWait = resolve;
             rejectWait = reject;
         });
+        waitPromise.catch(() => {});
 
         function fail (err) {
             if (!settled) {

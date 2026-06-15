@@ -119,7 +119,12 @@ function parseEnvArgs (value) {
 }
 
 Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
-    const content = fs.existsSync(dockerfileContentOrPath)
+    const isPath = typeof dockerfileContentOrPath === 'string' &&
+        dockerfileContentOrPath.length < 1024 &&
+        dockerfileContentOrPath.indexOf('\n') < 0 &&
+        dockerfileContentOrPath.indexOf('\r') < 0 &&
+        fs.existsSync(dockerfileContentOrPath);
+    const content = isPath
         ? fs.readFileSync(dockerfileContentOrPath, 'utf8')
         : dockerfileContentOrPath;
     content.split(/\r?\n/).forEach(line => {
