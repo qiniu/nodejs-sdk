@@ -2,9 +2,11 @@ const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYT
 const { SandboxError } = require('./errors');
 const { agentFromClient, millisecondsFromOptions, parseRequestUrl, rawRequest } = require('./util');
 const { Readable } = require('stream');
+const { promisify } = require('util');
 const zlib = require('zlib');
 const http = require('http');
 const https = require('https');
+const gzip = promisify(zlib.gzip);
 
 const FileType = {
     FILE: 'file',
@@ -161,11 +163,7 @@ function formatReadResult (data, opts) {
         return buffer;
     }
     if (format === 'stream') {
-        const stream = new Readable();
-        stream._read = function () {};
-        stream.push(buffer);
-        stream.push(null);
-        return stream;
+        return Readable.from([buffer]);
     }
     if (format === 'blob') {
         return typeof global.Blob !== 'undefined' ? new global.Blob([buffer]) : buffer;
@@ -212,24 +210,28 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
         const headers = {
             'Content-Type': 'application/octet-stream'
         };
-        let content = Buffer.isBuffer(dataOrOpts) ? dataOrOpts : Buffer.from(String(dataOrOpts !== undefined && dataOrOpts !== null ? dataOrOpts : ''));
-        if (opts.gzip && supportsEncodedUpload) {
-            headers['Content-Encoding'] = 'gzip';
-            content = zlib.gzipSync(content);
-        }
+        const content = Buffer.isBuffer(dataOrOpts) ? dataOrOpts : Buffer.from(String(dataOrOpts !== undefined && dataOrOpts !== null ? dataOrOpts : ''));
+        const compressed = opts.gzip && supportsEncodedUpload
+            ? gzip(content).then(result => {
+                headers['Content-Encoding'] = 'gzip';
+                return result;
+            })
+            : Promise.resolve(content);
 
-        const requestUrl = this.sandbox.uploadUrl(path, opts);
-        return rawRequest(requestUrl, {
-            method: 'POST',
-            content,
-            dataType: 'json',
-            agent: envdAgent(this.sandbox, requestUrl),
-            headers
+        return compressed.then(content => {
+            const requestUrl = this.sandbox.uploadUrl(path, opts);
+            return rawRequest(requestUrl, {
+                method: 'POST',
+                content,
+                dataType: 'json',
+                agent: envdAgent(this.sandbox, requestUrl),
+                headers
+            });
         }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
     }
 
     const boundary = `qiniu-sandbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    let body = multipartBody(boundary, [{
+    const body = multipartBody(boundary, [{
         field: 'file',
         filename: path,
         data: dataOrOpts
@@ -237,18 +239,22 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
     const headers = {
         'Content-Type': `multipart/form-data; boundary=${boundary}`
     };
-    if (opts.gzip && supportsEncodedUpload) {
-        headers['Content-Encoding'] = 'gzip';
-        body = zlib.gzipSync(body);
-    }
+    const compressed = opts.gzip && supportsEncodedUpload
+        ? gzip(body).then(result => {
+            headers['Content-Encoding'] = 'gzip';
+            return result;
+        })
+        : Promise.resolve(body);
 
-    const requestUrl = this.sandbox.uploadUrl(path, opts);
-    return rawRequest(requestUrl, {
-        method: 'POST',
-        content: body,
-        dataType: 'json',
-        agent: envdAgent(this.sandbox, requestUrl),
-        headers
+    return compressed.then(body => {
+        const requestUrl = this.sandbox.uploadUrl(path, opts);
+        return rawRequest(requestUrl, {
+            method: 'POST',
+            content: body,
+            dataType: 'json',
+            agent: envdAgent(this.sandbox, requestUrl),
+            headers
+        });
     }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
 };
 

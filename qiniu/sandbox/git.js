@@ -323,8 +323,13 @@ Git.prototype.branches = function (repoPath, opts) {
 Git.prototype.reset = function (repoPath, opts) {
     opts = opts || {};
     const args = ['reset'];
+    const rawPaths = opts.paths || opts.files || [];
+    const paths = Array.isArray(rawPaths) ? rawPaths : [rawPaths];
     const mode = opts.mode || (opts.hard ? 'hard' : null) || (opts.soft ? 'soft' : null) || (opts.mixed ? 'mixed' : null);
     if (mode) {
+        if (paths.length) {
+            throw new InvalidArgumentError('Git reset mode cannot be used when paths are specified');
+        }
         if (['soft', 'mixed', 'hard', 'merge', 'keep'].indexOf(mode) === -1) {
             throw new InvalidArgumentError(`Invalid git reset mode: ${mode}`);
         }
@@ -334,8 +339,6 @@ Git.prototype.reset = function (repoPath, opts) {
     if (target) {
         args.push(shellQuote(target));
     }
-    const rawPaths = opts.paths || opts.files || [];
-    const paths = Array.isArray(rawPaths) ? rawPaths : [rawPaths];
     if (paths.length) {
         args.push('--');
         paths.forEach(path => args.push(shellQuote(path)));
@@ -364,10 +367,11 @@ Git.prototype.restore = function (repoPath, opts) {
     }
     const rawPaths = opts.paths || opts.files || [];
     const paths = Array.isArray(rawPaths) ? rawPaths : [rawPaths];
-    if (paths.length) {
-        args.push('--');
-        paths.forEach(path => args.push(shellQuote(path)));
+    if (!paths.length) {
+        throw new InvalidArgumentError('At least one path must be specified for git restore');
     }
+    args.push('--');
+    paths.forEach(path => args.push(shellQuote(path)));
     return this._runGit(repoPath, args, opts);
 };
 

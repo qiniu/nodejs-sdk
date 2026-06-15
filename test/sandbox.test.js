@@ -2658,7 +2658,7 @@ describe('test sandbox module', function () {
                 return git.reset('/repo', { hard: true, ref: 'HEAD~1' });
             })
             .then(() => git.restore('/repo', { staged: true, paths: ['a.txt'] }))
-            .then(() => git.reset('/repo', { hard: true, ref: 'HEAD', paths: 'single.txt' }))
+            .then(() => git.reset('/repo', { ref: 'HEAD', paths: 'single.txt' }))
             .then(() => git.restore('/repo', { files: 'restore.txt' }))
             .then(() => git.remoteAdd('/repo', 'origin', 'https://github.com/acme/repo.git', { overwrite: true, fetch: true }))
             .then(() => git.commit('/repo', 'msg', {
@@ -2679,7 +2679,7 @@ describe('test sandbox module', function () {
                 commandText.should.containEql('branch \'--format=%(HEAD) %(refname:short)\'');
                 commandText.should.containEql('reset --hard \'HEAD~1\'');
                 commandText.should.containEql('restore --staged -- \'a.txt\'');
-                commandText.should.containEql('reset --hard \'HEAD\' -- \'single.txt\'');
+                commandText.should.containEql('reset \'HEAD\' -- \'single.txt\'');
                 commandText.should.containEql('restore --worktree -- \'restore.txt\'');
                 commandText.should.containEql('remote remove \'origin\'');
                 commandText.should.containEql('remote add \'origin\'');
@@ -2846,6 +2846,25 @@ describe('test sandbox module', function () {
         } catch (err) {
             err.name.should.eql('InvalidArgumentError');
             err.message.should.match(/Invalid git reset mode/);
+        }
+
+        try {
+            git.reset('/repo', {
+                mode: 'hard',
+                paths: ['a.txt']
+            });
+            throw new Error('expected git reset to reject mode with paths');
+        } catch (err) {
+            err.name.should.eql('InvalidArgumentError');
+            err.message.should.match(/mode cannot be used when paths are specified/);
+        }
+
+        try {
+            git.restore('/repo');
+            throw new Error('expected git restore to reject missing paths');
+        } catch (err) {
+            err.name.should.eql('InvalidArgumentError');
+            err.message.should.match(/At least one path/);
         }
     });
 
@@ -4219,8 +4238,7 @@ describe('test sandbox module', function () {
             });
         }).then(() => git.reset('/repo', {
             mode: 'hard',
-            target: 'HEAD~1',
-            paths: ['a.txt']
+            target: 'HEAD~1'
         })).then(() => git.restore('/repo', {
             paths: ['a.txt']
         })).then(() => {
@@ -4229,7 +4247,7 @@ describe('test sandbox module', function () {
                 'git config --local --get \'user.name\'',
                 'git config --local \'user.name\' \'Alice\'',
                 'git config --local \'user.email\' \'alice@example.com\'',
-                'git reset --hard \'HEAD~1\' -- \'a.txt\'',
+                'git reset --hard \'HEAD~1\'',
                 'git restore --worktree -- \'a.txt\''
             ]);
             commandsSeen.every(item => item.opts.cwd === '/repo').should.eql(true);
