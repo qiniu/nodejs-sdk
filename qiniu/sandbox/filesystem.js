@@ -277,8 +277,14 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
 
 Filesystem.prototype.writeFiles = function (files, opts) {
     opts = opts || {};
+    if (!Array.isArray(files)) {
+        return Promise.reject(new TypeError('files must be an array'));
+    }
     for (let i = 0; i < files.length; i += 1) {
         const file = files[i];
+        if (!file || typeof file !== 'object') {
+            return Promise.reject(new TypeError('Each file must be an object'));
+        }
         if (file && file.data && typeof file.data === 'object' && !Buffer.isBuffer(file.data) && typeof file.data.pipe === 'function') {
             return Promise.reject(new TypeError('Streams are not supported as data in filesystem.writeFiles'));
         }

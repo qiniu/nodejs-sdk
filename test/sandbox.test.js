@@ -1474,6 +1474,7 @@ describe('test sandbox module', function () {
                 .bunInstall(['elysia'], { dev: true })
                 .bunInstall({ dev: true })
                 .bunInstall([])
+                .bunInstall(undefined, { g: true })
                 .aptInstall(['curl'], { noInstallRecommends: true, fixMissing: true })
                 .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk dir', {
                     branch: 'sandbox',
@@ -1509,8 +1510,9 @@ describe('test sandbox module', function () {
                         { type: 'RUN', args: ['npm install -g \'tsx\'', 'root'] },
                         { type: 'RUN', args: ['npm install --save-dev'] },
                         { type: 'RUN', args: ['bun add --dev \'elysia\''] },
-                        { type: 'run', cmd: 'bun install' },
-                        { type: 'run', cmd: 'bun install' },
+                        { type: 'RUN', args: ['bun install'] },
+                        { type: 'RUN', args: ['bun install'] },
+                        { type: 'RUN', args: ['bun install', 'root'] },
                         { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing \'curl\'', 'root'] },
                         { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\' \'/src/sdk dir\'', 'root'] },
                         { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\''] },
@@ -1875,6 +1877,22 @@ describe('test sandbox module', function () {
                 })
                 .then(entries => {
                     entries.map(entry => entry.path).should.eql(['/a.txt', '/b.txt']);
+                    return sandbox.files.writeFiles(null).then(() => {
+                        throw new Error('expected writeFiles invalid files to fail');
+                    }, err => {
+                        err.name.should.eql('TypeError');
+                        err.message.should.eql('files must be an array');
+                    });
+                })
+                .then(() => {
+                    return sandbox.files.writeFiles([null]).then(() => {
+                        throw new Error('expected writeFiles invalid file item to fail');
+                    }, err => {
+                        err.name.should.eql('TypeError');
+                        err.message.should.eql('Each file must be an object');
+                    });
+                })
+                .then(() => {
                     return sandbox.files.writeFiles([
                         { path: '/stream.txt', data: new stream.Readable() }
                     ]).then(() => {
@@ -2858,8 +2876,7 @@ describe('test sandbox module', function () {
             err.message.should.eql('push failed');
             commandsSeen.length.should.eql(1);
             commandsSeen[0].cmd.should.containEql('credential.helper=');
-            commandsSeen[0].cmd.should.containEql('echo "username=$GIT_USERNAME"');
-            commandsSeen[0].cmd.should.containEql('echo "password=$GIT_PASSWORD"');
+            commandsSeen[0].cmd.should.containEql('printf "username=%s\\npassword=%s\\n" "$GIT_USERNAME" "$GIT_PASSWORD"');
             commandsSeen[0].cmd.should.containEql('push \'origin\' \'main\'');
             commandsSeen[0].cmd.should.not.containEql('u:p');
             commandsSeen[0].opts.envs.should.eql({

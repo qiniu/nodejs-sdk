@@ -46,7 +46,7 @@ function credentialHelperArgs (opts) {
     }
     return [
         '-c',
-        shellQuote('credential.helper=!f() { echo "username=$GIT_USERNAME"; echo "password=$GIT_PASSWORD"; }; f'),
+        shellQuote('credential.helper=!f() { printf "username=%s\\npassword=%s\\n" "$GIT_USERNAME" "$GIT_PASSWORD"; }; f'),
         '-c',
         shellQuote('credential.useHttpPath=true')
     ];

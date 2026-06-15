@@ -494,7 +494,7 @@ Template.prototype.bunInstall = function (packages, options) {
         args.push.apply(args, asArray(packages).map(shellQuote));
         return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
     }
-    return this.runCmd('bun install');
+    return this.runCmd('bun install', { user: options.g ? 'root' : undefined });
 };
 
 Template.prototype.gitClone = function (url, path, options) {
