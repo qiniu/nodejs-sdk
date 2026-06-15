@@ -240,12 +240,6 @@ function Pty (sandbox) {
 
 Pty.prototype.create = function (opts) {
     opts = opts || {};
-    if (!opts.cols && !opts.rows && !opts.onData && !opts.args) {
-        return this.commands.start(opts.cmd || '/bin/bash', Object.assign({}, opts, {
-            stdin: true
-        }));
-    }
-
     const envs = Object.assign({}, opts.envs || {});
     if (!envs.TERM) {
         envs.TERM = 'xterm-256color';

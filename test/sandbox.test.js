@@ -1946,7 +1946,6 @@ describe('test sandbox module', function () {
             }
         };
         const git = new qiniu.sandbox.Git(fakeCommands);
-        const pty = new qiniu.sandbox.Pty({ commands: fakeCommands });
 
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
@@ -2009,7 +2008,7 @@ describe('test sandbox module', function () {
                 return sandbox.commands.closeStdin(12);
             })
                 .then(() => sandbox.commands.kill(12))
-                .then(() => handleGitAndPty(git, pty, commandsSeen))
+                .then(() => handleGitAndPty(git, sandbox.pty, commandsSeen, fixture))
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
                         throw err;
@@ -3959,17 +3958,24 @@ describe('test sandbox module', function () {
         });
     });
 
-    it('uses live PTY creation when args are provided without size or data callbacks', function () {
+    it('uses live PTY creation for default and args-based create calls', function () {
+        let starts = 0;
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
+                starts += 1;
                 const body = decodeConnectEnvelope(req.rawBody);
-                body.process.cmd.should.eql('node');
-                body.process.args.should.eql(['-i']);
+                if (starts === 1) {
+                    body.process.cmd.should.eql('/bin/bash');
+                    body.process.args.should.eql(['-i', '-l']);
+                } else {
+                    body.process.cmd.should.eql('node');
+                    body.process.args.should.eql(['-i']);
+                }
                 should.exist(body.pty);
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/connect+json');
                 res.end(Buffer.concat([
-                    encodeConnectEnvelope({ event: { start: { pid: 49 } } }),
+                    encodeConnectEnvelope({ event: { start: { pid: 48 + starts } } }),
                     encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
                 ]));
                 return;
@@ -3985,10 +3991,13 @@ describe('test sandbox module', function () {
                 }
             });
 
-            return sandbox.pty.create({ cmd: 'node', args: ['-i'] })
+            return sandbox.pty.create()
+                .then(handle => handle.wait())
+                .then(() => sandbox.pty.create({ cmd: 'node', args: ['-i'] }))
                 .then(handle => handle.wait())
                 .then(result => {
                     result.exitCode.should.eql(0);
+                    starts.should.eql(2);
                 })
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
@@ -4529,7 +4538,7 @@ describe('test sandbox module', function () {
     });
 });
 
-function handleGitAndPty (git, pty, commandsSeen) {
+function handleGitAndPty (git, pty, commandsSeen, fixture) {
     return git.clone('https://example.com/repo.git', { path: '/repo' })
         .then(() => git.init('/repo'))
         .then(() => git.add('/repo', { all: true }))
@@ -4552,12 +4561,14 @@ function handleGitAndPty (git, pty, commandsSeen) {
         })
         .then(() => pty.create({ cmd: 'bash', cwd: '/repo' }))
         .then(handle => {
-            handle.pid.should.eql(9);
+            handle.pid.should.eql(12);
             commandsSeen[0].cmd.should.eql('git clone \'https://example.com/repo.git\' \'/repo\'');
             commandsSeen[1].cmd.should.eql('git init');
             commandsSeen[1].opts.cwd.should.eql('/repo');
             commandsSeen.some(item => item.cmd.indexOf('git commit -m') === 0).should.eql(true);
-            commandsSeen[commandsSeen.length - 1].cmd.should.eql('bash');
-            commandsSeen[commandsSeen.length - 1].opts.stdin.should.eql(true);
+            const ptyBody = decodeConnectEnvelope(fixture.requests[6].rawBody);
+            ptyBody.process.cmd.should.eql('bash');
+            ptyBody.process.cwd.should.eql('/repo');
+            should.exist(ptyBody.pty);
         });
 }
