@@ -549,6 +549,101 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('watches directory changes and returns a stoppable handle after start event', function () {
+        let watchResponse;
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                const body = decodeConnectEnvelope(req.rawBody);
+                body.path.should.eql('/workspace');
+                body.recursive.should.eql(true);
+                req.headers['content-type'].should.eql('application/connect+json');
+                req.headers['keepalive-ping-interval'].should.eql('50');
+                watchResponse = res;
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.write(encodeConnectEnvelope({ event: { start: {} } }));
+                setTimeout(() => {
+                    res.write(encodeConnectEnvelope({
+                        event: {
+                            filesystem: {
+                                name: 'created.txt',
+                                type: 'EVENT_TYPE_CREATE'
+                            }
+                        }
+                    }));
+                    res.write(encodeConnectEnvelope({
+                        event: {
+                            filesystem: {
+                                name: 'written.txt',
+                                type: 2
+                            }
+                        }
+                    }));
+                    res.write(encodeConnectEnvelope({ event: { keepalive: {} } }));
+                }, 10);
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const events = [];
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', event => {
+                events.push(event);
+            }, {
+                recursive: true,
+                requestTimeoutMs: 1000
+            }).then(handle => {
+                (typeof handle.stop).should.eql('function');
+                return new Promise(resolve => setTimeout(resolve, 40)).then(() => {
+                    events.should.eql([
+                        { name: 'created.txt', type: qiniu.sandbox.FilesystemEventType.CREATE },
+                        { name: 'written.txt', type: qiniu.sandbox.FilesystemEventType.WRITE }
+                    ]);
+                    return handle.stop();
+                });
+            }).then(() => {
+                if (watchResponse) {
+                    watchResponse.end();
+                }
+                return closeServer(fixture.server);
+            }, err => {
+                if (watchResponse) {
+                    watchResponse.end();
+                }
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects recursive directory watching on envd versions without support', function () {
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'sbx_old_watch',
+            envdUrl: 'http://127.0.0.1:9',
+            info: {
+                envdVersion: '0.1.3'
+            }
+        });
+
+        return sandbox.files.watchDir('/workspace', () => {}, {
+            recursive: true
+        }).then(() => {
+            throw new Error('expected watchDir to reject');
+        }, err => {
+            err.message.should.match(/recursive watching/i);
+        });
+    });
+
     it('runs commands and git operations through process RPC', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
@@ -965,6 +1060,119 @@ describe('test sandbox module', function () {
                     const body = JSON.parse(fixture.requests[0].body);
                     body.buildConfig.fromTemplate.should.eql('base-template');
                     body.buildConfig.steps[0].cmd.should.eql('echo child');
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('supports E2B style Template filesystem, env, package, and git helpers', function () {
+        return startServer((req, res) => {
+            res.statusCode = 201;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ templateID: 'tpl_helpers', buildID: 'bld_helpers' }));
+        }).then(fixture => {
+            return qiniu.sandbox.Template()
+                .fromImage('ubuntu:22.04')
+                .copyItems([
+                    { src: 'app.js', dest: '/app/', user: 'root', mode: 0o755 },
+                    { src: ['package.json', 'package-lock.json'], dest: '/app/' }
+                ])
+                .remove(['/tmp/cache', '/tmp/old'], { recursive: true, force: true, user: 'root' })
+                .rename('/tmp/a', '/tmp/b', { force: true })
+                .makeDir(['/app/data', '/app/logs'], { mode: 0o755 })
+                .makeSymlink('/usr/bin/node', '/usr/local/bin/node', { force: true, user: 'root' })
+                .setWorkdir('/app')
+                .setUser('node')
+                .setEnvs({ NODE_ENV: 'production', PORT: '8080' })
+                .pipInstall(['numpy', 'pandas'], { g: false })
+                .npmInstall('typescript', { dev: true })
+                .npmInstall('tsx', { g: true })
+                .bunInstall(['elysia'], { dev: true })
+                .aptInstall(['curl'], { noInstallRecommends: true, fixMissing: true })
+                .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', {
+                    branch: 'sandbox',
+                    depth: 1,
+                    user: 'root'
+                })
+                .runCmd(['echo one', 'echo two'], { user: 'root' })
+                .build({
+                    apiKey: 'sandbox-key',
+                    endpoint: fixture.endpoint,
+                    name: 'helper-template:test'
+                }).then(() => {
+                    const body = JSON.parse(fixture.requests[0].body);
+                    body.buildConfig.steps.should.eql([
+                        { type: 'COPY', args: ['app.js', '/app/', 'root', '0755'] },
+                        { type: 'COPY', args: ['package.json', '/app/', '', ''] },
+                        { type: 'COPY', args: ['package-lock.json', '/app/', '', ''] },
+                        { type: 'RUN', args: ['rm -r -f /tmp/cache /tmp/old', 'root'] },
+                        { type: 'RUN', args: ['mv /tmp/a /tmp/b -f'] },
+                        { type: 'RUN', args: ['mkdir -p -m 0755 /app/data /app/logs'] },
+                        { type: 'RUN', args: ['ln -s -f /usr/bin/node /usr/local/bin/node', 'root'] },
+                        { type: 'WORKDIR', args: ['/app'] },
+                        { type: 'USER', args: ['node'] },
+                        { type: 'ENV', args: ['NODE_ENV', 'production', 'PORT', '8080'] },
+                        { type: 'RUN', args: ['pip install --user numpy pandas'] },
+                        { type: 'RUN', args: ['npm install --save-dev typescript'] },
+                        { type: 'RUN', args: ['npm install -g tsx', 'root'] },
+                        { type: 'RUN', args: ['bun install --dev elysia'] },
+                        { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing curl', 'root'] },
+                        { type: 'RUN', args: ['git clone https://github.com/qiniu/nodejs-sdk.git --branch sandbox --single-branch --depth 1 /src/sdk', 'root'] },
+                        { type: 'RUN', args: ['echo one && echo two', 'root'] }
+                    ]);
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('supports Template registry, Dockerfile, and skipCache helpers', function () {
+        return startServer((req, res) => {
+            res.statusCode = 201;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ templateID: 'tpl_dockerfile', buildID: 'bld_dockerfile' }));
+        }).then(fixture => {
+            return qiniu.sandbox.Template()
+                .skipCache()
+                .fromImage('registry.example.com/private/app:latest', {
+                    username: 'alice',
+                    password: 'secret'
+                })
+                .runCmd('echo forced')
+                .fromDockerfile('FROM node:22\nWORKDIR /app\nENV NODE_ENV=production PORT=3000\nRUN npm ci\nCOPY package.json /app/\nUSER node')
+                .fromAWSRegistry('123456789.dkr.ecr.us-west-2.amazonaws.com/app:latest', {
+                    accessKeyId: 'ak',
+                    secretAccessKey: 'sk',
+                    region: 'us-west-2'
+                })
+                .fromGCPRegistry('gcr.io/project/app:latest', {
+                    serviceAccountJSON: { project_id: 'project' }
+                })
+                .build({
+                    apiKey: 'sandbox-key',
+                    endpoint: fixture.endpoint,
+                    name: 'dockerfile-template:test'
+                }).then(() => {
+                    const body = JSON.parse(fixture.requests[0].body);
+                    body.buildConfig.fromImage.should.eql('gcr.io/project/app:latest');
+                    body.buildConfig.fromImageRegistry.should.eql({
+                        type: 'gcp',
+                        serviceAccountJson: JSON.stringify({ project_id: 'project' })
+                    });
+                    body.buildConfig.force.should.eql(true);
+                    body.buildConfig.steps.should.eql([
+                        { type: 'RUN', args: ['echo forced'], force: true },
+                        { type: 'WORKDIR', args: ['/app'], force: true },
+                        { type: 'ENV', args: ['NODE_ENV', 'production', 'PORT', '3000'], force: true },
+                        { type: 'RUN', args: ['npm ci'], force: true },
+                        { type: 'COPY', args: ['package.json', '/app/', '', ''], force: true },
+                        { type: 'USER', args: ['node'], force: true }
+                    ]);
                 }).then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
                         throw err;
@@ -1939,6 +2147,169 @@ describe('test sandbox module', function () {
                     throw err;
                 });
             });
+        });
+    });
+
+    it('exports sandbox constants and typed helpers aligned with common runtime names', function () {
+        qiniu.sandbox.DEFAULT_SANDBOX_TIMEOUT_MS.should.eql(300000);
+        qiniu.sandbox.FileType.FILE.should.eql('file');
+        qiniu.sandbox.FileType.DIR.should.eql('dir');
+        qiniu.DEFAULT_SANDBOX_TIMEOUT_MS.should.eql(qiniu.sandbox.DEFAULT_SANDBOX_TIMEOUT_MS);
+        qiniu.FileType.should.equal(qiniu.sandbox.FileType);
+        new qiniu.sandbox.InvalidArgumentError('bad arg').name.should.eql('InvalidArgumentError');
+        new qiniu.sandbox.FileNotFoundError('missing').name.should.eql('FileNotFoundError');
+    });
+
+    it('supports instance connect and betaPause aliases', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'POST' && req.url === '/sandboxes/sbx_alias/connect') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                    sandboxID: 'sbx_alias',
+                    domain: 'alias.example.com',
+                    envdAccessToken: 'token2',
+                    envdVersion: '0.5.7'
+                }));
+                return;
+            }
+            if (req.method === 'POST' && req.url === '/sandboxes/sbx_alias/pause') {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_alias',
+                client: new qiniu.sandbox.SandboxClient({
+                    endpoint: fixture.endpoint,
+                    apiKey: 'sandbox-key'
+                }),
+                info: {}
+            });
+
+            return sandbox.connect({ timeoutMs: 30000 })
+                .then(connected => {
+                    connected.should.equal(sandbox);
+                    sandbox.envdAccessToken.should.eql('token2');
+                    sandbox.envdVersion.should.eql('0.5.7');
+                    sandbox.domain.should.eql('alias.example.com');
+                    return sandbox.betaPause();
+                })
+                .then(paused => {
+                    should(paused).equal(null);
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('supports commands.connect with E2B style command handle semantics', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Connect') {
+                const body = decodeConnectEnvelope(req.rawBody);
+                body.process.selector.pid.should.eql(55);
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: { pid: 55 } } }),
+                    encodeConnectEnvelope({ event: { data: { stdout: 'connected' } } }),
+                    encodeConnectEnvelope({ event: { end: { exitCode: 0 } } })
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_connect_cmd',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.connect(55, {
+                requestTimeoutMs: 9000
+            }).then(handle => {
+                handle.pid.should.eql(55);
+                return handle.wait();
+            }).then(result => {
+                result.stdout.should.eql('connected');
+                result.exitCode.should.eql(0);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('supports E2B style git option signatures for config and restore helpers', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                return Promise.resolve({ stdout: 'Alice\n', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.setConfig('user.name', 'Alice', {
+            path: '/repo',
+            scope: 'local'
+        }).then(() => git.getConfig('user.name', {
+            path: '/repo',
+            scope: 'local'
+        })).then(value => {
+            value.should.eql('Alice');
+            return git.configureUser('Alice', 'alice@example.com', {
+                path: '/repo',
+                scope: 'local'
+            });
+        }).then(() => git.reset('/repo', {
+            mode: 'hard',
+            target: 'HEAD~1',
+            paths: ['a.txt']
+        })).then(() => git.restore('/repo', {
+            paths: ['a.txt']
+        })).then(() => {
+            commandsSeen.map(item => item.cmd).should.eql([
+                'git config --local \'user.name\' \'Alice\'',
+                'git config --local --get \'user.name\'',
+                'git config --local \'user.name\' \'Alice\'',
+                'git config --local \'user.email\' \'alice@example.com\'',
+                'git reset --hard \'HEAD~1\' -- \'a.txt\'',
+                'git restore --worktree -- \'a.txt\''
+            ]);
+            commandsSeen.every(item => item.opts.cwd === '/repo').should.eql(true);
+        });
+    });
+
+    it('keeps legacy git configureUser repo path when delegating to config helpers', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.configureUser('/repo', 'Alice', 'alice@example.com', {
+            config: {
+                'http.version': 'HTTP/1.1'
+            }
+        }).then(result => {
+            result.exitCode.should.eql(0);
+            commandsSeen.map(item => item.cmd).should.eql([
+                'git -c \'http.version=HTTP/1.1\' config \'user.name\' \'Alice\'',
+                'git -c \'http.version=HTTP/1.1\' config \'user.email\' \'alice@example.com\''
+            ]);
+            commandsSeen.every(item => item.opts.cwd === '/repo').should.eql(true);
         });
     });
 });

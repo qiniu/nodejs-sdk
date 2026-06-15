@@ -28,6 +28,16 @@ runExample(() => {
             console.log('First template detail:', detail.templateID || detail.template_id || id);
         });
     }).then(() => {
+        const advanced = qiniu.sandbox.Template()
+            .fromDockerfile('FROM node:22\nWORKDIR /app\nENV NODE_ENV=production\nRUN npm ci')
+            .copyItems([{ src: 'package.json', dest: '/app/' }])
+            .setEnvs({ PORT: '3000' })
+            .npmInstall('tsx', { dev: true })
+            .pipInstall(undefined, { g: false })
+            .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', { depth: 1 })
+            .makeDir('/app/data')
+            .makeSymlink('/usr/bin/node', '/usr/local/bin/node', { force: true });
+        console.log('Advanced builder steps:', advanced.buildConfig.steps.length);
         return qiniu.sandbox.Template()
             .fromImage('ubuntu:22.04')
             .aptInstall(['curl', 'git'])

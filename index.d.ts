@@ -123,6 +123,20 @@ export declare namespace sandbox {
         symlinkTarget?: string;
     }
 
+    interface FilesystemEvent {
+        name: string;
+        type: 'create' | 'write' | 'remove' | 'rename' | 'chmod';
+    }
+
+    interface WatchOptions {
+        user?: string;
+        recursive?: boolean;
+        timeout?: number;
+        timeoutMs?: number;
+        requestTimeoutMs?: number;
+        onExit?: (err?: Error) => void | Promise<void>;
+    }
+
     interface CommandResult {
         pid?: number;
         exitCode: number;
@@ -152,6 +166,20 @@ export declare namespace sandbox {
         changedFiles: string[];
         untrackedFiles: string[];
         raw: string;
+    }
+
+    interface GitConfigOptions extends CommandOptions {
+        path?: string;
+        scope?: 'local' | 'global' | 'system';
+    }
+
+    interface TemplateCopyItem {
+        src: string | string[];
+        dest: string;
+        forceUpload?: true;
+        user?: string;
+        mode?: number;
+        resolveSymlinks?: boolean;
     }
 
     interface SnapshotInfo {
@@ -195,6 +223,11 @@ export declare namespace sandbox {
         remove(path: string, options?: {user?: string}): Promise<null>;
         rename(oldPath: string, newPath: string, options?: {user?: string}): Promise<EntryInfo>;
         move(oldPath: string, newPath: string, options?: {user?: string}): Promise<EntryInfo>;
+        watchDir(path: string, onEvent: (event: FilesystemEvent) => void | Promise<void>, options?: WatchOptions): Promise<WatchHandle>;
+    }
+
+    class WatchHandle {
+        stop(): Promise<void>;
     }
 
     class CommandHandle {
@@ -209,6 +242,7 @@ export declare namespace sandbox {
         run(command: string, options?: CommandOptions & {background?: false}): Promise<CommandResult>;
         run(command: string, options: CommandOptions & {background: true}): Promise<CommandHandle>;
         start(command: string, options?: CommandOptions): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandOptions): Promise<CommandHandle>;
         list(options?: {user?: string}): Promise<any[]>;
         sendStdin(pid: number, data: string | Buffer, options?: {user?: string}): Promise<null>;
         closeStdin(pid: number, options?: {user?: string}): Promise<null>;
@@ -228,13 +262,16 @@ export declare namespace sandbox {
         checkoutBranch(repoPath: string, branch: string, options?: CommandOptions): Promise<CommandResult>;
         deleteBranch(repoPath: string, branch: string, options?: CommandOptions & {force?: boolean}): Promise<CommandResult>;
         branches(repoPath: string, options?: CommandOptions): Promise<Array<{name: string; current: boolean}>>;
-        reset(repoPath: string, options?: CommandOptions & {hard?: boolean; soft?: boolean; mixed?: boolean; ref?: string}): Promise<CommandResult>;
+        reset(repoPath: string, options?: CommandOptions & {hard?: boolean; soft?: boolean; mixed?: boolean; ref?: string; mode?: 'soft' | 'mixed' | 'hard' | 'merge' | 'keep'; target?: string; paths?: string[]}): Promise<CommandResult>;
         restore(repoPath: string, options?: CommandOptions & {staged?: boolean; worktree?: boolean; source?: string; paths?: string[]; files?: string[]}): Promise<CommandResult>;
         remoteAdd(repoPath: string, name: string, repoUrl: string, options?: CommandOptions & {overwrite?: boolean; fetch?: boolean}): Promise<CommandResult | null>;
         remoteGet(repoPath: string, name: string, options?: CommandOptions): Promise<string | undefined>;
         setConfig(repoPath: string, key: string, value: string, options?: CommandOptions & {scope?: 'local' | 'global' | 'system'}): Promise<CommandResult>;
+        setConfig(key: string, value: string, options?: GitConfigOptions): Promise<CommandResult>;
         getConfig(repoPath: string, key: string, options?: CommandOptions & {scope?: 'local' | 'global' | 'system'}): Promise<string>;
+        getConfig(key: string, options?: GitConfigOptions): Promise<string>;
         configureUser(repoPath: string, name: string, email: string, options?: CommandOptions): Promise<CommandResult>;
+        configureUser(name: string, email: string, options?: GitConfigOptions): Promise<CommandResult>;
         dangerouslyAuthenticate(repoPath: string, remote: string, username: string, password: string, options?: CommandOptions): Promise<CommandResult>;
     }
 
@@ -247,6 +284,19 @@ export declare namespace sandbox {
     }
 
     const DEFAULT_ENDPOINT: string;
+    const DEFAULT_TEMPLATE: string;
+    const DEFAULT_SANDBOX_TIMEOUT_MS: number;
+    const FileType: {
+        FILE: 'file';
+        DIR: 'dir';
+    };
+    const FilesystemEventType: {
+        CREATE: 'create';
+        WRITE: 'write';
+        REMOVE: 'remove';
+        RENAME: 'rename';
+        CHMOD: 'chmod';
+    };
     const ALL_TRAFFIC: string;
 
     class SandboxError extends Error {
@@ -263,16 +313,36 @@ export declare namespace sandbox {
 
     class TimeoutError extends Error {}
     class NotImplementedError extends Error {}
+    class InvalidArgumentError extends Error {}
+    class NotFoundError extends Error {}
+    class FileNotFoundError extends Error {}
+    class SandboxNotFoundError extends Error {}
     class GitAuthError extends Error {}
     class GitUpstreamError extends Error {}
     class TemplateBuildError extends Error {}
 
     interface TemplateBuilder {
-        fromImage(image: string): this;
+        fromImage(image: string, credentials?: {username: string; password: string}): this;
+        fromAWSRegistry(image: string, credentials: {accessKeyId: string; secretAccessKey: string; region: string}): this;
+        fromGCPRegistry(image: string, credentials: {serviceAccountJSON: string | object}): this;
         fromTemplate(templateID: string): this;
-        aptInstall(packages: string | string[]): this;
-        runCmd(command: string): this;
-        copy(src: string, dest: string): this;
+        fromDockerfile(dockerfileContentOrPath: string): this;
+        aptInstall(packages: string | string[], options?: {noInstallRecommends?: boolean; fixMissing?: boolean}): this;
+        runCmd(command: string | string[], options?: {user?: string}): this;
+        copy(src: string | string[], dest: string, options?: {forceUpload?: true; user?: string; mode?: number; resolveSymlinks?: boolean}): this;
+        copyItems(items: TemplateCopyItem[]): this;
+        remove(path: string | string[], options?: {force?: boolean; recursive?: boolean; user?: string}): this;
+        rename(src: string, dest: string, options?: {force?: boolean; user?: string}): this;
+        makeDir(path: string | string[], options?: {mode?: number; user?: string}): this;
+        makeSymlink(src: string, dest: string, options?: {force?: boolean; user?: string}): this;
+        setWorkdir(workdir: string): this;
+        setUser(user: string): this;
+        pipInstall(packages?: string | string[], options?: {g?: boolean}): this;
+        npmInstall(packages?: string | string[], options?: {g?: boolean; dev?: boolean}): this;
+        bunInstall(packages?: string | string[], options?: {g?: boolean; dev?: boolean}): this;
+        gitClone(url: string, path?: string, options?: {branch?: string; depth?: number; user?: string}): this;
+        setEnvs(envs: {[key: string]: string}): this;
+        skipCache(): this;
         setStartCmd(command: string): this;
         setReadyCmd(command: string): this;
         build(options?: SandboxClientOptions & {client?: SandboxClient; name?: string; alias?: string; tags?: string[]}): Promise<any>;
@@ -377,6 +447,11 @@ export declare namespace sandbox {
         refresh(options?: {duration?: number}): Promise<null>;
         updateNetwork(network: any): Promise<any>;
         pause(): Promise<null>;
+        /**
+         * @deprecated use pause() instead
+         */
+        betaPause(): Promise<null>;
+        connect(options?: SandboxConnectOptions): Promise<this>;
         getInfo(): Promise<any>;
         getMetrics(options?: any): Promise<any>;
         getLogs(options?: any): Promise<any>;
@@ -401,6 +476,10 @@ export declare const Sandbox: typeof sandbox.Sandbox;
 export declare const SandboxClient: typeof sandbox.SandboxClient;
 export declare const SandboxPaginator: typeof sandbox.SandboxPaginator;
 export declare const SnapshotPaginator: typeof sandbox.SnapshotPaginator;
+export declare const DEFAULT_SANDBOX_TIMEOUT_MS: typeof sandbox.DEFAULT_SANDBOX_TIMEOUT_MS;
+export declare const FileType: typeof sandbox.FileType;
+export declare const FilesystemEventType: typeof sandbox.FilesystemEventType;
+export declare const WatchHandle: typeof sandbox.WatchHandle;
 export declare const CommandExitError: typeof sandbox.CommandExitError;
 export declare const SandboxError: typeof sandbox.SandboxError;
 

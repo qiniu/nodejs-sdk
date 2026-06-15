@@ -50,6 +50,59 @@ function configScopeArg (opts) {
     return null;
 }
 
+function pathFromOpts (opts) {
+    return opts && opts.path;
+}
+
+function normalizeConfigCall (args) {
+    if (typeof args[2] === 'object' && args[2] !== null) {
+        return {
+            repoPath: pathFromOpts(args[2]),
+            key: args[0],
+            value: args[1],
+            opts: Object.assign({}, args[2])
+        };
+    }
+    return {
+        repoPath: args[0],
+        key: args[1],
+        value: args[2],
+        opts: Object.assign({}, args[3] || {})
+    };
+}
+
+function normalizeGetConfigCall (args) {
+    if (typeof args[1] === 'object' && args[1] !== null) {
+        return {
+            repoPath: pathFromOpts(args[1]),
+            key: args[0],
+            opts: Object.assign({}, args[1])
+        };
+    }
+    return {
+        repoPath: args[0],
+        key: args[1],
+        opts: Object.assign({}, args[2] || {})
+    };
+}
+
+function normalizeConfigureUserCall (args) {
+    if (typeof args[2] === 'object' && args[2] !== null) {
+        return {
+            repoPath: pathFromOpts(args[2]),
+            name: args[0],
+            email: args[1],
+            opts: Object.assign({}, args[2])
+        };
+    }
+    return {
+        repoPath: args[0],
+        name: args[1],
+        email: args[2],
+        opts: Object.assign({}, args[3] || {})
+    };
+}
+
 Git.prototype._runGit = function (repoPath, args, opts) {
     opts = Object.assign({}, opts || {});
     if (repoPath) {
@@ -173,38 +226,41 @@ Git.prototype.remoteGet = function (repoPath, name, opts) {
         .then(result => result.exitCode ? undefined : result.stdout.trim());
 };
 
-Git.prototype.setConfig = function (repoPath, key, value, opts) {
+Git.prototype.setConfig = function () {
+    const normalized = normalizeConfigCall(arguments);
+    const opts = normalized.opts;
+    delete opts.path;
     const scope = configScopeArg(opts);
     const args = ['config'];
     if (scope) {
         args.push(scope);
     }
-    args.push(shellQuote(key), shellQuote(value));
-    return this._runGit(repoPath, args, opts);
+    args.push(shellQuote(normalized.key), shellQuote(normalized.value));
+    return this._runGit(normalized.repoPath, args, opts);
 };
 
-Git.prototype.getConfig = function (repoPath, key, opts) {
+Git.prototype.getConfig = function () {
+    const normalized = normalizeGetConfigCall(arguments);
+    const opts = normalized.opts;
+    delete opts.path;
     const scope = configScopeArg(opts);
     const args = ['config'];
     if (scope) {
         args.push(scope);
     }
-    args.push('--get', shellQuote(key));
-    return this._runGit(repoPath, args, opts)
+    args.push('--get', shellQuote(normalized.key));
+    return this._runGit(normalized.repoPath, args, opts)
         .then(result => result.stdout.trim());
 };
 
-Git.prototype.configureUser = function (repoPath, name, email, opts) {
-    return this._runGit(repoPath, [
-        'config',
-        'user.name',
-        shellQuote(name),
-        '&&',
-        'git',
-        'config',
-        'user.email',
-        shellQuote(email)
-    ], opts);
+Git.prototype.configureUser = function () {
+    const normalized = normalizeConfigureUserCall(arguments);
+    const opts = normalized.opts;
+    if (normalized.repoPath && opts.path === undefined) {
+        opts.path = normalized.repoPath;
+    }
+    return this.setConfig('user.name', normalized.name, opts)
+        .then(() => this.setConfig('user.email', normalized.email, opts));
 };
 
 Git.prototype.branches = function (repoPath, opts) {
@@ -220,15 +276,18 @@ Git.prototype.branches = function (repoPath, opts) {
 Git.prototype.reset = function (repoPath, opts) {
     opts = opts || {};
     const args = ['reset'];
-    if (opts.hard) {
-        args.push('--hard');
-    } else if (opts.soft) {
-        args.push('--soft');
-    } else if (opts.mixed) {
-        args.push('--mixed');
+    const mode = opts.mode || (opts.hard ? 'hard' : null) || (opts.soft ? 'soft' : null) || (opts.mixed ? 'mixed' : null);
+    if (mode) {
+        args.push(`--${mode}`);
     }
-    if (opts.ref) {
-        args.push(shellQuote(opts.ref));
+    const target = opts.target || opts.ref;
+    if (target) {
+        args.push(shellQuote(target));
+    }
+    const paths = opts.paths || opts.files || [];
+    if (paths.length) {
+        args.push('--');
+        paths.forEach(path => args.push(shellQuote(path)));
     }
     return this._runGit(repoPath, args, opts);
 };
@@ -236,11 +295,18 @@ Git.prototype.reset = function (repoPath, opts) {
 Git.prototype.restore = function (repoPath, opts) {
     opts = opts || {};
     const args = ['restore'];
-    if (opts.staged) {
-        args.push('--staged');
+    const staged = opts.staged;
+    let worktree = opts.worktree;
+    if (staged === undefined && worktree === undefined) {
+        worktree = true;
+    } else if (staged === true && worktree === undefined) {
+        worktree = false;
     }
-    if (opts.worktree) {
+    if (worktree) {
         args.push('--worktree');
+    }
+    if (staged) {
+        args.push('--staged');
     }
     if (opts.source) {
         args.push('--source', shellQuote(opts.source));

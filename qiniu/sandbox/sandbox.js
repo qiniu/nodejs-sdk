@@ -179,6 +179,15 @@ Sandbox.prototype.pause = function () {
     return this.client.pauseSandbox(this.sandboxId);
 };
 
+Sandbox.prototype.betaPause = Sandbox.prototype.pause;
+
+Sandbox.prototype.connect = function (opts) {
+    return this.client.connectSandbox(this.sandboxId, opts).then(info => {
+        this.updateInfo(info);
+        return this;
+    });
+};
+
 Sandbox.prototype.getInfo = function () {
     return this.client.getSandbox(this.sandboxId);
 };

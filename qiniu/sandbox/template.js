@@ -1,4 +1,5 @@
 const { SandboxClient } = require('./client');
+const fs = require('fs');
 
 function Template () {
     if (!(this instanceof Template)) {
@@ -7,27 +8,172 @@ function Template () {
     this.buildConfig = {
         steps: []
     };
+    this._forceNextLayer = false;
 }
 
-Template.prototype.fromImage = function (image) {
+Template.prototype.fromImage = function (image, credentials) {
     this.buildConfig.fromImage = image;
+    delete this.buildConfig.fromTemplate;
+    if (credentials) {
+        this.buildConfig.fromImageRegistry = {
+            type: 'registry',
+            username: credentials.username,
+            password: credentials.password
+        };
+    }
+    if (this._forceNextLayer) {
+        this.buildConfig.force = true;
+    }
+    return this;
+};
+
+Template.prototype.fromAWSRegistry = function (image, credentials) {
+    this.buildConfig.fromImage = image;
+    delete this.buildConfig.fromTemplate;
+    this.buildConfig.fromImageRegistry = {
+        type: 'aws',
+        awsAccessKeyId: credentials.accessKeyId,
+        awsSecretAccessKey: credentials.secretAccessKey,
+        awsRegion: credentials.region
+    };
+    if (this._forceNextLayer) {
+        this.buildConfig.force = true;
+    }
+    return this;
+};
+
+Template.prototype.fromGCPRegistry = function (image, credentials) {
+    this.buildConfig.fromImage = image;
+    delete this.buildConfig.fromTemplate;
+    const serviceAccountJSON = credentials.serviceAccountJSON;
+    this.buildConfig.fromImageRegistry = {
+        type: 'gcp',
+        serviceAccountJson: typeof serviceAccountJSON === 'string'
+            ? serviceAccountJSON
+            : JSON.stringify(serviceAccountJSON)
+    };
+    if (this._forceNextLayer) {
+        this.buildConfig.force = true;
+    }
     return this;
 };
 
 Template.prototype.fromTemplate = function (templateID) {
     this.buildConfig.fromTemplate = templateID;
+    delete this.buildConfig.fromImage;
+    delete this.buildConfig.fromImageRegistry;
+    if (this._forceNextLayer) {
+        this.buildConfig.force = true;
+    }
     return this;
 };
 
-Template.prototype.aptInstall = function (packages) {
-    this.buildConfig.steps.push({
-        type: 'apt',
-        packages: Array.isArray(packages) ? packages : [packages]
+function padOctal (value) {
+    let text = Number(value).toString(8);
+    while (text.length < 4) {
+        text = `0${text}`;
+    }
+    return text;
+}
+
+function asArray (value) {
+    return Array.isArray(value) ? value : [value];
+}
+
+function addStep (template, type, args, extra) {
+    const step = Object.assign({
+        type,
+        args: args.map(value => String(value))
+    }, extra || {});
+    if (template._forceNextLayer && step.force === undefined) {
+        step.force = true;
+    }
+    template.buildConfig.steps.push(step);
+    return template;
+}
+
+function runShellStep (template, command, options) {
+    const args = [Array.isArray(command) ? command.join(' && ') : command];
+    if (options && options.user) {
+        args.push(options.user);
+    }
+    return addStep(template, 'RUN', args);
+}
+
+function parseEnvArgs (value) {
+    const args = [];
+    const pattern = /([A-Za-z_][A-Za-z0-9_]*)=("[^"]*"|'[^']*'|\S+)/g;
+    let match;
+    while ((match = pattern.exec(value))) {
+        let envValue = match[2];
+        if (
+            (envValue[0] === '"' && envValue[envValue.length - 1] === '"') ||
+            (envValue[0] === '\'' && envValue[envValue.length - 1] === '\'')
+        ) {
+            envValue = envValue.slice(1, -1);
+        }
+        args.push(match[1], envValue);
+    }
+    return args;
+}
+
+Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
+    const content = fs.existsSync(dockerfileContentOrPath)
+        ? fs.readFileSync(dockerfileContentOrPath, 'utf8')
+        : dockerfileContentOrPath;
+    content.split(/\r?\n/).forEach(line => {
+        line = line.trim();
+        if (!line || line[0] === '#') {
+            return;
+        }
+        const match = line.match(/^([A-Z]+)\s+(.+)$/i);
+        if (!match) {
+            return;
+        }
+        const instruction = match[1].toUpperCase();
+        const rest = match[2].trim();
+        if (instruction === 'FROM') {
+            this.fromImage(rest.split(/\s+/)[0]);
+        } else if (instruction === 'RUN') {
+            this.runCmd(rest);
+        } else if (instruction === 'WORKDIR') {
+            this.setWorkdir(rest);
+        } else if (instruction === 'USER') {
+            this.setUser(rest);
+        } else if (instruction === 'ENV') {
+            const args = parseEnvArgs(rest);
+            if (args.length) {
+                addStep(this, 'ENV', args);
+            }
+        } else if (instruction === 'COPY' || instruction === 'ADD') {
+            const parts = rest.split(/\s+/);
+            if (parts.length >= 2) {
+                this.copy(parts.slice(0, -1), parts[parts.length - 1]);
+            }
+        }
     });
     return this;
 };
 
-Template.prototype.runCmd = function (cmd) {
+Template.prototype.aptInstall = function (packages, options) {
+    if (options) {
+        const packageList = asArray(packages);
+        return this.runCmd([
+            'apt-get update',
+            `DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y ${options.noInstallRecommends ? '--no-install-recommends ' : ''}${options.fixMissing ? '--fix-missing ' : ''}${packageList.join(' ')}`
+        ], { user: 'root' });
+    }
+    this.buildConfig.steps.push({
+        type: 'apt',
+        packages: asArray(packages)
+    });
+    return this;
+};
+
+Template.prototype.runCmd = function (cmd, options) {
+    if (Array.isArray(cmd) || options || this._forceNextLayer) {
+        return runShellStep(this, cmd, options);
+    }
     this.buildConfig.steps.push({
         type: 'run',
         cmd
@@ -35,12 +181,169 @@ Template.prototype.runCmd = function (cmd) {
     return this;
 };
 
-Template.prototype.copy = function (src, dest) {
+Template.prototype.copy = function (src, dest, options) {
+    if (Array.isArray(src) || options) {
+        asArray(src).forEach(item => {
+            const args = [
+                item,
+                dest,
+                options && options.user ? options.user : '',
+                options && options.mode ? padOctal(options.mode) : ''
+            ];
+            const extra = {};
+            if (options && options.forceUpload) {
+                extra.forceUpload = options.forceUpload;
+            }
+            if (options && options.resolveSymlinks !== undefined) {
+                extra.resolveSymlinks = options.resolveSymlinks;
+            }
+            addStep(this, 'COPY', args, extra);
+        });
+        return this;
+    }
     this.buildConfig.steps.push({
         type: 'copy',
         src,
         dest
     });
+    return this;
+};
+
+Template.prototype.copyItems = function (items) {
+    items.forEach(item => {
+        this.copy(item.src, item.dest, {
+            forceUpload: item.forceUpload,
+            user: item.user,
+            mode: item.mode,
+            resolveSymlinks: item.resolveSymlinks
+        });
+    });
+    return this;
+};
+
+Template.prototype.remove = function (path, options) {
+    options = options || {};
+    const args = ['rm'];
+    if (options.recursive) {
+        args.push('-r');
+    }
+    if (options.force) {
+        args.push('-f');
+    }
+    args.push.apply(args, asArray(path));
+    return this.runCmd(args.join(' '), { user: options.user });
+};
+
+Template.prototype.rename = function (src, dest, options) {
+    options = options || {};
+    const args = ['mv', src, dest];
+    if (options.force) {
+        args.push('-f');
+    }
+    return this.runCmd(args.join(' '), { user: options.user });
+};
+
+Template.prototype.makeDir = function (path, options) {
+    options = options || {};
+    const args = ['mkdir', '-p'];
+    if (options.mode) {
+        args.push(`-m ${padOctal(options.mode)}`);
+    }
+    args.push.apply(args, asArray(path));
+    return this.runCmd(args.join(' '), { user: options.user });
+};
+
+Template.prototype.makeSymlink = function (src, dest, options) {
+    options = options || {};
+    const args = ['ln', '-s'];
+    if (options.force) {
+        args.push('-f');
+    }
+    args.push(src, dest);
+    return this.runCmd(args.join(' '), { user: options.user });
+};
+
+Template.prototype.setWorkdir = function (workdir) {
+    return addStep(this, 'WORKDIR', [workdir]);
+};
+
+Template.prototype.setUser = function (user) {
+    return addStep(this, 'USER', [user]);
+};
+
+Template.prototype.pipInstall = function (packages, options) {
+    options = options || {};
+    const args = ['pip', 'install'];
+    if (options.g === false) {
+        args.push('--user');
+    }
+    if (packages) {
+        args.push.apply(args, asArray(packages));
+    } else {
+        args.push('.');
+    }
+    return this.runCmd(args.join(' '), { user: options.g === false ? undefined : 'root' });
+};
+
+Template.prototype.npmInstall = function (packages, options) {
+    options = options || {};
+    const args = ['npm', 'install'];
+    if (options.g) {
+        args.push('-g');
+    }
+    if (options.dev) {
+        args.push('--save-dev');
+    }
+    if (packages) {
+        args.push.apply(args, asArray(packages));
+    }
+    return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
+};
+
+Template.prototype.bunInstall = function (packages, options) {
+    options = options || {};
+    const args = ['bun', 'install'];
+    if (options.g) {
+        args.push('-g');
+    }
+    if (options.dev) {
+        args.push('--dev');
+    }
+    if (packages) {
+        args.push.apply(args, asArray(packages));
+    }
+    return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
+};
+
+Template.prototype.gitClone = function (url, path, options) {
+    options = options || {};
+    const args = ['git', 'clone', url];
+    if (options.branch) {
+        args.push('--branch', options.branch, '--single-branch');
+    }
+    if (options.depth) {
+        args.push('--depth', options.depth);
+    }
+    if (path) {
+        args.push(path);
+    }
+    return this.runCmd(args.join(' '), { user: options.user });
+};
+
+Template.prototype.setEnvs = function (envs) {
+    const keys = Object.keys(envs || {});
+    if (!keys.length) {
+        return this;
+    }
+    const args = [];
+    keys.forEach(key => {
+        args.push(key, envs[key]);
+    });
+    return addStep(this, 'ENV', args);
+};
+
+Template.prototype.skipCache = function () {
+    this._forceNextLayer = true;
     return this;
 };
 

@@ -170,6 +170,24 @@ Commands.prototype.list = function (opts) {
     });
 };
 
+Commands.prototype.connect = function (pid, opts) {
+    opts = opts || {};
+    return connectStreamRPC(this.sandbox, '/process.Process/Connect', {
+        process: {
+            selector: { pid }
+        }
+    }, {
+        user: opts.user,
+        keepalive: true,
+        timeout: requestTimeout(opts),
+        timeoutMs: requestTimeout(opts),
+        requestTimeoutMs: requestTimeout(opts)
+    }).then(events => {
+        const result = commandResultFromEvents(events, opts);
+        return new CommandHandle(this, result.pid || pid, result, opts);
+    });
+};
+
 Commands.prototype.sendStdin = function (pid, data, opts) {
     return connectRPC(this.sandbox, '/process.Process/SendInput', {
         process: {
