@@ -205,6 +205,14 @@ describe('test sandbox module', function () {
             apiKey: 'sandbox-key',
             accessKey: 'ak'
         })).should.throw(/Both accessKey and secretKey/);
+        const mac = new qiniu.auth.digest.Mac('ak', 'sk');
+        const clientWithMac = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key',
+            accessKey: 'ak',
+            mac
+        });
+        clientWithMac.mac.should.equal(mac);
 
         return client.listInjectionRules().then(() => {
             throw new Error('expected missing Qiniu credentials rejection');

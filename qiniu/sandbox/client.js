@@ -97,7 +97,7 @@ function normalizeSandboxListOptions (opts) {
 
 function normalizeClientOptions (opts) {
     opts = opts || {};
-    if ((opts.accessKey && !opts.secretKey) || (!opts.accessKey && opts.secretKey)) {
+    if (!opts.mac && ((opts.accessKey && !opts.secretKey) || (!opts.accessKey && opts.secretKey))) {
         throw new SandboxError('Both accessKey and secretKey must be provided');
     }
     const mac = opts.mac || (opts.accessKey || opts.secretKey
