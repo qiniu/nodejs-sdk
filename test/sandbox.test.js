@@ -2,6 +2,7 @@ const should = require('should');
 const http = require('http');
 const fs = require('fs');
 const stream = require('stream');
+const zlib = require('zlib');
 
 const qiniu = require('../index');
 
@@ -114,7 +115,9 @@ describe('test sandbox module', function () {
                 injections: [
                     {
                         type: 'qiniu',
-                        key: 'value'
+                        apiKey: 'ak',
+                        baseUrl: 'https://example.com',
+                        ruleId: 'rule_1'
                     }
                 ]
             }).then(ret => {
@@ -137,7 +140,9 @@ describe('test sandbox module', function () {
                     injections: [
                         {
                             type: 'qiniu',
-                            key: 'value'
+                            api_key: 'ak',
+                            base_url: 'https://example.com',
+                            ruleID: 'rule_1'
                         }
                     ]
                 });
@@ -1439,13 +1444,18 @@ describe('test sandbox module', function () {
                 .pipInstall({ g: false })
                 .npmInstall('typescript', { dev: true })
                 .npmInstall('tsx', { g: true })
+                .npmInstall({ dev: true })
                 .bunInstall(['elysia'], { dev: true })
-                .bunInstall(null, { g: true })
+                .bunInstall({ dev: true })
                 .aptInstall(['curl'], { noInstallRecommends: true, fixMissing: true })
                 .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk dir', {
                     branch: 'sandbox',
                     depth: 1,
                     user: 'root'
+                })
+                .gitClone('https://github.com/qiniu/nodejs-sdk.git', {
+                    branch: 'sandbox',
+                    depth: 1
                 })
                 .runCmd(['echo one', 'echo two'], { user: 'root' })
                 .build({
@@ -1469,10 +1479,12 @@ describe('test sandbox module', function () {
                         { type: 'RUN', args: ['pip install --user .'] },
                         { type: 'RUN', args: ['npm install --save-dev \'typescript\''] },
                         { type: 'RUN', args: ['npm install -g \'tsx\'', 'root'] },
+                        { type: 'RUN', args: ['npm install --save-dev'] },
                         { type: 'RUN', args: ['bun add --dev \'elysia\''] },
                         { type: 'run', cmd: 'bun install' },
                         { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing \'curl\'', 'root'] },
                         { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\' \'/src/sdk dir\'', 'root'] },
+                        { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\''] },
                         { type: 'RUN', args: ['echo one && echo two', 'root'] }
                     ]);
                 }).then(() => closeServer(fixture.server), err => {
@@ -3960,6 +3972,7 @@ describe('test sandbox module', function () {
                 req.headers['content-type'].should.eql('application/octet-stream');
                 req.headers['content-encoding'].should.eql('gzip');
                 parsed.searchParams.get('path').should.eql('/zip.txt');
+                zlib.gunzipSync(req.rawBody).toString().should.eql('0');
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify([{ name: 'zip.txt', path: '/zip.txt', type: 'file' }]));
@@ -3980,7 +3993,7 @@ describe('test sandbox module', function () {
             return sandbox.files.read('/zip.txt', { gzip: true })
                 .then(text => {
                     text.should.eql('zip');
-                    return sandbox.files.write('/zip.txt', 'zip', {
+                    return sandbox.files.write('/zip.txt', 0, {
                         gzip: true,
                         useOctetStream: true
                     });

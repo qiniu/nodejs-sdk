@@ -440,6 +440,10 @@ Template.prototype.pipInstall = function (packages, options) {
 };
 
 Template.prototype.npmInstall = function (packages, options) {
+    if (packages && typeof packages === 'object' && !Array.isArray(packages) && !Buffer.isBuffer(packages) && options === undefined) {
+        options = packages;
+        packages = undefined;
+    }
     options = options || {};
     const args = ['npm', 'install'];
     if (options.g) {
@@ -455,6 +459,10 @@ Template.prototype.npmInstall = function (packages, options) {
 };
 
 Template.prototype.bunInstall = function (packages, options) {
+    if (packages && typeof packages === 'object' && !Array.isArray(packages) && !Buffer.isBuffer(packages) && options === undefined) {
+        options = packages;
+        packages = undefined;
+    }
     options = options || {};
     if (packages) {
         const args = ['bun', 'add'];
@@ -467,14 +475,14 @@ Template.prototype.bunInstall = function (packages, options) {
         args.push.apply(args, asArray(packages).map(shellQuote));
         return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
     }
-    const args = ['bun', 'install'];
-    if (options.dev) {
-        args.push('--dev');
-    }
-    return this.runCmd(args.join(' '));
+    return this.runCmd('bun install');
 };
 
 Template.prototype.gitClone = function (url, path, options) {
+    if (path && typeof path === 'object' && !Array.isArray(path) && !Buffer.isBuffer(path) && options === undefined) {
+        options = path;
+        path = undefined;
+    }
     options = options || {};
     const args = ['git', 'clone', shellQuote(url)];
     if (options.branch) {

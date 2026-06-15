@@ -212,7 +212,7 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
         const headers = {
             'Content-Type': 'application/octet-stream'
         };
-        let content = Buffer.isBuffer(dataOrOpts) ? dataOrOpts : Buffer.from(String(dataOrOpts || ''));
+        let content = Buffer.isBuffer(dataOrOpts) ? dataOrOpts : Buffer.from(String(dataOrOpts !== undefined && dataOrOpts !== null ? dataOrOpts : ''));
         if (opts.gzip && supportsEncodedUpload) {
             headers['Content-Encoding'] = 'gzip';
             content = zlib.gzipSync(content);

@@ -34,7 +34,11 @@ function normalizeSandboxCreateOptions (opts) {
     copyDefined(body, opts, 'envVars');
     copyDefined(body, opts, 'envs', 'envVars');
     copyDefined(body, opts, 'mcp');
-    copyDefined(body, opts, 'injections');
+    if (Array.isArray(opts.injections)) {
+        body.injections = opts.injections.map(normalizeInjection);
+    } else {
+        copyDefined(body, opts, 'injections');
+    }
     copyDefined(body, opts, 'resources');
 
     return body;
