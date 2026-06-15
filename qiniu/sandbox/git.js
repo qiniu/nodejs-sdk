@@ -363,22 +363,9 @@ Git.prototype._runGitWithTemporaryAuth = function (repoPath, args, opts) {
     if (!opts.username && !opts.password) {
         return this._runGit(repoPath, args, opts);
     }
-    const remote = opts.remote || 'origin';
-    let originalUrl;
-    return this.remoteGet(repoPath, remote, opts).then(repoUrl => {
-        if (!repoUrl) {
-            throw new GitUpstreamError(`Remote ${remote} does not exist`);
-        }
-        originalUrl = repoUrl;
-        return this._runGit(repoPath, ['remote', 'set-url', shellQuote(remote), shellQuote(authUrl(repoUrl, opts))], opts);
-    }).then(() => this._runGit(repoPath, args, opts))
-        .then(result => this._runGit(repoPath, ['remote', 'set-url', shellQuote(remote), shellQuote(stripAuth(originalUrl))], opts)
-            .then(() => result), err => this._runGit(repoPath, ['remote', 'set-url', shellQuote(remote), shellQuote(stripAuth(originalUrl))], opts)
-            .then(() => {
-                throw err;
-            }, () => {
-                throw err;
-            }));
+    const runOpts = gitCredentialOptions(opts);
+    const authArgs = credentialHelperArgs(runOpts).concat(args);
+    return this._runGit(repoPath, authArgs, runOpts);
 };
 
 function parseGitStatus (stdout) {

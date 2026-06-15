@@ -218,7 +218,7 @@ SandboxClient.prototype.createSandbox = function (opts) {
 };
 
 SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
-    const ids = Array.isArray(sandboxIDs) ? sandboxIDs : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs)) || [];
+    const ids = Array.isArray(sandboxIDs) ? sandboxIDs : (typeof sandboxIDs === 'string' ? [sandboxIDs] : (sandboxIDs && (sandboxIDs.sandbox_ids || sandboxIDs.sandboxIDs)) || []);
     return this._request('GET', appendQuery('/sandboxes/metrics', { sandbox_ids: ids }));
 };
 

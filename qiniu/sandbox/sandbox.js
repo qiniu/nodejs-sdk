@@ -245,9 +245,10 @@ Sandbox.prototype.getMcpToken = function () {
     this._mcpTokenPromise = this.files.read('/etc/mcp-gateway/.token', {
         user: 'root'
     }).then(token => {
-        this.mcpToken = token;
+        const trimmedToken = typeof token === 'string' ? token.trim() : token;
+        this.mcpToken = trimmedToken;
         this._mcpTokenPromise = null;
-        return token;
+        return trimmedToken;
     }, err => {
         this._mcpTokenPromise = null;
         throw err;

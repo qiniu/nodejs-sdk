@@ -1,4 +1,4 @@
-const { connectEndStreamError, connectRPC, envdHeaders } = require('./envd');
+const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
 const { SandboxError } = require('./errors');
 const { parseRequestUrl, rawRequest } = require('./util');
 const { Readable } = require('stream');
@@ -266,7 +266,8 @@ Filesystem.prototype.list = function (path, opts) {
 
 Filesystem.prototype.exists = function (path, opts) {
     return this.getInfo(path, opts).then(() => true, err => {
-        if (err.response && err.response.statusCode === 404) {
+        const resp = err.response || err.resp;
+        if (resp && resp.statusCode === 404) {
             return false;
         }
         throw err;
@@ -389,6 +390,11 @@ function watchDir (sandbox, path, onEvent, opts) {
                 while (responseBuffer.length >= 5) {
                     const flags = responseBuffer[0];
                     const length = responseBuffer.readUInt32BE(1);
+                    if (length > MAX_CONNECT_ENVELOPE_BYTES) {
+                        fail(new SandboxError(`Sandbox envd stream envelope too large: ${length}`));
+                        req.destroy();
+                        return;
+                    }
                     if (responseBuffer.length < 5 + length) {
                         break;
                     }

@@ -149,6 +149,52 @@ function joinDockerfileLines (content) {
     return lines;
 }
 
+function splitDockerfileArgs (value) {
+    const args = [];
+    let current = '';
+    let quote = '';
+    let escape = false;
+    for (let i = 0; i < value.length; i += 1) {
+        const ch = value[i];
+        if (escape) {
+            current += ch;
+            escape = false;
+            continue;
+        }
+        if (ch === '\\') {
+            escape = true;
+            continue;
+        }
+        if (quote) {
+            if (ch === quote) {
+                quote = '';
+            } else {
+                current += ch;
+            }
+            continue;
+        }
+        if (ch === '"' || ch === '\'') {
+            quote = ch;
+            continue;
+        }
+        if (/\s/.test(ch)) {
+            if (current) {
+                args.push(current);
+                current = '';
+            }
+            continue;
+        }
+        current += ch;
+    }
+    if (escape) {
+        current += '\\';
+    }
+    if (current) {
+        args.push(current);
+    }
+    return args;
+}
+
 Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
     const isPath = typeof dockerfileContentOrPath === 'string' &&
         dockerfileContentOrPath.length < 1024 &&
@@ -183,7 +229,7 @@ Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
                 addStep(this, 'ENV', args);
             }
         } else if (instruction === 'COPY' || instruction === 'ADD') {
-            const parts = rest.split(/\s+/);
+            const parts = splitDockerfileArgs(rest);
             if (parts.length >= 2) {
                 this.copy(parts.slice(0, -1), parts[parts.length - 1]);
             }

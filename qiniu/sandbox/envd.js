@@ -1,5 +1,7 @@
 const { basicAuth, parseJSON, rawRequest } = require('./util');
 
+const MAX_CONNECT_ENVELOPE_BYTES = 10 * 1024 * 1024;
+
 function envdHeaders (sandbox, user) {
     const headers = {
         Authorization: basicAuth(user)
@@ -66,6 +68,9 @@ function decodeConnectEnvelopes (data) {
         const flags = data[offset];
         const length = data.readUInt32BE(offset + 1);
         offset += 5;
+        if (length > MAX_CONNECT_ENVELOPE_BYTES) {
+            throw new Error(`Sandbox envd stream envelope too large: ${length}`);
+        }
         if (offset + length > data.length) {
             break;
         }
@@ -126,3 +131,4 @@ exports.connectRPC = connectRPC;
 exports.connectStreamRPC = connectStreamRPC;
 exports.connectEndStreamError = connectEndStreamError;
 exports.envdHeaders = envdHeaders;
+exports.MAX_CONNECT_ENVELOPE_BYTES = MAX_CONNECT_ENVELOPE_BYTES;

@@ -69,6 +69,13 @@ function encodeConnectEndEnvelope (message) {
     return encodeRawConnectEnvelope(JSON.stringify(message || {}), 2);
 }
 
+function encodeOversizedConnectHeader () {
+    const header = Buffer.alloc(5);
+    header[0] = 0;
+    header.writeUInt32BE(10 * 1024 * 1024 + 1, 1);
+    return header;
+}
+
 describe('test sandbox module', function () {
     it('creates sandbox with E2B compatible options and API key auth', function () {
         return startServer((req, res) => {
@@ -151,10 +158,12 @@ describe('test sandbox module', function () {
 
         return client.listSandboxes()
             .then(() => client.getSandboxesMetrics())
+            .then(() => client.getSandboxesMetrics('sbx_one'))
             .then(() => {
                 urls.should.eql([
                     'http://sandbox.test/sandboxes',
-                    'http://sandbox.test/sandboxes/metrics?sandbox_ids='
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=',
+                    'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_one'
                 ]);
             });
     });
@@ -682,6 +691,22 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('returns false from exists for err.resp 404 responses', function () {
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'sbx_exists_resp',
+            envdUrl: 'http://127.0.0.1:9',
+            info: {}
+        });
+        sandbox.files.getInfo = function () {
+            const err = new Error('missing');
+            err.resp = { statusCode: 404 };
+            return Promise.reject(err);
+        };
+        return sandbox.files.exists('/missing').then(exists => {
+            exists.should.eql(false);
+        });
+    });
+
     it('rejects malformed filesystem watch stream payloads', function () {
         return startServer((req, res) => {
             if (req.url === '/filesystem.Filesystem/WatchDir') {
@@ -716,6 +741,40 @@ describe('test sandbox module', function () {
                 return new Promise(resolve => setTimeout(resolve, 20));
             }).then(() => {
                 handle._stopped.should.eql(true);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects oversized filesystem watch stream envelopes', function () {
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeOversizedConnectHeader());
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_huge',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', () => {}, {
+                recursive: true
+            }).then(() => {
+                throw new Error('expected watchDir to reject oversized frame');
+            }, err => {
+                err.message.should.containEql('envelope too large');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
@@ -1278,11 +1337,12 @@ describe('test sandbox module', function () {
 
     it('joins Dockerfile lines continued with backslash before parsing', function () {
         const template = qiniu.sandbox.Template()
-            .fromDockerfile('FROM ubuntu:22.04\nRUN apt-get update && \\\n    apt-get install -y curl\nENV FOO=bar \\\n    BAZ=qux\nENV PORT 3000');
+            .fromDockerfile('FROM ubuntu:22.04\nRUN apt-get update && \\\n    apt-get install -y curl\nENV FOO=bar \\\n    BAZ=qux\nENV PORT 3000\nCOPY "file name.txt" "/app/data dir/"');
         template.buildConfig.steps.should.eql([
             { type: 'run', cmd: 'apt-get update &&  apt-get install -y curl' },
             { type: 'ENV', args: ['FOO', 'bar', 'BAZ', 'qux'] },
-            { type: 'ENV', args: ['PORT', '3000'] }
+            { type: 'ENV', args: ['PORT', '3000'] },
+            { type: 'COPY', args: ['file name.txt', '/app/data dir/', '', ''] }
         ]);
     });
 
@@ -1699,6 +1759,37 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('rejects oversized command stream envelopes', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeOversizedConnectHeader());
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_huge',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('echo huge').then(() => {
+                throw new Error('expected command stream to reject oversized frame');
+            }, err => {
+                err.message.should.containEql('envelope too large');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('fails watchDir on Connect end-stream errors after start', function () {
         let exitError;
         return startServer((req, res) => {
@@ -1837,18 +1928,12 @@ describe('test sandbox module', function () {
             });
     });
 
-    it('cleans temporary git credentials when push fails', function () {
+    it('passes git push credentials through a helper when push fails', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
             run: function (cmd, opts) {
                 commandsSeen.push({ cmd, opts });
-                if (cmd.indexOf('remote get-url') >= 0) {
-                    return Promise.resolve({
-                        stdout: 'https://github.com/acme/repo.git\n',
-                        exitCode: 0
-                    });
-                }
-                if (cmd.indexOf('git push') >= 0) {
+                if (cmd.indexOf(' push ') >= 0) {
                     return Promise.reject(new Error('push failed'));
                 }
                 return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
@@ -1864,12 +1949,40 @@ describe('test sandbox module', function () {
             throw new Error('expected git push to fail');
         }, err => {
             err.message.should.eql('push failed');
-            commandsSeen.map(item => item.cmd).should.eql([
-                'git remote get-url \'origin\'',
-                'git remote set-url \'origin\' \'https://u:p@github.com/acme/repo.git\'',
-                'git push \'origin\' \'main\'',
-                'git remote set-url \'origin\' \'https://github.com/acme/repo.git\''
-            ]);
+            commandsSeen.length.should.eql(1);
+            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.containEql('push \'origin\' \'main\'');
+            commandsSeen[0].cmd.should.not.containEql('u:p');
+            commandsSeen[0].opts.envs.should.eql({
+                GIT_USERNAME: 'u',
+                GIT_PASSWORD: 'p'
+            });
+        });
+    });
+
+    it('passes git pull credentials through a helper without rewriting remotes', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.pull('/repo', {
+            username: 'u',
+            password: 'p',
+            remote: 'origin',
+            branch: 'main'
+        }).then(() => {
+            commandsSeen.length.should.eql(1);
+            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.containEql('pull \'origin\' \'main\'');
+            commandsSeen[0].cmd.should.not.containEql('u:p');
+            commandsSeen[0].opts.envs.should.eql({
+                GIT_USERNAME: 'u',
+                GIT_PASSWORD: 'p'
+            });
         });
     });
 
@@ -1939,27 +2052,26 @@ describe('test sandbox module', function () {
         }
     });
 
-    it('surfaces git upstream and validation errors on auth helpers', function () {
+    it('surfaces git auth and validation errors on auth helpers', function () {
         const git = new qiniu.sandbox.Git({
             run: function () {
                 return Promise.resolve({ stdout: '', stderr: '', exitCode: 1 });
             }
         });
 
-        return git.push('/repo', {
-            username: 'u',
-            password: 'p'
-        }).then(() => {
+        try {
+            git.push('/repo', {
+                username: 'u'
+            });
+            throw new Error('expected missing password');
+        } catch (err) {
+            err.name.should.eql('GitAuthError');
+        }
+
+        return git.dangerouslyAuthenticate('/repo', 'origin', 'u', 'p').then(() => {
             throw new Error('expected missing upstream');
         }, err => {
             err.name.should.eql('GitUpstreamError');
-            return git.clone('https://github.com/acme/repo.git', '/repo', {
-                username: 'u'
-            });
-        }).then(() => {
-            throw new Error('expected missing password');
-        }, err => {
-            err.name.should.eql('GitAuthError');
             return git.commit('/repo', 'msg', {
                 authorName: 'Alice'
             });
@@ -1970,22 +2082,13 @@ describe('test sandbox module', function () {
         });
     });
 
-    it('keeps original git push error when credential cleanup fails', function () {
+    it('keeps original git push error without credential cleanup', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
             run: function (cmd, opts) {
                 commandsSeen.push({ cmd, opts });
-                if (cmd.indexOf('remote get-url') >= 0) {
-                    return Promise.resolve({
-                        stdout: 'https://github.com/acme/repo.git\n',
-                        exitCode: 0
-                    });
-                }
-                if (cmd.indexOf('git push') >= 0) {
+                if (cmd.indexOf(' push ') >= 0) {
                     return Promise.reject(new Error('push failed'));
-                }
-                if (cmd.indexOf('remote set-url') >= 0 && commandsSeen.length > 3) {
-                    return Promise.reject(new Error('cleanup failed'));
                 }
                 return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
             }
@@ -2000,12 +2103,10 @@ describe('test sandbox module', function () {
             throw new Error('expected git push to fail');
         }, err => {
             err.message.should.eql('push failed');
-            commandsSeen.map(item => item.cmd).should.eql([
-                'git remote get-url \'origin\'',
-                'git remote set-url \'origin\' \'https://u:p@github.com/acme/repo.git\'',
-                'git push \'origin\' \'main\'',
-                'git remote set-url \'origin\' \'https://github.com/acme/repo.git\''
-            ]);
+            commandsSeen.length.should.eql(1);
+            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.containEql('push \'origin\' \'main\'');
+            commandsSeen[0].cmd.should.not.containEql('remote set-url');
         });
     });
 
@@ -2456,7 +2557,7 @@ describe('test sandbox module', function () {
                 tokenReads += 1;
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'text/plain');
-                res.end('mcp-token');
+                res.end('mcp-token\n');
                 return;
             }
             res.statusCode = 404;
@@ -2655,6 +2756,40 @@ describe('test sandbox module', function () {
             }, err => {
                 err.message.should.eql('pty failed');
                 err.code.should.eql('internal');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects oversized PTY stream envelopes', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeOversizedConnectHeader());
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_huge',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24
+            }).then(() => {
+                throw new Error('expected pty stream to reject oversized frame');
+            }, err => {
+                err.message.should.containEql('envelope too large');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;

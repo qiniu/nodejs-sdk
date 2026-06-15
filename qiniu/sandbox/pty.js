@@ -1,4 +1,4 @@
-const { connectEndStreamError, connectRPC, envdHeaders } = require('./envd');
+const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
 const { parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
@@ -160,6 +160,11 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 while (responseBuffer.length >= 5) {
                     const flags = responseBuffer[0];
                     const length = responseBuffer.readUInt32BE(1);
+                    if (length > MAX_CONNECT_ENVELOPE_BYTES) {
+                        fail(new Error(`Sandbox envd stream envelope too large: ${length}`));
+                        req.destroy();
+                        return;
+                    }
                     if (responseBuffer.length < 5 + length) {
                         break;
                     }
