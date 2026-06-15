@@ -1566,6 +1566,15 @@ describe('test sandbox module', function () {
         ]);
     });
 
+    it('does not continue Dockerfile lines with escaped trailing backslashes', function () {
+        const template = qiniu.sandbox.Template()
+            .fromDockerfile('FROM node:22\nRUN echo \\\\\nRUN echo next');
+        template.buildConfig.steps.should.eql([
+            { type: 'run', cmd: 'echo \\\\' },
+            { type: 'run', cmd: 'echo next' }
+        ]);
+    });
+
     it('does not merge Dockerfile comments or blank lines that end with backslash', function () {
         const template = qiniu.sandbox.Template()
             .fromDockerfile('FROM node:22\n# ignored comment \\\nRUN echo ok\n\nRUN echo next');
@@ -2365,6 +2374,40 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('rejects command wait when the live Connect stream ends before process end', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeConnectEnvelope({ event: { start: { pid: 84 } } }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_cmd_missing_end',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.start('echo bad').then(handle => {
+                handle.pid.should.eql(84);
+                return handle.wait();
+            }).then(() => {
+                throw new Error('expected command wait to reject');
+            }, err => {
+                err.message.should.eql('Command stream ended before process end');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('uses configured HTTP agents for live envd streams', function () {
         const agent = new http.Agent();
         const requestsThroughAgent = [];
@@ -2977,6 +3020,25 @@ describe('test sandbox module', function () {
                     throw err;
                 });
             });
+        });
+    });
+
+    it('does not retry programming errors while polling', function () {
+        let calls = 0;
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'sbx_programming_error',
+            info: {}
+        });
+        sandbox.getInfo = function () {
+            calls += 1;
+            return Promise.reject(new TypeError('bad poll logic'));
+        };
+
+        return sandbox.waitForReady({ intervalMs: 1, timeoutMs: 100 }).then(() => {
+            throw new Error('expected waitForReady to fail');
+        }, err => {
+            err.message.should.eql('bad poll logic');
+            calls.should.eql(1);
         });
     });
 
@@ -3640,6 +3702,43 @@ describe('test sandbox module', function () {
                 throw new Error('expected pty wait to reject');
             }, err => {
                 err.message.should.eql('Sandbox envd stream truncated unexpectedly');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('rejects PTY wait when the live Connect stream ends before process end', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeConnectEnvelope({ event: { start: { pid: 47 } } }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_missing_end',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.create({
+                cols: 80,
+                rows: 24
+            }).then(handle => {
+                handle.pid.should.eql(47);
+                return handle.wait();
+            }).then(() => {
+                throw new Error('expected pty wait to reject');
+            }, err => {
+                err.message.should.eql('PTY stream ended before process end');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;

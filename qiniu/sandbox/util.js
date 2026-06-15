@@ -79,7 +79,10 @@ function poll (fn, opts, done) {
         }, err => {
             const statusCode = (err.response && err.response.statusCode) || (err.resp && err.resp.statusCode);
             const fatalClientError = statusCode >= 400 && statusCode < 500 && statusCode !== 408 && statusCode !== 429;
-            if (fatalClientError || Date.now() - startedAt >= timeout) {
+            const programmingError = err instanceof TypeError ||
+                err instanceof ReferenceError ||
+                err instanceof SyntaxError;
+            if (fatalClientError || programmingError || Date.now() - startedAt >= timeout) {
                 throw err;
             }
             return new Promise(resolve => setTimeout(resolve, interval)).then(tick);

@@ -204,7 +204,8 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                     return;
                 }
                 if (result.exitCode === -1) {
-                    result.exitCode = 0;
+                    fail(new Error('PTY stream ended before process end'));
+                    return;
                 }
                 resolveWait(result);
             });

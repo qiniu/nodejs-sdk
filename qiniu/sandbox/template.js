@@ -150,7 +150,8 @@ function joinDockerfileLines (content) {
             lines.push(line);
             return;
         }
-        if (line.charAt(line.length - 1) === '\\') {
+        const trailingBackslashes = (line.match(/\\+$/) || [''])[0].length;
+        if (trailingBackslashes % 2 === 1) {
             current += line.slice(0, -1) + ' ';
             return;
         }

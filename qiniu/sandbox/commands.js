@@ -343,7 +343,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                     return;
                 }
                 if (result.exitCode === -1) {
-                    finish({ exitCode: 0 });
+                    fail(new Error('Command stream ended before process end'));
                 }
             });
         });
