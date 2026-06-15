@@ -1080,10 +1080,10 @@ describe('test sandbox module', function () {
                     { src: 'app.js', dest: '/app/', user: 'root', mode: 0o755 },
                     { src: ['package.json', 'package-lock.json'], dest: '/app/' }
                 ])
-                .remove(['/tmp/cache', '/tmp/old'], { recursive: true, force: true, user: 'root' })
-                .rename('/tmp/a', '/tmp/b', { force: true })
-                .makeDir(['/app/data', '/app/logs'], { mode: 0o755 })
-                .makeSymlink('/usr/bin/node', '/usr/local/bin/node', { force: true, user: 'root' })
+                .remove(['/tmp/cache dir', '/tmp/old'], { recursive: true, force: true, user: 'root' })
+                .rename('/tmp/a file', '/tmp/b file', { force: true })
+                .makeDir(['/app/data dir', '/app/logs'], { mode: 0o755 })
+                .makeSymlink('/usr/bin/node', '/usr/local/bin/node link', { force: true, user: 'root' })
                 .setWorkdir('/app')
                 .setUser('node')
                 .setEnvs({ NODE_ENV: 'production', PORT: '8080' })
@@ -1092,7 +1092,7 @@ describe('test sandbox module', function () {
                 .npmInstall('tsx', { g: true })
                 .bunInstall(['elysia'], { dev: true })
                 .aptInstall(['curl'], { noInstallRecommends: true, fixMissing: true })
-                .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', {
+                .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk dir', {
                     branch: 'sandbox',
                     depth: 1,
                     user: 'root'
@@ -1108,19 +1108,19 @@ describe('test sandbox module', function () {
                         { type: 'COPY', args: ['app.js', '/app/', 'root', '0755'] },
                         { type: 'COPY', args: ['package.json', '/app/', '', ''] },
                         { type: 'COPY', args: ['package-lock.json', '/app/', '', ''] },
-                        { type: 'RUN', args: ['rm -r -f /tmp/cache /tmp/old', 'root'] },
-                        { type: 'RUN', args: ['mv /tmp/a /tmp/b -f'] },
-                        { type: 'RUN', args: ['mkdir -p -m 0755 /app/data /app/logs'] },
-                        { type: 'RUN', args: ['ln -s -f /usr/bin/node /usr/local/bin/node', 'root'] },
+                        { type: 'RUN', args: ['rm -r -f \'/tmp/cache dir\' \'/tmp/old\'', 'root'] },
+                        { type: 'RUN', args: ['mv \'/tmp/a file\' \'/tmp/b file\' -f'] },
+                        { type: 'RUN', args: ['mkdir -p -m 0755 \'/app/data dir\' \'/app/logs\''] },
+                        { type: 'RUN', args: ['ln -s -f \'/usr/bin/node\' \'/usr/local/bin/node link\'', 'root'] },
                         { type: 'WORKDIR', args: ['/app'] },
                         { type: 'USER', args: ['node'] },
                         { type: 'ENV', args: ['NODE_ENV', 'production', 'PORT', '8080'] },
-                        { type: 'RUN', args: ['pip install --user numpy pandas'] },
-                        { type: 'RUN', args: ['npm install --save-dev typescript'] },
-                        { type: 'RUN', args: ['npm install -g tsx', 'root'] },
-                        { type: 'RUN', args: ['bun install --dev elysia'] },
-                        { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing curl', 'root'] },
-                        { type: 'RUN', args: ['git clone https://github.com/qiniu/nodejs-sdk.git --branch sandbox --single-branch --depth 1 /src/sdk', 'root'] },
+                        { type: 'RUN', args: ['pip install --user \'numpy\' \'pandas\''] },
+                        { type: 'RUN', args: ['npm install --save-dev \'typescript\''] },
+                        { type: 'RUN', args: ['npm install -g \'tsx\'', 'root'] },
+                        { type: 'RUN', args: ['bun install --dev \'elysia\''] },
+                        { type: 'RUN', args: ['apt-get update && DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y --no-install-recommends --fix-missing \'curl\'', 'root'] },
+                        { type: 'RUN', args: ['git clone \'https://github.com/qiniu/nodejs-sdk.git\' --branch \'sandbox\' --single-branch --depth \'1\' \'/src/sdk dir\'', 'root'] },
                         { type: 'RUN', args: ['echo one && echo two', 'root'] }
                     ]);
                 }).then(() => closeServer(fixture.server), err => {
@@ -1434,8 +1434,12 @@ describe('test sandbox module', function () {
                 return sandbox.commands.list();
             }).then(list => {
                 list[0].cwd.should.eql('/w');
-                return sandbox.commands.sendStdin(12, 'hello');
-            }).then(() => sandbox.commands.closeStdin(12))
+                return sandbox.commands.sendStdin(12, Buffer.from('hello'));
+            }).then(() => {
+                const sendStdinBody = JSON.parse(fixture.requests[3].body);
+                sendStdinBody.input.stdin.should.eql(Buffer.from('hello').toString('base64'));
+                return sandbox.commands.closeStdin(12);
+            })
                 .then(() => sandbox.commands.kill(12))
                 .then(() => handleGitAndPty(git, pty, commandsSeen))
                 .then(() => closeServer(fixture.server), err => {

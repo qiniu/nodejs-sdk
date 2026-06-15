@@ -101,6 +101,37 @@ function rawRequest (requestUrl, options) {
     });
 }
 
+function parseRequestUrl (requestUrl) {
+    const match = String(requestUrl).match(/^(https?:)\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/);
+    if (!match) {
+        throw new SandboxError(`Invalid request URL: ${requestUrl}`);
+    }
+
+    const host = match[2];
+    let hostname = host;
+    let port = '';
+    if (host.charAt(0) === '[') {
+        const end = host.indexOf(']');
+        hostname = host.slice(1, end);
+        if (host.charAt(end + 1) === ':') {
+            port = host.slice(end + 2);
+        }
+    } else {
+        const colon = host.lastIndexOf(':');
+        if (colon > 0 && host.indexOf(':') === colon) {
+            hostname = host.slice(0, colon);
+            port = host.slice(colon + 1);
+        }
+    }
+
+    return {
+        protocol: match[1],
+        hostname,
+        port,
+        path: (match[3] || '/') + (match[4] || '')
+    };
+}
+
 function parseJSON (data) {
     if (Buffer.isBuffer(data)) {
         data = data.toString();
@@ -125,5 +156,6 @@ exports.poll = poll;
 exports.basicAuth = basicAuth;
 exports.fileSignature = fileSignature;
 exports.rawRequest = rawRequest;
+exports.parseRequestUrl = parseRequestUrl;
 exports.parseJSON = parseJSON;
 exports.shellQuote = shellQuote;

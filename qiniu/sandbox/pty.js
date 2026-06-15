@@ -1,5 +1,6 @@
 const { connectRPC } = require('./envd');
 const { envdHeaders } = require('./envd');
+const { parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
 
@@ -59,7 +60,7 @@ LivePtyHandle.prototype.disconnect = function () {
 function connectLivePty (sandbox, procedure, body, opts, pty) {
     opts = opts || {};
     return new Promise((resolve, reject) => {
-        const target = new URL(sandbox.envdUrl() + procedure);
+        const target = parseRequestUrl(sandbox.envdUrl() + procedure);
         const transport = target.protocol === 'https:' ? https : http;
         const headers = Object.assign({
             'Content-Type': 'application/connect+json',
@@ -70,7 +71,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             protocol: target.protocol,
             hostname: target.hostname,
             port: target.port,
-            path: target.pathname + target.search,
+            path: target.path,
             headers
         });
 

@@ -1,4 +1,5 @@
 const { SandboxClient } = require('./client');
+const { shellQuote } = require('./util');
 const fs = require('fs');
 
 function Template () {
@@ -157,7 +158,7 @@ Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
 
 Template.prototype.aptInstall = function (packages, options) {
     if (options) {
-        const packageList = asArray(packages);
+        const packageList = asArray(packages).map(shellQuote);
         return this.runCmd([
             'apt-get update',
             `DEBIAN_FRONTEND=noninteractive DEBCONF_NOWARNINGS=yes apt-get install -y ${options.noInstallRecommends ? '--no-install-recommends ' : ''}${options.fixMissing ? '--fix-missing ' : ''}${packageList.join(' ')}`
@@ -230,13 +231,13 @@ Template.prototype.remove = function (path, options) {
     if (options.force) {
         args.push('-f');
     }
-    args.push.apply(args, asArray(path));
+    args.push.apply(args, asArray(path).map(shellQuote));
     return this.runCmd(args.join(' '), { user: options.user });
 };
 
 Template.prototype.rename = function (src, dest, options) {
     options = options || {};
-    const args = ['mv', src, dest];
+    const args = ['mv', shellQuote(src), shellQuote(dest)];
     if (options.force) {
         args.push('-f');
     }
@@ -249,7 +250,7 @@ Template.prototype.makeDir = function (path, options) {
     if (options.mode) {
         args.push(`-m ${padOctal(options.mode)}`);
     }
-    args.push.apply(args, asArray(path));
+    args.push.apply(args, asArray(path).map(shellQuote));
     return this.runCmd(args.join(' '), { user: options.user });
 };
 
@@ -259,7 +260,7 @@ Template.prototype.makeSymlink = function (src, dest, options) {
     if (options.force) {
         args.push('-f');
     }
-    args.push(src, dest);
+    args.push(shellQuote(src), shellQuote(dest));
     return this.runCmd(args.join(' '), { user: options.user });
 };
 
@@ -278,7 +279,7 @@ Template.prototype.pipInstall = function (packages, options) {
         args.push('--user');
     }
     if (packages) {
-        args.push.apply(args, asArray(packages));
+        args.push.apply(args, asArray(packages).map(shellQuote));
     } else {
         args.push('.');
     }
@@ -295,7 +296,7 @@ Template.prototype.npmInstall = function (packages, options) {
         args.push('--save-dev');
     }
     if (packages) {
-        args.push.apply(args, asArray(packages));
+        args.push.apply(args, asArray(packages).map(shellQuote));
     }
     return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
 };
@@ -310,22 +311,22 @@ Template.prototype.bunInstall = function (packages, options) {
         args.push('--dev');
     }
     if (packages) {
-        args.push.apply(args, asArray(packages));
+        args.push.apply(args, asArray(packages).map(shellQuote));
     }
     return this.runCmd(args.join(' '), { user: options.g ? 'root' : undefined });
 };
 
 Template.prototype.gitClone = function (url, path, options) {
     options = options || {};
-    const args = ['git', 'clone', url];
+    const args = ['git', 'clone', shellQuote(url)];
     if (options.branch) {
-        args.push('--branch', options.branch, '--single-branch');
+        args.push('--branch', shellQuote(options.branch), '--single-branch');
     }
     if (options.depth) {
-        args.push('--depth', options.depth);
+        args.push('--depth', shellQuote(options.depth));
     }
     if (path) {
-        args.push(path);
+        args.push(shellQuote(path));
     }
     return this.runCmd(args.join(' '), { user: options.user });
 };

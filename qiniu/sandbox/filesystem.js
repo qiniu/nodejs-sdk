@@ -1,6 +1,6 @@
 const { connectRPC, envdHeaders } = require('./envd');
 const { SandboxError } = require('./errors');
-const { rawRequest } = require('./util');
+const { parseRequestUrl, rawRequest } = require('./util');
 const { Readable } = require('stream');
 const zlib = require('zlib');
 const http = require('http');
@@ -152,7 +152,11 @@ function formatReadResult (data, opts) {
         return buffer;
     }
     if (format === 'stream') {
-        return Readable.from([buffer]);
+        const stream = new Readable();
+        stream._read = function () {};
+        stream.push(buffer);
+        stream.push(null);
+        return stream;
     }
     if (format === 'blob') {
         return typeof global.Blob !== 'undefined' ? new global.Blob([buffer]) : buffer;
@@ -306,7 +310,7 @@ exports.normalizeEntry = normalizeEntry;
 
 function watchDir (sandbox, path, onEvent, opts) {
     return new Promise((resolve, reject) => {
-        const target = new URL(sandbox.envdUrl() + '/filesystem.Filesystem/WatchDir');
+        const target = parseRequestUrl(sandbox.envdUrl() + '/filesystem.Filesystem/WatchDir');
         const transport = target.protocol === 'https:' ? https : http;
         const headers = Object.assign({
             'Content-Type': 'application/connect+json',
@@ -317,7 +321,7 @@ function watchDir (sandbox, path, onEvent, opts) {
             protocol: target.protocol,
             hostname: target.hostname,
             port: target.port,
-            path: target.pathname + target.search,
+            path: target.path,
             headers
         });
 

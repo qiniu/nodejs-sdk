@@ -189,12 +189,13 @@ Commands.prototype.connect = function (pid, opts) {
 };
 
 Commands.prototype.sendStdin = function (pid, data, opts) {
+    const stdin = Buffer.isBuffer(data) ? data.toString('base64') : Buffer.from(String(data)).toString('base64');
     return connectRPC(this.sandbox, '/process.Process/SendInput', {
         process: {
             selector: { pid }
         },
         input: {
-            stdin: typeof data === 'string' ? Buffer.from(data).toString('base64') : data
+            stdin
         }
     }, opts).then(() => null);
 };
