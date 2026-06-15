@@ -225,12 +225,19 @@ function splitDockerfileArgs (value) {
 
 function dockerfileCopyArgs (value) {
     const args = splitDockerfileArgs(value);
+    const flagsWithValue = {
+        '--checksum': true,
+        '--chmod': true,
+        '--chown': true,
+        '--exclude': true
+    };
     while (args.length && /^--/.test(args[0])) {
         const flag = args.shift();
         if (/^--from(?:=|$)/i.test(flag)) {
             return [];
         }
-        if (flag.indexOf('=') < 0 && args.length > 2) {
+        const flagName = flag.split('=')[0].toLowerCase();
+        if (flag.indexOf('=') < 0 && flagsWithValue[flagName] && args.length > 2) {
             args.shift();
         }
     }

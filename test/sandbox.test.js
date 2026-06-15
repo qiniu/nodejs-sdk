@@ -1651,10 +1651,11 @@ describe('test sandbox module', function () {
 
     it('parses JSON Dockerfile COPY args and skips unsupported COPY --from flags', function () {
         const template = qiniu.sandbox.Template()
-            .fromDockerfile('FROM node:22\nCOPY ["file name.txt", "/app/data dir/"]\nCOPY --chown=node package.json /app/\nCOPY --from=builder /app/dist /app/dist');
+            .fromDockerfile('FROM node:22\nCOPY ["file name.txt", "/app/data dir/"]\nCOPY --chown=node package.json /app/\nCOPY --link linked.txt /linked/\nCOPY --from=builder /app/dist /app/dist');
         template.buildConfig.steps.should.eql([
             { type: 'COPY', args: ['file name.txt', '/app/data dir/'] },
-            { type: 'COPY', args: ['package.json', '/app/'] }
+            { type: 'COPY', args: ['package.json', '/app/'] },
+            { type: 'COPY', args: ['linked.txt', '/linked/'] }
         ]);
     });
 

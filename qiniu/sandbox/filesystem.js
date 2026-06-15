@@ -2,11 +2,9 @@ const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYT
 const { SandboxError } = require('./errors');
 const { agentFromClient, millisecondsFromOptions, parseRequestUrl, rawRequest } = require('./util');
 const { Readable } = require('stream');
-const { promisify } = require('util');
 const zlib = require('zlib');
 const http = require('http');
 const https = require('https');
-const gzip = promisify(zlib.gzip);
 
 const FileType = {
     FILE: 'file',
@@ -163,7 +161,14 @@ function formatReadResult (data, opts) {
         return buffer;
     }
     if (format === 'stream') {
-        return Readable.from([buffer]);
+        if (typeof Readable.from === 'function') {
+            return Readable.from([buffer]);
+        }
+        const stream = new Readable();
+        stream._read = function () {};
+        stream.push(buffer);
+        stream.push(null);
+        return stream;
     }
     if (format === 'blob') {
         return typeof global.Blob !== 'undefined' ? new global.Blob([buffer]) : buffer;
@@ -173,6 +178,18 @@ function formatReadResult (data, opts) {
 
 function envdAgent (sandbox, requestUrl) {
     return agentFromClient(sandbox.client, parseRequestUrl(requestUrl).protocol);
+}
+
+function gzipAsync (content) {
+    return new Promise((resolve, reject) => {
+        zlib.gzip(content, (err, result) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(result);
+        });
+    });
 }
 
 Filesystem.prototype.read = function (path, opts) {
@@ -212,7 +229,7 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
         };
         const content = Buffer.isBuffer(dataOrOpts) ? dataOrOpts : Buffer.from(String(dataOrOpts !== undefined && dataOrOpts !== null ? dataOrOpts : ''));
         const compressed = opts.gzip && supportsEncodedUpload
-            ? gzip(content).then(result => {
+            ? gzipAsync(content).then(result => {
                 headers['Content-Encoding'] = 'gzip';
                 return result;
             })
@@ -240,7 +257,7 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
         'Content-Type': `multipart/form-data; boundary=${boundary}`
     };
     const compressed = opts.gzip && supportsEncodedUpload
-        ? gzip(body).then(result => {
+        ? gzipAsync(body).then(result => {
             headers['Content-Encoding'] = 'gzip';
             return result;
         })
