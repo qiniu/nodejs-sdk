@@ -195,6 +195,21 @@ function splitDockerfileArgs (value) {
     return args;
 }
 
+function dockerfileFromImage (value) {
+    const parts = splitDockerfileArgs(value);
+    for (let i = 0; i < parts.length; i += 1) {
+        const part = parts[i];
+        if (/^--/.test(part)) {
+            continue;
+        }
+        if (/^AS$/i.test(part)) {
+            break;
+        }
+        return part;
+    }
+    return null;
+}
+
 Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
     const isPath = typeof dockerfileContentOrPath === 'string' &&
         dockerfileContentOrPath.length < 1024 &&
@@ -216,7 +231,10 @@ Template.prototype.fromDockerfile = function (dockerfileContentOrPath) {
         const instruction = match[1].toUpperCase();
         const rest = match[2].trim();
         if (instruction === 'FROM') {
-            this.fromImage(rest.split(/\s+/)[0]);
+            const image = dockerfileFromImage(rest);
+            if (image) {
+                this.fromImage(image);
+            }
         } else if (instruction === 'RUN') {
             this.runCmd(rest);
         } else if (instruction === 'WORKDIR') {

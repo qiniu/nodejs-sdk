@@ -72,7 +72,7 @@ function decodeConnectEnvelopes (data) {
             throw new Error(`Sandbox envd stream envelope too large: ${length}`);
         }
         if (offset + length > data.length) {
-            break;
+            throw new Error('Sandbox envd stream truncated unexpectedly');
         }
         const payload = data.slice(offset, offset + length).toString();
         offset += length;
@@ -130,5 +130,6 @@ function connectStreamRPC (sandbox, procedure, body, opts) {
 exports.connectRPC = connectRPC;
 exports.connectStreamRPC = connectStreamRPC;
 exports.connectEndStreamError = connectEndStreamError;
+exports.decodeConnectEnvelopes = decodeConnectEnvelopes;
 exports.envdHeaders = envdHeaders;
 exports.MAX_CONNECT_ENVELOPE_BYTES = MAX_CONNECT_ENVELOPE_BYTES;

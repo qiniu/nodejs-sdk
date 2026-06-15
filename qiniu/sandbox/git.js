@@ -85,6 +85,14 @@ function pathFromOpts (opts) {
 }
 
 function normalizeConfigCall (args) {
+    if (args.length === 2) {
+        return {
+            repoPath: undefined,
+            key: args[0],
+            value: args[1],
+            opts: {}
+        };
+    }
     if (typeof args[2] === 'object' && args[2] !== null) {
         return {
             repoPath: pathFromOpts(args[2]),
@@ -102,6 +110,13 @@ function normalizeConfigCall (args) {
 }
 
 function normalizeGetConfigCall (args) {
+    if (args.length === 1) {
+        return {
+            repoPath: undefined,
+            key: args[0],
+            opts: {}
+        };
+    }
     if (typeof args[1] === 'object' && args[1] !== null) {
         return {
             repoPath: pathFromOpts(args[1]),
@@ -117,6 +132,14 @@ function normalizeGetConfigCall (args) {
 }
 
 function normalizeConfigureUserCall (args) {
+    if (args.length === 2) {
+        return {
+            repoPath: undefined,
+            name: args[0],
+            email: args[1],
+            opts: {}
+        };
+    }
     if (typeof args[2] === 'object' && args[2] !== null) {
         return {
             repoPath: pathFromOpts(args[2]),

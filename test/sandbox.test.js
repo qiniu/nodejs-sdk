@@ -76,6 +76,13 @@ function encodeOversizedConnectHeader () {
     return header;
 }
 
+function encodeTruncatedConnectHeader () {
+    const header = Buffer.alloc(5);
+    header[0] = 0;
+    header.writeUInt32BE(20, 1);
+    return header;
+}
+
 describe('test sandbox module', function () {
     it('creates sandbox with E2B compatible options and API key auth', function () {
         return startServer((req, res) => {
@@ -1337,7 +1344,8 @@ describe('test sandbox module', function () {
 
     it('joins Dockerfile lines continued with backslash before parsing', function () {
         const template = qiniu.sandbox.Template()
-            .fromDockerfile('FROM ubuntu:22.04\nRUN apt-get update && \\\n    apt-get install -y curl\nENV FOO=bar \\\n    BAZ=qux\nENV PORT 3000\nCOPY "file name.txt" "/app/data dir/"');
+            .fromDockerfile('FROM --platform=linux/amd64 ubuntu:22.04 AS build\nRUN apt-get update && \\\n    apt-get install -y curl\nENV FOO=bar \\\n    BAZ=qux\nENV PORT 3000\nCOPY "file name.txt" "/app/data dir/"');
+        template.buildConfig.fromImage.should.eql('ubuntu:22.04');
         template.buildConfig.steps.should.eql([
             { type: 'run', cmd: 'apt-get update &&  apt-get install -y curl' },
             { type: 'ENV', args: ['FOO', 'bar', 'BAZ', 'qux'] },
@@ -1832,6 +1840,57 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('fails watchDir when the event callback throws', function () {
+        let exitError;
+        return startServer((req, res) => {
+            if (req.url === '/filesystem.Filesystem/WatchDir') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(Buffer.concat([
+                    encodeConnectEnvelope({ event: { start: {} } }),
+                    encodeConnectEnvelope({
+                        event: {
+                            filesystem: {
+                                name: 'created.txt',
+                                type: 'EVENT_TYPE_CREATE'
+                            }
+                        }
+                    })
+                ]));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_watch_callback',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token',
+                    envdVersion: '0.5.7'
+                }
+            });
+
+            return sandbox.files.watchDir('/workspace', () => {
+                throw new Error('callback failed');
+            }, {
+                recursive: true,
+                onExit: err => {
+                    exitError = err;
+                }
+            }).then(handle => {
+                return new Promise(resolve => setTimeout(resolve, 20)).then(() => handle);
+            }).then(handle => {
+                handle._stopped.should.eql(true);
+                exitError.message.should.eql('callback failed');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('rejects command start when the process stream does not start before timeout', function () {
         let commandResponse;
         return startServer((req, res) => {
@@ -2110,6 +2169,35 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('normalizes git config helpers when options are omitted', function () {
+        const commandsSeen = [];
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                commandsSeen.push({ cmd, opts });
+                return Promise.resolve({ stdout: 'Alice\n', stderr: '', exitCode: 0 });
+            }
+        });
+
+        return git.setConfig('user.name', 'Alice')
+            .then(() => git.getConfig('user.name'))
+            .then(value => {
+                value.should.eql('Alice');
+                return git.configureUser('Alice', 'alice@example.com');
+            })
+            .then(() => {
+                const shellQuote = require('../qiniu/sandbox/util').shellQuote;
+                commandsSeen.map(item => item.cmd).should.eql([
+                    'git config ' + shellQuote('user.name') + ' ' + shellQuote('Alice'),
+                    'git config --get ' + shellQuote('user.name'),
+                    'git config ' + shellQuote('user.name') + ' ' + shellQuote('Alice'),
+                    'git config ' + shellQuote('user.email') + ' ' + shellQuote('alice@example.com')
+                ]);
+                commandsSeen.forEach(item => {
+                    should.not.exist(item.opts.cwd);
+                });
+            });
+    });
+
     it('covers Sandbox.connect, Sandbox.list, wait polling, and stopped health checks', function () {
         let infoCalls = 0;
         return startServer((req, res) => {
@@ -2277,6 +2365,18 @@ describe('test sandbox module', function () {
         });
     });
 
+    it('returns false from isRunning on connection failures', function () {
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'sbx_down',
+            envdUrl: 'http://127.0.0.1:9',
+            info: {}
+        });
+
+        return sandbox.isRunning().then(running => {
+            running.should.eql(false);
+        });
+    });
+
     it('supports JSON fallback for process stream responses and poll timeout errors', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {
@@ -2326,6 +2426,44 @@ describe('test sandbox module', function () {
                         throw err;
                     });
                 });
+        });
+    });
+
+    it('rejects truncated buffered Connect stream responses', function () {
+        try {
+            require('../qiniu/sandbox/envd').decodeConnectEnvelopes(encodeTruncatedConnectHeader());
+            throw new Error('expected buffered decoder to reject truncated stream');
+        } catch (err) {
+            err.message.should.eql('Sandbox envd stream truncated unexpectedly');
+        }
+
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.end(encodeTruncatedConnectHeader());
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_truncated',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.commands.run('echo bad').then(() => {
+                throw new Error('expected truncated stream error');
+            }, err => {
+                err.message.should.eql('Command stream ended before process start');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
         });
     });
 

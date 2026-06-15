@@ -269,10 +269,11 @@ Sandbox.prototype.isRunning = function () {
         method: 'GET',
         dataType: 'text'
     }).then(() => true, err => {
-        if (err.response && err.response.statusCode === 502) {
+        const resp = err.response || err.resp;
+        if (resp && resp.statusCode === 502) {
             return false;
         }
-        if (err.resp && err.resp.statusCode === 502) {
+        if (['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].indexOf(err.code) >= 0) {
             return false;
         }
         throw err;

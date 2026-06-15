@@ -363,10 +363,15 @@ function watchDir (sandbox, path, onEvent, opts) {
             if (event.filesystem && onEvent) {
                 const type = normalizeFilesystemEventType(event.filesystem.type);
                 if (type) {
-                    onEvent({
-                        name: event.filesystem.name,
-                        type
-                    });
+                    try {
+                        onEvent({
+                            name: event.filesystem.name,
+                            type
+                        });
+                    } catch (err) {
+                        fail(err);
+                        req.destroy();
+                    }
                 }
             }
         }
