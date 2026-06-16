@@ -4536,6 +4536,190 @@ describe('test sandbox module', function () {
             commandsSeen.every(item => item.opts.cwd === '/repo').should.eql(true);
         });
     });
+
+    it('rejects missing sandbox ids and encodes nested template file paths', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key'
+        });
+        const requests = [];
+        client.httpClient.sendRequest = req => {
+            requests.push(req);
+            return Promise.resolve({
+                ok: () => true,
+                data: { ok: true }
+            });
+        };
+
+        return client.getSandbox('').then(() => {
+            throw new Error('expected getSandbox to reject missing id');
+        }, err => {
+            err.name.should.eql('SandboxError');
+            err.message.should.eql('sandboxID is required');
+            return client.deleteSandbox('');
+        }).then(() => {
+            throw new Error('expected deleteSandbox to reject missing id');
+        }, err => {
+            err.name.should.eql('SandboxError');
+            err.message.should.eql('sandboxID is required');
+            return client.getSandboxLogs('sbx/with space', { cursor: 'next/page' });
+        }).then(() => client.getTemplateFiles('tpl/with space', 'dir/file hash'))
+            .then(() => {
+                requests.map(req => req.url).should.eql([
+                    'http://sandbox.test/sandboxes/sbx%2Fwith%20space/logs?cursor=next%2Fpage',
+                    'http://sandbox.test/templates/tpl%2Fwith%20space/files/dir%2Ffile%20hash'
+                ]);
+            });
+    });
+
+    it('parses envd stream fallback responses shaped as events, arrays, and single events', function () {
+        const envd = require('../qiniu/sandbox/envd');
+        return startServer((req, res) => {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            if (req.url === '/stream.EventsObject') {
+                res.end(JSON.stringify({
+                    events: [{ event: { start: { pid: 1 } } }]
+                }));
+                return;
+            }
+            if (req.url === '/stream.Array') {
+                res.end(JSON.stringify([{ event: { end: { exitCode: 0 } } }]));
+                return;
+            }
+            if (req.url === '/stream.Single') {
+                res.end(JSON.stringify({ event: { data: { stdout: 'aGVsbG8=' } } }));
+                return;
+            }
+            if (req.url === '/stream.Empty') {
+                res.end(JSON.stringify({ ok: true }));
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_envd_fallbacks',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return envd.connectStreamRPC(sandbox, '/stream.EventsObject', {})
+                .then(events => {
+                    events.should.eql([{ event: { start: { pid: 1 } } }]);
+                    return envd.connectStreamRPC(sandbox, '/stream.Array', {});
+                })
+                .then(events => {
+                    events.should.eql([{ event: { end: { exitCode: 0 } } }]);
+                    return envd.connectStreamRPC(sandbox, '/stream.Single', {});
+                })
+                .then(events => {
+                    events.should.eql([{ event: { data: { stdout: 'aGVsbG8=' } } }]);
+                    return envd.connectStreamRPC(sandbox, '/stream.Empty', {});
+                })
+                .then(events => {
+                    events.should.eql([]);
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('returns false for PTY kill 404 responses and rethrows other failures', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/SendSignal') {
+                const body = JSON.parse(req.body);
+                if (body.process.selector.pid === 404) {
+                    res.statusCode = 404;
+                    res.end('missing');
+                    return;
+                }
+                res.statusCode = 500;
+                res.end('boom');
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_pty_kill',
+                envdUrl: fixture.endpoint,
+                info: {
+                    envdAccessToken: 'token'
+                }
+            });
+
+            return sandbox.pty.kill(404)
+                .then(killed => {
+                    killed.should.eql(false);
+                    return sandbox.pty.kill(500);
+                })
+                .then(() => {
+                    throw new Error('expected non-404 PTY kill to reject');
+                }, err => {
+                    err.name.should.eql('SandboxError');
+                    err.message.should.containEql('status 500');
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('covers Template package helper option branches and build option cleanup', function () {
+        const bodySeen = [];
+        const client = {
+            createTemplateV3: body => {
+                bodySeen.push(body);
+                return Promise.resolve({ templateID: 'tpl_1' });
+            }
+        };
+        const template = qiniu.sandbox.Template()
+            .pipInstall({ g: false })
+            .npmInstall({ g: true, dev: true })
+            .bunInstall({ g: true })
+            .setEnvs({})
+            .setStartCmd('npm start')
+            .setReadyCmd('curl -f http://localhost:3000');
+
+        return template.build({
+            client,
+            endpoint: 'https://sandbox.example.com',
+            apiKey: 'api-key',
+            accessToken: 'access-token',
+            accessKey: 'ak',
+            secretKey: 'sk',
+            timeout: 1,
+            requestTimeoutMs: 2000,
+            alias: 'tpl-alias'
+        }).then(ret => {
+            ret.templateID.should.eql('tpl_1');
+            bodySeen.length.should.eql(1);
+            bodySeen[0].alias.should.eql('tpl-alias');
+            should.not.exist(bodySeen[0].client);
+            should.not.exist(bodySeen[0].endpoint);
+            should.not.exist(bodySeen[0].apiKey);
+            should.not.exist(bodySeen[0].accessToken);
+            should.not.exist(bodySeen[0].accessKey);
+            should.not.exist(bodySeen[0].secretKey);
+            should.not.exist(bodySeen[0].timeout);
+            should.not.exist(bodySeen[0].requestTimeoutMs);
+            bodySeen[0].buildConfig.startCmd.should.eql('npm start');
+            bodySeen[0].buildConfig.readyCmd.should.eql('curl -f http://localhost:3000');
+            bodySeen[0].buildConfig.steps.should.eql([
+                { type: 'RUN', args: ['pip install --user .'] },
+                { type: 'RUN', args: ['npm install -g --save-dev', 'root'] },
+                { type: 'RUN', args: ['bun install', 'root'] }
+            ]);
+        });
+    });
 });
 
 function handleGitAndPty (git, pty, commandsSeen, fixture) {
