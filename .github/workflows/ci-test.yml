@@ -24,7 +24,8 @@ jobs:
       - name: Run cases
         run: |
           npm run check-type
-          nyc --reporter=lcov npm test
+          nyc --reporter=lcov npm run test:sandbox
+          nyc --no-clean --reporter=lcov npm test
         env:
           QINIU_ACCESS_KEY: ${{ secrets.QINIU_ACCESS_KEY }}
           QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
