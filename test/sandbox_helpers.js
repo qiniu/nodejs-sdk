@@ -2,6 +2,7 @@ const should = require('should');
 const http = require('http');
 const fs = require('fs');
 const stream = require('stream');
+const legacyUrl = require('url');
 const zlib = require('zlib');
 
 const qiniu = require('../index');
@@ -43,7 +44,22 @@ function closeServer (server) {
 }
 
 function parseUrl (value) {
-    return new URL(value, 'http://127.0.0.1');
+    const href = /^https?:\/\//.test(value) ? value : 'http://127.0.0.1' + value;
+    if (typeof URL !== 'undefined') {
+        return new URL(href);
+    }
+    // eslint-disable-next-line node/no-deprecated-api, dot-notation
+    const parsed = legacyUrl['parse'](href, true);
+    parsed.searchParams = {
+        get: function (key) {
+            const value = parsed.query[key];
+            if (typeof value === 'undefined') {
+                return null;
+            }
+            return Array.isArray(value) ? value[0] : value;
+        }
+    };
+    return parsed;
 }
 
 function decodeConnectEnvelope (body) {
