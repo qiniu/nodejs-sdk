@@ -1,0 +1,441 @@
+const fs = require('fs');
+const path = require('path');
+const should = require('should');
+
+const qiniu = require('../index');
+const { shellQuote } = require('../qiniu/sandbox/util');
+
+function loadDotEnvIfPresent () {
+    [
+        path.join(process.cwd(), '.env')
+    ].forEach(filepath => {
+        if (!fs.existsSync(filepath)) {
+            return;
+        }
+
+        fs.readFileSync(filepath, 'utf8')
+            .split(/\r?\n/)
+            .forEach(line => {
+                line = line.trim();
+                if (!line || line[0] === '#') {
+                    return;
+                }
+                const index = line.indexOf('=');
+                if (index < 0) {
+                    return;
+                }
+                const key = line.slice(0, index).trim();
+                let value = line.slice(index + 1).trim();
+                if (
+                    (value[0] === '"' && value[value.length - 1] === '"') ||
+                    (value[0] === '\'' && value[value.length - 1] === '\'')
+                ) {
+                    value = value.slice(1, -1);
+                }
+                if (process.env[key] === undefined) {
+                    process.env[key] = value;
+                }
+            });
+    });
+}
+
+loadDotEnvIfPresent();
+
+function integrationLog () {
+    const args = Array.prototype.slice.call(arguments);
+    args.unshift('[sandbox integration]');
+    console.log.apply(console, args);
+}
+
+function integrationConfig () {
+    return {
+        endpoint: process.env.QINIU_SANDBOX_ENDPOINT,
+        apiKey: process.env.QINIU_SANDBOX_API_KEY,
+        template: process.env.QINIU_SANDBOX_TEMPLATE || 'base',
+        accessKey: process.env.QINIU_SANDBOX_ACCESS_KEY,
+        secretKey: process.env.QINIU_SANDBOX_SECRET_KEY,
+        kodoBucket: process.env.QINIU_SANDBOX_KODO_BUCKET,
+        kodoPrefix: process.env.QINIU_SANDBOX_KODO_PREFIX,
+        kodoMountPath: process.env.QINIU_SANDBOX_KODO_MOUNT_PATH || '/mnt/qiniu-nodejs-sdk-it',
+        gitRepoUrl: process.env.GIT_REPO_URL,
+        gitUsername: process.env.GIT_USERNAME,
+        gitPassword: process.env.GIT_PASSWORD
+    };
+}
+
+const config = integrationConfig();
+const describeIntegration = config.apiKey ? describe : describe.skip;
+
+function authedGitUrl (repoUrl, username, password) {
+    const parsed = new URL(repoUrl);
+    parsed.username = username;
+    parsed.password = password;
+    return parsed.toString();
+}
+
+function scrubSecrets (text) {
+    text = String(text || '');
+    [config.gitPassword, config.gitUsername].forEach(secret => {
+        if (secret) {
+            text = text.split(secret).join('[redacted]');
+            text = text.split(encodeURIComponent(secret)).join('[redacted]');
+        }
+    });
+    return text.replace(/https?:\/\/[^@\s]+@/g, 'https://[redacted]@');
+}
+
+function hasGitCredentials () {
+    return Boolean(config.gitRepoUrl && config.gitUsername && config.gitPassword);
+}
+
+function hasQiniuCredentials () {
+    return Boolean(config.accessKey && config.secretKey);
+}
+
+function sandboxClient (opts) {
+    opts = opts || {};
+    return new qiniu.sandbox.SandboxClient(Object.assign({
+        endpoint: config.endpoint,
+        apiKey: config.apiKey
+    }, opts));
+}
+
+function exerciseRemoteGitIfConfigured (sandbox, runID) {
+    if (!hasGitCredentials()) {
+        integrationLog('skip remote git: set GIT_REPO_URL, GIT_USERNAME, and GIT_PASSWORD to run');
+        return Promise.resolve();
+    }
+
+    const cloneDir = `/tmp/${runID}-clone`;
+    const cloneUrl = authedGitUrl(config.gitRepoUrl, config.gitUsername, config.gitPassword);
+    const branch = `nodejs-sdk-it-${runID}`;
+    const pushedFile = `${cloneDir}/qiniu-nodejs-sdk-integration-${runID}.txt`;
+    const gitOptions = {
+        timeout: 120000,
+        config: {
+            'http.version': 'HTTP/1.1'
+        }
+    };
+
+    integrationLog('cloning configured git repository', cloneDir);
+    return sandbox.git.clone(cloneUrl, Object.assign({}, gitOptions, {
+        path: cloneDir,
+        depth: 1
+    })).then(result => {
+        if (result.exitCode !== 0) {
+            throw new Error(`git clone failed with exit ${result.exitCode}: ${scrubSecrets(result.stderr || result.stdout)}`);
+        }
+        result.exitCode.should.eql(0);
+        integrationLog('cloned configured git repository', cloneDir);
+        return sandbox.git.configureUser(cloneDir, 'qiniu-nodejs-sdk', 'qiniu-nodejs-sdk@example.com', gitOptions);
+    }).then(result => {
+        result.exitCode.should.eql(0);
+        return sandbox.git.createBranch(cloneDir, branch, gitOptions);
+    }).then(result => {
+        result.exitCode.should.eql(0);
+        integrationLog('created git branch', branch);
+        return sandbox.files.write(pushedFile, `sandbox integration ${runID}\n`);
+    }).then(entry => {
+        entry.path.should.eql(pushedFile);
+        return sandbox.git.add(cloneDir, {
+            files: [path.basename(pushedFile)],
+            timeout: gitOptions.timeout,
+            config: gitOptions.config
+        });
+    }).then(result => {
+        result.exitCode.should.eql(0);
+        return sandbox.git.commit(cloneDir, `test: sandbox integration ${runID}`, gitOptions);
+    }).then(result => {
+        result.exitCode.should.eql(0);
+        integrationLog('committed git branch', branch);
+        return sandbox.git.push(cloneDir, Object.assign({}, gitOptions, {
+            remote: cloneUrl,
+            branch: `HEAD:refs/heads/${branch}`
+        }));
+    }).then(result => {
+        if (result.exitCode !== 0) {
+            throw new Error(`git push failed with exit ${result.exitCode}: ${scrubSecrets(result.stderr || result.stdout)}`);
+        }
+        result.exitCode.should.eql(0);
+        integrationLog('pushed git branch', branch);
+        return sandbox.commands.run(`git -C ${shellQuote(cloneDir)} remote set-url origin ${shellQuote(config.gitRepoUrl)}`);
+    }).then(result => {
+        result.exitCode.should.eql(0);
+        return sandbox.git.remoteGet(cloneDir, 'origin');
+    }).then(remoteUrl => {
+        remoteUrl.should.eql(config.gitRepoUrl);
+        integrationLog('sanitized git remote url', cloneDir);
+        return sandbox.git.status(cloneDir);
+    }).then(status => {
+        status.raw.should.be.String();
+        integrationLog('verified cloned git status', cloneDir);
+    });
+}
+
+describeIntegration('sandbox integration', function () {
+    this.timeout(600000);
+
+    let sandbox;
+
+    after(function () {
+        if (!sandbox) {
+            return null;
+        }
+        return sandbox.kill()
+            .catch(err => {
+                console.log('failed to cleanup sandbox', sandbox.sandboxId, err.message);
+            });
+    });
+
+    it('creates a sandbox and exercises files, commands, and git', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: config.endpoint,
+            apiKey: config.apiKey
+        });
+        const runID = `nodejs-sdk-${Date.now()}`;
+        const workdir = `/tmp/${runID}`;
+        const filePath = `${workdir}/hello.txt`;
+
+        return qiniu.sandbox.Sandbox.create({
+            client,
+            template: config.template,
+            timeout: 300,
+            metadata: {
+                sdk: 'qiniu-nodejs-sdk',
+                test: runID
+            }
+        }).then(created => {
+            sandbox = created;
+            sandbox.sandboxId.should.be.String();
+            integrationLog('created sandbox', sandbox.sandboxId);
+            return sandbox.waitForReady({
+                interval: 3000,
+                timeout: 180000
+            });
+        }).then(info => {
+            info.state.should.eql('running');
+            integrationLog('sandbox ready', sandbox.sandboxId);
+            return sandbox.isRunning();
+        }).then(running => {
+            running.should.eql(true);
+            integrationLog('envd health ok', sandbox.sandboxId);
+            return sandbox.commands.run(`mkdir -p ${workdir}`);
+        }).then(result => {
+            result.exitCode.should.eql(0);
+            integrationLog('created workdir', workdir);
+            return sandbox.files.write(filePath, 'hello sandbox');
+        }).then(entry => {
+            entry.path.should.eql(filePath);
+            integrationLog('wrote file', filePath);
+            return sandbox.files.readText(filePath);
+        }).then(text => {
+            text.should.eql('hello sandbox');
+            integrationLog('read file', filePath);
+            return sandbox.commands.run(`cat ${filePath}`);
+        }).then(result => {
+            result.exitCode.should.eql(0);
+            result.stdout.should.containEql('hello sandbox');
+            integrationLog('ran cat command', filePath);
+            return sandbox.git.init(workdir);
+        }).then(result => {
+            result.exitCode.should.eql(0);
+            integrationLog('initialized git repo', workdir);
+            return sandbox.git.status(workdir);
+        }).then(status => {
+            status.raw.should.be.String();
+            status.untrackedFiles.should.containEql('hello.txt');
+            sandbox.getHost(8080).should.be.String();
+            integrationLog('verified git status', workdir);
+            return exerciseRemoteGitIfConfigured(sandbox, runID);
+        });
+    });
+
+    it('creates and deletes an injection rule when AK/SK is configured', function () {
+        if (!hasQiniuCredentials()) {
+            this.skip();
+        }
+
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: config.endpoint,
+            apiKey: config.apiKey,
+            mac: new qiniu.auth.digest.Mac(config.accessKey, config.secretKey)
+        });
+        const name = `nodejs-sdk-it-${Date.now()}`;
+        let ruleID;
+
+        return client.createInjectionRule({
+            name,
+            injection: {
+                type: 'openai',
+                apiKey: 'test-key'
+            }
+        }).then(rule => {
+            ruleID = rule.id || rule.ruleID || rule.ruleId;
+            should(ruleID).be.ok();
+            return client.getInjectionRule(ruleID);
+        }).then(rule => {
+            rule.name.should.eql(name);
+            return client.updateInjectionRule(ruleID, {
+                name: name + '-updated'
+            });
+        }).then(rule => {
+            rule.name.should.eql(name + '-updated');
+            return client.deleteInjectionRule(ruleID);
+        });
+    });
+
+    it('creates a sandbox with an injection rule when AK/SK is configured', function () {
+        if (!hasQiniuCredentials()) {
+            this.skip();
+        }
+
+        const client = sandboxClient({
+            mac: new qiniu.auth.digest.Mac(config.accessKey, config.secretKey)
+        });
+        const name = `nodejs-sdk-create-it-${Date.now()}`;
+        let ruleID;
+        let createdSandbox;
+
+        return client.createInjectionRule({
+            name,
+            injection: {
+                type: 'openai',
+                apiKey: 'test-key'
+            }
+        }).then(rule => {
+            ruleID = rule.id || rule.ruleID || rule.ruleId;
+            should(ruleID).be.ok();
+            return qiniu.sandbox.Sandbox.create({
+                client,
+                template: config.template,
+                timeout: 120,
+                injections: [
+                    {
+                        type: 'id',
+                        id: ruleID
+                    }
+                ],
+                metadata: {
+                    sdk: 'qiniu-nodejs-sdk',
+                    test: 'injection-create'
+                }
+            });
+        }).then(created => {
+            createdSandbox = created;
+            return createdSandbox.waitForReady({
+                interval: 3000,
+                timeout: 180000
+            });
+        }).then(info => {
+            info.state.should.eql('running');
+            integrationLog('created sandbox with injection rule', createdSandbox.sandboxId);
+        }).finally(() => {
+            const cleanup = [];
+            if (createdSandbox) {
+                cleanup.push(createdSandbox.kill().catch(() => null));
+            }
+            if (ruleID) {
+                cleanup.push(client.deleteInjectionRule(ruleID).catch(() => null));
+            }
+            return Promise.all(cleanup);
+        });
+    });
+
+    it('creates a sandbox with a Kodo resource mount when bucket is configured', function () {
+        if (!hasQiniuCredentials() || !config.kodoBucket) {
+            this.skip();
+        }
+
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: config.endpoint,
+            mac: new qiniu.auth.digest.Mac(config.accessKey, config.secretKey)
+        });
+        const runID = `nodejs-sdk-kodo-${Date.now()}`;
+        let kodoSandbox;
+        const resource = {
+            type: 'kodo',
+            bucket: config.kodoBucket,
+            mount_path: config.kodoMountPath
+        };
+        if (config.kodoPrefix) {
+            resource.prefix = config.kodoPrefix;
+        }
+
+        return qiniu.sandbox.Sandbox.create({
+            client,
+            template: config.template,
+            timeout: 300,
+            resources: [resource],
+            metadata: {
+                sdk: 'qiniu-nodejs-sdk',
+                test: runID
+            }
+        }).then(created => {
+            kodoSandbox = created;
+            return kodoSandbox.waitForReady({
+                interval: 3000,
+                timeout: 240000
+            });
+        }).then(info => {
+            info.state.should.eql('running');
+            return kodoSandbox.commands.run(`test -d ${shellQuote(config.kodoMountPath)}`);
+        }).then(result => {
+            result.exitCode.should.eql(0);
+            const filePath = path.posix.join(config.kodoMountPath, `${runID}.txt`);
+            return kodoSandbox.commands.run(`sh -c "echo ${shellQuote(runID)} > ${shellQuote(filePath)} && cat ${shellQuote(filePath)}"`)
+                .then(writeResult => {
+                    writeResult.exitCode.should.eql(0);
+                    writeResult.stdout.should.containEql(runID);
+                    return kodoSandbox.commands.run(`rm -f ${shellQuote(filePath)}`);
+                })
+                .then(removeResult => {
+                    removeResult.exitCode.should.eql(0);
+                });
+        }).finally(() => {
+            if (kodoSandbox) {
+                return kodoSandbox.kill().catch(() => null);
+            }
+            return null;
+        });
+    });
+
+    it('creates, inspects, and deletes a template', function () {
+        const client = sandboxClient();
+        const name = `nodejs-sdk-it-${Date.now()}`;
+        let templateID;
+        let buildID;
+        const template = qiniu.sandbox.Template()
+            .fromImage('ubuntu:22.04')
+            .runCmd('echo qiniu-nodejs-sdk');
+
+        return template.build({
+            client,
+            name,
+            tags: ['nodejs-sdk-it']
+        }).then(result => {
+            templateID = result.templateID || result.templateId || result.id || name;
+            buildID = result.buildID || result.buildId;
+            should(templateID).be.ok();
+            if (!buildID) {
+                return result;
+            }
+            return client.getTemplateBuildStatus(templateID, buildID)
+                .then(status => {
+                    should(status).be.ok();
+                    return client.getTemplateBuildLogs(templateID, buildID, { limit: 5 });
+                });
+        }).then(result => {
+            should(result).be.ok();
+            integrationLog('template integration completed', templateID, buildID);
+        }).finally(() => {
+            if (templateID) {
+                return client.deleteTemplate(templateID).catch(() => null);
+            }
+            return null;
+        });
+    });
+});
+
+if (!config.apiKey) {
+    console.log('skip sandbox integration: set QINIU_SANDBOX_API_KEY to run');
+}

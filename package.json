@@ -9,6 +9,7 @@
   "scripts": {
     "check-type": "tsc --noEmit",
     "test": "NODE_ENV=test mocha -t 300000 --retries 3",
+    "test:sandbox": "NODE_ENV=test mocha -t 300000 --retries 3 test/sandbox_client.test.js test/sandbox_commands.test.js test/sandbox_facade.test.js test/sandbox_filesystem.test.js test/sandbox_git.test.js test/sandbox_pty.test.js test/sandbox_template.test.js",
     "cover": "nyc npm run test",
     "report": "nyc report --reporter=html",
     "lint": "eslint ."
