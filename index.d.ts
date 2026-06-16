@@ -38,6 +38,455 @@ export declare namespace auth {
     }
 }
 
+export declare namespace sandbox {
+    interface SandboxClientOptions {
+        endpoint?: string;
+        apiUrl?: string;
+        apiKey?: string;
+        accessToken?: string;
+        mac?: auth.digest.Mac;
+        accessKey?: string;
+        secretKey?: string;
+        macOptions?: auth.digest.MacOptions;
+        timeout?: number | number[];
+        httpAgent?: HttpAgent;
+        httpsAgent?: HttpsAgent;
+    }
+
+    interface GitRepositoryResource {
+        type: 'github_repository';
+        url: string;
+        mount_path: string;
+        authorization_token?: string;
+    }
+
+    interface KodoResource {
+        type: 'kodo';
+        bucket: string;
+        mount_path: string;
+        prefix?: string;
+        read_only?: boolean;
+    }
+
+    type SandboxResource = GitRepositoryResource | KodoResource;
+
+    interface SandboxCreateOptions extends SandboxClientOptions {
+        template?: string;
+        templateID?: string;
+        timeout?: number;
+        timeoutMs?: number;
+        autoPause?: boolean;
+        secure?: boolean;
+        allow_internet_access?: boolean;
+        allowInternetAccess?: boolean;
+        network?: any;
+        metadata?: {[key: string]: string};
+        envVars?: {[key: string]: string};
+        envs?: {[key: string]: string};
+        mcp?: any;
+        injections?: any[];
+        resources?: SandboxResource[];
+        client?: SandboxClient;
+    }
+
+    interface SandboxConnectOptions extends SandboxClientOptions {
+        timeout?: number;
+        timeoutMs?: number;
+        client?: SandboxClient;
+    }
+
+    interface PollOptions {
+        interval?: number;
+        intervalMs?: number;
+        timeout?: number;
+        timeoutMs?: number;
+    }
+
+    interface FileUrlOptions {
+        user?: string;
+        signatureExpiration?: number;
+        signature_expiration?: number;
+        gzip?: boolean;
+        useOctetStream?: boolean;
+    }
+
+    interface EntryInfo {
+        name?: string;
+        type?: string;
+        path?: string;
+        size?: number;
+        mode?: number;
+        permissions?: string;
+        owner?: string;
+        group?: string;
+        modifiedTime?: string | Date;
+        symlinkTarget?: string;
+    }
+
+    interface FilesystemEvent {
+        name: string;
+        type: 'create' | 'write' | 'remove' | 'rename' | 'chmod';
+    }
+
+    interface WatchOptions {
+        user?: string;
+        recursive?: boolean;
+        timeout?: number;
+        timeoutMs?: number;
+        requestTimeoutMs?: number;
+        onExit?: (err?: Error) => void | Promise<void>;
+    }
+
+    interface CommandResult {
+        pid?: number;
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+        error?: string;
+    }
+
+    interface CommandOptions {
+        background?: boolean;
+        cwd?: string;
+        user?: string;
+        envs?: {[key: string]: string};
+        tag?: string;
+        stdin?: boolean;
+        timeout?: number;
+        timeoutMs?: number;
+        requestTimeoutMs?: number;
+        throwOnError?: boolean;
+        config?: {[key: string]: string | number | boolean};
+        onStdout?: (data: string) => void;
+        onStderr?: (data: string) => void;
+    }
+
+    interface GitStatus {
+        currentBranch: string;
+        changedFiles: string[];
+        untrackedFiles: string[];
+        raw: string;
+    }
+
+    interface GitConfigOptions extends CommandOptions {
+        path?: string;
+        scope?: 'local' | 'global' | 'system';
+    }
+
+    interface TemplateCopyItem {
+        src: string | string[];
+        dest: string;
+        forceUpload?: true;
+        user?: string;
+        mode?: number;
+        resolveSymlinks?: boolean;
+    }
+
+    interface SnapshotInfo {
+        snapshotId?: string;
+        snapshotID?: string;
+        [key: string]: any;
+    }
+
+    class SandboxPaginator {
+        readonly hasNext: boolean;
+        readonly nextToken?: string;
+        nextItems(options?: SandboxClientOptions): Promise<Sandbox[]>;
+        then<TResult1 = Sandbox[], TResult2 = never>(
+            onfulfilled?: ((value: Sandbox[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+            onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
+        ): Promise<TResult1 | TResult2>;
+    }
+
+    class SnapshotPaginator {
+        readonly hasNext: boolean;
+        readonly nextToken?: string;
+        nextItems(options?: SandboxClientOptions): Promise<SnapshotInfo[]>;
+        then<TResult1 = SnapshotInfo[], TResult2 = never>(
+            onfulfilled?: ((value: SnapshotInfo[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+            onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
+        ): Promise<TResult1 | TResult2>;
+    }
+
+    class Filesystem {
+        read(path: string, options?: FileUrlOptions & {format?: string}): Promise<any>;
+        readText(path: string, options?: FileUrlOptions): Promise<string>;
+        write(path: string, data: string | Buffer, options?: FileUrlOptions): Promise<EntryInfo>;
+        write(files: Array<{path: string; data: string | Buffer}>, options?: FileUrlOptions): Promise<EntryInfo[]>;
+        writeFiles(files: Array<{path: string; data: string | Buffer}>, options?: FileUrlOptions): Promise<EntryInfo[]>;
+        getInfo(path: string, options?: {user?: string}): Promise<EntryInfo>;
+        stat(path: string, options?: {user?: string}): Promise<EntryInfo>;
+        list(path: string, options?: {user?: string; depth?: number}): Promise<EntryInfo[]>;
+        exists(path: string, options?: {user?: string}): Promise<boolean>;
+        makeDir(path: string, options?: {user?: string}): Promise<EntryInfo>;
+        mkdir(path: string, options?: {user?: string}): Promise<EntryInfo>;
+        remove(path: string, options?: {user?: string}): Promise<null>;
+        rename(oldPath: string, newPath: string, options?: {user?: string}): Promise<EntryInfo>;
+        move(oldPath: string, newPath: string, options?: {user?: string}): Promise<EntryInfo>;
+        watchDir(path: string, onEvent: (event: FilesystemEvent) => void | Promise<void>, options?: WatchOptions): Promise<WatchHandle>;
+    }
+
+    class WatchHandle {
+        stop(): Promise<void>;
+    }
+
+    class CommandHandle {
+        pid: number;
+        result?: CommandResult;
+        wait(): Promise<CommandResult>;
+        kill(): Promise<null | boolean>;
+        disconnect(): Promise<void>;
+    }
+
+    class Commands {
+        run(command: string, options?: CommandOptions & {background?: false}): Promise<CommandResult>;
+        run(command: string, options: CommandOptions & {background: true}): Promise<CommandHandle>;
+        start(command: string, options?: CommandOptions): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandOptions): Promise<CommandHandle>;
+        list(options?: {user?: string}): Promise<any[]>;
+        sendStdin(pid: number, data: string | Buffer, options?: {user?: string}): Promise<null>;
+        closeStdin(pid: number, options?: {user?: string}): Promise<null>;
+        kill(pid: number, options?: {user?: string}): Promise<null>;
+    }
+
+    class Git {
+        clone(repoUrl: string, options?: CommandOptions & {path?: string; depth?: number; branch?: string; username?: string; password?: string; dangerouslyStoreCredentials?: boolean}): Promise<CommandResult>;
+        clone(repoUrl: string, path: string, options?: CommandOptions & {depth?: number; branch?: string; username?: string; password?: string; dangerouslyStoreCredentials?: boolean}): Promise<CommandResult>;
+        init(repoPath: string, options?: CommandOptions & {bare?: boolean; initialBranch?: string}): Promise<CommandResult>;
+        status(repoPath: string, options?: CommandOptions): Promise<GitStatus>;
+        add(repoPath: string, options?: CommandOptions & {files?: string[]; all?: boolean}): Promise<CommandResult>;
+        commit(repoPath: string, message: string, options?: CommandOptions & {allowEmpty?: boolean; authorName?: string; authorEmail?: string}): Promise<CommandResult>;
+        pull(repoPath: string, options?: CommandOptions & {remote?: string; branch?: string; username?: string; password?: string}): Promise<CommandResult>;
+        push(repoPath: string, options?: CommandOptions & {remote?: string; branch?: string; username?: string; password?: string}): Promise<CommandResult>;
+        createBranch(repoPath: string, branch: string, options?: CommandOptions): Promise<CommandResult>;
+        checkoutBranch(repoPath: string, branch: string, options?: CommandOptions): Promise<CommandResult>;
+        deleteBranch(repoPath: string, branch: string, options?: CommandOptions & {force?: boolean}): Promise<CommandResult>;
+        branches(repoPath: string, options?: CommandOptions): Promise<Array<{name: string; current: boolean}>>;
+        reset(repoPath: string, options?: CommandOptions & {hard?: boolean; soft?: boolean; mixed?: boolean; ref?: string; mode?: 'soft' | 'mixed' | 'hard' | 'merge' | 'keep'; target?: string; paths?: string[]}): Promise<CommandResult>;
+        restore(repoPath: string, options?: CommandOptions & {staged?: boolean; worktree?: boolean; source?: string; paths?: string[]; files?: string[]}): Promise<CommandResult>;
+        remoteAdd(repoPath: string, name: string, repoUrl: string, options?: CommandOptions & {overwrite?: boolean; fetch?: boolean}): Promise<CommandResult | null>;
+        remoteGet(repoPath: string, name: string, options?: CommandOptions): Promise<string | undefined>;
+        setConfig(repoPath: string, key: string, value: string, options?: CommandOptions & {scope?: 'local' | 'global' | 'system'}): Promise<CommandResult>;
+        setConfig(key: string, value: string, options?: GitConfigOptions): Promise<CommandResult>;
+        getConfig(repoPath: string, key: string, options?: CommandOptions & {scope?: 'local' | 'global' | 'system'}): Promise<string | undefined>;
+        getConfig(key: string, options?: GitConfigOptions): Promise<string | undefined>;
+        configureUser(repoPath: string, name: string, email: string, options?: CommandOptions): Promise<CommandResult>;
+        configureUser(name: string, email: string, options?: GitConfigOptions): Promise<CommandResult>;
+        dangerouslyAuthenticate(repoPath: string, remote: string, username: string, password: string, options?: CommandOptions): Promise<CommandResult>;
+    }
+
+    class Pty {
+        create(options?: CommandOptions & {cmd?: string; args?: string[]; cols?: number; rows?: number; onData?: (data: Buffer) => void}): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandOptions & {onData?: (data: Buffer) => void}): Promise<CommandHandle>;
+        sendInput(pid: number, data: string | Buffer, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
+        resize(pid: number, size: {cols: number; rows: number}, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
+        kill(pid: number, options?: {user?: string; requestTimeoutMs?: number}): Promise<boolean>;
+    }
+
+    const DEFAULT_ENDPOINT: string;
+    const DEFAULT_TEMPLATE: string;
+    const DEFAULT_SANDBOX_TIMEOUT_MS: number;
+    const FileType: {
+        FILE: 'file';
+        DIR: 'dir';
+    };
+    const FilesystemEventType: {
+        CREATE: 'create';
+        WRITE: 'write';
+        REMOVE: 'remove';
+        RENAME: 'rename';
+        CHMOD: 'chmod';
+    };
+    const ALL_TRAFFIC: string;
+
+    class SandboxError extends Error {
+        response?: IncomingMessage;
+        data?: any;
+    }
+
+    class CommandExitError extends SandboxError {
+        command?: string;
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+    }
+
+    class TimeoutError extends Error {}
+    class NotImplementedError extends Error {}
+    class InvalidArgumentError extends Error {}
+    class NotFoundError extends Error {}
+    class FileNotFoundError extends Error {}
+    class SandboxNotFoundError extends Error {}
+    class GitAuthError extends Error {}
+    class GitUpstreamError extends Error {}
+    class TemplateBuildError extends Error {}
+
+    interface TemplateBuilder {
+        fromImage(image: string, credentials?: {username: string; password: string}): this;
+        fromAWSRegistry(image: string, credentials: {accessKeyId: string; secretAccessKey: string; region: string}): this;
+        fromGCPRegistry(image: string, credentials: {serviceAccountJSON: string | object}): this;
+        fromTemplate(templateID: string): this;
+        fromDockerfile(dockerfileContentOrPath: string): this;
+        aptInstall(packages: string | string[], options?: {noInstallRecommends?: boolean; fixMissing?: boolean}): this;
+        runCmd(command: string | string[], options?: {user?: string}): this;
+        copy(src: string | string[], dest: string, options?: {forceUpload?: true; user?: string; mode?: number; resolveSymlinks?: boolean}): this;
+        copyItems(items: TemplateCopyItem[]): this;
+        remove(path: string | string[], options?: {force?: boolean; recursive?: boolean; user?: string}): this;
+        rename(src: string, dest: string, options?: {force?: boolean; user?: string}): this;
+        makeDir(path: string | string[], options?: {mode?: number; user?: string}): this;
+        makeSymlink(src: string, dest: string, options?: {force?: boolean; user?: string}): this;
+        setWorkdir(workdir: string): this;
+        setUser(user: string): this;
+        pipInstall(options?: {g?: boolean}): this;
+        pipInstall(packages?: string | string[], options?: {g?: boolean}): this;
+        npmInstall(options?: {g?: boolean; dev?: boolean}): this;
+        npmInstall(packages?: string | string[], options?: {g?: boolean; dev?: boolean}): this;
+        bunInstall(options?: {g?: boolean; dev?: boolean}): this;
+        bunInstall(packages?: string | string[], options?: {g?: boolean; dev?: boolean}): this;
+        gitClone(url: string, options?: {branch?: string; depth?: number; user?: string}): this;
+        gitClone(url: string, path?: string, options?: {branch?: string; depth?: number; user?: string}): this;
+        setEnvs(envs: {[key: string]: string}): this;
+        skipCache(): this;
+        setStartCmd(command: string): this;
+        setReadyCmd(command: string): this;
+        build(options?: SandboxClientOptions & {client?: SandboxClient; name?: string; alias?: string; tags?: string[]}): Promise<any>;
+    }
+
+    const Template: {
+        new(): TemplateBuilder;
+        (): TemplateBuilder;
+    };
+
+    class Volume {
+        create(): Promise<never>;
+        delete(): Promise<never>;
+        list(): Promise<never>;
+    }
+
+    class SandboxClient {
+        endpoint: string;
+        apiKey?: string;
+        accessToken?: string;
+        mac?: auth.digest.Mac;
+
+        constructor(options?: SandboxClientOptions);
+
+        listSandboxes(options?: any): Promise<any>;
+        listSandboxesV2(options?: any): Promise<any>;
+        createSandbox(options?: SandboxCreateOptions): Promise<any>;
+        getSandboxesMetrics(sandboxIDs: string[] | any): Promise<any>;
+        getSandboxLogs(sandboxID: string, options?: any): Promise<any>;
+        getSandbox(sandboxID: string): Promise<any>;
+        deleteSandbox(sandboxID: string): Promise<null>;
+        killSandbox(sandboxID: string): Promise<null>;
+        getSandboxMetrics(sandboxID: string, options?: any): Promise<any>;
+        pauseSandbox(sandboxID: string): Promise<null>;
+        resumeSandbox(sandboxID: string, options?: any): Promise<any>;
+        connectSandbox(sandboxID: string, options?: SandboxConnectOptions): Promise<any>;
+        updateSandboxTimeout(sandboxID: string, timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
+        updateSandbox(sandboxID: string, options?: any): Promise<any>;
+        refreshSandbox(sandboxID: string, options?: {duration?: number}): Promise<null>;
+
+        createTemplate(options?: any): Promise<any>;
+        createTemplateV3(options?: any): Promise<any>;
+        createTemplateV2(options?: any): Promise<any>;
+        getTemplateFiles(templateID: string, hash: string): Promise<any>;
+        listDefaultTemplates(): Promise<any>;
+        listTemplates(options?: any): Promise<any>;
+        getTemplate(templateID: string, options?: any): Promise<any>;
+        deleteTemplate(templateID: string): Promise<null>;
+        updateTemplate(templateID: string, options?: any): Promise<any>;
+        startTemplateBuildV2(templateID: string, buildID: string, options?: any): Promise<null>;
+        getTemplateBuildStatus(templateID: string, buildID: string, options?: any): Promise<any>;
+        getTemplateBuildLogs(templateID: string, buildID: string, options?: any): Promise<any>;
+        assignTemplateTags(options?: any): Promise<any>;
+        deleteTemplateTags(options?: any): Promise<null>;
+        getTemplateByAlias(alias: string): Promise<any>;
+
+        listInjectionRules(): Promise<any>;
+        createInjectionRule(options?: any): Promise<any>;
+        getInjectionRule(ruleID: string): Promise<any>;
+        updateInjectionRule(ruleID: string, options?: any): Promise<any>;
+        deleteInjectionRule(ruleID: string): Promise<null>;
+
+        create(options?: SandboxCreateOptions): Promise<any>;
+        connect(sandboxID: string, options?: SandboxConnectOptions): Promise<any>;
+        list(options?: any): Promise<any>;
+        kill(sandboxID: string): Promise<null>;
+        setTimeout(sandboxID: string, timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
+        getInfo(sandboxID: string): Promise<any>;
+        getMetrics(sandboxID: string, options?: any): Promise<any>;
+        getLogs(sandboxID: string, options?: any): Promise<any>;
+        createAndWait(options?: SandboxCreateOptions, pollOptions?: PollOptions): Promise<Sandbox>;
+        rebuildTemplate(templateID: string, options?: any): Promise<any>;
+        startTemplateBuild(templateID: string, buildID: string, options?: any): Promise<null>;
+        waitForBuild(templateID: string, buildID: string, options?: PollOptions): Promise<any>;
+        createSnapshot(sandboxID: string, options?: any): Promise<SnapshotInfo>;
+        listSnapshots(options?: any): Promise<any>;
+        deleteSnapshot(snapshotID: string): Promise<null>;
+    }
+
+    class Sandbox {
+        sandboxId: string;
+        sandboxID: string;
+        sandboxDomain?: string;
+        domain?: string;
+        info: any;
+        client: SandboxClient;
+        files: Filesystem;
+        filesystem: Filesystem;
+        commands: Commands;
+        pty: Pty;
+        git: Git;
+
+        constructor(options?: any);
+
+        static create(options?: SandboxCreateOptions): Promise<Sandbox>;
+        static create(template: string, options?: SandboxCreateOptions): Promise<Sandbox>;
+        static connect(sandboxID: string, options?: SandboxConnectOptions): Promise<Sandbox>;
+        static list(options?: SandboxClientOptions & {client?: SandboxClient; limit?: number; nextToken?: string; query?: any}): SandboxPaginator;
+
+        kill(): Promise<null>;
+        setTimeout(timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
+        refresh(options?: {duration?: number}): Promise<null>;
+        updateNetwork(network: any): Promise<any>;
+        pause(): Promise<null>;
+        /**
+         * @deprecated use pause() instead
+         */
+        betaPause(): Promise<null>;
+        connect(options?: SandboxConnectOptions): Promise<this>;
+        getInfo(): Promise<any>;
+        getMetrics(options?: any): Promise<any>;
+        getLogs(options?: any): Promise<any>;
+        createSnapshot(options?: any): Promise<SnapshotInfo>;
+        listSnapshots(options?: any): SnapshotPaginator;
+        getMcpUrl(): string;
+        getMcpToken(): Promise<string | undefined>;
+        waitForReady(options?: PollOptions): Promise<any>;
+        isRunning(): Promise<boolean>;
+        getHost(port: number): string;
+        envdUrl(): string;
+        fileUrl(path: string, operation: string, options?: FileUrlOptions): string;
+        downloadUrl(path: string, options?: FileUrlOptions): string;
+        DownloadURL(path: string, options?: FileUrlOptions): string;
+        uploadUrl(path: string, options?: FileUrlOptions): string;
+        UploadURL(path: string, options?: FileUrlOptions): string;
+        batchUploadUrl(options?: string | FileUrlOptions): string;
+    }
+}
+
+export declare const Sandbox: typeof sandbox.Sandbox;
+export declare const SandboxClient: typeof sandbox.SandboxClient;
+export declare const SandboxPaginator: typeof sandbox.SandboxPaginator;
+export declare const SnapshotPaginator: typeof sandbox.SnapshotPaginator;
+export declare const DEFAULT_SANDBOX_TIMEOUT_MS: typeof sandbox.DEFAULT_SANDBOX_TIMEOUT_MS;
+export declare const FileType: typeof sandbox.FileType;
+export declare const FilesystemEventType: typeof sandbox.FilesystemEventType;
+export declare const WatchHandle: typeof sandbox.WatchHandle;
+export declare const CommandExitError: typeof sandbox.CommandExitError;
+export declare const SandboxError: typeof sandbox.SandboxError;
+
 export declare namespace cdn {
     class CdnManager {
         mac: auth.digest.Mac;
