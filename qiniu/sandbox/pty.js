@@ -33,6 +33,7 @@ function LivePtyHandle (pty, pid, request, waitPromise, opts) {
     this.pid = pid;
     this._request = request;
     this._waitPromise = waitPromise;
+    this._resolveWait = null;
     this.opts = opts || {};
     this.stdout = '';
     this.stderr = '';
@@ -52,10 +53,19 @@ LivePtyHandle.prototype.kill = function () {
 };
 
 LivePtyHandle.prototype.disconnect = function () {
+    this._disconnected = true;
     if (this._request) {
-        this._disconnected = true;
         this._request.destroy();
         this._request = null;
+    }
+    if (this._resolveWait) {
+        const result = {
+            exitCode: 0,
+            stdout: this.stdout,
+            stderr: this.stderr
+        };
+        this._resolveWait(result);
+        this._resolveWait = null;
     }
     return Promise.resolve();
 };
@@ -124,6 +134,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             if (event.start && !handle) {
                 cleanupStartTimer();
                 handle = new LivePtyHandle(pty, event.start.pid, req, waitPromise, opts);
+                handle._resolveWait = resolveWait;
                 settled = true;
                 resolve(handle);
             }
@@ -151,6 +162,9 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                     exitCode: event.end.exitCode === undefined ? 0 : event.end.exitCode,
                     error: event.end.error || ''
                 });
+                if (handle) {
+                    handle._resolveWait = null;
+                }
                 resolveWait(result);
             }
         }

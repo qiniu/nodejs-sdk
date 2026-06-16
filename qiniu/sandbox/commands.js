@@ -108,6 +108,7 @@ function CommandHandle (commands, pid, result, opts, request, waitPromise) {
     this.opts = opts || {};
     this._request = request;
     this._waitPromise = waitPromise;
+    this._resolveWait = null;
     this.stdout = result && result.stdout ? result.stdout : '';
     this.stderr = result && result.stderr ? result.stderr : '';
 }
@@ -135,10 +136,25 @@ CommandHandle.prototype.kill = function () {
 };
 
 CommandHandle.prototype.disconnect = function () {
+    this._disconnected = true;
     if (this._request) {
-        this._disconnected = true;
         this._request.destroy();
         this._request = null;
+    }
+    if (this._resolveWait) {
+        const result = this.result || {
+            pid: this.pid,
+            exitCode: 0,
+            stdout: this.stdout,
+            stderr: this.stderr,
+            error: ''
+        };
+        if (result.exitCode === -1) {
+            result.exitCode = 0;
+        }
+        this.result = result;
+        this._resolveWait(result);
+        this._resolveWait = null;
     }
     return Promise.resolve();
 };
@@ -212,6 +228,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                 cleanupStartTimer();
                 result.pid = pid || result.pid;
                 handle = new CommandHandle(commands, result.pid, null, opts, req, waitPromise);
+                handle._resolveWait = resolveWait;
                 settled = true;
                 resolve(handle);
             }
@@ -248,6 +265,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             result.error = end && end.error ? end.error : '';
             if (handle) {
                 handle.result = result;
+                handle._resolveWait = null;
             }
             resolveWait(result);
         }
