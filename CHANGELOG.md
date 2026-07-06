@@ -1,9 +1,11 @@
 ## CHANGE LOG
 
+## 7.15.4
+- 沙箱请求注入支持 `baseUrl` 路径前缀匹配和 `ifHeaders`、`ifQueries` 条件匹配
+
 ## 7.15.3
 - 新增沙箱（Sandbox）模块，支持沙箱实例、文件系统、命令执行、Git、PTY、模板、资源挂载、请求注入等能力
 - 新增沙箱模块的 TypeScript 类型声明、示例和测试覆盖
-- 沙箱请求注入支持 `baseUrl` 路径前缀匹配和 `ifHeaders`、`ifQueries` 条件匹配
 
 ## 7.15.2
 - 对象存储，修复 pfop pipeline 参数无效问题
