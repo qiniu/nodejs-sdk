@@ -37,6 +37,12 @@ describe('test sandbox client module', function () {
                         type: 'qiniu',
                         apiKey: 'ak',
                         baseUrl: 'https://example.com',
+                        ifHeaders: {
+                            'X-Provider': 'qiniu'
+                        },
+                        ifQueries: {
+                            model: 'default'
+                        },
                         ruleId: 'rule_1'
                     }
                 ]
@@ -62,6 +68,12 @@ describe('test sandbox client module', function () {
                             type: 'qiniu',
                             api_key: 'ak',
                             base_url: 'https://example.com',
+                            if_headers: {
+                                'X-Provider': 'qiniu'
+                            },
+                            if_queries: {
+                                model: 'default'
+                            },
                             ruleID: 'rule_1'
                         }
                     ]
@@ -386,7 +398,14 @@ describe('test sandbox client module', function () {
                 name: 'openai',
                 injection: {
                     type: 'openai',
-                    apiKey: 'secret'
+                    apiKey: 'secret',
+                    baseUrl: 'https://api.openai.com/v1/*',
+                    ifHeaders: {
+                        'X-Use-Injected-Key': 'true'
+                    },
+                    ifQueries: {
+                        source: 'sdk-test'
+                    }
                 }
             }).then(() => {
                 fixture.requests[0].method.should.eql('POST');
@@ -397,9 +416,48 @@ describe('test sandbox client module', function () {
                     name: 'openai',
                     injection: {
                         type: 'openai',
-                        api_key: 'secret'
+                        api_key: 'secret',
+                        base_url: 'https://api.openai.com/v1/*',
+                        if_headers: {
+                            'X-Use-Injected-Key': 'true'
+                        },
+                        if_queries: {
+                            source: 'sdk-test'
+                        }
                     }
                 });
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('uses the signing default content type for Qiniu-auth GET requests without a body', function () {
+        return startServer((req, res) => {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+                id: 'rule_1',
+                name: 'openai',
+                injection: {
+                    type: 'openai'
+                }
+            }));
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                mac: new qiniu.auth.digest.Mac('ak', 'sk', {
+                    disableQiniuTimestampSignature: true
+                })
+            });
+
+            return client.getInjectionRule('rule_1').then(() => {
+                fixture.requests[0].method.should.eql('GET');
+                fixture.requests[0].url.should.eql('/injection-rules/rule_1');
+                should(fixture.requests[0].headers.authorization).startWith('Qiniu ak:');
+                fixture.requests[0].headers['content-type'].should.eql('application/x-www-form-urlencoded');
             }).then(() => closeServer(fixture.server), err => {
                 return closeServer(fixture.server).then(() => {
                     throw err;
