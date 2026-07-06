@@ -19,10 +19,38 @@ async function useSandboxTypes () {
         mount_path: '/workspace/repo',
         authorization_token: 'token'
     };
+    const qiniuInjection: qiniu.sandbox.QiniuInjection = {
+        type: 'qiniu',
+        apiKey: 'sandbox-qiniu-ai-key',
+        baseUrl: 'https://api.qnaigc.com/v1/*',
+        ifHeaders: {
+            'X-Use-Injected-Key': 'true'
+        },
+        ifQueries: {
+            model: 'qiniu-default'
+        }
+    };
+    const githubInjection: qiniu.sandbox.GithubInjection = {
+        type: 'github',
+        token: 'github-token',
+        base_url: 'https://api.github.com/repos/qiniu/*',
+        if_headers: {
+            Accept: 'application/vnd.github+json'
+        },
+        if_queries: {
+            per_page: '100'
+        }
+    };
 
     const sandbox = await qiniu.Sandbox.create('base', {
         client,
         resources: [kodoResource, gitResource],
+        injections: [
+            { type: 'id', id: 'rule_1' },
+            { injectionRuleID: 'rule_2' },
+            qiniuInjection,
+            githubInjection
+        ],
         network: {
             allowOut: [qiniu.sandbox.ALL_TRAFFIC]
         }

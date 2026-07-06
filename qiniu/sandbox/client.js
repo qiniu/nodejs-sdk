@@ -64,6 +64,14 @@ function normalizeInjection (injection) {
         normalized.base_url = normalized.baseUrl;
         delete normalized.baseUrl;
     }
+    if (normalized.ifHeaders !== undefined && normalized.if_headers === undefined) {
+        normalized.if_headers = normalized.ifHeaders;
+        delete normalized.ifHeaders;
+    }
+    if (normalized.ifQueries !== undefined && normalized.if_queries === undefined) {
+        normalized.if_queries = normalized.ifQueries;
+        delete normalized.ifQueries;
+    }
     if (normalized.ruleId !== undefined && normalized.ruleID === undefined) {
         normalized.ruleID = normalized.ruleId;
         delete normalized.ruleId;
@@ -172,6 +180,9 @@ SandboxClient.prototype._request = function (method, path, options) {
     const body = options.body;
     const hasBody = body !== undefined && body !== null;
     const headers = this._headers(options.authType);
+    if (!hasBody && (method === 'GET' || method === 'HEAD')) {
+        delete headers['Content-Type'];
+    }
     const urllibOptions = {
         method,
         headers,

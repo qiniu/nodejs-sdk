@@ -70,6 +70,85 @@ export declare namespace sandbox {
 
     type SandboxResource = GitRepositoryResource | KodoResource;
 
+    type InjectionConditions = {[key: string]: string};
+
+    interface InjectionMatchOptions {
+        base_url?: string;
+        baseUrl?: string;
+        if_headers?: InjectionConditions;
+        ifHeaders?: InjectionConditions;
+        if_queries?: InjectionConditions;
+        ifQueries?: InjectionConditions;
+    }
+
+    interface InjectionById {
+        type: 'id';
+        id?: string;
+        ruleID?: string;
+        ruleId?: string;
+        injectionRuleID?: string;
+    }
+
+    interface InjectionRuleReference {
+        injectionRuleID: string;
+    }
+
+    interface HttpInjection extends InjectionMatchOptions {
+        type: 'http';
+        headers?: {[key: string]: string};
+    }
+
+    interface OpenaiInjection extends InjectionMatchOptions {
+        type: 'openai';
+        api_key?: string;
+        apiKey?: string;
+    }
+
+    interface AnthropicInjection extends InjectionMatchOptions {
+        type: 'anthropic';
+        api_key?: string;
+        apiKey?: string;
+    }
+
+    interface GeminiInjection extends InjectionMatchOptions {
+        type: 'gemini';
+        api_key?: string;
+        apiKey?: string;
+    }
+
+    interface QiniuInjection extends InjectionMatchOptions {
+        type: 'qiniu';
+        api_key?: string;
+        apiKey?: string;
+    }
+
+    interface GithubInjection extends InjectionMatchOptions {
+        type: 'github';
+        token: string;
+    }
+
+    type Injection = HttpInjection | OpenaiInjection | AnthropicInjection | GeminiInjection | QiniuInjection | GithubInjection;
+    type SandboxInjection = InjectionById | InjectionRuleReference | Injection;
+
+    interface InjectionRule {
+        ruleID?: string;
+        id?: string;
+        name: string;
+        createdAt?: string | Date;
+        updatedAt?: string | Date;
+        injection: Injection;
+    }
+
+    interface CreateInjectionRuleOptions {
+        name: string;
+        injection: Injection;
+    }
+
+    interface UpdateInjectionRuleOptions {
+        name?: string;
+        injection?: Injection;
+    }
+
     interface SandboxCreateOptions extends SandboxClientOptions {
         template?: string;
         templateID?: string;
@@ -84,7 +163,7 @@ export declare namespace sandbox {
         envVars?: {[key: string]: string};
         envs?: {[key: string]: string};
         mcp?: any;
-        injections?: any[];
+        injections?: SandboxInjection[];
         resources?: SandboxResource[];
         client?: SandboxClient;
     }
@@ -403,10 +482,10 @@ export declare namespace sandbox {
         deleteTemplateTags(options?: any): Promise<null>;
         getTemplateByAlias(alias: string): Promise<any>;
 
-        listInjectionRules(): Promise<any>;
-        createInjectionRule(options?: any): Promise<any>;
-        getInjectionRule(ruleID: string): Promise<any>;
-        updateInjectionRule(ruleID: string, options?: any): Promise<any>;
+        listInjectionRules(): Promise<InjectionRule[]>;
+        createInjectionRule(options: CreateInjectionRuleOptions): Promise<InjectionRule>;
+        getInjectionRule(ruleID: string): Promise<InjectionRule>;
+        updateInjectionRule(ruleID: string, options: UpdateInjectionRuleOptions): Promise<InjectionRule>;
         deleteInjectionRule(ruleID: string): Promise<null>;
 
         create(options?: SandboxCreateOptions): Promise<any>;
