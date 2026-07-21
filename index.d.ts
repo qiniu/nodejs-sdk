@@ -130,6 +130,24 @@ export declare namespace sandbox {
     type Injection = HttpInjection | OpenaiInjection | AnthropicInjection | GeminiInjection | QiniuInjection | GithubInjection;
     type SandboxInjection = InjectionById | InjectionRuleReference | Injection;
 
+    interface SandboxInjectionsResponse {
+        injections: SandboxInjection[];
+    }
+
+    interface TemplateInfo {
+        templateID: string;
+        public: boolean;
+        /** @deprecated use names instead */
+        aliases: string[];
+        names: string[];
+        [key: string]: any;
+    }
+
+    interface TemplateWithBuilds extends TemplateInfo {
+        isOwner: boolean;
+        builds: any[];
+    }
+
     interface InjectionRule {
         ruleID?: string;
         id?: string;
@@ -456,6 +474,9 @@ export declare namespace sandbox {
         getSandboxesMetrics(sandboxIDs: string[] | any): Promise<any>;
         getSandboxLogs(sandboxID: string, options?: any): Promise<any>;
         getSandbox(sandboxID: string): Promise<any>;
+        getSandboxInjections(sandboxID: string): Promise<SandboxInjectionsResponse>;
+        updateSandboxInjections(sandboxID: string, injections: SandboxInjection[]): Promise<null>;
+        updateSandboxGithubToken(sandboxID: string, authorizationToken: string): Promise<null>;
         deleteSandbox(sandboxID: string): Promise<null>;
         killSandbox(sandboxID: string): Promise<null>;
         getSandboxMetrics(sandboxID: string, options?: any): Promise<any>;
@@ -472,7 +493,7 @@ export declare namespace sandbox {
         getTemplateFiles(templateID: string, hash: string): Promise<any>;
         listDefaultTemplates(): Promise<any>;
         listTemplates(options?: any): Promise<any>;
-        getTemplate(templateID: string, options?: any): Promise<any>;
+        getTemplate(templateID: string, options?: any): Promise<TemplateWithBuilds>;
         deleteTemplate(templateID: string): Promise<null>;
         updateTemplate(templateID: string, options?: any): Promise<any>;
         startTemplateBuildV2(templateID: string, buildID: string, options?: any): Promise<null>;
@@ -536,6 +557,9 @@ export declare namespace sandbox {
         betaPause(): Promise<null>;
         connect(options?: SandboxConnectOptions): Promise<this>;
         getInfo(): Promise<any>;
+        getInjections(): Promise<SandboxInjectionsResponse>;
+        updateInjections(injections: SandboxInjection[]): Promise<null>;
+        updateGithubToken(authorizationToken: string): Promise<null>;
         getMetrics(options?: any): Promise<any>;
         getLogs(options?: any): Promise<any>;
         createSnapshot(options?: any): Promise<SnapshotInfo>;

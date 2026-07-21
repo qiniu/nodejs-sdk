@@ -7,25 +7,29 @@ const {
 
 runExample(() => {
     let sandbox;
+    const httpInjection = {
+        type: 'http',
+        baseUrl: 'https://httpbin.org/bearer',
+        ifHeaders: {
+            'X-Sandbox-Example': 'qiniu-nodejs-sdk'
+        },
+        headers: {
+            Authorization: `Bearer ${env('QINIU_SANDBOX_HTTP_INJECTION_TOKEN', 'real_token')}`
+        }
+    };
 
     return createSandboxAndWait({
-        injections: [
-            {
-                type: 'http',
-                baseUrl: 'https://httpbin.org/bearer',
-                ifHeaders: {
-                    'X-Sandbox-Example': 'qiniu-nodejs-sdk'
-                },
-                headers: {
-                    Authorization: `Bearer ${env('QINIU_SANDBOX_HTTP_INJECTION_TOKEN', 'real_token')}`
-                }
-            }
-        ],
+        injections: [httpInjection],
         metadata: {
             example: 'sandbox_request_injections'
         }
     }).then(created => {
         sandbox = created;
+        return sandbox.getInjections();
+    }).then(result => {
+        console.log('Current runtime injections:', result.injections);
+        return sandbox.updateInjections([httpInjection]);
+    }).then(() => {
         return sandbox.commands.run('curl --max-time 20 -sSL https://httpbin.org/bearer -H "Authorization: Bearer fake_token" -H "X-Sandbox-Example: qiniu-nodejs-sdk"', {
             timeout: 30000
         });

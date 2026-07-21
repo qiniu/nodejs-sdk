@@ -216,6 +216,18 @@ Sandbox.prototype.getInfo = function () {
     return this.client.getSandbox(this.sandboxId);
 };
 
+Sandbox.prototype.getInjections = function () {
+    return this.client.getSandboxInjections(this.sandboxId);
+};
+
+Sandbox.prototype.updateInjections = function (injections) {
+    return this.client.updateSandboxInjections(this.sandboxId, injections);
+};
+
+Sandbox.prototype.updateGithubToken = function (authorizationToken) {
+    return this.client.updateSandboxGithubToken(this.sandboxId, authorizationToken);
+};
+
 Sandbox.prototype.refreshEnvdTokenIfNeeded = function () {
     if (this.envdAccessToken) {
         return Promise.resolve(this);

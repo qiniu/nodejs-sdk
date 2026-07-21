@@ -32,7 +32,14 @@ describe('test sandbox template module', function () {
             }
             if (req.method === 'GET' && req.url === '/templates/tpl_1?limit=5&nextToken=n2') {
                 res.statusCode = 200;
-                res.end(JSON.stringify({ templateID: 'tpl_1' }));
+                res.end(JSON.stringify({
+                    templateID: 'tpl_1',
+                    public: true,
+                    aliases: ['nodejs'],
+                    names: ['qiniu/nodejs'],
+                    isOwner: true,
+                    builds: []
+                }));
                 return;
             }
             if (req.method === 'PATCH' && req.url === '/templates/tpl_1') {
@@ -99,6 +106,12 @@ describe('test sandbox template module', function () {
                 .then(() => client.createTemplate({ name: 'node:v1' }))
                 .then(() => client.createTemplateV2({ alias: 'old' }))
                 .then(() => client.getTemplate('tpl_1', { limit: 5, nextToken: 'n2' }))
+                .then(template => {
+                    template.names.should.eql(['qiniu/nodejs']);
+                    template.aliases.should.eql(['nodejs']);
+                    template.isOwner.should.eql(true);
+                    template.builds.should.eql([]);
+                })
                 .then(() => client.updateTemplate('tpl_1', { public: true }))
                 .then(() => client.deleteTemplate('tpl_1'))
                 .then(() => client.getTemplateFiles('tpl_1', 'hash'))

@@ -25,7 +25,13 @@ runExample(() => {
         }
         const id = first.templateID || first.template_id || first.id || sandboxTemplate();
         return client.getTemplate(id).then(detail => {
-            console.log('First template detail:', detail.templateID || detail.template_id || id);
+            console.log('First template detail:', {
+                templateID: detail.templateID || detail.template_id || id,
+                names: detail.names,
+                aliases: detail.aliases,
+                isOwner: detail.isOwner,
+                buildCount: Array.isArray(detail.builds) ? detail.builds.length : 0
+            });
         });
     }).then(() => {
         const advanced = qiniu.sandbox.Template()

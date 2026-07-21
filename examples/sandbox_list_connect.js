@@ -1,16 +1,19 @@
 const {
     qiniu,
     sandboxClient,
+    sandboxTemplate,
     cleanupSandbox,
     runExample
 } = require('./sandbox_common');
 
 runExample(() => {
     const client = sandboxClient();
+    const template = sandboxTemplate();
     let sandbox;
 
     return qiniu.sandbox.Sandbox.create({
         client,
+        template,
         timeout: 300,
         metadata: {
             example: 'sandbox_list_connect'
@@ -20,7 +23,10 @@ runExample(() => {
         console.log('Created:', sandbox.sandboxId);
         return qiniu.sandbox.Sandbox.list({
             client,
-            limit: 10
+            limit: 10,
+            query: {
+                template: [template]
+            }
         });
     }).then(items => {
         console.log('List result:', Array.isArray(items) ? items.map(item => item.sandboxId || item.sandboxID) : items);
