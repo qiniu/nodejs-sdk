@@ -10,3 +10,4 @@ docs/
 examples/
 coverage/
 .nyc_output/
+.env

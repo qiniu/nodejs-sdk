@@ -1,5 +1,9 @@
 ## CHANGE LOG
 
+## 7.15.5
+- 沙箱列表支持按模板筛选
+- 沙箱实例支持查询和更新运行时请求注入配置，并支持更新 GitHub Token
+
 ## 7.15.4
 - 沙箱请求注入支持 `baseUrl` 路径前缀匹配和 `ifHeaders`、`ifQueries` 条件匹配
 
