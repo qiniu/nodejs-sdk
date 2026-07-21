@@ -553,6 +553,119 @@ describe('test sandbox client module', function () {
         });
     });
 
+    it('maps sandbox template filters and runtime injection APIs', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'GET' && req.url === '/v2/sandboxes?limit=5&template=tpl_1%2Ctpl_2%2Ctpl_3%2Ctpl_4') {
+                res.statusCode = 200;
+                res.end(JSON.stringify([]));
+                return;
+            }
+            if (req.method === 'GET' && req.url === '/sandboxes/sbx_runtime/injections') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                    injections: [{ type: 'github', token: 'ghp_****' }]
+                }));
+                return;
+            }
+            if (req.method === 'PUT' && req.url === '/sandboxes/sbx_runtime/injections') {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
+            if (req.method === 'PUT' && req.url === '/sandboxes/sbx_runtime/github-token') {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
+            res.statusCode = 404;
+            res.end(JSON.stringify({ message: req.method + ' ' + req.url }));
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                apiKey: 'sandbox-key'
+            });
+
+            return client.listSandboxesV2({
+                limit: 5,
+                query: {
+                    template: [
+                        'tpl_1',
+                        { templateID: 'tpl_2' },
+                        { template_id: 'tpl_3' },
+                        { id: 'tpl_4' },
+                        null
+                    ]
+                }
+            }).then(() => client.getSandboxInjections('sbx_runtime'))
+                .then(result => {
+                    result.injections[0].token.should.eql('ghp_****');
+                    return client.updateSandboxInjections('sbx_runtime', [{
+                        type: 'openai',
+                        apiKey: 'secret',
+                        baseUrl: 'https://api.openai.com/v1/*'
+                    }]);
+                })
+                .then(() => client.updateSandboxGithubToken('sbx_runtime', 'github-token'))
+                .then(() => {
+                    JSON.parse(fixture.requests[2].body).should.eql({
+                        injections: [{
+                            type: 'openai',
+                            api_key: 'secret',
+                            base_url: 'https://api.openai.com/v1/*'
+                        }]
+                    });
+                    JSON.parse(fixture.requests[3].body).should.eql({
+                        authorization_token: 'github-token'
+                    });
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
+    it('validates runtime injection API arguments before sending requests', function () {
+        return startServer((req, res) => {
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                apiKey: 'sandbox-key'
+            });
+            const calls = [
+                () => client.getSandboxInjections(),
+                () => client.updateSandboxInjections(undefined, []),
+                () => client.updateSandboxGithubToken(undefined, 'github-token'),
+                () => client.updateSandboxInjections('sbx_runtime', { type: 'id', id: 'rule_1' }),
+                () => client.updateSandboxGithubToken('sbx_runtime'),
+                () => client.updateSandboxInjections('sbx_runtime', [null])
+            ];
+
+            return calls.reduce((promise, call, index) => {
+                return promise.then(() => call().then(() => {
+                    throw new Error('expected runtime injection argument validation to fail');
+                }, err => {
+                    err.name.should.eql('SandboxError');
+                    const expected = index < 3
+                        ? 'sandboxID is required'
+                        : (index === 3
+                            ? 'injections must be an array'
+                            : (index === 4 ? 'authorizationToken is required' : 'injections must contain objects'));
+                    err.message.should.eql(expected);
+                }));
+            }, Promise.resolve()).then(() => {
+                fixture.requests.should.have.length(0);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('surfaces sandbox API string errors and default connect timeout', function () {
         return startServer((req, res) => {
             if (req.method === 'POST' && req.url === '/sandboxes/sbx_default/connect') {

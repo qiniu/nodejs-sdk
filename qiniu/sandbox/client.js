@@ -100,6 +100,25 @@ function normalizeSandboxListOptions (opts) {
     if (query && query.state) {
         opts.state = query.state;
     }
+    if (query && query.template) {
+        const normalizeTemplate = template => {
+            if (typeof template === 'string') {
+                return template;
+            }
+            return template && (template.templateID || template.template_id || template.id);
+        };
+        if (Array.isArray(query.template)) {
+            const templates = query.template.map(normalizeTemplate).filter(Boolean);
+            if (templates.length) {
+                opts.template = templates;
+            }
+        } else {
+            const template = normalizeTemplate(query.template);
+            if (template) {
+                opts.template = template;
+            }
+        }
+    }
     return opts;
 }
 
@@ -274,6 +293,46 @@ SandboxClient.prototype.getSandbox = function (sandboxID) {
         return Promise.reject(new SandboxError('sandboxID is required'));
     }
     return this._request('GET', `/sandboxes/${encodePath(sandboxID)}`);
+};
+
+SandboxClient.prototype.getSandboxInjections = function (sandboxID) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
+    return this._request('GET', `/sandboxes/${encodePath(sandboxID)}/injections`);
+};
+
+SandboxClient.prototype.updateSandboxInjections = function (sandboxID, injections) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
+    if (!Array.isArray(injections)) {
+        return Promise.reject(new SandboxError('injections must be an array'));
+    }
+    if (injections.some(injection => !injection || typeof injection !== 'object' || Array.isArray(injection))) {
+        return Promise.reject(new SandboxError('injections must contain objects'));
+    }
+    return this._request('PUT', `/sandboxes/${encodePath(sandboxID)}/injections`, {
+        body: {
+            injections: injections.map(normalizeInjection)
+        },
+        empty: true
+    });
+};
+
+SandboxClient.prototype.updateSandboxGithubToken = function (sandboxID, authorizationToken) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
+    if (!authorizationToken) {
+        return Promise.reject(new SandboxError('authorizationToken is required'));
+    }
+    return this._request('PUT', `/sandboxes/${encodePath(sandboxID)}/github-token`, {
+        body: {
+            authorization_token: authorizationToken
+        },
+        empty: true
+    });
 };
 
 SandboxClient.prototype.deleteSandbox = function (sandboxID) {

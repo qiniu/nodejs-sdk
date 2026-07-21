@@ -41,6 +41,9 @@ function runGitResourceExample () {
         return sandbox.waitForReady({ interval: 3000, timeout: 180000 });
     }).then(() => {
         console.log('Git resource sandbox ready:', sandbox.sandboxId);
+        return sandbox.updateGithubToken(token);
+    }).then(() => {
+        console.log('GitHub token updated for the running sandbox.');
         return sandbox.commands.run(`ls -la ${shellQuote(mountPath)} | head -20`);
     }).then(result => {
         console.log(result.stdout);

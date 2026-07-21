@@ -136,6 +136,13 @@ async function useSandboxTypes () {
         .runCmd(['echo one', 'echo two'], { user: 'root' });
     await template.build({ client, name: 'typed-template:test' });
     await sandbox.updateNetwork({ allowOut: [qiniu.sandbox.ALL_TRAFFIC] });
+    const injections: qiniu.sandbox.SandboxInjection[] = (await sandbox.getInjections()).injections;
+    await sandbox.updateInjections(injections);
+    await sandbox.updateGithubToken('github-token');
+    const templateInfo: qiniu.sandbox.TemplateWithBuilds = await client.getTemplate('typed-template');
+    const templateNames: string[] = templateInfo.names;
+    const isOwner: boolean = templateInfo.isOwner;
+    qiniu.Sandbox.list({ client, query: { template: templateNames } });
     qiniu.CommandExitError.name;
     bytes.length;
     text.length;
@@ -144,6 +151,9 @@ async function useSandboxTypes () {
     eventType.length;
     if (gitUser) {
         gitUser.length;
+    }
+    if (isOwner) {
+        isOwner.valueOf();
     }
 }
 

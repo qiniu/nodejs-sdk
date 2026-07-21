@@ -5,6 +5,51 @@ const {
 } = require('./sandbox_helpers');
 
 describe('test sandbox facade module', function () {
+    it('manages runtime injections and GitHub tokens through Sandbox instances', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'GET' && req.url === '/sandboxes/sbx_runtime/injections') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({ injections: [{ type: 'id', id: 'rule_1' }] }));
+                return;
+            }
+            if (req.method === 'PUT' && (req.url === '/sandboxes/sbx_runtime/injections' || req.url === '/sandboxes/sbx_runtime/github-token')) {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
+            res.statusCode = 404;
+            res.end(JSON.stringify({ message: req.method + ' ' + req.url }));
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_runtime',
+                client: new qiniu.sandbox.SandboxClient({
+                    endpoint: fixture.endpoint,
+                    apiKey: 'sandbox-key'
+                }),
+                info: {}
+            });
+
+            return sandbox.getInjections()
+                .then(result => {
+                    result.injections[0].id.should.eql('rule_1');
+                    return sandbox.updateInjections([{ type: 'id', id: 'rule_2' }]);
+                })
+                .then(() => sandbox.updateGithubToken('github-token'))
+                .then(() => {
+                    fixture.requests.map(req => `${req.method} ${req.url}`).should.eql([
+                        'GET /sandboxes/sbx_runtime/injections',
+                        'PUT /sandboxes/sbx_runtime/injections',
+                        'PUT /sandboxes/sbx_runtime/github-token'
+                    ]);
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
     it('covers Sandbox.connect, Sandbox.list, wait polling, and stopped health checks', function () {
         let infoCalls = 0;
         return startServer((req, res) => {
