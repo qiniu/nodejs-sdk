@@ -556,7 +556,7 @@ describe('test sandbox client module', function () {
     it('maps sandbox template filters and runtime injection APIs', function () {
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');
-            if (req.method === 'GET' && req.url === '/v2/sandboxes?limit=5&template=tpl_1%2Ctpl_2') {
+            if (req.method === 'GET' && req.url === '/v2/sandboxes?limit=5&template=tpl_1%2Ctpl_2%2Ctpl_3%2Ctpl_4') {
                 res.statusCode = 200;
                 res.end(JSON.stringify([]));
                 return;
@@ -589,7 +589,13 @@ describe('test sandbox client module', function () {
             return client.listSandboxesV2({
                 limit: 5,
                 query: {
-                    template: ['tpl_1', 'tpl_2']
+                    template: [
+                        'tpl_1',
+                        { templateID: 'tpl_2' },
+                        { template_id: 'tpl_3' },
+                        { id: 'tpl_4' },
+                        null
+                    ]
                 }
             }).then(() => client.getSandboxInjections('sbx_runtime'))
                 .then(result => {
@@ -634,7 +640,8 @@ describe('test sandbox client module', function () {
                 () => client.updateSandboxInjections(undefined, []),
                 () => client.updateSandboxGithubToken(undefined, 'github-token'),
                 () => client.updateSandboxInjections('sbx_runtime', { type: 'id', id: 'rule_1' }),
-                () => client.updateSandboxGithubToken('sbx_runtime')
+                () => client.updateSandboxGithubToken('sbx_runtime'),
+                () => client.updateSandboxInjections('sbx_runtime', [null])
             ];
 
             return calls.reduce((promise, call, index) => {
@@ -644,7 +651,9 @@ describe('test sandbox client module', function () {
                     err.name.should.eql('SandboxError');
                     const expected = index < 3
                         ? 'sandboxID is required'
-                        : (index === 3 ? 'injections must be an array' : 'authorizationToken is required');
+                        : (index === 3
+                            ? 'injections must be an array'
+                            : (index === 4 ? 'authorizationToken is required' : 'injections must contain objects'));
                     err.message.should.eql(expected);
                 }));
             }, Promise.resolve()).then(() => {

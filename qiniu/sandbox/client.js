@@ -101,7 +101,23 @@ function normalizeSandboxListOptions (opts) {
         opts.state = query.state;
     }
     if (query && query.template) {
-        opts.template = query.template;
+        const normalizeTemplate = template => {
+            if (typeof template === 'string') {
+                return template;
+            }
+            return template && (template.templateID || template.template_id || template.id);
+        };
+        if (Array.isArray(query.template)) {
+            const templates = query.template.map(normalizeTemplate).filter(Boolean);
+            if (templates.length) {
+                opts.template = templates;
+            }
+        } else {
+            const template = normalizeTemplate(query.template);
+            if (template) {
+                opts.template = template;
+            }
+        }
     }
     return opts;
 }
@@ -292,6 +308,9 @@ SandboxClient.prototype.updateSandboxInjections = function (sandboxID, injection
     }
     if (!Array.isArray(injections)) {
         return Promise.reject(new SandboxError('injections must be an array'));
+    }
+    if (injections.some(injection => !injection || typeof injection !== 'object' || Array.isArray(injection))) {
+        return Promise.reject(new SandboxError('injections must contain objects'));
     }
     return this._request('PUT', `/sandboxes/${encodePath(sandboxID)}/injections`, {
         body: {
