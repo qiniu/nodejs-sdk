@@ -280,19 +280,31 @@ SandboxClient.prototype.getSandbox = function (sandboxID) {
 };
 
 SandboxClient.prototype.getSandboxInjections = function (sandboxID) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
     return this._request('GET', `/sandboxes/${encodePath(sandboxID)}/injections`);
 };
 
 SandboxClient.prototype.updateSandboxInjections = function (sandboxID, injections) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
+    if (!Array.isArray(injections)) {
+        return Promise.reject(new SandboxError('injections must be an array'));
+    }
     return this._request('PUT', `/sandboxes/${encodePath(sandboxID)}/injections`, {
         body: {
-            injections: (injections || []).map(normalizeInjection)
+            injections: injections.map(normalizeInjection)
         },
         empty: true
     });
 };
 
 SandboxClient.prototype.updateSandboxGithubToken = function (sandboxID, authorizationToken) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
     return this._request('PUT', `/sandboxes/${encodePath(sandboxID)}/github-token`, {
         body: {
             authorization_token: authorizationToken

@@ -620,6 +620,39 @@ describe('test sandbox client module', function () {
         });
     });
 
+    it('validates runtime injection API arguments before sending requests', function () {
+        return startServer((req, res) => {
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                endpoint: fixture.endpoint,
+                apiKey: 'sandbox-key'
+            });
+            const calls = [
+                () => client.getSandboxInjections(),
+                () => client.updateSandboxInjections(undefined, []),
+                () => client.updateSandboxGithubToken(undefined, 'github-token'),
+                () => client.updateSandboxInjections('sbx_runtime', { type: 'id', id: 'rule_1' })
+            ];
+
+            return calls.reduce((promise, call, index) => {
+                return promise.then(() => call().then(() => {
+                    throw new Error('expected runtime injection argument validation to fail');
+                }, err => {
+                    err.name.should.eql('SandboxError');
+                    err.message.should.eql(index < 3 ? 'sandboxID is required' : 'injections must be an array');
+                }));
+            }, Promise.resolve()).then(() => {
+                fixture.requests.should.have.length(0);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('surfaces sandbox API string errors and default connect timeout', function () {
         return startServer((req, res) => {
             if (req.method === 'POST' && req.url === '/sandboxes/sbx_default/connect') {
