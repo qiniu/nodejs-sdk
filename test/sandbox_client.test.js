@@ -633,7 +633,8 @@ describe('test sandbox client module', function () {
                 () => client.getSandboxInjections(),
                 () => client.updateSandboxInjections(undefined, []),
                 () => client.updateSandboxGithubToken(undefined, 'github-token'),
-                () => client.updateSandboxInjections('sbx_runtime', { type: 'id', id: 'rule_1' })
+                () => client.updateSandboxInjections('sbx_runtime', { type: 'id', id: 'rule_1' }),
+                () => client.updateSandboxGithubToken('sbx_runtime')
             ];
 
             return calls.reduce((promise, call, index) => {
@@ -641,7 +642,10 @@ describe('test sandbox client module', function () {
                     throw new Error('expected runtime injection argument validation to fail');
                 }, err => {
                     err.name.should.eql('SandboxError');
-                    err.message.should.eql(index < 3 ? 'sandboxID is required' : 'injections must be an array');
+                    const expected = index < 3
+                        ? 'sandboxID is required'
+                        : (index === 3 ? 'injections must be an array' : 'authorizationToken is required');
+                    err.message.should.eql(expected);
                 }));
             }, Promise.resolve()).then(() => {
                 fixture.requests.should.have.length(0);

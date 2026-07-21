@@ -305,6 +305,9 @@ SandboxClient.prototype.updateSandboxGithubToken = function (sandboxID, authoriz
     if (!sandboxID) {
         return Promise.reject(new SandboxError('sandboxID is required'));
     }
+    if (!authorizationToken) {
+        return Promise.reject(new SandboxError('authorizationToken is required'));
+    }
     return this._request('PUT', `/sandboxes/${encodePath(sandboxID)}/github-token`, {
         body: {
             authorization_token: authorizationToken
