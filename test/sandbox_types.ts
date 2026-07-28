@@ -146,8 +146,12 @@ async function useSandboxTypes () {
     const templateNames: string[] = templateInfo.names;
     const isOwner: boolean = templateInfo.isOwner;
     const defaultTemplates = await client.listDefaultTemplates();
-    const defaultTemplatesAreTyped: AssertFalse<IsAny<typeof defaultTemplates>> = false;
-    const defaultTemplate: qiniu.sandbox.TemplateInfo | undefined = defaultTemplates[0];
+    type DefaultTemplate = typeof defaultTemplates[number];
+    const defaultTemplateIsTyped: AssertFalse<IsAny<DefaultTemplate>> = false;
+    const defaultTemplateBuildStatusIsTyped: AssertFalse<IsAny<DefaultTemplate['buildStatus']>> = false;
+    const defaultTemplate: qiniu.sandbox.DefaultTemplateInfo | undefined = defaultTemplates[0];
+    const defaultTemplateBuildStatus: qiniu.sandbox.TemplateBuildStatus | undefined =
+        defaultTemplate && defaultTemplate.buildStatus;
     qiniu.Sandbox.list({ client, query: { template: templateNames } });
     qiniu.CommandExitError.name;
     bytes.length;
@@ -164,7 +168,11 @@ async function useSandboxTypes () {
     if (defaultTemplate) {
         defaultTemplate.templateID.length;
     }
-    defaultTemplatesAreTyped.valueOf();
+    if (defaultTemplateBuildStatus) {
+        defaultTemplateBuildStatus.length;
+    }
+    defaultTemplateIsTyped.valueOf();
+    defaultTemplateBuildStatusIsTyped.valueOf();
 }
 
 void useSandboxTypes;

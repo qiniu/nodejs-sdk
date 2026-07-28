@@ -143,6 +143,12 @@ export declare namespace sandbox {
         [key: string]: any;
     }
 
+    type TemplateBuildStatus = 'building' | 'waiting' | 'ready' | 'error' | 'uploaded';
+
+    interface DefaultTemplateInfo extends TemplateInfo {
+        buildStatus: TemplateBuildStatus;
+    }
+
     interface TemplateWithBuilds extends TemplateInfo {
         isOwner: boolean;
         builds: any[];
@@ -491,7 +497,7 @@ export declare namespace sandbox {
         createTemplateV3(options?: any): Promise<any>;
         createTemplateV2(options?: any): Promise<any>;
         getTemplateFiles(templateID: string, hash: string): Promise<any>;
-        listDefaultTemplates(): Promise<TemplateInfo[]>;
+        listDefaultTemplates(): Promise<DefaultTemplateInfo[]>;
         listTemplates(options?: any): Promise<any>;
         getTemplate(templateID: string, options?: any): Promise<TemplateWithBuilds>;
         deleteTemplate(templateID: string): Promise<null>;
