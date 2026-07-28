@@ -10,12 +10,19 @@ runExample(() => {
     const client = sandboxClient({
         accessToken: env('QINIU_SANDBOX_ACCESS_TOKEN')
     });
+    const allowMutation = env('QINIU_SANDBOX_TEMPLATE_MUTATION_EXAMPLE') === 'true';
     const templateName = `nodejs-sdk-example-${Date.now()}`;
     let templateID;
     let buildID;
 
     return client.listDefaultTemplates().then(defaultTemplates => {
-        console.log('Default templates:', Array.isArray(defaultTemplates) ? defaultTemplates.length : defaultTemplates);
+        console.log('Default templates:', Array.isArray(defaultTemplates)
+            ? defaultTemplates.map(template => ({
+                templateID: template.templateID,
+                names: template.names,
+                buildStatus: template.buildStatus
+            }))
+            : defaultTemplates);
         return client.listTemplates({ limit: 10 });
     }).then(templates => {
         console.log('Templates:', Array.isArray(templates) ? templates.map(item => item.templateID || item.template_id || item.name) : templates);
@@ -34,6 +41,10 @@ runExample(() => {
             });
         });
     }).then(() => {
+        if (!allowMutation) {
+            console.log('Skipping template mutation; set QINIU_SANDBOX_TEMPLATE_MUTATION_EXAMPLE=true to enable it.');
+            return null;
+        }
         const advanced = qiniu.sandbox.Template()
             .fromDockerfile('FROM node:22\nWORKDIR /app\nENV NODE_ENV=production\nRUN npm ci')
             .copyItems([{ src: 'package.json', dest: '/app/' }])
@@ -55,6 +66,9 @@ runExample(() => {
                 tags: ['nodejs-sdk-example']
             });
     }).then(result => {
+        if (!result) {
+            return null;
+        }
         templateID = result.templateID || result.template_id || result.id;
         buildID = result.buildID || result.build_id;
         console.log('Template created:', templateID, 'build:', buildID);

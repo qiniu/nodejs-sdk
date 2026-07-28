@@ -64,6 +64,9 @@ function integrationConfig () {
 }
 
 const config = integrationConfig();
+if (process.env.QINIU_SANDBOX_REQUIRE_API_KEY === 'true' && !config.apiKey) {
+    throw new Error('QINIU_SANDBOX_API_KEY is required for this integration test');
+}
 const describeIntegration = config.apiKey ? describe : describe.skip;
 
 function authedGitUrl (repoUrl, username, password) {
@@ -432,6 +435,20 @@ describeIntegration('sandbox integration', function () {
                 return client.deleteTemplate(templateID).catch(() => null);
             }
             return null;
+        });
+    });
+
+    it('lists default templates', function () {
+        const client = sandboxClient();
+
+        return client.listDefaultTemplates().then(templates => {
+            Array.isArray(templates).should.eql(true);
+            templates.length.should.be.above(0);
+            templates.forEach(template => {
+                should(template.templateID).be.String();
+                Array.isArray(template.names).should.eql(true);
+            });
+            integrationLog('default template integration completed', templates.length);
         });
     });
 });

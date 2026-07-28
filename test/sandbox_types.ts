@@ -1,5 +1,8 @@
 import * as qiniu from '../index';
 
+type IsAny<T> = 0 extends (1 & T) ? true : false;
+type AssertFalse<T extends false> = T;
+
 async function useSandboxTypes () {
     const client = new qiniu.sandbox.SandboxClient({
         endpoint: 'https://sandbox.example.com',
@@ -142,6 +145,9 @@ async function useSandboxTypes () {
     const templateInfo: qiniu.sandbox.TemplateWithBuilds = await client.getTemplate('typed-template');
     const templateNames: string[] = templateInfo.names;
     const isOwner: boolean = templateInfo.isOwner;
+    const defaultTemplates = await client.listDefaultTemplates();
+    const defaultTemplatesAreTyped: AssertFalse<IsAny<typeof defaultTemplates>> = false;
+    const defaultTemplate: qiniu.sandbox.TemplateInfo | undefined = defaultTemplates[0];
     qiniu.Sandbox.list({ client, query: { template: templateNames } });
     qiniu.CommandExitError.name;
     bytes.length;
@@ -155,6 +161,10 @@ async function useSandboxTypes () {
     if (isOwner) {
         isOwner.valueOf();
     }
+    if (defaultTemplate) {
+        defaultTemplate.templateID.length;
+    }
+    defaultTemplatesAreTyped.valueOf();
 }
 
 void useSandboxTypes;

@@ -491,7 +491,7 @@ export declare namespace sandbox {
         createTemplateV3(options?: any): Promise<any>;
         createTemplateV2(options?: any): Promise<any>;
         getTemplateFiles(templateID: string, hash: string): Promise<any>;
-        listDefaultTemplates(): Promise<any>;
+        listDefaultTemplates(): Promise<TemplateInfo[]>;
         listTemplates(options?: any): Promise<any>;
         getTemplate(templateID: string, options?: any): Promise<TemplateWithBuilds>;
         deleteTemplate(templateID: string): Promise<null>;

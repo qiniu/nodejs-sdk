@@ -7,6 +7,69 @@ const {
 } = require('./sandbox_helpers');
 
 describe('test sandbox template module', function () {
+    it('lists default templates with their public fields', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify([{
+                templateID: 'base',
+                public: true,
+                aliases: ['base'],
+                names: ['qiniu/base'],
+                buildStatus: 'ready'
+            }]));
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                apiKey: 'sandbox-key',
+                endpoint: fixture.endpoint
+            });
+
+            return client.listDefaultTemplates().then(templates => {
+                templates.should.eql([{
+                    templateID: 'base',
+                    public: true,
+                    aliases: ['base'],
+                    names: ['qiniu/base'],
+                    buildStatus: 'ready'
+                }]);
+                fixture.requests.length.should.eql(1);
+                fixture.requests[0].method.should.eql('GET');
+                fixture.requests[0].url.should.eql('/default-templates');
+                fixture.requests[0].headers['x-api-key'].should.eql('sandbox-key');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
+    it('surfaces errors from the default templates API', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 401;
+            res.end(JSON.stringify({ message: 'unauthorized' }));
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                apiKey: 'invalid-key',
+                endpoint: fixture.endpoint
+            });
+
+            return client.listDefaultTemplates().then(() => {
+                throw new Error('expected listDefaultTemplates to fail');
+            }, err => {
+                err.name.should.eql('SandboxError');
+                err.message.should.eql('Sandbox API request failed with status 401: unauthorized');
+                err.response.statusCode.should.eql(401);
+                err.data.should.eql({ message: 'unauthorized' });
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => {
+                    throw err;
+                });
+            });
+        });
+    });
+
     it('maps template, build, tag, and access-token APIs', function () {
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');

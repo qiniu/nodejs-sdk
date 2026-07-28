@@ -10,6 +10,8 @@
     "check-type": "tsc --noEmit",
     "test": "NODE_ENV=test mocha -t 300000 --retries 3",
     "test:sandbox": "NODE_ENV=test mocha -t 300000 --retries 3 test/sandbox_client.test.js test/sandbox_commands.test.js test/sandbox_facade.test.js test/sandbox_filesystem.test.js test/sandbox_git.test.js test/sandbox_pty.test.js test/sandbox_template.test.js",
+    "test:sandbox:default-templates": "NODE_ENV=test mocha -t 300000 test/sandbox_template.test.js --grep 'default templates'",
+    "test:sandbox:integration:default-templates": "QINIU_SANDBOX_REQUIRE_API_KEY=true NODE_ENV=test mocha -t 300000 test/sandbox_integration.test.js --grep 'lists default templates'",
     "cover": "nyc npm run test",
     "report": "nyc report --reporter=html",
     "lint": "eslint ."
