@@ -152,6 +152,9 @@ function sandboxClientOptions (opts) {
     if (opts.requestTimeoutMs !== undefined) {
         clientOpts.timeout = opts.requestTimeoutMs;
     }
+    if (opts.maxRetries !== undefined) {
+        clientOpts.maxRetries = opts.maxRetries;
+    }
     return clientOpts;
 }
 

@@ -51,6 +51,7 @@ export declare namespace sandbox {
         timeout?: number | number[];
         httpAgent?: HttpAgent;
         httpsAgent?: HttpsAgent;
+        maxRetries?: number;
     }
 
     interface GitRepositoryResource {
@@ -190,6 +191,7 @@ export declare namespace sandbox {
         injections?: SandboxInjection[];
         resources?: SandboxResource[];
         client?: SandboxClient;
+        idempotencyKey?: string;
     }
 
     interface SandboxConnectOptions extends SandboxClientOptions {

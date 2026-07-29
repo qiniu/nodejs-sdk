@@ -1,5 +1,6 @@
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 
 const { HttpClient } = require('../httpc/client');
 const { QiniuAuthMiddleware } = require('../httpc/middleware/qiniuAuth');
@@ -14,6 +15,33 @@ const {
     poll,
     timeoutSecondsFromOptions
 } = require('./util');
+
+function generateIdempotencyKey () {
+    const bytes = crypto.randomBytes(16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = bytes.toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+const retryableNetworkErrorCodes = [
+    'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'EAI_AGAIN',
+    'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE'
+];
+
+function normalizeMaxRetries (value, source, allowString) {
+    if (typeof value === 'string') {
+        if (!allowString || !/^\d+$/.test(value)) {
+            throw new SandboxError(`${source} must be a non-negative integer`);
+        }
+        value = parseInt(value, 10);
+    }
+    if (typeof value !== 'number' || !isFinite(value) ||
+        Math.floor(value) !== value || value < 0) {
+        throw new SandboxError(`${source} must be a non-negative integer`);
+    }
+    return value;
+}
 
 function normalizeSandboxCreateOptions (opts) {
     opts = opts || {};
@@ -143,6 +171,7 @@ function normalizeClientOptions (opts) {
 }
 
 function SandboxClient (opts) {
+    opts = opts || {};
     const normalized = normalizeClientOptions(opts);
     this.endpoint = normalized.endpoint;
     this.apiKey = normalized.apiKey;
@@ -153,6 +182,14 @@ function SandboxClient (opts) {
         httpAgent: normalized.httpAgent,
         httpsAgent: normalized.httpsAgent
     });
+    if (opts.maxRetries !== undefined && opts.maxRetries !== null) {
+        this.maxRetries = normalizeMaxRetries(opts.maxRetries, 'maxRetries', false);
+    } else {
+        const envVal = process.env.SANDBOX_RETRY_MAX;
+        this.maxRetries = envVal
+            ? normalizeMaxRetries(envVal, 'SANDBOX_RETRY_MAX', true)
+            : 5;
+    }
 }
 
 SandboxClient.prototype._headers = function (authType) {
@@ -199,6 +236,9 @@ SandboxClient.prototype._request = function (method, path, options) {
     const body = options.body;
     const hasBody = body !== undefined && body !== null;
     const headers = this._headers(options.authType);
+    if (options.headers) {
+        Object.assign(headers, options.headers);
+    }
     if (!hasBody && (method === 'GET' || method === 'HEAD')) {
         delete headers['Content-Type'];
     }
@@ -251,6 +291,39 @@ SandboxClient.prototype._handleResponse = function (wrapper, empty) {
     throw new SandboxError(message, wrapper.resp, data);
 };
 
+SandboxClient.prototype._isRetryable = function (err) {
+    if (err instanceof SandboxError) {
+        const sc = (err.response && err.response.statusCode) ||
+                   (err.resp && err.resp.statusCode) || 0;
+        if (sc === 408) return true;
+        if (sc >= 500 && sc !== 501) return true;
+        return false;
+    }
+    if (err && retryableNetworkErrorCodes.indexOf(err.code) >= 0) {
+        return true;
+    }
+    const msg = String(err.message || err).toLowerCase();
+    return ['connection refused', 'connection reset', 'broken pipe',
+        'no such host', 'unexpected eof', 'use of closed',
+        'timed out', 'timeout'].some(p => msg.includes(p));
+};
+
+SandboxClient.prototype._retryCall = function (fn) {
+    const self = this;
+    function attempt (n) {
+        return fn().catch(err => {
+            if (n < self.maxRetries && self._isRetryable(err)) {
+                const base = Math.min(500 * Math.pow(2, n), 10000);
+                const jitter = Math.random() * base / 2;
+                return new Promise(resolve => setTimeout(resolve, base + jitter))
+                    .then(() => attempt(n + 1));
+            }
+            throw err;
+        });
+    }
+    return attempt(0);
+};
+
 SandboxClient.prototype.listSandboxes = function (opts) {
     return this._request('GET', appendQuery('/sandboxes', opts));
 };
@@ -260,11 +333,15 @@ SandboxClient.prototype.listSandboxesV2 = function (opts) {
 };
 
 SandboxClient.prototype.createSandbox = function (opts) {
+    opts = opts || {};
     const body = normalizeSandboxCreateOptions(opts);
-    return this._request('POST', '/sandboxes', {
+    const idempotencyKey = opts.idempotencyKey || opts.idempotency_key || generateIdempotencyKey();
+    const headers = { 'Idempotency-Key': idempotencyKey };
+    return this._retryCall(() => this._request('POST', '/sandboxes', {
         authType: hasKodoResource(body) ? 'qiniu' : undefined,
-        body
-    });
+        body,
+        headers
+    }));
 };
 
 SandboxClient.prototype.getSandboxesMetrics = function (sandboxIDs) {
@@ -354,11 +431,11 @@ SandboxClient.prototype.resumeSandbox = function (sandboxID, opts) {
 
 SandboxClient.prototype.connectSandbox = function (sandboxID, opts) {
     const timeout = timeoutSecondsFromOptions(opts);
-    return this._request('POST', `/sandboxes/${encodePath(sandboxID)}/connect`, {
+    return this._retryCall(() => this._request('POST', `/sandboxes/${encodePath(sandboxID)}/connect`, {
         body: {
             timeout: timeout === undefined ? 15 : timeout
         }
-    });
+    }));
 };
 
 SandboxClient.prototype.updateSandboxTimeout = function (sandboxID, timeoutOrOpts) {

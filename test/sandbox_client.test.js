@@ -7,6 +7,99 @@ const {
 } = require('./sandbox_helpers');
 
 describe('test sandbox client module', function () {
+    it('rejects invalid retry counts from options and environment', function () {
+        (() => new qiniu.sandbox.SandboxClient({ maxRetries: -1 }))
+            .should.throw(/maxRetries/);
+
+        const previous = process.env.SANDBOX_RETRY_MAX;
+        process.env.SANDBOX_RETRY_MAX = 'invalid';
+        try {
+            (() => new qiniu.sandbox.SandboxClient()).should.throw(/SANDBOX_RETRY_MAX/);
+        } finally {
+            if (previous === undefined) {
+                delete process.env.SANDBOX_RETRY_MAX;
+            } else {
+                process.env.SANDBOX_RETRY_MAX = previous;
+            }
+        }
+    });
+
+    it('generates a Node.js 6 compatible UUID v4 idempotency key', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key'
+        });
+        let request;
+        client.httpClient.sendRequest = receivedRequest => {
+            request = receivedRequest;
+            return Promise.resolve({
+                ok: () => true,
+                data: { sandboxID: 'sbx_uuid' }
+            });
+        };
+
+        return client.createSandbox({ template: 'base' }).then(() => {
+            request.urllibOptions.headers['Idempotency-Key']
+                .should.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        });
+    });
+
+    it('retries retryable responses and keeps the idempotency key stable', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key',
+            maxRetries: 1
+        });
+        const requests = [];
+        client.httpClient.sendRequest = request => {
+            requests.push(request);
+            if (requests.length === 1) {
+                return Promise.resolve({
+                    ok: () => false,
+                    resp: { statusCode: 408 },
+                    data: { message: 'request timeout' }
+                });
+            }
+            return Promise.resolve({
+                ok: () => true,
+                data: { sandboxID: 'sbx_retry' }
+            });
+        };
+        const originalSetTimeout = global.setTimeout;
+        global.setTimeout = callback => {
+            callback();
+            return null;
+        };
+
+        const restoreSetTimeout = () => {
+            global.setTimeout = originalSetTimeout;
+        };
+        return client.createSandbox({
+            template: 'base',
+            idempotencyKey: 'retry-key'
+        }).then(info => {
+            restoreSetTimeout();
+            info.sandboxID.should.eql('sbx_retry');
+            requests.length.should.eql(2);
+            requests.map(request => request.urllibOptions.headers['Idempotency-Key'])
+                .should.eql(['retry-key', 'retry-key']);
+        }, err => {
+            restoreSetTimeout();
+            throw err;
+        });
+    });
+
+    it('recognizes Node.js network error codes as retryable', function () {
+        const client = new qiniu.sandbox.SandboxClient({
+            endpoint: 'http://sandbox.test',
+            apiKey: 'sandbox-key'
+        });
+
+        ['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'EAI_AGAIN'].forEach(code => {
+            client._isRetryable({ code }).should.eql(true);
+        });
+    });
+
     it('creates sandbox with E2B compatible options and API key auth', function () {
         return startServer((req, res) => {
             res.statusCode = 201;
