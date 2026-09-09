@@ -108,6 +108,10 @@ async function useSandboxTypes () {
         .fromImage('ubuntu:22.04')
         .aptInstall(['git'])
         .runCmd('git --version');
+    const templateCreateOptions: qiniu.sandbox.TemplateCreateOptions = {
+        name: 'typed-template:test',
+        diskSizeMB: 15360
+    };
     qiniu.sandbox.Template()
         .skipCache()
         .fromImage('registry.example.com/app:latest', { username: 'u', password: 'p' })
@@ -137,12 +141,16 @@ async function useSandboxTypes () {
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', { branch: 'sandbox', depth: 1 })
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', { branch: 'sandbox', depth: 1 })
         .runCmd(['echo one', 'echo two'], { user: 'root' });
-    await template.build({ client, name: 'typed-template:test' });
+    await template.build({ client, ...templateCreateOptions });
+    await client.createTemplate(templateCreateOptions);
     await sandbox.updateNetwork({ allowOut: [qiniu.sandbox.ALL_TRAFFIC] });
     const injections: qiniu.sandbox.SandboxInjection[] = (await sandbox.getInjections()).injections;
     await sandbox.updateInjections(injections);
     await sandbox.updateGithubToken('github-token');
     const templateInfo: qiniu.sandbox.TemplateWithBuilds = await client.getTemplate('typed-template');
+    const sandboxResources: qiniu.sandbox.SandboxResourcesResponse = await client.getSandboxResources('sandbox_1');
+    const resourceInfo: qiniu.sandbox.SandboxResourceInfo | undefined = sandboxResources.resources[0];
+    await client.updateGitRepositoryResourceToken('sandbox_1', 'res_1', 'token');
     const templateNames: string[] = templateInfo.names;
     const isOwner: boolean = templateInfo.isOwner;
     const defaultTemplates = await client.listDefaultTemplates();
@@ -170,6 +178,9 @@ async function useSandboxTypes () {
     }
     if (defaultTemplateBuildStatus) {
         defaultTemplateBuildStatus.length;
+    }
+    if (resourceInfo && resourceInfo.type === 'github_repository') {
+        resourceInfo.resource_id.length;
     }
     defaultTemplateIsTyped.valueOf();
     defaultTemplateBuildStatusIsTyped.valueOf();
