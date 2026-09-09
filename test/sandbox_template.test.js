@@ -70,6 +70,50 @@ describe('test sandbox template module', function () {
         });
     });
 
+    it('lists sandbox resources and updates a Git repository token', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'GET' && req.url === '/sandboxes/sbx_1/resources') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({ resources: [{
+                    type: 'github_repository',
+                    resource_id: 'res_1',
+                    url: 'https://github.com/qiniu/nodejs-sdk.git',
+                    mount_path: '/workspace/repo'
+                }] }));
+                return;
+            }
+            if (req.method === 'PATCH' && req.url === '/sandboxes/sbx_1/resources/res_1') {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
+            res.statusCode = 404;
+            res.end();
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({
+                apiKey: 'sandbox-key',
+                endpoint: fixture.endpoint
+            });
+            return client.getSandboxResources('sbx_1')
+                .then(resources => {
+                    resources.resources[0].resource_id.should.eql('res_1');
+                    return client.updateGitRepositoryResourceToken(
+                        'sbx_1', 'res_1', 'new-token');
+                })
+                .then(() => {
+                    JSON.parse(fixture.requests[1].body).should.eql({
+                        authorization_token: 'new-token'
+                    });
+                })
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => {
+                        throw err;
+                    });
+                });
+        });
+    });
+
     it('maps template, build, tag, and access-token APIs', function () {
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');
@@ -166,7 +210,10 @@ describe('test sandbox template module', function () {
 
             return client.listTemplates({ teamID: 'team' })
                 .then(() => client.listDefaultTemplates())
-                .then(() => client.createTemplate({ name: 'node:v1' }))
+                .then(() => client.createTemplate({
+                    name: 'node:v1',
+                    diskSizeMB: 15360
+                }))
                 .then(() => client.createTemplateV2({ alias: 'old' }))
                 .then(() => client.getTemplate('tpl_1', { limit: 5, nextToken: 'n2' }))
                 .then(template => {
@@ -192,7 +239,10 @@ describe('test sandbox template module', function () {
                 .then(() => client.getTemplateByAlias('base'))
                 .then(() => client.rebuildTemplate('tpl_1', { name: 'again' }))
                 .then(() => {
-                    JSON.parse(fixture.requests[2].body).should.eql({ name: 'node:v1' });
+                    JSON.parse(fixture.requests[2].body).should.eql({
+                        name: 'node:v1',
+                        diskSizeMB: 15360
+                    });
                     JSON.parse(fixture.requests[5].body).should.eql({ public: true });
                     fixture.requests[14].headers.authorization.should.eql('Bearer access-token');
                 }).then(() => closeServer(fixture.server), err => {
