@@ -6,6 +6,8 @@ type AssertNever<T extends never> = T;
 type BodyOptionKeys<T> = T extends unknown ? Extract<keyof T, 'body' | 'ifBody' | 'if_body'> : never;
 type ProviderInjection = Exclude<qiniu.sandbox.Injection, qiniu.sandbox.HttpInjection>;
 type ProviderBodyOptions = AssertNever<BodyOptionKeys<ProviderInjection>>;
+type ResourceSecretKeys<T> = T extends unknown ? Extract<keyof T, 'authorization_token' | 'access_key' | 'secret_key'> : never;
+type ResourceResponseSecrets = AssertNever<ResourceSecretKeys<qiniu.sandbox.SandboxResourceInfo>>;
 
 async function useSandboxTypes () {
     const client = new qiniu.sandbox.SandboxClient({
@@ -93,9 +95,9 @@ async function useSandboxTypes () {
     const snapshotIsTyped: AssertFalse<IsAny<Snapshot>> = false;
     const tags: qiniu.sandbox.TemplateTag[] = await client.listTemplateTags(snapshotID);
     const resources: qiniu.sandbox.SandboxResourcesResponse = await sandbox.getResources();
-    const resourceID: string | undefined = resources.resources[0].resource_id;
+    const resourceID: string = resources.resources[0].resource_id;
     if (resourceID) {
-        await sandbox.patchResource(resourceID, { authorization_token: 'new-token' });
+        await sandbox.updateGitRepositoryResourceToken(resourceID, 'new-token');
     }
     snapshotNames.length;
     snapshotPage.items.length;
@@ -146,6 +148,11 @@ async function useSandboxTypes () {
         .fromImage('ubuntu:22.04')
         .aptInstall(['git'])
         .runCmd('git --version');
+    const templateCreateOptions: qiniu.sandbox.TemplateCreateOptions = {
+        name: 'typed-template:test',
+        minDiskMb: 20480,
+        minFreeDiskMb: 0
+    };
     qiniu.sandbox.Template()
         .skipCache()
         .fromImage('registry.example.com/app:latest', { username: 'u', password: 'p' })
@@ -175,13 +182,16 @@ async function useSandboxTypes () {
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', { branch: 'sandbox', depth: 1 })
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', { branch: 'sandbox', depth: 1 })
         .runCmd(['echo one', 'echo two'], { user: 'root' });
-    await template.build({ client, name: 'typed-template:test', minDiskMb: 20480, minFreeDiskMb: 0 });
-    await client.createTemplate({ name: 'typed-template', minDiskMb: 0, minFreeDiskMb: 1024 });
+    await template.build({ client, ...templateCreateOptions });
+    await client.createTemplate(templateCreateOptions);
     await sandbox.updateNetwork({ allowOut: [qiniu.sandbox.ALL_TRAFFIC] });
     const injections: qiniu.sandbox.SandboxInjection[] = (await sandbox.getInjections()).injections;
     await sandbox.updateInjections(injections);
     await sandbox.updateGithubToken('github-token');
     const templateInfo: qiniu.sandbox.TemplateWithBuilds = await client.getTemplate('typed-template');
+    const sandboxResources: qiniu.sandbox.SandboxResourcesResponse = await client.getSandboxResources('sandbox_1');
+    const resourceInfo: qiniu.sandbox.SandboxResourceInfo | undefined = sandboxResources.resources[0];
+    await client.updateGitRepositoryResourceToken('sandbox_1', 'res_1', 'token');
     const templateNames: string[] = templateInfo.names;
     const isOwner: boolean = templateInfo.isOwner;
     const defaultTemplates = await client.listDefaultTemplates();
@@ -209,6 +219,9 @@ async function useSandboxTypes () {
     }
     if (defaultTemplateBuildStatus) {
         defaultTemplateBuildStatus.length;
+    }
+    if (resourceInfo && resourceInfo.type === 'github_repository') {
+        resourceInfo.resource_id.length;
     }
     defaultTemplateIsTyped.valueOf();
     defaultTemplateBuildStatusIsTyped.valueOf();

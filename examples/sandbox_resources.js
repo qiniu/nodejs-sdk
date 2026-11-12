@@ -44,7 +44,7 @@ function runGitResourceExample () {
         return sandbox.getResources();
     }).then(result => {
         const resource = result.resources.find(item => item.type === 'github_repository');
-        return sandbox.patchResource(resource.resource_id, { authorization_token: token });
+        return sandbox.updateGitRepositoryResourceToken(resource.resource_id, token);
     }).then(() => {
         console.log('GitHub resource token updated for the running sandbox.');
         return sandbox.commands.run(`ls -la ${shellQuote(mountPath)} | head -20`);

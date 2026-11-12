@@ -110,10 +110,8 @@ const tags = await client.listTemplateTags('template-id');
 ```js
 const result = await sandbox.getResources();
 const repo = result.resources.find(resource => resource.type === 'github_repository');
-await sandbox.patchResource(repo.resource_id, {
-    authorization_token: process.env.GITHUB_TOKEN
-});
-// 底层接口：client.getSandboxResources / client.patchSandboxResource。
+await sandbox.updateGitRepositoryResourceToken(repo.resource_id, process.env.GITHUB_TOKEN);
+// 底层接口：client.getSandboxResources / client.updateGitRepositoryResourceToken。
 ```
 
 PATCH 只支持更新 GitHub 资源的 `authorization_token`，运行中的实例立即生效；不支持更新 Kodo 资源。

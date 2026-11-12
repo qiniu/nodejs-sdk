@@ -70,13 +70,29 @@ function normalizeSandboxCreateOptions (opts) {
         copyDefined(body, opts, 'injections');
     }
     copyDefined(body, opts, 'resources');
+    (body.resources || []).forEach(resource => {
+        if (!resource || resource.type !== 'kodo') {
+            return;
+        }
+        if ((resource.access_key === undefined) !==
+            (resource.secret_key === undefined)) {
+            throw new SandboxError(
+                'access_key and secret_key must be provided together');
+        }
+        if (resource.access_key !== undefined &&
+            (!resource.access_key || !resource.secret_key)) {
+            throw new SandboxError(
+                'access_key and secret_key must not be empty');
+        }
+    });
 
     return body;
 }
 
-function needsQiniuResourceAuth (body) {
+function hasKodoResource (body) {
     return Array.isArray(body.resources) && body.resources.some(resource => {
-        return resource && resource.type === 'kodo' && (!resource.access_key || !resource.secret_key);
+        return resource && resource.type === 'kodo' &&
+            (!resource.access_key || !resource.secret_key);
     });
 }
 
@@ -356,7 +372,7 @@ SandboxClient.prototype.createSandbox = function (opts) {
     const idempotencyKey = opts.idempotencyKey || opts.idempotency_key || generateIdempotencyKey();
     const headers = { 'Idempotency-Key': idempotencyKey };
     return this._retryCall(() => this._request('POST', '/sandboxes', {
-        authType: needsQiniuResourceAuth(body) ? 'qiniu' : undefined,
+        authType: hasKodoResource(body) ? 'qiniu' : undefined,
         body,
         headers
     }));
@@ -397,6 +413,29 @@ SandboxClient.prototype.getSandboxInjections = function (sandboxID) {
     return this._request('GET', `/sandboxes/${encodePath(sandboxID)}/injections`);
 };
 
+SandboxClient.prototype.getSandboxResources = function (sandboxID) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
+    return this._request('GET', `/sandboxes/${encodePath(sandboxID)}/resources`);
+};
+
+SandboxClient.prototype.updateGitRepositoryResourceToken = function (sandboxID, resourceID, authorizationToken) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
+    if (!resourceID) {
+        return Promise.reject(new SandboxError('resourceID is required'));
+    }
+    if (!authorizationToken) {
+        return Promise.reject(new SandboxError('authorizationToken is required'));
+    }
+    return this._request('PATCH', `/sandboxes/${encodePath(sandboxID)}/resources/${encodePath(resourceID)}`, {
+        body: { authorization_token: authorizationToken },
+        empty: true
+    });
+};
+
 SandboxClient.prototype.updateSandboxInjections = function (sandboxID, injections) {
     if (!sandboxID) {
         return Promise.reject(new SandboxError('sandboxID is required'));
@@ -426,23 +465,6 @@ SandboxClient.prototype.updateSandboxGithubToken = function (sandboxID, authoriz
         body: {
             authorization_token: authorizationToken
         },
-        empty: true
-    });
-};
-
-SandboxClient.prototype.getSandboxResources = function (sandboxID) {
-    if (!sandboxID) {
-        return Promise.reject(new SandboxError('sandboxID is required'));
-    }
-    return this._request('GET', `/sandboxes/${encodePath(sandboxID)}/resources`);
-};
-
-SandboxClient.prototype.patchSandboxResource = function (sandboxID, resourceID, opts) {
-    if (!sandboxID || !resourceID || !opts || !opts.authorization_token) {
-        return Promise.reject(new SandboxError('sandboxID, resourceID and authorization_token are required'));
-    }
-    return this._request('PATCH', `/sandboxes/${encodePath(sandboxID)}/resources/${encodePath(resourceID)}`, {
-        body: opts,
         empty: true
     });
 };

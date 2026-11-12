@@ -56,7 +56,6 @@ export declare namespace sandbox {
 
     interface GitRepositoryResource {
         type: 'github_repository';
-        readonly resource_id?: string;
         url: string;
         mount_path: string;
         authorization_token?: string;
@@ -64,23 +63,36 @@ export declare namespace sandbox {
 
     interface KodoResource {
         type: 'kodo';
-        readonly resource_id?: string;
+        access_key?: string;
         bucket: string;
         mount_path: string;
         prefix?: string;
         read_only?: boolean;
-        access_key?: string;
         secret_key?: string;
     }
 
     type SandboxResource = GitRepositoryResource | KodoResource;
 
-    interface ResourcePatch {
-        authorization_token: string;
+    interface GitRepositoryResourceInfo {
+        type: 'github_repository';
+        resource_id: string;
+        url: string;
+        mount_path: string;
     }
 
+    interface KodoResourceInfo {
+        type: 'kodo';
+        resource_id: string;
+        bucket: string;
+        mount_path: string;
+        prefix?: string;
+        read_only?: boolean;
+    }
+
+    type SandboxResourceInfo = GitRepositoryResourceInfo | KodoResourceInfo;
+
     interface SandboxResourcesResponse {
-        resources: SandboxResource[];
+        resources: SandboxResourceInfo[];
     }
 
     type InjectionConditions = {[key: string]: string};
@@ -161,6 +173,21 @@ export declare namespace sandbox {
     }
 
     type TemplateBuildStatus = 'building' | 'waiting' | 'ready' | 'error' | 'uploaded';
+
+    interface TemplateCreateOptions {
+        alias?: string;
+        buildConfig?: any;
+        cpuCount?: number;
+        /** Minimum free space in MiB after build. Omit for team default; 0 disables growth. */
+        minFreeDiskMb?: number;
+        /** Minimum total disk size in MiB. Omit or 0 for no minimum; never shrinks. */
+        minDiskMb?: number;
+        memoryMB?: number;
+        name?: string;
+        tags?: string[];
+        teamID?: string;
+        [key: string]: any;
+    }
 
     interface DefaultTemplateInfo extends TemplateInfo {
         buildStatus: TemplateBuildStatus;
@@ -341,20 +368,6 @@ export declare namespace sandbox {
         tag: string;
         buildID: string;
         createdAt: string;
-    }
-
-    interface TemplateCreateOptions {
-        name?: string;
-        alias?: string;
-        tags?: string[];
-        teamID?: string;
-        cpuCount?: number;
-        memoryMB?: number;
-        /** Minimum free space in MiB after build. Omit for team default; 0 disables growth. */
-        minFreeDiskMb?: number;
-        /** Minimum total disk size in MiB. Omit or 0 for no minimum; never shrinks. */
-        minDiskMb?: number;
-        buildConfig?: any;
     }
 
     class SandboxPaginator {
@@ -547,10 +560,10 @@ export declare namespace sandbox {
         getSandboxLogs(sandboxID: string, options?: any): Promise<any>;
         getSandbox(sandboxID: string): Promise<any>;
         getSandboxInjections(sandboxID: string): Promise<SandboxInjectionsResponse>;
+        getSandboxResources(sandboxID: string): Promise<SandboxResourcesResponse>;
+        updateGitRepositoryResourceToken(sandboxID: string, resourceID: string, authorizationToken: string): Promise<null>;
         updateSandboxInjections(sandboxID: string, injections: SandboxInjection[]): Promise<null>;
         updateSandboxGithubToken(sandboxID: string, authorizationToken: string): Promise<null>;
-        getSandboxResources(sandboxID: string): Promise<SandboxResourcesResponse>;
-        patchSandboxResource(sandboxID: string, resourceID: string, options: ResourcePatch): Promise<null>;
         deleteSandbox(sandboxID: string): Promise<null>;
         killSandbox(sandboxID: string): Promise<null>;
         getSandboxMetrics(sandboxID: string, options?: any): Promise<any>;
@@ -613,6 +626,8 @@ export declare namespace sandbox {
         client: SandboxClient;
         files: Filesystem;
         filesystem: Filesystem;
+        getResources(): Promise<SandboxResourcesResponse>;
+        updateGitRepositoryResourceToken(resourceID: string, authorizationToken: string): Promise<null>;
         commands: Commands;
         pty: Pty;
         git: Git;
@@ -638,8 +653,6 @@ export declare namespace sandbox {
         getInjections(): Promise<SandboxInjectionsResponse>;
         updateInjections(injections: SandboxInjection[]): Promise<null>;
         updateGithubToken(authorizationToken: string): Promise<null>;
-        getResources(): Promise<SandboxResourcesResponse>;
-        patchResource(resourceID: string, options: ResourcePatch): Promise<null>;
         getMetrics(options?: any): Promise<any>;
         getLogs(options?: any): Promise<any>;
         createSnapshot(options?: SnapshotCreateOptions): Promise<SnapshotInfo>;

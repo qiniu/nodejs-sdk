@@ -233,7 +233,7 @@ describe('sandbox public API contract updates', function () {
         });
     });
 
-    it('lists resources and patches a single repository token through the facade', function () {
+    it('uses the existing resource facade to update a repository token with encoded IDs', function () {
         const resource = { type: 'github_repository', resource_id: 'res/1', url: 'https://github.com/qiniu/nodejs-sdk', mount_path: '/repo' };
         return serve((req, res) => {
             if (req.method === 'PATCH') {
@@ -245,7 +245,7 @@ describe('sandbox public API contract updates', function () {
             const sandbox = new qiniu.sandbox.Sandbox({ client, sandboxID: 'sbx/id' });
             return sandbox.getResources().then(result => {
                 assert.deepStrictEqual(result.resources, [resource]);
-                return sandbox.patchResource(result.resources[0].resource_id, { authorization_token: 'new-token' });
+                return sandbox.updateGitRepositoryResourceToken(result.resources[0].resource_id, 'new-token');
             });
         }).then(result => {
             assert.strictEqual(result, null);
@@ -264,6 +264,28 @@ describe('sandbox public API contract updates', function () {
                 assert.strictEqual(fixture.requests[0].headers.authorization, 'Bearer api-key');
                 assert.strictEqual(JSON.parse(fixture.requests[0].body).resources[0].secret_key, 'sk');
             });
+    });
+
+    it('preserves validation of incomplete and empty Kodo resource credentials', function () {
+        const offline = new qiniu.sandbox.SandboxClient({ apiKey: 'api-key' });
+        offline.httpClient.sendRequest = () => { throw new Error('must not send'); };
+        [
+            { access_key: 'ak' },
+            { secret_key: 'sk' }
+        ].forEach(credentials => {
+            assert.throws(() => offline.createSandbox({
+                resources: [Object.assign({ type: 'kodo', bucket: 'bucket', mount_path: '/kodo' }, credentials)]
+            }), /access_key and secret_key must be provided together/);
+        });
+        [
+            { access_key: '', secret_key: 'sk' },
+            { access_key: 'ak', secret_key: '' },
+            { access_key: '', secret_key: '' }
+        ].forEach(credentials => {
+            assert.throws(() => offline.createSandbox({
+                resources: [Object.assign({ type: 'kodo', bucket: 'bucket', mount_path: '/kodo' }, credentials)]
+            }), /access_key and secret_key must not be empty/);
+        });
     });
 
     it('deletes persistent snapshots through the template endpoint', function () {
