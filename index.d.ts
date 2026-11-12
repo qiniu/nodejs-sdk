@@ -63,13 +63,37 @@ export declare namespace sandbox {
 
     interface KodoResource {
         type: 'kodo';
+        access_key?: string;
+        bucket: string;
+        mount_path: string;
+        prefix?: string;
+        read_only?: boolean;
+        secret_key?: string;
+    }
+
+    type SandboxResource = GitRepositoryResource | KodoResource;
+
+    interface GitRepositoryResourceInfo {
+        type: 'github_repository';
+        resource_id: string;
+        url: string;
+        mount_path: string;
+    }
+
+    interface KodoResourceInfo {
+        type: 'kodo';
+        resource_id: string;
         bucket: string;
         mount_path: string;
         prefix?: string;
         read_only?: boolean;
     }
 
-    type SandboxResource = GitRepositoryResource | KodoResource;
+    type SandboxResourceInfo = GitRepositoryResourceInfo | KodoResourceInfo;
+
+    interface SandboxResourcesResponse {
+        resources: SandboxResourceInfo[];
+    }
 
     type InjectionConditions = {[key: string]: string};
 
@@ -145,6 +169,19 @@ export declare namespace sandbox {
     }
 
     type TemplateBuildStatus = 'building' | 'waiting' | 'ready' | 'error' | 'uploaded';
+
+    interface TemplateCreateOptions {
+        alias?: string;
+        buildConfig?: any;
+        cpuCount?: number;
+        /** Template build disk size in MiB. The minimum is 10240. */
+        diskSizeMB?: number;
+        memoryMB?: number;
+        name?: string;
+        tags?: string[];
+        teamID?: string;
+        [key: string]: any;
+    }
 
     interface DefaultTemplateInfo extends TemplateInfo {
         buildStatus: TemplateBuildStatus;
@@ -454,7 +491,7 @@ export declare namespace sandbox {
         skipCache(): this;
         setStartCmd(command: string): this;
         setReadyCmd(command: string): this;
-        build(options?: SandboxClientOptions & {client?: SandboxClient; name?: string; alias?: string; tags?: string[]}): Promise<any>;
+        build(options?: SandboxClientOptions & TemplateCreateOptions & {client?: SandboxClient}): Promise<any>;
     }
 
     const Template: {
@@ -483,6 +520,8 @@ export declare namespace sandbox {
         getSandboxLogs(sandboxID: string, options?: any): Promise<any>;
         getSandbox(sandboxID: string): Promise<any>;
         getSandboxInjections(sandboxID: string): Promise<SandboxInjectionsResponse>;
+        getSandboxResources(sandboxID: string): Promise<SandboxResourcesResponse>;
+        updateGitRepositoryResourceToken(sandboxID: string, resourceID: string, authorizationToken: string): Promise<null>;
         updateSandboxInjections(sandboxID: string, injections: SandboxInjection[]): Promise<null>;
         updateSandboxGithubToken(sandboxID: string, authorizationToken: string): Promise<null>;
         deleteSandbox(sandboxID: string): Promise<null>;
@@ -495,8 +534,8 @@ export declare namespace sandbox {
         updateSandbox(sandboxID: string, options?: any): Promise<any>;
         refreshSandbox(sandboxID: string, options?: {duration?: number}): Promise<null>;
 
-        createTemplate(options?: any): Promise<any>;
-        createTemplateV3(options?: any): Promise<any>;
+        createTemplate(options?: TemplateCreateOptions): Promise<any>;
+        createTemplateV3(options?: TemplateCreateOptions): Promise<any>;
         createTemplateV2(options?: any): Promise<any>;
         getTemplateFiles(templateID: string, hash: string): Promise<any>;
         listDefaultTemplates(): Promise<DefaultTemplateInfo[]>;
@@ -543,6 +582,8 @@ export declare namespace sandbox {
         client: SandboxClient;
         files: Filesystem;
         filesystem: Filesystem;
+        getResources(): Promise<SandboxResourcesResponse>;
+        updateGitRepositoryResourceToken(resourceID: string, authorizationToken: string): Promise<null>;
         commands: Commands;
         pty: Pty;
         git: Git;

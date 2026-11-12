@@ -223,6 +223,15 @@ Sandbox.prototype.getInjections = function () {
     return this.client.getSandboxInjections(this.sandboxId);
 };
 
+Sandbox.prototype.getResources = function () {
+    return this.client.getSandboxResources(this.sandboxId);
+};
+
+Sandbox.prototype.updateGitRepositoryResourceToken = function (resourceID, authorizationToken) {
+    return this.client.updateGitRepositoryResourceToken(
+        this.sandboxId, resourceID, authorizationToken);
+};
+
 Sandbox.prototype.updateInjections = function (injections) {
     return this.client.updateSandboxInjections(this.sandboxId, injections);
 };

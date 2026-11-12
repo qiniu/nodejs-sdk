@@ -1161,4 +1161,23 @@ describe('test sandbox client module', function () {
                 ]);
             });
     });
+    it('uses API-key authentication for Kodo resources with inline credentials', function () {
+        const client = new qiniu.sandbox.SandboxClient({ apiKey: 'sandbox-key' });
+        let requestOptions;
+        client._request = (method, path, options) => {
+            requestOptions = { method, path, options };
+            return Promise.resolve({ sandboxID: 'sbx_1' });
+        };
+
+        return client.createSandbox({ resources: [{
+            type: 'kodo',
+            bucket: 'bucket',
+            mount_path: '/mnt/bucket',
+            access_key: 'resource-ak',
+            secret_key: 'resource-sk'
+        }] }).then(() => {
+            should.not.exist(requestOptions.options.authType);
+            requestOptions.options.body.resources[0].access_key.should.eql('resource-ak');
+        });
+    });
 });
