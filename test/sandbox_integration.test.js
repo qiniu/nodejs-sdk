@@ -431,7 +431,7 @@ describeIntegration('sandbox integration', function () {
             autoResume: { enabled: false }
         }).then(created => {
             source = created;
-            return source.waitForReady({ timeout: 180000, interval: 2000 });
+            return source.waitForReady({ timeoutMs: 180000, intervalMs: 2000 });
         }).then(() => {
             stage = 'write source file';
             return source.files.write(filePath, runID);
@@ -459,7 +459,7 @@ describeIntegration('sandbox integration', function () {
                 stage = 'connect source';
                 return source.connect();
             })
-            .then(() => source.waitForReady({ timeout: 180000, interval: 2000 }))
+            .then(() => source.waitForReady({ timeoutMs: 180000, intervalMs: 2000 }))
             .then(() => {
                 stage = 'read source file after cold boot';
                 return source.files.readText(filePath);
@@ -470,7 +470,7 @@ describeIntegration('sandbox integration', function () {
                 return qiniu.sandbox.Sandbox.create({ client, template: snapshotID, timeout: 300 });
             }).then(created => {
                 copy = created;
-                return copy.waitForReady({ timeout: 180000, interval: 2000 });
+                return copy.waitForReady({ timeoutMs: 180000, intervalMs: 2000 });
             }).then(() => {
                 stage = 'read copied snapshot file';
                 return copy.files.readText(filePath);
