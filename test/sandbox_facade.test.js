@@ -54,7 +54,7 @@ describe('test sandbox facade module', function () {
         let infoCalls = 0;
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');
-            if (req.method === 'POST' && req.url === '/sandboxes/sbx_9/connect') {
+            if (req.method === 'POST' && req.url === '/v2/sandboxes/sbx_9/connect') {
                 res.statusCode = 200;
                 res.end(JSON.stringify({ sandboxID: 'sbx_9', domain: 'd.example.com', envdAccessToken: 'token' }));
                 return;

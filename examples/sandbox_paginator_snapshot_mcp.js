@@ -9,6 +9,14 @@ const {
 runExample(() => {
     const client = sandboxClient();
     let sandbox;
+    let snapshotID;
+    const captureKey = `nodejs-sdk-snapshot-${Date.now()}`;
+
+    function cleanup () {
+        return cleanupSandbox(sandbox).then(() => {
+            return snapshotID ? client.deleteSnapshot(snapshotID) : null;
+        });
+    }
 
     return createSandboxAndWait({
         client,
@@ -36,19 +44,22 @@ runExample(() => {
         });
     }).then(() => {
         return sandbox.createSnapshot({
-            name: `nodejs-sdk-example-${Date.now()}`
+            name: `nodejs-sdk-example-${Date.now()}:v1`,
+            memory: false,
+            // Persist this key and reuse the same body if the outcome is unknown.
+            idempotencyKey: captureKey
         }).then(snapshot => {
-            console.log('Snapshot created:', snapshot.snapshotId || snapshot.snapshotID || snapshot);
-        }, err => {
-            console.log('Snapshot skipped:', err.message);
+            snapshotID = snapshot.snapshotID;
+            console.log('Snapshot created:', snapshotID, snapshot.names);
+            return client.listTemplateTags(snapshotID);
+        }).then(tags => {
+            console.log('Snapshot template tags:', tags);
         });
     }).then(() => {
         return sandbox.listSnapshots({
             limit: 5
         }).nextItems().then(snapshots => {
             console.log('Snapshots:', snapshots.map(item => item.snapshotId || item.snapshotID || item.id));
-        }, err => {
-            console.log('List snapshots skipped:', err.message);
         });
     }).then(() => {
         console.log('MCP URL:', sandbox.getMcpUrl());
@@ -58,9 +69,9 @@ runExample(() => {
             console.log('MCP token skipped:', err.message);
         });
     }).then(() => {
-        return cleanupSandbox(sandbox);
+        return cleanup();
     }, err => {
-        return cleanupSandbox(sandbox).then(() => {
+        return cleanup().then(() => {
             throw err;
         });
     });

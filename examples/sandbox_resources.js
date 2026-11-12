@@ -41,9 +41,12 @@ function runGitResourceExample () {
         return sandbox.waitForReady({ interval: 3000, timeout: 180000 });
     }).then(() => {
         console.log('Git resource sandbox ready:', sandbox.sandboxId);
-        return sandbox.updateGithubToken(token);
+        return sandbox.getResources();
+    }).then(result => {
+        const resource = result.resources.find(item => item.type === 'github_repository');
+        return sandbox.updateGitRepositoryResourceToken(resource.resource_id, token);
     }).then(() => {
-        console.log('GitHub token updated for the running sandbox.');
+        console.log('GitHub resource token updated for the running sandbox.');
         return sandbox.commands.run(`ls -la ${shellQuote(mountPath)} | head -20`);
     }).then(result => {
         console.log(result.stdout);
@@ -70,10 +73,11 @@ function runKodoResourceExample () {
         return Promise.resolve();
     }
 
-    const client = new qiniu.sandbox.SandboxClient({
-        endpoint: sandboxEndpoint(),
-        mac: sandboxMac()
-    });
+    const resourceAccessKey = env('QINIU_SANDBOX_KODO_ACCESS_KEY');
+    const resourceSecretKey = env('QINIU_SANDBOX_KODO_SECRET_KEY');
+    const client = resourceAccessKey && resourceSecretKey
+        ? sandboxClient()
+        : new qiniu.sandbox.SandboxClient({ endpoint: sandboxEndpoint(), mac: sandboxMac() });
     const mountPath = env('QINIU_SANDBOX_KODO_MOUNT_PATH', '/workspace/kodo');
     const resource = {
         type: 'kodo',
@@ -82,6 +86,10 @@ function runKodoResourceExample () {
     };
     if (env('QINIU_SANDBOX_KODO_PREFIX')) {
         resource.prefix = env('QINIU_SANDBOX_KODO_PREFIX');
+    }
+    if (resourceAccessKey && resourceSecretKey) {
+        resource.access_key = resourceAccessKey;
+        resource.secret_key = resourceSecretKey;
     }
 
     let sandbox;

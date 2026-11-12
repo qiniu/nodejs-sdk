@@ -16,6 +16,9 @@ runExample(() => {
             client,
             template: sandboxTemplate(),
             timeout: 300,
+            autoPause: true,
+            autoPauseMemory: false,
+            autoResume: { enabled: false },
             metadata: {
                 example: 'sandbox_lifecycle'
             },
@@ -41,6 +44,12 @@ runExample(() => {
         return sandbox.refresh({ duration: 300 });
     }).then(() => {
         console.log('Sandbox refreshed');
+        // Filesystem-only pause loses processes and must be resumed explicitly.
+        return sandbox.pause({ memory: false });
+    }).then(() => {
+        // Connect v2 extends TTL, defaulting to 300 seconds when timeout is omitted.
+        return sandbox.connect({ timeout: 300 });
+    }).then(() => {
         return sandbox.updateNetwork({
             allowOut: [qiniu.sandbox.ALL_TRAFFIC]
         }).then(info => {

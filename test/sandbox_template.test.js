@@ -75,12 +75,14 @@ describe('test sandbox template module', function () {
             res.setHeader('Content-Type', 'application/json');
             if (req.method === 'GET' && req.url === '/sandboxes/sbx_1/resources') {
                 res.statusCode = 200;
-                res.end(JSON.stringify({ resources: [{
-                    type: 'github_repository',
-                    resource_id: 'res_1',
-                    url: 'https://github.com/qiniu/nodejs-sdk.git',
-                    mount_path: '/workspace/repo'
-                }] }));
+                res.end(JSON.stringify({
+                    resources: [{
+                        type: 'github_repository',
+                        resource_id: 'res_1',
+                        url: 'https://github.com/qiniu/nodejs-sdk.git',
+                        mount_path: '/workspace/repo'
+                    }]
+                }));
                 return;
             }
             if (req.method === 'PATCH' && req.url === '/sandboxes/sbx_1/resources/res_1') {
@@ -212,7 +214,8 @@ describe('test sandbox template module', function () {
                 .then(() => client.listDefaultTemplates())
                 .then(() => client.createTemplate({
                     name: 'node:v1',
-                    diskSizeMB: 15360
+                    minDiskMb: 15360,
+                    minFreeDiskMb: 0
                 }))
                 .then(() => client.createTemplateV2({ alias: 'old' }))
                 .then(() => client.getTemplate('tpl_1', { limit: 5, nextToken: 'n2' }))
@@ -241,7 +244,8 @@ describe('test sandbox template module', function () {
                 .then(() => {
                     JSON.parse(fixture.requests[2].body).should.eql({
                         name: 'node:v1',
-                        diskSizeMB: 15360
+                        minDiskMb: 15360,
+                        minFreeDiskMb: 0
                     });
                     JSON.parse(fixture.requests[5].body).should.eql({ public: true });
                     fixture.requests[14].headers.authorization.should.eql('Bearer access-token');

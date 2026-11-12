@@ -17,9 +17,15 @@ runExample(() => {
             Authorization: `Bearer ${env('QINIU_SANDBOX_HTTP_INJECTION_TOKEN', 'real_token')}`
         }
     };
+    const bodyInjection = {
+        type: 'http',
+        baseUrl: 'https://httpbin.org/post',
+        ifBody: { model: 'demo' },
+        body: { token: env('QINIU_SANDBOX_BODY_INJECTION_TOKEN', 'example-secret') }
+    };
 
     return createSandboxAndWait({
-        injections: [httpInjection],
+        injections: [httpInjection, bodyInjection],
         metadata: {
             example: 'sandbox_request_injections'
         }
@@ -27,15 +33,18 @@ runExample(() => {
         sandbox = created;
         return sandbox.getInjections();
     }).then(result => {
-        console.log('Current runtime injections:', result.injections);
-        return sandbox.updateInjections([httpInjection]);
+        console.log('Current runtime injection types:', result.injections.map(injection => injection.type));
+        return sandbox.updateInjections([httpInjection, bodyInjection]);
     }).then(() => {
         return sandbox.commands.run('curl --max-time 20 -sSL https://httpbin.org/bearer -H "Authorization: Bearer fake_token" -H "X-Sandbox-Example: qiniu-nodejs-sdk"', {
             timeout: 30000
         });
     }).then(result => {
         console.log('HTTP injection curl exit:', result.exitCode);
-        console.log(result.stdout);
+        // Discard the echo response because it contains the injected secret.
+        return sandbox.commands.run('curl --max-time 20 -sS -o /dev/null -w "%{http_code}" https://httpbin.org/post -H "Content-Type: application/json" -d \'{"model":"demo","token":"placeholder"}\'');
+    }).then(result => {
+        console.log('JSON body injection HTTP status:', result.stdout);
         if (!env('QINIU_SANDBOX_OPENAI_API_KEY')) {
             console.log('Skip OpenAI-compatible injection: set QINIU_SANDBOX_OPENAI_API_KEY to try it.');
             return null;

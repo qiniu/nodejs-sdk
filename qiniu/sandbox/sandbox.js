@@ -96,11 +96,13 @@ Object.defineProperty(SnapshotPaginator.prototype, 'hasNext', {
 });
 
 SnapshotPaginator.prototype.nextItems = function (opts) {
-    const requestOpts = Object.assign({}, this.opts, opts || {});
-    if (this._nextToken && requestOpts.nextToken === undefined) {
-        requestOpts.nextToken = this._nextToken;
+    const hasExplicitCursor = opts && opts.nextToken !== undefined;
+    if (!this.hasNext && !hasExplicitCursor) {
+        return Promise.resolve([]);
     }
-    return this.client.listSnapshots(requestOpts).then(data => {
+    const requestOpts = Object.assign({}, this.opts, opts || {});
+    requestOpts.nextToken = hasExplicitCursor ? opts.nextToken : this._nextToken;
+    return this.client.listSnapshotsPage(requestOpts).then(data => {
         const page = normalizeItems(data);
         this._nextToken = page.nextToken;
         this._hasNext = !!page.nextToken;
@@ -202,8 +204,8 @@ Sandbox.prototype.updateNetwork = function (network) {
     return this.client.updateSandbox(this.sandboxId, { network });
 };
 
-Sandbox.prototype.pause = function () {
-    return this.client.pauseSandbox(this.sandboxId);
+Sandbox.prototype.pause = function (opts) {
+    return this.client.pauseSandbox(this.sandboxId, opts);
 };
 
 Sandbox.prototype.betaPause = Sandbox.prototype.pause;
@@ -275,7 +277,7 @@ Sandbox.prototype.createSnapshot = function (opts) {
 
 Sandbox.prototype.listSnapshots = function (opts) {
     return new SnapshotPaginator(this.client, Object.assign({}, opts || {}, {
-        sandboxId: this.sandboxId
+        sandboxID: this.sandboxId
     }));
 };
 
