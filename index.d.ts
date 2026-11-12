@@ -56,6 +56,7 @@ export declare namespace sandbox {
 
     interface GitRepositoryResource {
         type: 'github_repository';
+        readonly resource_id?: string;
         url: string;
         mount_path: string;
         authorization_token?: string;
@@ -63,13 +64,24 @@ export declare namespace sandbox {
 
     interface KodoResource {
         type: 'kodo';
+        readonly resource_id?: string;
         bucket: string;
         mount_path: string;
         prefix?: string;
         read_only?: boolean;
+        access_key?: string;
+        secret_key?: string;
     }
 
     type SandboxResource = GitRepositoryResource | KodoResource;
+
+    interface ResourcePatch {
+        authorization_token: string;
+    }
+
+    interface SandboxResourcesResponse {
+        resources: SandboxResource[];
+    }
 
     type InjectionConditions = {[key: string]: string};
 
@@ -97,6 +109,10 @@ export declare namespace sandbox {
     interface HttpInjection extends InjectionMatchOptions {
         type: 'http';
         headers?: {[key: string]: string};
+        if_body?: InjectionConditions;
+        ifBody?: InjectionConditions;
+        /** Secret JSON string fields to inject; values are omitted from responses. */
+        body?: {[key: string]: string};
     }
 
     interface OpenaiInjection extends InjectionMatchOptions {
@@ -180,6 +196,9 @@ export declare namespace sandbox {
         timeout?: number;
         timeoutMs?: number;
         autoPause?: boolean;
+        /** False persists only the filesystem on auto-pause; incompatible with autoResume. */
+        autoPauseMemory?: boolean;
+        autoResume?: {enabled: boolean};
         secure?: boolean;
         allow_internet_access?: boolean;
         allowInternetAccess?: boolean;
@@ -289,8 +308,53 @@ export declare namespace sandbox {
 
     interface SnapshotInfo {
         snapshotId?: string;
-        snapshotID?: string;
-        [key: string]: any;
+        snapshotID: string;
+        names: string[];
+    }
+
+    interface SandboxPauseOptions {
+        /** Defaults to true. False cold-boots on resume and cannot auto-resume on traffic. */
+        memory?: boolean;
+    }
+
+    interface SnapshotCreateOptions extends SandboxPauseOptions {
+        /** Alias with optional tag, without '/'. Reusing an owned name updates its build. */
+        name?: string;
+        /** Reuse the same key, sandbox ID and body when retrying an unknown outcome. */
+        idempotencyKey?: string;
+    }
+
+    interface SnapshotListOptions {
+        sandboxID?: string;
+        sandboxId?: string;
+        name?: string;
+        limit?: number;
+        nextToken?: string;
+    }
+
+    interface SnapshotPage {
+        items: SnapshotInfo[];
+        nextToken?: string;
+    }
+
+    interface TemplateTag {
+        tag: string;
+        buildID: string;
+        createdAt: string;
+    }
+
+    interface TemplateCreateOptions {
+        name?: string;
+        alias?: string;
+        tags?: string[];
+        teamID?: string;
+        cpuCount?: number;
+        memoryMB?: number;
+        /** Minimum free space in MiB after build. Omit for team default; 0 disables growth. */
+        minFreeDiskMb?: number;
+        /** Minimum total disk size in MiB. Omit or 0 for no minimum; never shrinks. */
+        minDiskMb?: number;
+        buildConfig?: any;
     }
 
     class SandboxPaginator {
@@ -306,7 +370,7 @@ export declare namespace sandbox {
     class SnapshotPaginator {
         readonly hasNext: boolean;
         readonly nextToken?: string;
-        nextItems(options?: SandboxClientOptions): Promise<SnapshotInfo[]>;
+        nextItems(options?: SandboxClientOptions & SnapshotListOptions): Promise<SnapshotInfo[]>;
         then<TResult1 = SnapshotInfo[], TResult2 = never>(
             onfulfilled?: ((value: SnapshotInfo[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
             onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
@@ -454,7 +518,7 @@ export declare namespace sandbox {
         skipCache(): this;
         setStartCmd(command: string): this;
         setReadyCmd(command: string): this;
-        build(options?: SandboxClientOptions & {client?: SandboxClient; name?: string; alias?: string; tags?: string[]}): Promise<any>;
+        build(options?: SandboxClientOptions & TemplateCreateOptions & {client?: SandboxClient; requestTimeoutMs?: number}): Promise<any>;
     }
 
     const Template: {
@@ -485,18 +549,21 @@ export declare namespace sandbox {
         getSandboxInjections(sandboxID: string): Promise<SandboxInjectionsResponse>;
         updateSandboxInjections(sandboxID: string, injections: SandboxInjection[]): Promise<null>;
         updateSandboxGithubToken(sandboxID: string, authorizationToken: string): Promise<null>;
+        getSandboxResources(sandboxID: string): Promise<SandboxResourcesResponse>;
+        patchSandboxResource(sandboxID: string, resourceID: string, options: ResourcePatch): Promise<null>;
         deleteSandbox(sandboxID: string): Promise<null>;
         killSandbox(sandboxID: string): Promise<null>;
         getSandboxMetrics(sandboxID: string, options?: any): Promise<any>;
-        pauseSandbox(sandboxID: string): Promise<null>;
+        pauseSandbox(sandboxID: string, options?: SandboxPauseOptions): Promise<null>;
         resumeSandbox(sandboxID: string, options?: any): Promise<any>;
         connectSandbox(sandboxID: string, options?: SandboxConnectOptions): Promise<any>;
+        connectSandboxV2(sandboxID: string, options?: SandboxConnectOptions): Promise<any>;
         updateSandboxTimeout(sandboxID: string, timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
         updateSandbox(sandboxID: string, options?: any): Promise<any>;
         refreshSandbox(sandboxID: string, options?: {duration?: number}): Promise<null>;
 
-        createTemplate(options?: any): Promise<any>;
-        createTemplateV3(options?: any): Promise<any>;
+        createTemplate(options?: TemplateCreateOptions): Promise<any>;
+        createTemplateV3(options?: TemplateCreateOptions): Promise<any>;
         createTemplateV2(options?: any): Promise<any>;
         getTemplateFiles(templateID: string, hash: string): Promise<any>;
         listDefaultTemplates(): Promise<DefaultTemplateInfo[]>;
@@ -508,6 +575,7 @@ export declare namespace sandbox {
         getTemplateBuildStatus(templateID: string, buildID: string, options?: any): Promise<any>;
         getTemplateBuildLogs(templateID: string, buildID: string, options?: any): Promise<any>;
         assignTemplateTags(options?: any): Promise<any>;
+        listTemplateTags(templateID: string): Promise<TemplateTag[]>;
         deleteTemplateTags(options?: any): Promise<null>;
         getTemplateByAlias(alias: string): Promise<any>;
 
@@ -529,8 +597,10 @@ export declare namespace sandbox {
         rebuildTemplate(templateID: string, options?: any): Promise<any>;
         startTemplateBuild(templateID: string, buildID: string, options?: any): Promise<null>;
         waitForBuild(templateID: string, buildID: string, options?: PollOptions): Promise<any>;
-        createSnapshot(sandboxID: string, options?: any): Promise<SnapshotInfo>;
-        listSnapshots(options?: any): Promise<any>;
+        createSnapshot(sandboxID: string, options?: SnapshotCreateOptions): Promise<SnapshotInfo>;
+        createSandboxSnapshot(sandboxID: string, options?: SnapshotCreateOptions): Promise<SnapshotInfo>;
+        listSnapshots(options?: SnapshotListOptions): Promise<SnapshotInfo[]>;
+        listSnapshotsPage(options?: SnapshotListOptions): Promise<SnapshotPage>;
         deleteSnapshot(snapshotID: string): Promise<null>;
     }
 
@@ -558,20 +628,22 @@ export declare namespace sandbox {
         setTimeout(timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
         refresh(options?: {duration?: number}): Promise<null>;
         updateNetwork(network: any): Promise<any>;
-        pause(): Promise<null>;
+        pause(options?: SandboxPauseOptions): Promise<null>;
         /**
          * @deprecated use pause() instead
          */
-        betaPause(): Promise<null>;
+        betaPause(options?: SandboxPauseOptions): Promise<null>;
         connect(options?: SandboxConnectOptions): Promise<this>;
         getInfo(): Promise<any>;
         getInjections(): Promise<SandboxInjectionsResponse>;
         updateInjections(injections: SandboxInjection[]): Promise<null>;
         updateGithubToken(authorizationToken: string): Promise<null>;
+        getResources(): Promise<SandboxResourcesResponse>;
+        patchResource(resourceID: string, options: ResourcePatch): Promise<null>;
         getMetrics(options?: any): Promise<any>;
         getLogs(options?: any): Promise<any>;
-        createSnapshot(options?: any): Promise<SnapshotInfo>;
-        listSnapshots(options?: any): SnapshotPaginator;
+        createSnapshot(options?: SnapshotCreateOptions): Promise<SnapshotInfo>;
+        listSnapshots(options?: SnapshotListOptions): SnapshotPaginator;
         getMcpUrl(): string;
         getMcpToken(): Promise<string | undefined>;
         waitForReady(options?: PollOptions): Promise<any>;

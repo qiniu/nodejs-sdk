@@ -54,6 +54,8 @@ function normalizeSandboxCreateOptions (opts) {
     }
 
     copyDefined(body, opts, 'autoPause');
+    copyDefined(body, opts, 'autoPauseMemory');
+    copyDefined(body, opts, 'autoResume');
     copyDefined(body, opts, 'secure');
     copyDefined(body, opts, 'allow_internet_access');
     copyDefined(body, opts, 'allowInternetAccess', 'allow_internet_access');
@@ -72,9 +74,9 @@ function normalizeSandboxCreateOptions (opts) {
     return body;
 }
 
-function hasKodoResource (body) {
+function needsQiniuResourceAuth (body) {
     return Array.isArray(body.resources) && body.resources.some(resource => {
-        return resource && resource.type === 'kodo';
+        return resource && resource.type === 'kodo' && (!resource.access_key || !resource.secret_key);
     });
 }
 
@@ -99,6 +101,12 @@ function normalizeInjection (injection) {
     if (normalized.ifQueries !== undefined && normalized.if_queries === undefined) {
         normalized.if_queries = normalized.ifQueries;
         delete normalized.ifQueries;
+    }
+    if (normalized.ifBody !== undefined) {
+        if (normalized.if_body === undefined) {
+            normalized.if_body = normalized.ifBody;
+        }
+        delete normalized.ifBody;
     }
     if (normalized.ruleId !== undefined && normalized.ruleID === undefined) {
         normalized.ruleID = normalized.ruleId;
@@ -272,7 +280,17 @@ SandboxClient.prototype._request = function (method, path, options) {
         url: this.endpoint + path,
         middlewares,
         urllibOptions
-    }).then(wrapper => this._handleResponse(wrapper, options.empty));
+    }).then(wrapper => {
+        const data = this._handleResponse(wrapper, options.empty);
+        if (options.paginated && Array.isArray(data)) {
+            const headers = (wrapper.resp && wrapper.resp.headers) || {};
+            return {
+                items: data,
+                nextToken: headers['x-next-token'] || headers['X-Next-Token']
+            };
+        }
+        return data;
+    });
 };
 
 SandboxClient.prototype._handleResponse = function (wrapper, empty) {
@@ -338,7 +356,7 @@ SandboxClient.prototype.createSandbox = function (opts) {
     const idempotencyKey = opts.idempotencyKey || opts.idempotency_key || generateIdempotencyKey();
     const headers = { 'Idempotency-Key': idempotencyKey };
     return this._retryCall(() => this._request('POST', '/sandboxes', {
-        authType: hasKodoResource(body) ? 'qiniu' : undefined,
+        authType: needsQiniuResourceAuth(body) ? 'qiniu' : undefined,
         body,
         headers
     }));
@@ -412,6 +430,23 @@ SandboxClient.prototype.updateSandboxGithubToken = function (sandboxID, authoriz
     });
 };
 
+SandboxClient.prototype.getSandboxResources = function (sandboxID) {
+    if (!sandboxID) {
+        return Promise.reject(new SandboxError('sandboxID is required'));
+    }
+    return this._request('GET', `/sandboxes/${encodePath(sandboxID)}/resources`);
+};
+
+SandboxClient.prototype.patchSandboxResource = function (sandboxID, resourceID, opts) {
+    if (!sandboxID || !resourceID || !opts || !opts.authorization_token) {
+        return Promise.reject(new SandboxError('sandboxID, resourceID and authorization_token are required'));
+    }
+    return this._request('PATCH', `/sandboxes/${encodePath(sandboxID)}/resources/${encodePath(resourceID)}`, {
+        body: opts,
+        empty: true
+    });
+};
+
 SandboxClient.prototype.deleteSandbox = function (sandboxID) {
     if (!sandboxID) {
         return Promise.reject(new SandboxError('sandboxID is required'));
@@ -421,8 +456,11 @@ SandboxClient.prototype.deleteSandbox = function (sandboxID) {
 
 SandboxClient.prototype.killSandbox = SandboxClient.prototype.deleteSandbox;
 
-SandboxClient.prototype.pauseSandbox = function (sandboxID) {
-    return this._request('POST', `/sandboxes/${encodePath(sandboxID)}/pause`, { empty: true });
+SandboxClient.prototype.pauseSandbox = function (sandboxID, opts) {
+    return this._request('POST', `/sandboxes/${encodePath(sandboxID)}/pause`, {
+        body: opts,
+        empty: true
+    });
 };
 
 SandboxClient.prototype.resumeSandbox = function (sandboxID, opts) {
@@ -431,12 +469,14 @@ SandboxClient.prototype.resumeSandbox = function (sandboxID, opts) {
 
 SandboxClient.prototype.connectSandbox = function (sandboxID, opts) {
     const timeout = timeoutSecondsFromOptions(opts);
-    return this._retryCall(() => this._request('POST', `/sandboxes/${encodePath(sandboxID)}/connect`, {
+    return this._retryCall(() => this._request('POST', `/v2/sandboxes/${encodePath(sandboxID)}/connect`, {
         body: {
-            timeout: timeout === undefined ? 15 : timeout
+            timeout: timeout === undefined ? 300 : timeout
         }
     }));
 };
+
+SandboxClient.prototype.connectSandboxV2 = SandboxClient.prototype.connectSandbox;
 
 SandboxClient.prototype.updateSandboxTimeout = function (sandboxID, timeoutOrOpts) {
     const timeout = typeof timeoutOrOpts === 'number' ? timeoutOrOpts : timeoutSecondsFromOptions(timeoutOrOpts);
@@ -464,17 +504,44 @@ SandboxClient.prototype.getSandboxMetrics = function (sandboxID, opts) {
 };
 
 SandboxClient.prototype.createSnapshot = function (sandboxID, opts) {
-    return this._request('POST', `/sandboxes/${encodePath(sandboxID)}/snapshots`, {
-        body: opts || {}
+    opts = opts || {};
+    const idempotencyKey = opts.idempotencyKey === undefined ? generateIdempotencyKey() : opts.idempotencyKey;
+    if (typeof idempotencyKey !== 'string' || !idempotencyKey.length || idempotencyKey.length > 128) {
+        return Promise.reject(new SandboxError('idempotencyKey must contain 1 to 128 characters'));
+    }
+    const body = {};
+    copyDefined(body, opts, 'name');
+    copyDefined(body, opts, 'memory');
+    return this._retryCall(() => this._request('POST', `/sandboxes/${encodePath(sandboxID)}/snapshots`, {
+        body,
+        headers: { 'Idempotency-Key': idempotencyKey }
+    }));
+};
+
+SandboxClient.prototype.createSandboxSnapshot = SandboxClient.prototype.createSnapshot;
+
+function snapshotListOptions (opts) {
+    opts = Object.assign({}, opts || {});
+    if (opts.sandboxID === undefined) {
+        copyDefined(opts, opts, 'sandboxId', 'sandboxID');
+    }
+    delete opts.sandboxId;
+    return opts;
+}
+
+SandboxClient.prototype.listSnapshotsPage = function (opts) {
+    return this._request('GET', appendQuery('/snapshots', snapshotListOptions(opts)), {
+        paginated: true
     });
 };
 
 SandboxClient.prototype.listSnapshots = function (opts) {
-    return this._request('GET', appendQuery('/snapshots', opts));
+    return this._request('GET', appendQuery('/snapshots', snapshotListOptions(opts)));
 };
 
 SandboxClient.prototype.deleteSnapshot = function (snapshotID) {
-    return this._request('DELETE', `/snapshots/${encodePath(snapshotID)}`, { empty: true });
+    // Persistent snapshots are templates and share their deletion endpoint.
+    return this.deleteTemplate(snapshotID);
 };
 
 SandboxClient.prototype.createTemplate = function (opts) {
@@ -528,6 +595,10 @@ SandboxClient.prototype.getTemplateBuildLogs = function (templateID, buildID, op
 
 SandboxClient.prototype.assignTemplateTags = function (opts) {
     return this._request('POST', '/templates/tags', { body: opts || {} });
+};
+
+SandboxClient.prototype.listTemplateTags = function (templateID) {
+    return this._request('GET', `/templates/${encodePath(templateID)}/tags`);
 };
 
 SandboxClient.prototype.deleteTemplateTags = function (opts) {

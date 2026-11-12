@@ -39,6 +39,9 @@ runExample(() => {
                 isOwner: detail.isOwner,
                 buildCount: Array.isArray(detail.builds) ? detail.builds.length : 0
             });
+            return client.listTemplateTags(id);
+        }).then(tags => {
+            console.log('Template tags:', tags);
         });
     }).then(() => {
         if (!allowMutation) {
@@ -63,6 +66,8 @@ runExample(() => {
             .build({
                 client,
                 name: templateName,
+                minDiskMb: 20480,
+                minFreeDiskMb: 1024,
                 tags: ['nodejs-sdk-example']
             });
     }).then(result => {

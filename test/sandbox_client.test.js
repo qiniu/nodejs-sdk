@@ -572,7 +572,7 @@ describe('test sandbox client module', function () {
                 res.end(JSON.stringify({ sandboxID: 'sbx_1', state: 'running' }));
                 return;
             }
-            if (req.method === 'POST' && req.url === '/sandboxes/sbx_1/connect') {
+            if (req.method === 'POST' && req.url === '/v2/sandboxes/sbx_1/connect') {
                 res.statusCode = 200;
                 res.end(JSON.stringify({ sandboxID: 'sbx_1', envdAccessToken: 'token' }));
                 return;
@@ -761,7 +761,7 @@ describe('test sandbox client module', function () {
 
     it('surfaces sandbox API string errors and default connect timeout', function () {
         return startServer((req, res) => {
-            if (req.method === 'POST' && req.url === '/sandboxes/sbx_default/connect') {
+            if (req.method === 'POST' && req.url === '/v2/sandboxes/sbx_default/connect') {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ sandboxID: 'sbx_default' }));
@@ -781,7 +781,7 @@ describe('test sandbox client module', function () {
                 .then(() => {
                     throw new Error('expected string error');
                 }, err => {
-                    JSON.parse(fixture.requests[0].body).should.eql({ timeout: 15 });
+                    JSON.parse(fixture.requests[0].body).should.eql({ timeout: 300 });
                     err.name.should.eql('SandboxError');
                     err.message.should.containEql('teapot');
                     return client.getSandbox('');
@@ -996,7 +996,7 @@ describe('test sandbox client module', function () {
                 res.end(JSON.stringify({ snapshotID: 'snap_1', snapshotId: 'snap_1' }));
                 return;
             }
-            if (req.method === 'GET' && req.url === '/snapshots?limit=1&sandboxId=sbx_page') {
+            if (req.method === 'GET' && req.url === '/snapshots?limit=1&sandboxID=sbx_page') {
                 res.statusCode = 200;
                 res.end(JSON.stringify({
                     items: [{ snapshotID: 'snap_1', snapshotId: 'snap_1' }],
@@ -1081,7 +1081,7 @@ describe('test sandbox client module', function () {
     it('supports instance connect and betaPause aliases', function () {
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');
-            if (req.method === 'POST' && req.url === '/sandboxes/sbx_alias/connect') {
+            if (req.method === 'POST' && req.url === '/v2/sandboxes/sbx_alias/connect') {
                 res.statusCode = 200;
                 res.end(JSON.stringify({
                     sandboxID: 'sbx_alias',

@@ -402,6 +402,88 @@ describeIntegration('sandbox integration', function () {
         });
     });
 
+    it('captures a filesystem snapshot and reconnects after filesystem-only pause', function () {
+        const client = sandboxClient({ maxRetries: 0, timeout: 120000 });
+        const runID = `nodejs-sdk-snapshot-it-${Date.now()}`;
+        const filePath = `/home/user/${runID}.txt`;
+        let source;
+        let copy;
+        let snapshotID;
+        let stage = 'create';
+
+        function cleanup () {
+            const errors = [];
+            return Promise.all([copy, source].filter(Boolean).map(instance => {
+                return instance.kill().catch(err => { errors.push(err); });
+            })).then(() => {
+                return snapshotID ? client.deleteTemplate(snapshotID).catch(err => { errors.push(err); }) : null;
+            }).then(() => {
+                if (errors.length) throw errors[0];
+            });
+        }
+
+        return qiniu.sandbox.Sandbox.create({
+            client,
+            template: config.template,
+            timeout: 300,
+            autoPause: true,
+            autoPauseMemory: false,
+            autoResume: { enabled: false }
+        }).then(created => {
+            source = created;
+            return source.waitForReady({ timeout: 180000, interval: 2000 });
+        }).then(() => {
+            stage = 'write source file';
+            return source.files.write(filePath, runID);
+        })
+            .then(() => source.getResources())
+            .then(result => {
+                Array.isArray(result.resources).should.eql(true);
+                stage = 'capture snapshot';
+                return source.createSnapshot({ name: `${runID}:v1`, memory: false, idempotencyKey: runID });
+            }).then(snapshot => {
+                snapshotID = snapshot.snapshotID;
+                should(snapshotID).be.String();
+                Array.isArray(snapshot.names).should.eql(true);
+                stage = 'list snapshot tags';
+                return client.listTemplateTags(snapshotID);
+            }).then(tags => {
+                tags.some(tag => tag.tag === 'v1').should.eql(true);
+                stage = 'list snapshots';
+                return client.listSnapshotsPage({ sandboxID: source.sandboxID, name: `${runID}:v1`, limit: 10 });
+            }).then(page => {
+                page.items.some(item => item.snapshotID === snapshotID).should.eql(true);
+                stage = 'pause source';
+                return source.pause({ memory: false });
+            }).then(() => {
+                stage = 'connect source';
+                return source.connect();
+            })
+            .then(() => source.waitForReady({ timeout: 180000, interval: 2000 }))
+            .then(() => {
+                stage = 'read source file after cold boot';
+                return source.files.readText(filePath);
+            })
+            .then(text => {
+                text.should.eql(runID);
+                stage = 'create sandbox from snapshot';
+                return qiniu.sandbox.Sandbox.create({ client, template: snapshotID, timeout: 300 });
+            }).then(created => {
+                copy = created;
+                return copy.waitForReady({ timeout: 180000, interval: 2000 });
+            }).then(() => {
+                stage = 'read copied snapshot file';
+                return copy.files.readText(filePath);
+            })
+            .then(text => {
+                text.should.eql(runID);
+                integrationLog('filesystem snapshot, tags, pause and Connect v2 verified');
+            }).then(cleanup, err => {
+                integrationLog('snapshot integration failed at', stage);
+                return cleanup().then(() => { throw err; });
+            });
+    });
+
     it('creates, inspects, and deletes a template', function () {
         const client = sandboxClient();
         const name = `nodejs-sdk-it-${Date.now()}`;
@@ -414,6 +496,8 @@ describeIntegration('sandbox integration', function () {
         return template.build({
             client,
             name,
+            minDiskMb: 10240,
+            minFreeDiskMb: 0,
             tags: ['nodejs-sdk-it']
         }).then(result => {
             templateID = result.templateID || result.templateId || result.id || name;

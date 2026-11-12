@@ -2,6 +2,10 @@ import * as qiniu from '../index';
 
 type IsAny<T> = 0 extends (1 & T) ? true : false;
 type AssertFalse<T extends false> = T;
+type AssertNever<T extends never> = T;
+type BodyOptionKeys<T> = T extends unknown ? Extract<keyof T, 'body' | 'ifBody' | 'if_body'> : never;
+type ProviderInjection = Exclude<qiniu.sandbox.Injection, qiniu.sandbox.HttpInjection>;
+type ProviderBodyOptions = AssertNever<BodyOptionKeys<ProviderInjection>>;
 
 async function useSandboxTypes () {
     const client = new qiniu.sandbox.SandboxClient({
@@ -14,7 +18,9 @@ async function useSandboxTypes () {
         bucket: 'bucket',
         mount_path: '/mnt/kodo',
         prefix: 'prefix',
-        read_only: true
+        read_only: true,
+        access_key: 'ak',
+        secret_key: 'sk'
     };
     const gitResource: qiniu.sandbox.GitRepositoryResource = {
         type: 'github_repository',
@@ -33,6 +39,12 @@ async function useSandboxTypes () {
             model: 'qiniu-default'
         }
     };
+    const httpInjection: qiniu.sandbox.HttpInjection = {
+        type: 'http',
+        ifBody: { model: 'demo' },
+        if_body: { model: 'demo' },
+        body: { token: 'secret' }
+    };
     const githubInjection: qiniu.sandbox.GithubInjection = {
         type: 'github',
         token: 'github-token',
@@ -47,11 +59,15 @@ async function useSandboxTypes () {
 
     const sandbox = await qiniu.Sandbox.create('base', {
         client,
+        autoPause: true,
+        autoPauseMemory: false,
+        autoResume: { enabled: false },
         resources: [kodoResource, gitResource],
         injections: [
             { type: 'id', id: 'rule_1' },
             { injectionRuleID: 'rule_2' },
             qiniuInjection,
+            httpInjection,
             githubInjection
         ],
         network: {
@@ -63,7 +79,29 @@ async function useSandboxTypes () {
     const fileType: 'file' = qiniu.FileType.FILE;
     const eventType: 'write' = qiniu.FilesystemEventType.WRITE;
     await sandbox.connect({ timeoutMs });
-    await sandbox.betaPause();
+    await sandbox.betaPause({ memory: false });
+    await sandbox.pause({ memory: true });
+    await client.connectSandboxV2(sandbox.sandboxID);
+    const snapshot = await sandbox.createSnapshot({ name: 'demo:v1', memory: false, idempotencyKey: 'capture-key' });
+    const snapshotID: string = snapshot.snapshotID;
+    const snapshotNames: string[] = snapshot.names;
+    const snapshotPage: qiniu.sandbox.SnapshotPage = await client.listSnapshotsPage({ name: 'demo:v1', sandboxID: sandbox.sandboxID });
+    const snapshots: qiniu.sandbox.SnapshotInfo[] = await client.listSnapshots({ limit: 10 });
+    const snapshotItems: qiniu.sandbox.SnapshotInfo[] = await sandbox.listSnapshots({ limit: 10 }).nextItems();
+    await sandbox.listSnapshots({ limit: 10 }).nextItems({ nextToken: 'saved-cursor' });
+    type Snapshot = typeof snapshotItems[number];
+    const snapshotIsTyped: AssertFalse<IsAny<Snapshot>> = false;
+    const tags: qiniu.sandbox.TemplateTag[] = await client.listTemplateTags(snapshotID);
+    const resources: qiniu.sandbox.SandboxResourcesResponse = await sandbox.getResources();
+    const resourceID: string | undefined = resources.resources[0].resource_id;
+    if (resourceID) {
+        await sandbox.patchResource(resourceID, { authorization_token: 'new-token' });
+    }
+    snapshotNames.length;
+    snapshotPage.items.length;
+    snapshots.length;
+    tags[0].createdAt.length;
+    snapshotIsTyped.valueOf();
     const bytes: Buffer = await sandbox.files.read('/tmp/a.bin', { format: 'bytes' });
     const text: string = await sandbox.files.read('/tmp/a.txt', { format: 'text' });
     const stream: NodeJS.ReadableStream = await sandbox.files.read('/tmp/a.txt', { format: 'stream' });
@@ -137,7 +175,8 @@ async function useSandboxTypes () {
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', { branch: 'sandbox', depth: 1 })
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', { branch: 'sandbox', depth: 1 })
         .runCmd(['echo one', 'echo two'], { user: 'root' });
-    await template.build({ client, name: 'typed-template:test' });
+    await template.build({ client, name: 'typed-template:test', minDiskMb: 20480, minFreeDiskMb: 0 });
+    await client.createTemplate({ name: 'typed-template', minDiskMb: 0, minFreeDiskMb: 1024 });
     await sandbox.updateNetwork({ allowOut: [qiniu.sandbox.ALL_TRAFFIC] });
     const injections: qiniu.sandbox.SandboxInjection[] = (await sandbox.getInjections()).injections;
     await sandbox.updateInjections(injections);
