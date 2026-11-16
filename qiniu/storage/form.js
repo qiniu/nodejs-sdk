@@ -113,7 +113,7 @@ function PutExtra (
     this.params = params || {};
     this.mimeType = mimeType || null;
     this.crc32 = crc32 || null;
-    this.checkCrc = checkCrc || true;
+    this.checkCrc = checkCrc == null ? true : checkCrc;
     this.metadata = metadata || {};
 }
 
