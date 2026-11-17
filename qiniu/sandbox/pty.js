@@ -178,6 +178,11 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 res.resume();
                 return;
             }
+            let responseEnded = false;
+            res.on('aborted', () => fail(new Error('PTY stream aborted')));
+            res.on('close', () => {
+                if (!responseEnded) fail(new Error('PTY stream closed before response end'));
+            });
             res.on('data', chunk => {
                 responseBuffer = Buffer.concat([responseBuffer, chunk]);
                 while (responseBuffer.length >= 5) {
@@ -221,6 +226,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             });
             res.on('error', fail);
             res.on('end', () => {
+                responseEnded = true;
                 if (responseBuffer.length > 0) {
                     fail(new Error('Sandbox envd stream truncated unexpectedly'));
                     return;

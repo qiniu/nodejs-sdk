@@ -297,6 +297,11 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             if (!isConnectStream) {
                 cleanupStartTimer();
             }
+            let responseEnded = false;
+            res.on('aborted', () => fail(new Error('Command stream aborted')));
+            res.on('close', () => {
+                if (!responseEnded) fail(new Error('Command stream closed before response end'));
+            });
             res.on('data', chunk => {
                 if (!isConnectStream) {
                     jsonChunks.push(chunk);
@@ -347,6 +352,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             });
             res.on('error', fail);
             res.on('end', () => {
+                responseEnded = true;
                 if (responseBuffer.length - responseOffset > 0) {
                     fail(new Error('Sandbox envd stream truncated unexpectedly'));
                     return;

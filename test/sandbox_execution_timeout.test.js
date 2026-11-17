@@ -29,6 +29,18 @@ describe('test sandbox native process execution deadlines', function () {
                 let child;
                 let killTimer;
                 let exited;
+                let handle;
+                let fixture;
+                let watchdog;
+                const sockets = new Set();
+                const cleanup = () => {
+                    clearTimeout(watchdog);
+                    clearTimeout(killTimer);
+                    if (child) child.kill('SIGKILL');
+                    if (handle) handle.disconnect();
+                    sockets.forEach(socket => socket.destroy());
+                    return closeServer(fixture.server);
+                };
                 return startServer((req, res) => {
                     if (req.url !== '/process.Process/Start') {
                         res.statusCode = 500;
@@ -49,27 +61,37 @@ describe('test sandbox native process execution deadlines', function () {
                     res.setHeader('Content-Type', 'application/connect+json');
                     res.write(encodeConnectEnvelope({ event: { start: { pid: child.pid } } }));
                     if (mode === 'network-error') setTimeout(() => res.destroy(), 10);
-                }).then(fixture => {
-                    return start(makeSandbox(fixture.endpoint), kind, {
+                }).then(serverFixture => {
+                    fixture = serverFixture;
+                    fixture.server.on('connection', socket => {
+                        sockets.add(socket);
+                        socket.once('close', () => sockets.delete(socket));
+                    });
+                    const operation = start(makeSandbox(fixture.endpoint), kind, {
                         executionTimeoutMs: 80,
                         requestTimeoutMs: 1000
-                    }).then(handle => {
+                    }).then(startedHandle => {
+                        handle = startedHandle;
                         fixture.requests[0].headers['connect-timeout-ms'].should.eql('80');
                         const waiting = handle.wait().then(result => {
+                            if (mode === 'network-error') throw new Error('expected stream interruption');
                             if (mode === 'connected') result.exitCode.should.eql(-1);
                         }, err => {
                             if (mode !== 'network-error') throw err;
+                            err.message.should.match(/abort|closed/);
                         });
                         return (mode === 'disconnected' ? handle.disconnect() : Promise.resolve())
                             .then(() => Promise.all([waiting, exited]));
                     }).then(results => {
                         results[1].exitCode.should.eql(-1);
                         fixture.requests.length.should.eql(1);
-                    }).then(() => closeServer(fixture.server), err => {
-                        clearTimeout(killTimer);
-                        if (child) child.kill('SIGKILL');
-                        return closeServer(fixture.server).then(() => { throw err; });
                     });
+                    const bounded = new Promise((resolve, reject) => {
+                        watchdog = setTimeout(() => reject(new Error('Native deadline fixture did not finish')), 4000);
+                    });
+                    return Promise.race([operation, bounded]);
+                }).then(cleanup, err => {
+                    return cleanup().then(() => { throw err; });
                 });
             });
         });
