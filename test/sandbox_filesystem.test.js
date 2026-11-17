@@ -15,6 +15,7 @@ const {
     encodeTruncatedConnectHeader
 } = require('./sandbox_helpers');
 const { execFile } = require('child_process');
+const fs = require('fs');
 
 describe('test sandbox filesystem module', function () {
     describe('stream transfer lifecycle', function () {
@@ -183,8 +184,17 @@ describe('test sandbox filesystem module', function () {
                 res.write('partial');
                 setTimeout(() => res.destroy(), 10);
             }).then(() => sandbox.files.read('/truncated', { format: 'stream' }))
-                .then(consume).then(() => { throw new Error('expected interrupted stream'); }, err => {
-                    err.message.should.match(/aborted|closed/);
+                .then(source => {
+                    let ended = false;
+                    const closed = new Promise(resolve => source.once('close', resolve));
+                    source.once('end', () => { ended = true; });
+                    return consume(source).then(() => { throw new Error('expected interrupted stream'); }, err => {
+                        err.message.should.match(/aborted|closed/);
+                        return closed;
+                    }).then(() => {
+                        ended.should.eql(false);
+                        if (typeof source.closed === 'boolean') source.closed.should.eql(true);
+                    });
                 });
         });
 
@@ -196,6 +206,30 @@ describe('test sandbox filesystem module', function () {
                 res.on('close', closed);
             }).then(() => sandbox.files.read('/cancel', { format: 'stream' }))
                 .then(source => { source.destroy(); return connectionClosed; });
+        });
+
+        it('stops buffered download data immediately when the consumer destroys the stream', function () {
+            return serve((req, res) => {
+                res.write('first');
+                const timer = setTimeout(() => res.write('second'), 10);
+                res.on('close', () => clearTimeout(timer));
+            }).then(() => sandbox.files.read('/cancel-buffered', { format: 'stream' }))
+                .then(source => {
+                    const events = [];
+                    source.on('error', err => events.push(`error:${err.message}`));
+                    source.on('end', () => events.push('end'));
+                    const closed = new Promise(resolve => source.once('close', () => {
+                        events.push('close');
+                        resolve();
+                    }));
+                    return new Promise(resolve => setTimeout(resolve, 40)).then(() => {
+                        source.on('data', () => {
+                            events.push('data');
+                            source.destroy(new Error('consumer stop'));
+                        });
+                        return closed;
+                    }).then(() => events.should.eql(['data', 'error:consumer stop', 'close']));
+                });
         });
 
         it('applies a file deadline after download headers and gives requestTimeoutMs precedence', function () {
@@ -548,6 +582,25 @@ describe('test sandbox filesystem module', function () {
         }, err => {
             err.code.should.eql('ECONNREFUSED');
             source.destroyed.should.eql(true);
+        });
+    });
+
+    it('preserves native file-stream cleanup when an upload cannot connect', function () {
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'native-stream-write',
+            envdUrl: 'http://127.0.0.1:9',
+            info: { envdAccessToken: 'token' }
+        });
+        const source = fs.createReadStream(__filename, { highWaterMark: 1 });
+        const closed = new Promise(resolve => source.once('close', resolve));
+        return sandbox.files.write('/stream.txt', source).then(() => {
+            throw new Error('expected stream write to reject');
+        }, err => {
+            err.code.should.eql('ECONNREFUSED');
+            return closed;
+        }).then(() => {
+            source.destroyed.should.eql(true);
+            should(source.fd).eql(null);
         });
     });
 

@@ -25,19 +25,32 @@ function isReadable (value) {
 }
 
 function makeDestroyable (source) {
-    if (typeof source.destroy !== 'function') {
+    // SDK memory streams need error-before-close and idempotent destruction.
+    // Node 8's default _destroy ends without close; Node 10/12 can emit a late
+    // error when an already destroyed Readable is destroyed again with an error.
+    const nativeDestroy = source.destroy;
+    if (typeof nativeDestroy === 'function' && source._readableState.emitClose !== undefined) {
         source.destroy = function (err) {
-            if (source.destroyed) return source;
-            source.destroyed = true;
-            source.readable = false;
-            source.unpipe();
-            process.nextTick(() => {
-                if (err) source.emit('error', err);
-                source.emit('close');
-            });
+            if (!source.destroyed) {
+                source.pause();
+                nativeDestroy.call(source, err);
+            }
             return source;
         };
+        return source;
     }
+    source.destroy = function (err) {
+        if (source.destroyed) return source;
+        source.destroyed = true;
+        source.readable = false;
+        source.pause();
+        source.unpipe();
+        process.nextTick(() => {
+            if (err) source.emit('error', err);
+            source.emit('close');
+        });
+        return source;
+    };
     return source;
 }
 
@@ -46,7 +59,8 @@ function destroyStream (source) {
     if (typeof source.destroy !== 'function' && typeof source.close === 'function') {
         source.close();
     } else {
-        destroy(makeDestroyable(source));
+        if (typeof source.destroy !== 'function') makeDestroyable(source);
+        destroy(source);
     }
 }
 
