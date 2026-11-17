@@ -45,6 +45,17 @@ describe('test sandbox filesystem module', function () {
             return source;
         }
 
+        function closeReadable (source) {
+            if (typeof source.destroy === 'function') {
+                source.destroy();
+                // Node 8's default Readable.destroy() does not emit close.
+                if (source._readableState.emitClose === undefined) process.nextTick(() => source.emit('close'));
+            } else {
+                source.destroyed = true;
+                source.emit('close');
+            }
+        }
+
         function consume (source) {
             return new Promise((resolve, reject) => {
                 const chunks = [];
@@ -59,12 +70,7 @@ describe('test sandbox filesystem module', function () {
                 const sockets = [];
                 const source = new stream.Readable({ read: function () {} });
                 const sourceClosed = new Promise(resolve => source.once('close', resolve));
-                if (typeof source.destroy === 'function') {
-                    source.destroy();
-                } else {
-                    source.destroyed = true;
-                    source.emit('close');
-                }
+                closeReadable(source);
                 const server = http.createServer((req, res) => {
                     req.resume();
                     req.on('end', () => res.end('[]'));
@@ -99,7 +105,14 @@ describe('test sandbox filesystem module', function () {
                     });
                 }).then(err => {
                     err.message.should.match(/upload.*closed/i);
-                    return new Promise(resolve => setTimeout(resolve, 10));
+                    return new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('upload connections did not close')), 1000);
+                        server.close(() => {
+                            clearTimeout(timer);
+                            fixture = null;
+                            resolve();
+                        });
+                    });
                 }).then(() => sockets.length.should.eql(0)).then(null, err => {
                     sockets.forEach(socket => socket.destroy());
                     throw err;
@@ -111,12 +124,7 @@ describe('test sandbox filesystem module', function () {
             it(`removes listeners when reusing an already closed ${mode} source`, function () {
                 const source = new stream.Readable({ read: function () {} });
                 const closed = new Promise(resolve => source.once('close', resolve));
-                if (typeof source.destroy === 'function') {
-                    source.destroy();
-                } else {
-                    source.destroyed = true;
-                    source.emit('close');
-                }
+                closeReadable(source);
                 const sandbox = new qiniu.sandbox.Sandbox({
                     sandboxId: 'closed-source', envdUrl: 'http://127.0.0.1:1', info: { envdVersion: '0.5.7' }
                 });
@@ -165,6 +173,30 @@ describe('test sandbox filesystem module', function () {
         });
 
         ['multipart', 'octet'].forEach(mode => {
+            it(`owns asynchronously delivered destroy errors in ${mode} mode`, function () {
+                const source = new stream.Readable({ read: function () {} });
+                source._destroy = (err, callback) => setTimeout(() => callback(err), 20);
+                const error = new Error('asynchronous source destroy failure');
+                if (typeof source.destroy === 'function') {
+                    source.destroy(error);
+                } else {
+                    source.destroyed = true;
+                    source._destroy(error, err => {
+                        source.emit('error', err);
+                        source.emit('close');
+                    });
+                }
+                const sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'closed-source', envdUrl: 'http://127.0.0.1:1', info: { envdVersion: '0.5.7' }
+                });
+                return sandbox.files.write('/closed', source, { requestTimeoutMs: 0, useOctetStream: mode === 'octet' })
+                    .then(() => { throw new Error('expected destroyed source failure'); }, err => {
+                        err.message.should.match(/upload.*closed|source destroy failure/i);
+                    }).then(() => new Promise(resolve => setTimeout(resolve, 40))).then(() => {
+                        ['end', 'error', 'close'].map(event => source.listenerCount(event)).should.eql([0, 0, 0]);
+                    });
+            });
+
             it(`bounds guards when retrying a closed native file in ${mode} mode`, function () {
                 const source = fs.createReadStream(__filename);
                 const closed = new Promise(resolve => source.once('close', resolve));
@@ -194,8 +226,8 @@ describe('test sandbox filesystem module', function () {
 
             it(`owns a pending native file open error in ${mode} mode`, function () {
                 const source = fs.createReadStream(path.join(__dirname, 'missing-source-' + Date.now()));
-                const originalCounts = ['end', 'error', 'close'].map(event => source.listenerCount(event));
                 source.destroy();
+                const nativeListeners = ['end', 'error', 'close'].map(event => source.listeners(event));
                 const sandbox = new qiniu.sandbox.Sandbox({
                     sandboxId: 'closed-file', envdUrl: 'http://127.0.0.1:1', info: { envdVersion: '0.5.7' }
                 });
@@ -203,7 +235,12 @@ describe('test sandbox filesystem module', function () {
                     .then(() => { throw new Error('expected destroyed file failure'); }, err => {
                         err.message.should.match(/upload.*closed/i);
                     }).then(() => new Promise(resolve => setTimeout(resolve, 20))).then(() => {
-                        ['end', 'error', 'close'].map(event => source.listenerCount(event)).should.eql(originalCounts);
+                        // Node 8 can retain its own fs close callback after open fails.
+                        ['end', 'error', 'close'].forEach((event, index) => {
+                            source.listeners(event).forEach(listener => {
+                                nativeListeners[index].indexOf(listener).should.be.aboveOrEqual(0);
+                            });
+                        });
                     });
             });
         });

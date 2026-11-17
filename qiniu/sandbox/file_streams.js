@@ -48,9 +48,9 @@ function cleanupClosedSource (source, cleanup) {
         cleanup();
     } else if (state && typeof state.closeEmitted === 'boolean' && state.emitClose !== false) {
         // Native destroy() still has an error/close event pending.
-    } else if (typeof source._destroy !== 'function' && typeof source.close !== 'function') {
-        // Legacy generic Readables have no asynchronous destroy/close operation.
-        // Keep the error listener through errors already queued by destroy().
+    } else if ((typeof source._destroy === 'function' && source._destroy === Readable.prototype._destroy) || (typeof source._destroy !== 'function' && typeof source.close !== 'function')) {
+        // The native Readable destroy callback is synchronous, including Node
+        // 8/10/12 without closeEmitted. Keep protection for its queued events.
         process.nextTick(cleanup);
     } else {
         cleanup();
@@ -116,6 +116,7 @@ function sequenceStream (parts) {
     let stopped = false;
     let demand = false;
     let initialError;
+    const destroySources = [];
     const output = makeDestroyable(new Readable({
         read: function () {
             demand = true;
@@ -187,11 +188,7 @@ function sequenceStream (parts) {
     output.on('close', () => {
         stopped = true;
         detach();
-        parts.forEach(part => {
-            if (isReadable(part)) {
-                destroyStream(part);
-            }
-        });
+        destroySources.forEach(destroySource => destroySource());
     });
     parts.forEach(part => {
         if (isReadable(part)) {
@@ -213,6 +210,10 @@ function sequenceStream (parts) {
             part.once('end', onEnd);
             part.on('error', fail);
             part.once('close', onClose);
+            destroySources.push(() => {
+                destroyStream(part);
+                cleanupClosedSource(part, cleanup);
+            });
             if (readableClosed(part)) cleanupClosedSource(part, cleanup);
         }
     });
@@ -236,6 +237,7 @@ function requestFile (requestUrl, options) {
         let requestFinished = false;
         let pendingResult;
         let uploadStream = options.stream;
+        let cleanupUploadSource;
         const sourceError = options.stream && prematureCloseError(options.stream);
         const req = sourceError ? null : transport.request({
             method: options.method,
@@ -258,6 +260,7 @@ function requestFile (requestUrl, options) {
             settled = true;
             cleanup();
             destroyStream(options.stream);
+            if (cleanupUploadSource) cleanupUploadSource();
             resolve(pendingResult);
         }
 
@@ -266,6 +269,7 @@ function requestFile (requestUrl, options) {
             destroyStream(response);
             if (decoded !== response) destroyStream(decoded);
             destroyStream(options.stream);
+            if (cleanupUploadSource) cleanupUploadSource();
             if (uploadStream !== options.stream) destroyStream(uploadStream);
         }
 
@@ -300,12 +304,12 @@ function requestFile (requestUrl, options) {
             options.stream.once('end', onEnd);
             options.stream.on('error', fail);
             options.stream.once('close', onClose);
+            cleanupUploadSource = () => cleanupClosedSource(options.stream, cleanupSource);
             if (sourceError) {
                 fail(sourceError);
-                cleanupClosedSource(options.stream, cleanupSource);
                 return;
             }
-            if (readableClosed(options.stream)) cleanupClosedSource(options.stream, cleanupSource);
+            if (readableClosed(options.stream)) cleanupUploadSource();
         }
 
         req.on('error', fail);
