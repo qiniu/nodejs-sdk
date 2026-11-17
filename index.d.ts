@@ -339,13 +339,17 @@ export declare namespace sandbox {
         timeout?: number;
         timeoutMs?: number;
         requestTimeoutMs?: number;
-        /** Opt-in process deadline after start, from 0 to 2147483647 milliseconds; 0 disables it. Expiry kills the PID and rejects wait(). */
+        /** Server-enforced execution limit for a new process, in integer milliseconds (0..9999999999). Zero disables it. Survives client disconnection. */
         executionTimeoutMs?: number;
         throwOnError?: boolean;
         config?: {[key: string]: string | number | boolean};
         onStdout?: (data: string) => void;
         onStderr?: (data: string) => void;
     }
+
+    type CommandConnectOptions = Pick<CommandOptions,
+        'user' | 'timeout' | 'timeoutMs' | 'requestTimeoutMs' | 'throwOnError' | 'onStdout' | 'onStderr'
+    > & {executionTimeoutMs?: never};
 
     interface GitStatus {
         currentBranch: string;
@@ -465,7 +469,7 @@ export declare namespace sandbox {
         run(command: string, options?: CommandOptions & {background?: false}): Promise<CommandResult>;
         run(command: string, options: CommandOptions & {background: true}): Promise<CommandHandle>;
         start(command: string, options?: CommandOptions): Promise<CommandHandle>;
-        connect(pid: number, options?: CommandOptions): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandConnectOptions): Promise<CommandHandle>;
         list(options?: {user?: string}): Promise<any[]>;
         sendStdin(pid: number, data: string | Buffer, options?: {user?: string}): Promise<null>;
         closeStdin(pid: number, options?: {user?: string}): Promise<null>;
@@ -500,7 +504,7 @@ export declare namespace sandbox {
 
     class Pty {
         create(options?: CommandOptions & {cmd?: string; args?: string[]; cols?: number; rows?: number; onData?: (data: Buffer) => void}): Promise<CommandHandle>;
-        connect(pid: number, options?: CommandOptions & {onData?: (data: Buffer) => void}): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandConnectOptions & {onData?: (data: Buffer) => void}): Promise<CommandHandle>;
         sendInput(pid: number, data: string | Buffer, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
         resize(pid: number, size: {cols: number; rows: number}, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
         kill(pid: number, options?: {user?: string; requestTimeoutMs?: number}): Promise<boolean>;
@@ -537,8 +541,6 @@ export declare namespace sandbox {
     class TimeoutError extends Error {
         pid?: number;
         timeoutMs?: number;
-        /** Present when terminating the process after its execution deadline fails. */
-        killError?: Error;
     }
     class NotImplementedError extends Error {}
     class InvalidArgumentError extends Error {}

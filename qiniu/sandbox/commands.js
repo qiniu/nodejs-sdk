@@ -3,7 +3,7 @@ const { CommandExitError } = require('./errors');
 const { agentFromClient, millisecondsFromOptions, parseJSON, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
-const { validateExecutionTimeout, startExecutionTimeout } = require('./execution_timeout');
+const { executionTimeoutHeaders } = require('./execution_timeout');
 
 function eventPayload (event) {
     return event.event || event;
@@ -137,13 +137,12 @@ CommandHandle.prototype.kill = function () {
 };
 
 CommandHandle.prototype.disconnect = function () {
-    if (this._executionDeadline) this._executionDeadline.cancel();
     this._disconnected = true;
     if (this._request) {
         this._request.destroy();
         this._request = null;
     }
-    if (this._resolveWait && !(this._executionDeadline && this._executionDeadline.expired)) {
+    if (this._resolveWait) {
         const result = this.result || {
             pid: this.pid,
             exitCode: 0,
@@ -164,13 +163,12 @@ CommandHandle.prototype.disconnect = function () {
 function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
     opts = opts || {};
     return new Promise((resolve, reject) => {
-        validateExecutionTimeout(opts.executionTimeoutMs);
         const target = parseRequestUrl(commands.sandbox.envdUrl() + procedure);
         const transport = target.protocol === 'https:' ? https : http;
         const headers = Object.assign({
             'Content-Type': 'application/connect+json',
             'Keepalive-Ping-Interval': '50'
-        }, envdHeaders(commands.sandbox, opts.user));
+        }, envdHeaders(commands.sandbox, opts.user), executionTimeoutHeaders(procedure, opts.executionTimeoutMs));
         const req = transport.request({
             method: 'POST',
             protocol: target.protocol,
@@ -202,7 +200,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         });
         waitPromise.catch(() => {});
         let startTimer;
-        let executionDeadline;
+        let receivedEnd = false;
 
         function cleanupStartTimer () {
             if (startTimer) {
@@ -212,9 +210,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         }
 
         function fail (err) {
-            if (executionDeadline && executionDeadline.expired) return;
             cleanupStartTimer();
-            if (executionDeadline) executionDeadline.cancel();
             if (handle && handle._disconnected) {
                 if (result.exitCode === -1) {
                     result.exitCode = 0;
@@ -235,13 +231,6 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                 result.pid = pid || result.pid;
                 handle = new CommandHandle(commands, result.pid, null, opts, req, waitPromise);
                 handle._resolveWait = resolveWait;
-                executionDeadline = startExecutionTimeout(opts.executionTimeoutMs, result.pid,
-                    timeout => commands.kill(result.pid, { user: opts.user, requestTimeoutMs: timeout }),
-                    () => req.destroy(), err => {
-                        handle._resolveWait = null;
-                        rejectWait(err);
-                    });
-                handle._executionDeadline = executionDeadline;
                 settled = true;
                 resolve(handle);
             }
@@ -274,8 +263,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         }
 
         function finish (end) {
-            if (executionDeadline && executionDeadline.expired) return;
-            if (executionDeadline) executionDeadline.cancel();
+            receivedEnd = true;
             result.exitCode = end && end.exitCode !== undefined ? end.exitCode : 0;
             result.error = end && end.error ? end.error : '';
             if (handle) {
@@ -385,7 +373,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                     fail(new Error('Command stream ended before process start'));
                     return;
                 }
-                if (result.exitCode === -1) {
+                if (!receivedEnd) {
                     fail(new Error('Command stream ended before process end'));
                 }
             });

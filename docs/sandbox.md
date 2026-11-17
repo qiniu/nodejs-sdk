@@ -174,20 +174,30 @@ await sandbox.files.write('/tmp/input.bin', fs.createReadStream('./input.bin'), 
 ## 进程执行期限
 
 Commands／PTY 的既有 `requestTimeoutMs`、`timeoutMs`、`timeout` 保持启动等待语义。
-需要限制启动后的执行时长时，显式传入 `executionTimeoutMs`（`0` 至 `2147483647` 毫秒，`0` 禁用）；超过上限时在发出请求前以 `RangeError` 拒绝：
+创建新命令或 PTY 时，可用 `executionTimeoutMs` 限制执行时长（整数毫秒，`0` 至 `9999999999`，`0` 禁用）。
+该上限来自 Connect 协议的十位 timeout Header；非法值在发出请求前拒绝：
 
 ```js
 const handle = await sandbox.commands.start('long-running-command', {
     requestTimeoutMs: 10000,
     executionTimeoutMs: 60000
 });
-await handle.wait();
+const result = await handle.wait();
+if (result.exitCode !== 0) {
+    console.error(result.exitCode, result.error);
+}
 ```
 
-执行期限从收到 PID 后开始计时；到期后关闭本地流并尝试终止该 PID。
-终止请求完成或最多等待 5 秒后，`wait()` 以带 `pid` 的 `TimeoutError` 拒绝；
-终止失败时，`error.killError` 保留原因，此时应核实远端进程状态。
-自然结束会取消计时；`disconnect()` 取消本地期限并断开流，保留远端进程。
+SDK 在初次 `Start` 请求中通过 `Connect-Timeout-Ms` 将期限交给 Envd；期限从服务端创建进程时开始，
+客户端断连、退出或网络中断都不会撤销。到期由 Envd 终止进程，SDK 不依赖客户端计时或另发 kill 请求。
+省略该选项或传 `0` 时不发送这个 Header，沿用服务端的默认执行生命周期。
+
+`wait()` 保留 Envd 实际返回的结束结果；被终止时退出码可能是 `-1`，应检查 `exitCode` 和 `error`。
+命令启用 `throwOnError` 时，非零退出抛出 `CommandExitError`；协议层的 `deadline_exceeded` 等错误按原样传播，
+不承诺统一抛出 `TimeoutError`。
+
+`commands.connect`／`pty.connect` 只连接已有进程，不接受 `executionTimeoutMs`，也不重设原进程的期限。
+`disconnect()` 只结束本次输出订阅；创建时已经交给 Envd 的执行期限仍然有效。
 
 ## 示例与验证
 

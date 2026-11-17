@@ -2,7 +2,7 @@ const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYT
 const { agentFromClient, millisecondsFromOptions, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
-const { validateExecutionTimeout, startExecutionTimeout } = require('./execution_timeout');
+const { executionTimeoutHeaders } = require('./execution_timeout');
 
 function encodeConnectEnvelope (message) {
     const payload = Buffer.from(JSON.stringify(message || {}));
@@ -54,13 +54,12 @@ LivePtyHandle.prototype.kill = function () {
 };
 
 LivePtyHandle.prototype.disconnect = function () {
-    if (this._executionDeadline) this._executionDeadline.cancel();
     this._disconnected = true;
     if (this._request) {
         this._request.destroy();
         this._request = null;
     }
-    if (this._resolveWait && !(this._executionDeadline && this._executionDeadline.expired)) {
+    if (this._resolveWait) {
         const result = {
             exitCode: 0,
             stdout: this.stdout,
@@ -75,13 +74,12 @@ LivePtyHandle.prototype.disconnect = function () {
 function connectLivePty (sandbox, procedure, body, opts, pty) {
     opts = opts || {};
     return new Promise((resolve, reject) => {
-        validateExecutionTimeout(opts.executionTimeoutMs);
         const target = parseRequestUrl(sandbox.envdUrl() + procedure);
         const transport = target.protocol === 'https:' ? https : http;
         const headers = Object.assign({
             'Content-Type': 'application/connect+json',
             'Keepalive-Ping-Interval': '50'
-        }, envdHeaders(sandbox, opts.user));
+        }, envdHeaders(sandbox, opts.user), executionTimeoutHeaders(procedure, opts.executionTimeoutMs));
         const req = transport.request({
             method: 'POST',
             protocol: target.protocol,
@@ -108,7 +106,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
         });
         waitPromise.catch(() => {});
         let startTimer;
-        let executionDeadline;
+        let receivedEnd = false;
 
         function cleanupStartTimer () {
             if (startTimer) {
@@ -118,9 +116,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
         }
 
         function fail (err) {
-            if (executionDeadline && executionDeadline.expired) return;
             cleanupStartTimer();
-            if (executionDeadline) executionDeadline.cancel();
             if (handle && handle._disconnected) {
                 if (result.exitCode === -1) {
                     result.exitCode = 0;
@@ -141,13 +137,6 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 cleanupStartTimer();
                 handle = new LivePtyHandle(pty, event.start.pid, req, waitPromise, opts);
                 handle._resolveWait = resolveWait;
-                executionDeadline = startExecutionTimeout(opts.executionTimeoutMs, handle.pid,
-                    timeout => pty.kill(handle.pid, { user: opts.user, requestTimeoutMs: timeout }),
-                    () => req.destroy(), err => {
-                        handle._resolveWait = null;
-                        rejectWait(err);
-                    });
-                handle._executionDeadline = executionDeadline;
                 settled = true;
                 resolve(handle);
             }
@@ -171,8 +160,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 }
             }
             if (event.end) {
-                if (executionDeadline && executionDeadline.expired) return;
-                if (executionDeadline) executionDeadline.cancel();
+                receivedEnd = true;
                 result = Object.assign(result, {
                     exitCode: event.end.exitCode === undefined ? 0 : event.end.exitCode,
                     error: event.end.error || ''
@@ -241,7 +229,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                     fail(new Error('PTY stream ended before process start'));
                     return;
                 }
-                if (result.exitCode === -1) {
+                if (!receivedEnd) {
                     fail(new Error('PTY stream ended before process end'));
                     return;
                 }

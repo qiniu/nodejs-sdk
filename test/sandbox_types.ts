@@ -141,6 +141,13 @@ async function useSandboxTypes () {
     const handle = await sandbox.commands.connect(123);
     await sandbox.commands.run('long task', {executionTimeoutMs: 1000});
     await sandbox.pty.create({executionTimeoutMs: 1000});
+    // @ts-expect-error Reconnecting does not set an existing process execution limit.
+    await sandbox.commands.connect(123, {executionTimeoutMs: 1000});
+    // @ts-expect-error Reconnecting a PTY does not set an execution limit.
+    await sandbox.pty.connect(123, {executionTimeoutMs: 1000});
+    const startOptions: qiniu.sandbox.CommandOptions = {executionTimeoutMs: 1000};
+    // @ts-expect-error Start options with an execution limit cannot flow into connect.
+    await sandbox.commands.connect(123, startOptions);
     await handle.disconnect();
     await sandbox.commands.run('false', {
         requestTimeoutMs: 1000,
