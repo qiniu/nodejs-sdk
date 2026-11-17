@@ -42,3 +42,6 @@ module.exports.FilesystemEventType = module.exports.sandbox.FilesystemEventType;
 module.exports.WatchHandle = module.exports.sandbox.WatchHandle;
 module.exports.CommandExitError = module.exports.sandbox.CommandExitError;
 module.exports.SandboxError = module.exports.sandbox.SandboxError;
+
+module.exports.Desktop = module.exports.sandbox.Desktop;
+module.exports.DesktopCommandError = module.exports.sandbox.DesktopCommandError;

@@ -51,3 +51,16 @@ exports.SandboxNotFoundError = defineError('SandboxNotFoundError');
 exports.GitAuthError = defineError('GitAuthError');
 exports.GitUpstreamError = defineError('GitUpstreamError');
 exports.TemplateBuildError = defineError('TemplateBuildError');
+
+function DesktopCommandError (operation, result) {
+    CommandExitError.call(this, result);
+    this.name = 'DesktopCommandError';
+    this.operation = operation;
+    this.result = result;
+    this.message = `Desktop ${operation} failed with exit code ${result.exitCode}`;
+    if (result.stderr) this.message += ': ' + result.stderr.trim();
+}
+
+DesktopCommandError.prototype = Object.create(CommandExitError.prototype);
+DesktopCommandError.prototype.constructor = DesktopCommandError;
+exports.DesktopCommandError = DesktopCommandError;

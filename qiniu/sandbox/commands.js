@@ -447,9 +447,7 @@ Commands.prototype.connect = function (pid, opts) {
 Commands.prototype.sendStdin = function (pid, data, opts) {
     const stdin = Buffer.isBuffer(data) ? data.toString('base64') : Buffer.from(String(data)).toString('base64');
     return connectRPC(this.sandbox, '/process.Process/SendInput', {
-        process: {
-            selector: { pid }
-        },
+        process: { pid },
         input: {
             stdin
         }
@@ -466,9 +464,7 @@ Commands.prototype.closeStdin = function (pid, opts) {
 
 Commands.prototype.kill = function (pid, opts) {
     return connectRPC(this.sandbox, '/process.Process/SendSignal', {
-        process: {
-            selector: { pid }
-        },
+        process: { pid },
         signal: 'SIGNAL_SIGKILL'
     }, opts).then(() => null);
 };

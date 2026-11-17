@@ -210,11 +210,17 @@ describe('test sandbox commands module', function () {
                 return sandbox.commands.sendStdin(12, Buffer.from('hello'));
             }).then(() => {
                 const sendStdinBody = JSON.parse(fixture.requests[3].body);
+                sendStdinBody.process.should.eql({ pid: 12 });
                 sendStdinBody.input.stdin.should.eql(Buffer.from('hello').toString('base64'));
                 return sandbox.commands.closeStdin(12);
             })
                 .then(() => sandbox.commands.kill(12))
-                .then(() => handleGitAndPty(git, sandbox.pty, commandsSeen, fixture))
+                .then(() => {
+                    const killBody = JSON.parse(fixture.requests[5].body);
+                    killBody.process.should.eql({ pid: 12 });
+                    killBody.signal.should.eql('SIGNAL_SIGKILL');
+                    return handleGitAndPty(git, sandbox.pty, commandsSeen, fixture);
+                })
                 .then(() => closeServer(fixture.server), err => {
                     return closeServer(fixture.server).then(() => {
                         throw err;

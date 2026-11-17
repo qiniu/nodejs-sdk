@@ -161,3 +161,101 @@ npm run lint
 
 Sandbox 单元测试使用本地 HTTP 服务核对请求、响应、重试和分页，无需真实云凭据。
 `test/sandbox_integration.test.js` 中的在线验证需要配置 Sandbox API key。
+
+## Desktop
+
+Desktop 使用 `desktop` 模板中的 Xvfb、Xfce、xdotool、scrot、x11vnc 和
+`/opt/noVNC/utils/novnc_proxy`，通过现有 envd 命令与文件接口执行操作。
+自定义模板需预装这些工具及 `xdpyinfo`、`xrandr`、`gtk-launch`、`xdg-open`、
+`pgrep`、`pkill` 和 `netstat`。
+
+```js
+const desktop = await qiniu.Desktop.create({
+    client,
+    resolution: { width: 1024, height: 768 },
+    dpi: 96,
+    display: ':0',
+    timeout: 300,
+    pollOptions: { intervalMs: 2000, timeoutMs: 90000 }
+});
+try {
+    await desktop.launch('xfce4-terminal');
+    await desktop.wait(1000);
+    await desktop.typeText('echo Hello desktop', { chunkSize: 25, delayMs: 75 });
+    await desktop.press('enter');
+    const png = await desktop.screenshot(); // Buffer，包含鼠标指针的 PNG
+    require('fs').writeFileSync('desktop.png', png);
+} finally {
+    await desktop.sandbox.kill();
+}
+```
+
+`qiniu.Desktop` 与 `qiniu.sandbox.Desktop` 是同一个类。
+也可调用 `client.createDesktop(options)`，或用
+`Desktop.create('custom-template', options)` 选择模板。
+默认分辨率为 1024 × 768，DPI 为 96，display 为 `:0`。
+创建时复制环境变量并设置 `DISPLAY`，不会修改传入对象；等待 sandbox 运行后启动桌面，
+并等待 Xvfb 和 Xfce 就绪。创建后的初始化失败会尝试销毁 sandbox，销毁失败信息保存在
+原始错误的 `cleanupError` 中。
+
+已有实例可通过 `new qiniu.Desktop(sandbox, options)` 包装；构造函数不会启动进程，
+按需调用 `await desktop.start()`。同一 Desktop 实例的 `start()` 支持并发调用并只初始化一次。
+Sandbox 的生命周期、文件、命令、Git 等 API 通过 `desktop.sandbox` 访问，
+例如 `desktop.sandbox.files.read(...)`、`desktop.sandbox.pause()` 和
+`desktop.sandbox.kill()`。冷启动恢复丢失桌面进程后，应重新包装并调用 `start()`。
+
+| 操作 | API |
+| --- | --- |
+| 屏幕与指针 | `screenSize()`、`cursorPosition()`、`screenshot()` |
+| 移动、单击、双击 | `moveMouse({ x, y })`、`click('left', { x, y })`、`doubleClick(point)` |
+| 按下、释放、拖动 | `mouseDown('left')`、`mouseUp('left')`、`drag(from, to)` |
+| 滚轮 | `scroll('up', 3)`、`scroll('down', 3)` |
+| 文本与组合键 | `typeText(text, { chunkSize, delayMs })`、`press('ctrl', 'c')` |
+| 打开文件、URL、应用 | `open(pathOrURL)`、`launch('firefox-esr', '--new-window', url)` |
+| 窗口查询 | `activeWindowID()`、`applicationWindows('xfce4-terminal')`、`windowTitle(id)` |
+| 等待 | `wait(durationMs)` |
+
+鼠标按钮支持 `left`、`middle`、`right`；`click()` 默认左键，单击和双击省略坐标时使用
+当前位置。坐标接受非负整数，包括 `{ x: 0, y: 0 }`。同一 Desktop 实例中的键鼠操作按调用
+顺序串行执行，拖拽和分段文本输入期间不会插入其他输入操作。文本按 Unicode 码点分块，
+默认每块 25 个字符、每字符延迟 75 毫秒，`delayMs: 0` 禁用延迟。
+`press` 接受单独的按键参数，例如 `press('ctrl', 'shift', 'enter')`。
+应用没有可见窗口时 `applicationWindows` 返回空数组。
+命令非零退出会抛出 `DesktopCommandError`（继承 `CommandExitError`），包含
+`operation` 和完整的 `result`。
+
+### noVNC 桌面流
+
+```js
+await desktop.stream.start();
+const url = desktop.stream.url({ viewOnly: true, resize: 'scale' });
+const password = desktop.stream.authKey();
+// 将 URL 和密码交给连接端；URL 默认不包含密码。
+await desktop.stream.stop();
+```
+
+`stream.start()` 默认启用随机 VNC 密码，VNC 端口为 5900，Web 端口为 6080。
+可设置 `{ vncPort, webPort, requireAuth, windowID }`；两个端口必须不同且位于 1–65535。
+`windowID` 可指定十进制或十六进制 X11 窗口 ID，仅共享该窗口。
+已运行的流再次启动会报错，启动失败会尝试清理已启动进程和临时密码文件。
+`stop()` 可重复调用；即使清理失败，也会清除本地运行状态和内存中的密码，并返回错误。
+
+`stream.url()` 默认自动连接，缩放方式为 `scale`；也支持 `off` 和 `remote`。
+只有显式传入 `authKey` 才会把密码加入 URL；这会使密码可能出现在浏览器历史、代理和日志中。
+`requireAuth: false` 可显式禁用 VNC 密码，此时 `authKey()` 会报错。
+停止流后不能再获取 URL 或密码。
+
+平台流量鉴权和 VNC 密码是两层独立鉴权。私有流量需要在请求 Header 中携带流量令牌，
+浏览器直接打开 noVNC URL 无法附加该 Header，调用方应提供鉴权代理。
+需要浏览器直接访问时，可在创建 sandbox 时显式设置
+`network: { allowPublicTraffic: true }`，并保留默认 VNC 密码认证。
+
+示例：[sandbox_desktop.js](../examples/sandbox_desktop.js)。运行示例需要
+`QINIU_SANDBOX_API_KEY`，可选设置 `QINIU_SANDBOX_ENDPOINT` 和
+`QINIU_SANDBOX_DESKTOP_TEMPLATE`，支持从 `.env` 读取。示例保存 `desktop.png`，
+启动流后保留 30 秒，再停止流并销毁 sandbox。
+
+`npm run test:sandbox` 覆盖本地 desktop 单元测试与模拟 HTTP/envd 传输；
+`npm run test:sandbox:integration:desktop` 显式执行真实环境验收，创建一个 TTL 为 180 秒、
+允许公共流量的临时 desktop sandbox，测试截图、键鼠、窗口、noVNC 两种认证模式并清理实例。
+普通测试不会自动启动这项真实环境验收。
