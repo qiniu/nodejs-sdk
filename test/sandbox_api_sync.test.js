@@ -80,13 +80,21 @@ describe('sandbox public API contract updates', function () {
             });
     });
 
-    it('encodes sandbox metadata filters as one nested query string', function () {
+    it('encodes sandbox metadata filters for both server decoding stages', function () {
         const metadata = { app: 'reports &= +', 空: '值/=', empty: '' };
         return serve((req, res) => json(res, []))
             .then(() => client.listSandboxes({ query: { metadata } }))
             .then(() => {
                 const parsed = parseUrl(fixture.requests[0].url);
-                assert.strictEqual(parsed.searchParams.get('metadata'), 'app=reports%20%26%3D%20%2B&%E7%A9%BA=%E5%80%BC%2F%3D&empty=');
+                const queryUnescape = value => decodeURIComponent(value.replace(/\+/g, ' '));
+                const filter = queryUnescape(parsed.searchParams.get('metadata'));
+                const decoded = {};
+                filter.split('&').forEach(pair => {
+                    const parts = pair.split('=');
+                    assert.strictEqual(parts.length, 2);
+                    decoded[queryUnescape(parts[0])] = queryUnescape(parts[1]);
+                });
+                assert.deepStrictEqual(decoded, metadata);
                 assert.strictEqual(parsed.searchParams.get('metadata[app]'), null);
                 assert.deepStrictEqual(metadata, { app: 'reports &= +', 空: '值/=', empty: '' });
             });

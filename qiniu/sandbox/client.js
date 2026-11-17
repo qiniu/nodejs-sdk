@@ -146,7 +146,10 @@ function normalizeSandboxListOptions (opts) {
     delete opts.query;
 
     if (query && query.metadata) {
-        opts.metadata = querystring.stringify(query.metadata);
+        // The API unescapes the filter before splitting it, then decodes each key/value.
+        opts.metadata = querystring.stringify(query.metadata, '&', '=', {
+            encodeURIComponent: value => encodeURIComponent(encodeURIComponent(value))
+        });
     }
     if (query && query.state) {
         opts.state = query.state;

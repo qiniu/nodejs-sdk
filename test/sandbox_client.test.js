@@ -7,6 +7,46 @@ const {
 } = require('./sandbox_helpers');
 
 describe('test sandbox client module', function () {
+    it('preserves special metadata keys and values through the server filter decoder', function () {
+        const metadata = {
+            plain: 'plain',
+            chinese: '中文 空格',
+            plus: 'a+b',
+            percent: '100%',
+            equals: 'a=b',
+            ampersand: 'a&b',
+            combined: 'feat/a&b=1+2%',
+            'key+&=%': 'value+&=%'
+        };
+        function queryUnescape (value) {
+            return decodeURIComponent(value.replace(/\+/g, ' '));
+        }
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            try {
+                // Match Envd API parseFilters: unescape the query, split, then unescape each pair.
+                const filter = queryUnescape(parseUrl(req.url).searchParams.get('metadata'));
+                const decoded = {};
+                filter.split('&').forEach(pair => {
+                    const parts = pair.split('=');
+                    if (parts.length !== 2) throw new Error('invalid key value pair in query');
+                    decoded[queryUnescape(parts[0])] = queryUnescape(parts[1]);
+                });
+                res.end(JSON.stringify([{ sandboxID: 'filtered', metadata: decoded }]));
+            } catch (err) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ message: err.message }));
+            }
+        }).then(fixture => {
+            const client = new qiniu.sandbox.SandboxClient({ endpoint: fixture.endpoint, apiKey: 'fixture', maxRetries: 0 });
+            return client.listSandboxes({ query: { metadata } }).then(page => {
+                page.items[0].metadata.should.eql(metadata);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => { throw err; });
+            });
+        });
+    });
+
     it('rejects invalid retry counts from options and environment', function () {
         (() => new qiniu.sandbox.SandboxClient({ maxRetries: -1 }))
             .should.throw(/maxRetries/);
