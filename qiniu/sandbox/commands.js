@@ -446,7 +446,7 @@ Commands.prototype.connect = function (pid, opts) {
     opts = opts || {};
     return connectLiveCommand(this, '/process.Process/Connect', {
         process: {
-            selector: { pid }
+            pid
         }
     }, Object.assign({}, opts, {
         requestTimeoutMs: requestTimeout(opts)
@@ -457,7 +457,7 @@ Commands.prototype.sendStdin = function (pid, data, opts) {
     const stdin = Buffer.isBuffer(data) ? data.toString('base64') : Buffer.from(String(data)).toString('base64');
     return connectRPC(this.sandbox, '/process.Process/SendInput', {
         process: {
-            selector: { pid }
+            pid
         },
         input: {
             stdin
@@ -468,7 +468,7 @@ Commands.prototype.sendStdin = function (pid, data, opts) {
 Commands.prototype.closeStdin = function (pid, opts) {
     return connectRPC(this.sandbox, '/process.Process/CloseStdin', {
         process: {
-            selector: { pid }
+            pid
         }
     }, opts).then(() => null);
 };
@@ -476,7 +476,7 @@ Commands.prototype.closeStdin = function (pid, opts) {
 Commands.prototype.kill = function (pid, opts) {
     return connectRPC(this.sandbox, '/process.Process/SendSignal', {
         process: {
-            selector: { pid }
+            pid
         },
         signal: 'SIGNAL_SIGKILL'
     }, opts).then(() => null);

@@ -305,7 +305,7 @@ Pty.prototype.connect = function (pid, opts) {
     opts = opts || {};
     return connectLivePty(this.sandbox, '/process.Process/Connect', {
         process: {
-            selector: { pid }
+            pid
         }
     }, {
         user: opts.user,
@@ -320,7 +320,7 @@ Pty.prototype.connect = function (pid, opts) {
 Pty.prototype.sendInput = function (pid, data, opts) {
     return connectRPC(this.sandbox, '/process.Process/SendInput', {
         process: {
-            selector: { pid }
+            pid
         },
         input: {
             pty: Buffer.isBuffer(data) ? data.toString('base64') : Buffer.from(String(data)).toString('base64')
@@ -331,7 +331,7 @@ Pty.prototype.sendInput = function (pid, data, opts) {
 Pty.prototype.resize = function (pid, size, opts) {
     return connectRPC(this.sandbox, '/process.Process/Update', {
         process: {
-            selector: { pid }
+            pid
         },
         pty: {
             size
@@ -342,7 +342,7 @@ Pty.prototype.resize = function (pid, size, opts) {
 Pty.prototype.kill = function (pid, opts) {
     return connectRPC(this.sandbox, '/process.Process/SendSignal', {
         process: {
-            selector: { pid }
+            pid
         },
         signal: 'SIGNAL_SIGKILL'
     }, opts).then(() => true, err => {
