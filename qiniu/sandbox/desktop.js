@@ -83,11 +83,25 @@ Desktop.prototype._commandOptions = function (timeoutMs) {
     return { envs: { DISPLAY: this.display }, requestTimeoutMs: timeoutMs || 10000 };
 };
 
-// Commands.start resolves with the PID; detaching preserves the remote process.
-Desktop.prototype._startProcess = function (command) {
+// Commands.start resolves with the PID; observe early failure before detaching.
+Desktop.prototype._startProcess = function (command, operation) {
     return this.sandbox.commands.start(command, this._commandOptions()).then(handle => {
-        handle.disconnect();
-        return handle.pid;
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(resolve, 250);
+            handle.wait().then(result => {
+                clearTimeout(timer);
+                try {
+                    this._checkResult(operation || 'start process', result);
+                    resolve();
+                } catch (err) { reject(err); }
+            }, err => { clearTimeout(timer); reject(err); });
+        }).then(() => {
+            handle.disconnect();
+            return handle.pid;
+        }, err => {
+            handle.disconnect();
+            throw err;
+        });
     });
 };
 
@@ -145,6 +159,18 @@ Desktop.prototype._waitUntil = function (command, timeoutMs, needsOutput) {
     return probe();
 };
 
+Desktop.prototype._xfceReadyCommand = function () {
+    // Xfce may normalize :0 to :0.0; other screens/displays must not satisfy readiness.
+    const displays = [this.display];
+    if (/:[0-9]+$/.test(this.display)) displays.push(this.display + '.0');
+    else if (/\.0$/.test(this.display)) displays.push(this.display.slice(0, -2));
+    const patterns = displays.map(display => '-e ' + shellQuote('DISPLAY=' + display)).join(' ');
+    return 'for name in xfce4-session xfwm4 xfdesktop; do found=; ' +
+        'for pid in $(pgrep -x "$name"); do ' +
+        'if tr \'\\0\' \'\\n\' < /proc/$pid/environ 2>/dev/null | grep -Fx ' + patterns + ' >/dev/null; ' +
+        'then found=1; break; fi; done; test -n "$found" || exit 1; done';
+};
+
 Desktop.prototype.start = function () {
     if (this._started) return Promise.resolve();
     if (this._starting) return this._starting;
@@ -153,8 +179,8 @@ Desktop.prototype.start = function () {
     // X11 is local to the sandbox; TCP transport stays disabled.
     this._starting = this._startProcess(`Xvfb ${shellQuote(this.display)} -ac -screen 0 ${shellQuote(resolution)} -retro -dpi ${shellQuote(opts.dpi)} -nolisten tcp`)
         .then(() => this._waitUntil('xdpyinfo -display ' + shellQuote(this.display), 10000))
-        .then(() => this._startProcess('startxfce4'))
-        .then(() => this._waitUntil('pgrep -x xfce4-session >/dev/null && pgrep -x xfwm4 >/dev/null && pgrep -x xfdesktop >/dev/null', 60000))
+        .then(() => this._startProcess('startxfce4', 'start Xfce'))
+        .then(() => this._waitUntil(this._xfceReadyCommand(), 60000))
         .then(() => {
             this._started = true;
             this._starting = null;
@@ -316,14 +342,14 @@ Desktop.prototype.press = function (...keys) {
     if (!keys.length) throw new InvalidArgumentError('At least one desktop key is required');
     const mapped = keys.map(key => {
         if (typeof key !== 'string' || !/^[A-Za-z0-9_]+$/.test(key)) throw new InvalidArgumentError('Invalid desktop key');
-        key = key.toLowerCase();
-        return Object.prototype.hasOwnProperty.call(keyNames, key) ? keyNames[key] : key;
+        const alias = key.toLowerCase();
+        return Object.prototype.hasOwnProperty.call(keyNames, alias) ? keyNames[alias] : key;
     });
     return this._action(() => this._run('press key', 'xdotool key ' + shellQuote(mapped.join('+'))));
 };
 
 Desktop.prototype.open = function (pathOrURL) {
-    return this._startProcess('xdg-open ' + shellQuote(text(pathOrURL, 'path or URL'))).then(() => undefined);
+    return this._startProcess('xdg-open ' + shellQuote(text(pathOrURL, 'path or URL')), 'open file or URL').then(() => undefined);
 };
 
 Desktop.prototype.launch = function (application, ...args) {
@@ -332,22 +358,7 @@ Desktop.prototype.launch = function (application, ...args) {
         return arg;
     }));
     // Execute argv directly: gtk-launch interprets arguments as its own options or URIs.
-    return this.sandbox.commands.start('exec -- ' + parts.map(shellQuote).join(' '), this._commandOptions()).then(handle => {
-        return new Promise((resolve, reject) => {
-            // Catch executable/argument failures before detaching a long-lived application.
-            const timer = setTimeout(resolve, 250);
-            handle.wait().then(result => {
-                clearTimeout(timer);
-                try {
-                    this._checkResult('launch application', result);
-                    resolve();
-                } catch (err) { reject(err); }
-            }, err => { clearTimeout(timer); reject(err); });
-        }).then(() => handle.disconnect(), err => {
-            handle.disconnect();
-            throw err;
-        });
-    });
+    return this._startProcess('exec -- ' + parts.map(shellQuote).join(' '), 'launch application').then(() => undefined);
 };
 
 Desktop.prototype.activeWindowID = function () {
@@ -357,7 +368,7 @@ Desktop.prototype.activeWindowID = function () {
 Desktop.prototype.applicationWindows = function (application) {
     return this._runRaw('xdotool search --onlyvisible --class ' + shellQuote(text(application, 'application'))).then(result => {
         const output = result.stdout.trim();
-        if (result.exitCode === 1 && !output) return [];
+        if (result.exitCode === 1 && !output && !result.stderr.trim()) return [];
         this._checkResult('find application windows', result);
         return output ? output.split(/\r?\n/) : [];
     });

@@ -251,4 +251,50 @@ describe('sandbox desktop', function () {
         });
         return f.desktop.launch('long-lived').then(() => assert(disconnected));
     });
+    it('preserves case-sensitive keysyms while resolving aliases case-insensitively', function () {
+        const f = fixture();
+        return f.desktop.press('A', 'Super_L', 'KP_Enter', 'CTRL').then(() => {
+            assert.strictEqual(f.calls[0].cmd, 'xdotool key \'A+Super_L+KP_Enter+Control_L\'');
+        });
+    });
+
+    it('reports early xdg-open failures and detaches the failed handle', function () {
+        const f = fixture(() => ({ exitCode: 2, stderr: 'file does not exist' }));
+        return rejects(f.desktop.open('/missing-file'), err => {
+            assert(err instanceof qiniu.DesktopCommandError);
+            assert.strictEqual(err.operation, 'open file or URL');
+            assert.strictEqual(err.result.exitCode, 2);
+            assert(f.handles[0].disconnected);
+        });
+    });
+
+    it('propagates window search errors instead of returning an empty list', function () {
+        const f = fixture(() => ({ exitCode: 1, stderr: 'Error: Cannot open display' }));
+        return rejects(f.desktop.applicationWindows('terminal'), err => {
+            assert(err instanceof qiniu.DesktopCommandError);
+            assert.strictEqual(err.result.stderr, 'Error: Cannot open display');
+        });
+    });
+
+    it('matches Xfce process environments against the selected display and screen', function () {
+        const f = fixture();
+        const desktop = new qiniu.Desktop(f.sandbox, { display: ':7.0' });
+        return desktop.start().then(() => {
+            const probe = f.calls[3].cmd;
+            assert(probe.indexOf('/proc/$pid/environ') >= 0);
+            assert(probe.indexOf('-e \'DISPLAY=:7.0\' -e \'DISPLAY=:7\'') >= 0);
+            assert.strictEqual(f.calls[3].opts.envs.DISPLAY, ':7.0');
+            const other = new qiniu.Desktop(f.sandbox, { display: ':7.1' });
+            assert(other._xfceReadyCommand().indexOf('-e \'DISPLAY=:7\'') < 0);
+        });
+    });
+
+    it('does not mark a failed Xfce startup ready', function () {
+        const f = fixture(cmd => cmd === 'startxfce4' ? { exitCode: 1, stderr: 'session failed' } : undefined);
+        return rejects(f.desktop.start(), err => {
+            assert(err instanceof qiniu.DesktopCommandError);
+            assert.strictEqual(err.operation, 'start Xfce');
+            assert.strictEqual(f.desktop._started, false);
+        });
+    });
 });

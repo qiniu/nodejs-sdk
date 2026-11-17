@@ -33,7 +33,7 @@ describe('sandbox desktop stream', function () {
         }).then(() => {
             assert.throws(() => f.desktop.stream.authKey(), /not running/);
             assert.throws(() => f.desktop.stream.url(), /not running/);
-            assert(f.calls.some(call => call.cmd.indexOf('pkill -f') === 0 && call.cmd.indexOf('5900([[:space:]]|$)') >= 0));
+            assert(!f.calls.some(call => call.cmd.indexOf('pkill') >= 0));
             assert(f.calls.some(call => call.cmd.indexOf('kill ') === 0));
             assert(f.calls.some(call => call.cmd.indexOf('rm -f') === 0));
             const count = f.calls.length;
@@ -59,7 +59,7 @@ describe('sandbox desktop stream', function () {
             rejects(f.desktop.stream.start(), err => assert(/already running/.test(err.message))),
             f.desktop.stream.stop()
         ]).then(() => {
-            assert.strictEqual(f.calls.filter(call => call.cmd.indexOf('x11vnc -bg') === 0).length, 1);
+            assert.strictEqual(f.calls.filter(call => call.cmd.indexOf('exec x11vnc') === 0).length, 1);
             assert.throws(() => f.desktop.stream.url(), /not running/);
         });
     });
@@ -93,7 +93,7 @@ describe('sandbox desktop stream', function () {
     it('cleans partially started streams and preserves the primary error', function () {
         const f = fixture(cmd => {
             if (cmd.indexOf('novnc_proxy --vnc') >= 0) throw new Error('noVNC failed');
-            if (cmd.indexOf('pkill -f') === 0) return { exitCode: 2, stderr: 'cleanup failed' };
+            if (cmd.indexOf('kill ') === 0) return { exitCode: 2, stderr: 'cleanup failed' };
             return streamResponse(cmd);
         });
         return rejects(f.desktop.stream.start(), err => {
@@ -112,7 +112,7 @@ describe('sandbox desktop stream', function () {
             const helper = f.handles[2];
             assert(helper.killed && helper.disconnected);
             assert(f.calls.some(call => call.cmd.indexOf('rm -f') === 0));
-            assert(!f.calls.some(call => call.cmd.indexOf('x11vnc -bg') === 0));
+            assert(!f.calls.some(call => call.cmd.indexOf('exec x11vnc') === 0));
         });
     });
 
@@ -132,7 +132,7 @@ describe('sandbox desktop stream', function () {
 
     it('clears credentials even when stop cleanup fails and attempts all cleanup steps', function () {
         const f = fixture(cmd => {
-            if (cmd.indexOf('pkill -f') === 0) throw new Error('stop failed');
+            if (cmd.indexOf('kill ') === 0) throw new Error('stop failed');
             return streamResponse(cmd);
         });
         return f.desktop.stream.start().then(() => rejects(f.desktop.stream.stop(), err => {
@@ -184,5 +184,51 @@ describe('sandbox desktop stream', function () {
     it('fails when the proxy exits successfully without serving a listener', function () {
         const f = fixture(cmd => cmd.indexOf('exec ./novnc_proxy') >= 0 ? { exitCode: 0 } : streamResponse(cmd));
         return rejects(f.desktop.stream.start(), err => assert(/exited before becoming ready/.test(err.message)));
+    });
+    it('cleans only the losing attempt PID after concurrent VNC binds', function () {
+        const winner = fixture(streamResponse);
+        const loser = fixture(cmd => cmd.indexOf('exec x11vnc') === 0 ? { exitCode: 1, stderr: 'bind failed' } : streamResponse(cmd));
+        const start = loser.sandbox.commands.start;
+        loser.sandbox.commands.start = (cmd, opts) => start(cmd, opts).then(handle => {
+            handle.pid += 1000;
+            return handle;
+        });
+        return Promise.all([
+            winner.desktop.stream.start(),
+            rejects(loser.desktop.stream.start(), err => assert(err instanceof qiniu.DesktopCommandError))
+        ]).then(() => {
+            const winnerPID = winner.desktop.stream._state.vncPID;
+            const attempt = loser.calls.findIndex(call => call.cmd.indexOf('exec x11vnc') === 0);
+            const loserPID = loser.handles[attempt].pid;
+            assert(loser.calls.some(call => call.cmd.indexOf('kill ' + '\'' + loserPID + '\'') === 0));
+            assert(!loser.calls.some(call => call.cmd.indexOf('kill ' + '\'' + winnerPID + '\'') === 0));
+            assert(!loser.calls.some(call => call.cmd.indexOf('pkill') >= 0));
+            assert(winner.desktop.stream.url());
+            return winner.desktop.stream.stop();
+        });
+    });
+
+    it('reports status-one kill and password-removal failures while trying every cleanup step', function () {
+        const f = fixture(cmd => /^(kill |rm -f )/.test(cmd) ? { exitCode: 1, stderr: 'permission denied' } : streamResponse(cmd));
+        return f.desktop.stream.start().then(() => rejects(f.desktop.stream.stop(), err => {
+            assert(err instanceof qiniu.DesktopCommandError);
+            assert.strictEqual(err.result.exitCode, 1);
+            assert.strictEqual(err.cleanupErrors.length, 2);
+            assert(f.calls.filter(call => call.cmd.indexOf('kill ') === 0).every(call => /\|\| test ! -d/.test(call.cmd)));
+            assert.throws(() => f.desktop.stream.authKey(), /not running/);
+        }));
+    });
+
+    it('retains status-one cleanup errors during startup rollback', function () {
+        const f = fixture(cmd => {
+            if (cmd.indexOf('exec x11vnc') === 0) return { exitCode: 2, stderr: 'bind failed' };
+            if (cmd.indexOf('rm -f') === 0) return { exitCode: 1, stderr: 'read-only filesystem' };
+            return streamResponse(cmd);
+        });
+        return rejects(f.desktop.stream.start(), err => {
+            assert.strictEqual(err.result.exitCode, 2);
+            assert.strictEqual(err.cleanupError.result.exitCode, 1);
+            assert.strictEqual(err.cleanupError.result.stderr, 'read-only filesystem');
+        });
     });
 });

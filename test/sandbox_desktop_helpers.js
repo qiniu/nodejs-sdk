@@ -14,7 +14,7 @@ function fixture (respond) {
                     pid: 100 + handles.length,
                     disconnected: false,
                     killed: false,
-                    wait: () => cmd.indexOf('exec ./novnc_proxy') >= 0 && !result
+                    wait: () => (cmd.indexOf('exec ./novnc_proxy') >= 0 || cmd.indexOf('exec x11vnc') === 0) && !result
                         ? new Promise(() => {})
                         : Promise.resolve(Object.assign({ exitCode: 0, stdout: '', stderr: '' }, result)),
                     disconnect: function () { this.disconnected = true; },

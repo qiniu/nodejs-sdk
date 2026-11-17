@@ -167,7 +167,7 @@ Sandbox 单元测试使用本地 HTTP 服务核对请求、响应、重试和分
 Desktop 使用 `desktop` 模板中的 Xvfb、Xfce、xdotool、scrot、x11vnc 和
 `/opt/noVNC/utils/novnc_proxy`，通过现有 envd 命令与文件接口执行操作。
 自定义模板需预装这些工具及 `xdpyinfo`、`xrandr`、`xdg-open`、
-`pgrep`、`pkill`、`ps`、`awk` 和 `netstat`。
+`pgrep`、`ps`、`awk`、`tr`、`grep` 和 `netstat`；就绪与进程清理检查使用 Linux `/proc`。
 
 ```js
 const desktop = await qiniu.Desktop.create({
@@ -195,8 +195,8 @@ try {
 `Desktop.create('custom-template', options)` 选择模板。
 默认分辨率为 1024 × 768，DPI 为 96，display 为 `:0`。
 创建时复制环境变量并设置 `DISPLAY`，不会修改传入对象；等待 sandbox 运行后启动桌面，
-并等待 Xvfb 和 Xfce 就绪。创建后的初始化失败会尝试销毁 sandbox，销毁失败信息保存在
-原始错误的 `cleanupError` 中。
+并等待 Xvfb 和当前 display 的 Xfce 进程就绪。创建后的初始化失败会尝试销毁 sandbox，
+销毁失败信息保存在原始错误的 `cleanupError` 中。
 
 已有实例可通过 `new qiniu.Desktop(sandbox, options)` 包装；构造函数不会启动进程，
 按需调用 `await desktop.start()`。同一 Desktop 实例的 `start()` 支持并发调用并只初始化一次。
@@ -219,11 +219,12 @@ Sandbox 的生命周期、文件、命令、Git 等 API 通过 `desktop.sandbox`
 当前位置。坐标接受非负整数，包括 `{ x: 0, y: 0 }`。同一 Desktop 实例中的键鼠操作按调用
 顺序串行执行，拖拽和分段文本输入期间不会插入其他输入操作。文本按 Unicode 码点分块，
 默认每块 25 个字符、每字符延迟 75 毫秒，`delayMs: 0` 禁用延迟。
-`press` 接受单独的按键参数，例如 `press('ctrl', 'shift', 'enter')`。
+`press` 对常用别名忽略大小写，其他 X11 keysym 保留原始大小写（如 `A`、`Super_L`、`KP_Enter`）。
+它接受单独的按键参数，例如 `press('ctrl', 'shift', 'enter')`。
 `launch` 接受可执行文件名称（从 PATH 查找）或路径，后续参数按 argv 原样传递，
 不接受 `.desktop` 应用 ID。它等待最多 250 毫秒检查早期退出失败，然后断开长驻进程连接；
-返回成功不代表应用窗口已就绪，调用方可用窗口查询确认。
-应用没有可见窗口时 `applicationWindows` 返回空数组。
+`open` 也会检查 `xdg-open` 的早期失败。返回成功不代表应用窗口已就绪，调用方可用窗口查询确认。
+应用没有可见窗口时 `applicationWindows` 返回空数组，display 不可用等带错误诊断的失败会继续抛出。
 命令非零退出会抛出 `DesktopCommandError`（继承 `CommandExitError`），包含
 `operation` 和完整的 `result`。
 
@@ -241,8 +242,10 @@ await desktop.stream.stop();
 可设置 `{ vncPort, webPort, requireAuth, windowID }`；两个端口必须不同且位于 1–65535。
 `windowID` 可指定十进制或十六进制 X11 窗口 ID，仅共享该窗口。
 已运行的流再次启动会报错，已占用的 Web 端口会在启动前被拒绝。就绪检查确认监听进程属于
-本次 noVNC 代理或其子进程，启动失败会尝试清理已启动进程和临时密码文件。
+本次流启动的进程或其子进程。x11vnc 与 noVNC 均记录各自 PID，启动失败只清理本次启动的进程
+和临时密码文件，不按端口批量终止进程。
 `stop()` 可重复调用；即使清理失败，也会清除本地运行状态和内存中的密码，并返回错误。
+只有已确认进程不存在时才忽略终止失败，权限或密码文件删除失败会保留。
 
 `stream.url()` 默认自动连接，缩放方式为 `scale`；也支持 `off` 和 `remote`。
 只有显式传入 `authKey` 才会把密码加入 URL；这会使密码可能出现在浏览器历史、代理和日志中。

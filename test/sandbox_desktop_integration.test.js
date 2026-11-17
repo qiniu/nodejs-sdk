@@ -99,4 +99,33 @@ describe('sandbox desktop integration', function () {
                 return desktop.stream.stop();
             });
     });
+    it('does not use another display to satisfy Xfce readiness or hide display errors', function () {
+        const other = new qiniu.Desktop(desktop.sandbox, { display: ':91' });
+        return desktop.sandbox.commands.run(other._xfceReadyCommand()).then(result => {
+            assert.strictEqual(result.exitCode, 1);
+            return other.applicationWindows('xfce4-terminal').then(
+                () => { throw new Error('An unavailable display must fail'); },
+                err => assert(err instanceof qiniu.DesktopCommandError)
+            );
+        });
+    });
+
+    it('keeps the winning stream alive when two wrappers race for one VNC port', function () {
+        const streams = [new qiniu.Desktop(desktop.sandbox).stream, new qiniu.Desktop(desktop.sandbox).stream];
+        return Promise.all(streams.map((stream, i) => stream.start({ vncPort: 5910, webPort: 6090 + i }).then(
+            () => ({ stream, ok: true }),
+            error => ({ stream, ok: false, error })
+        ))).then(results => {
+            const winners = results.filter(result => result.ok);
+            assert.strictEqual(winners.length, 1);
+            const winner = winners[0].stream;
+            return desktop.sandbox.commands.run('kill -0 ' + winner._state.vncPID).then(result => {
+                assert.strictEqual(result.exitCode, 0);
+                return rawRequest(winner.url(), { method: 'GET', dataType: 'text', timeout: 15000 });
+            }).then(response => {
+                assert(/noVNC/i.test(response.data));
+                return winner.stop();
+            });
+        });
+    });
 });

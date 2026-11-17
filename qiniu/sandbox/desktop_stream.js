@@ -41,16 +41,18 @@ function randomKey () {
 
 DesktopStream.prototype._cleanup = function (state) {
     const commands = [];
-    if (state.vncStarted) commands.push('pkill -f ' + shellQuote(processMatch('x11vnc', '-rfbport', state.vncPort)));
-    if (state.noVNCPID) {
-        commands.push('kill ' + shellQuote(state.noVNCPID));
-    }
+    [state.vncPID, state.noVNCPID].forEach(pid => {
+        if (pid) {
+            // Ignore only a vanished process, not permission or other signal errors.
+            commands.push('kill ' + shellQuote(pid) + ' || test ! -d ' + shellQuote('/proc/' + pid));
+        }
+    });
     if (state.passwordFile) commands.push('rm -f ' + shellQuote(state.passwordFile));
     let firstError;
     let chain = Promise.resolve();
     commands.forEach(command => {
         chain = chain.then(() => this.desktop._runRaw(command).then(result => {
-            if (result.exitCode !== 1) this.desktop._checkResult('stop stream', result);
+            this.desktop._checkResult('stop stream', result);
         }).catch(err => {
             if (!firstError) firstError = err;
             else {
@@ -90,40 +92,39 @@ function webListenersCommand (webPort, withPID) {
         ' | awk ' + shellQuote('$1 ~ /^tcp/ && $4 ~ /:' + webPort + '$/ { print ' + (withPID ? '$7' : '$4') + ' }');
 }
 
-function ownedListenerCommand (state) {
-    return 'listeners=$(' + webListenersCommand(state.webPort, true) + ') || exit $?; ' +
+function ownedListenerCommand (port, pid) {
+    return 'listeners=$(' + webListenersCommand(port, true) + ') || exit $?; ' +
         'test -n "$listeners" || exit 0; ' +
         // eslint-disable-next-line no-template-curly-in-string
         'for listener in $listeners; do owner=${listener%%/*}; ' +
         'while [ "$owner" -gt 1 ] 2>/dev/null; do ' +
-        'if [ "$owner" = ' + shellQuote(state.noVNCPID) + ' ]; then echo owned; exit 0; fi; ' +
+        'if [ "$owner" = ' + shellQuote(pid) + ' ]; then echo owned; exit 0; fi; ' +
         'owner=$(ps -o ppid= -p "$owner") || break; owner=$((owner + 0)); ' +
         'done; done; echo foreign';
 }
 
-DesktopStream.prototype._startProxy = function (state) {
+DesktopStream.prototype._startServer = function (state, pidKey, port, name, command) {
     const desktop = this.desktop;
-    const command = `cd /opt/noVNC/utils && exec ./novnc_proxy --vnc ${shellQuote('localhost:' + state.vncPort)} --listen ${shellQuote(state.webPort)} --web /opt/noVNC > /tmp/novnc.log 2>&1`;
     return desktop.sandbox.commands.start(command, desktop._commandOptions()).then(handle => {
-        state.noVNCPID = handle.pid;
+        state[pidKey] = handle.pid;
         let failure;
         // Keep the process stream attached until its own listener is ready.
         handle.wait().then(result => {
             try {
-                desktop._checkResult('start noVNC', result);
-                failure = new Error('Desktop noVNC exited before becoming ready');
+                desktop._checkResult('start ' + name, result);
+                failure = new Error('Desktop ' + name + ' exited before becoming ready');
             } catch (err) { failure = err; }
         }, err => { failure = err; });
         const deadline = Date.now() + 10000;
         const probe = () => {
             if (failure) return Promise.reject(failure);
-            return desktop._run('check noVNC listener', ownedListenerCommand(state), Math.max(1, deadline - Date.now())).then(result => {
+            return desktop._run('check ' + name + ' listener', ownedListenerCommand(port, handle.pid), Math.max(1, deadline - Date.now())).then(result => {
                 if (failure) throw failure;
                 const owner = result.stdout.trim();
                 if (owner === 'owned') return;
-                if (owner) throw new Error('Desktop web port is owned by another process');
+                if (owner) throw new Error('Desktop ' + name + ' port is owned by another process');
                 const remaining = deadline - Date.now();
-                if (remaining <= 0) throw new TimeoutError('Desktop noVNC readiness timed out');
+                if (remaining <= 0) throw new TimeoutError('Desktop ' + name + ' readiness timed out');
                 return desktop.wait(Math.min(500, remaining)).then(probe);
             });
         };
@@ -166,11 +167,12 @@ DesktopStream.prototype.start = function (opts) {
             }
             return prepare.then(() => {
                 const auth = state.requireAuth ? '-rfbauth ' + shellQuote(state.passwordFile) : '-nopw';
-                let command = `x11vnc -bg -display ${shellQuote(this.desktop.display)} -forever -wait '50' -shared -rfbport ${shellQuote(state.vncPort)} ${auth} 2>/tmp/x11vnc_stderr.log`;
+                let command = `exec x11vnc -display ${shellQuote(this.desktop.display)} -forever -wait '50' -shared -rfbport ${shellQuote(state.vncPort)} ${auth} 2>/tmp/x11vnc_stderr.log`;
                 if (opts.windowID !== undefined) command += ' -id ' + shellQuote(opts.windowID);
-                state.vncStarted = true;
-                return this.desktop._run('start x11vnc', command);
-            }).then(() => this._startProxy(state)).then(() => {
+                return this._startServer(state, 'vncPID', state.vncPort, 'x11vnc', command);
+            }).then(() => this._startServer(state, 'noVNCPID', state.webPort, 'noVNC',
+                `cd /opt/noVNC/utils && exec ./novnc_proxy --vnc ${shellQuote('localhost:' + state.vncPort)} --listen ${shellQuote(state.webPort)} --web /opt/noVNC > /tmp/novnc.log 2>&1`
+            )).then(() => {
                 this._state = state;
             }).catch(err => this._cleanup(state).catch(cleanupError => {
                 err.cleanupError = cleanupError;
