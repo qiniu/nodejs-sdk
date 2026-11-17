@@ -394,6 +394,11 @@ export declare namespace sandbox {
         nextToken?: string;
     }
 
+    interface SandboxPage {
+        items: any[];
+        nextToken?: string;
+    }
+
     interface SnapshotPage {
         items: SnapshotInfo[];
         nextToken?: string;
@@ -595,9 +600,7 @@ export declare namespace sandbox {
 
         constructor(options?: SandboxClientOptions);
 
-        listSandboxes(options?: any): Promise<any>;
-        listSandboxesV2(options?: any): Promise<any>;
-        listSandboxesPage(options?: any): Promise<{items: any[]; nextToken?: string}>;
+        listSandboxes(options?: any): Promise<SandboxPage>;
         createSandbox(options?: SandboxCreateOptions): Promise<any>;
         getSandboxesMetrics(sandboxIDs: string[] | any): Promise<any>;
         getSandboxLogs(sandboxID: string, options?: any): Promise<any>;
@@ -643,7 +646,7 @@ export declare namespace sandbox {
 
         create(options?: SandboxCreateOptions): Promise<any>;
         connect(sandboxID: string, options?: SandboxConnectOptions): Promise<any>;
-        list(options?: any): Promise<any>;
+        list(options?: any): Promise<SandboxPage>;
         kill(sandboxID: string): Promise<null>;
         setTimeout(sandboxID: string, timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
         getInfo(sandboxID: string): Promise<any>;
@@ -655,8 +658,7 @@ export declare namespace sandbox {
         waitForBuild(templateID: string, buildID: string, options?: PollOptions): Promise<any>;
         createSnapshot(sandboxID: string, options?: SnapshotCreateOptions): Promise<SnapshotInfo>;
         createSandboxSnapshot(sandboxID: string, options?: SnapshotCreateOptions): Promise<SnapshotInfo>;
-        listSnapshots(options?: SnapshotListOptions): Promise<SnapshotInfo[]>;
-        listSnapshotsPage(options?: SnapshotListOptions): Promise<SnapshotPage>;
+        listSnapshots(options?: SnapshotListOptions): Promise<SnapshotPage>;
         deleteSnapshot(snapshotID: string): Promise<null>;
     }
 

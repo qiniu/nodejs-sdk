@@ -14,19 +14,6 @@ function getInfoValue (info, camelKey, snakeKey) {
     return info && (info[camelKey] !== undefined ? info[camelKey] : info[snakeKey]);
 }
 
-function normalizeItems (data) {
-    if (Array.isArray(data)) {
-        return {
-            items: data
-        };
-    }
-    data = data || {};
-    return {
-        items: data.items || data.sandboxes || data.snapshots || [],
-        nextToken: data.nextToken || data.next_token
-    };
-}
-
 function normalizeSnapshot (info) {
     info = info || {};
     if (info.snapshotId === undefined && info.snapshotID !== undefined) {
@@ -66,9 +53,7 @@ SandboxPaginator.prototype.nextItems = function (opts) {
     }
     const requestOpts = Object.assign({}, this.opts, opts || {});
     requestOpts.nextToken = hasExplicitCursor ? opts.nextToken : this._nextToken;
-    const listPage = this.client.listSandboxesPage || this.client.listSandboxesV2;
-    return listPage.call(this.client, requestOpts).then(data => {
-        const page = normalizeItems(data);
+    return this.client.listSandboxes(requestOpts).then(page => {
         this._nextToken = page.nextToken;
         this._hasNext = !!page.nextToken;
         return page.items.map(info => new Sandbox({ client: this.client, info }));
@@ -105,8 +90,7 @@ SnapshotPaginator.prototype.nextItems = function (opts) {
     }
     const requestOpts = Object.assign({}, this.opts, opts || {});
     requestOpts.nextToken = hasExplicitCursor ? opts.nextToken : this._nextToken;
-    return this.client.listSnapshotsPage(requestOpts).then(data => {
-        const page = normalizeItems(data);
+    return this.client.listSnapshots(requestOpts).then(page => {
         this._nextToken = page.nextToken;
         this._hasNext = !!page.nextToken;
         return page.items.map(normalizeSnapshot);

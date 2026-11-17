@@ -28,7 +28,7 @@ describe('sandbox public API contract updates', function () {
         res.end(JSON.stringify(value));
     }
 
-    it('uses sandbox header cursors without changing raw list array responses', function () {
+    it('returns sandbox pages and follows header cursors through one list entry point', function () {
         let paginator;
         return serve((req, res) => {
             const cursor = parseUrl(req.url).searchParams.get('nextToken');
@@ -52,17 +52,38 @@ describe('sandbox public API contract updates', function () {
         }).then(items => {
             assert.deepStrictEqual(items, []);
             assert.strictEqual(fixture.requests.length, 2);
-            return client.listSandboxesV2({ limit: 1 });
-        }).then(items => {
-            assert.ok(Array.isArray(items));
-            assert.strictEqual(items[0].sandboxID, 'first');
+            return client.listSandboxes({ limit: 1 });
+        }).then(page => {
+            assert.deepStrictEqual(page.items, [{ sandboxID: 'first' }]);
+            assert.strictEqual(page.nextToken, 'page+/=2');
+            fixture.requests.forEach(req => assert.strictEqual(parseUrl(req.url).pathname, '/v2/sandboxes'));
+            return client.list({ limit: 1, nextToken: page.nextToken });
+        }).then(page => {
+            assert.deepStrictEqual(page.items, [{ sandboxID: 'second' }]);
+            assert.strictEqual(page.nextToken, undefined);
         });
+    });
+
+    it('normalizes object sandbox and snapshot responses at the client boundary', function () {
+        return serve((req, res) => {
+            if (parseUrl(req.url).pathname === '/v2/sandboxes') {
+                json(res, { sandboxes: [{ sandboxID: 'sandbox' }], next_token: 'sandbox-next' });
+            } else {
+                json(res, { snapshots: [{ snapshotID: 'snapshot', names: [] }], next_token: 'snapshot-next' });
+            }
+        }).then(() => Promise.all([client.listSandboxes(), client.listSnapshots()]))
+            .then(pages => {
+                assert.deepStrictEqual(pages, [
+                    { items: [{ sandboxID: 'sandbox' }], nextToken: 'sandbox-next' },
+                    { items: [{ snapshotID: 'snapshot', names: [] }], nextToken: 'snapshot-next' }
+                ]);
+            });
     });
 
     it('encodes sandbox metadata filters as one nested query string', function () {
         const metadata = { app: 'reports &= +', 空: '值/=', empty: '' };
         return serve((req, res) => json(res, []))
-            .then(() => client.listSandboxesV2({ query: { metadata } }))
+            .then(() => client.listSandboxes({ query: { metadata } }))
             .then(() => {
                 const parsed = parseUrl(fixture.requests[0].url);
                 assert.strictEqual(parsed.searchParams.get('metadata'), 'app=reports%20%26%3D%20%2B&%E7%A9%BA=%E5%80%BC%2F%3D&empty=');
@@ -116,9 +137,9 @@ describe('sandbox public API contract updates', function () {
         });
     });
 
-    it('keeps custom sandbox list clients compatible with envelope responses', function () {
+    it('uses the same page contract for custom sandbox list clients', function () {
         const client = {
-            listSandboxesV2: function () {
+            listSandboxes: function () {
                 return Promise.resolve({ items: [{ sandboxID: 'custom' }], nextToken: 'next' });
             }
         };
@@ -297,8 +318,9 @@ describe('sandbox public API contract updates', function () {
                 });
                 assert.strictEqual(parseUrl(fixture.requests[1].url).searchParams.get('nextToken'), 'next+/=');
                 return client.listSnapshots({ sandboxId: 'alias' });
-            }).then(items => {
-                assert.ok(Array.isArray(items));
+            }).then(page => {
+                assert.deepStrictEqual(page.items, [{ snapshotID: 'snap2', names: ['team/demo:v1'] }]);
+                assert.strictEqual(page.nextToken, undefined);
                 assert.strictEqual(parseUrl(fixture.requests[2].url).searchParams.get('sandboxID'), 'alias');
             });
         });

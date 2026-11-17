@@ -210,7 +210,7 @@ describe('test sandbox client module', function () {
             .then(() => client.getSandboxesMetrics([{ sandboxID: 'sbx_array_object' }, 'sbx_array_string']))
             .then(() => {
                 urls.should.eql([
-                    'http://sandbox.test/sandboxes',
+                    'http://sandbox.test/v2/sandboxes',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_one',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_field',
                     'http://sandbox.test/sandboxes/metrics?sandbox_ids=sbx_object',
@@ -679,7 +679,7 @@ describe('test sandbox client module', function () {
                 apiKey: 'sandbox-key'
             });
 
-            return client.listSandboxesV2({
+            return client.listSandboxes({
                 limit: 5,
                 query: {
                     template: [

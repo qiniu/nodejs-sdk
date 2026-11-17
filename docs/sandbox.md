@@ -36,6 +36,23 @@ await sandbox.connect({ timeout: 300 });
 需要流量自动恢复时，可使用 `autoPause: true`、`autoPauseMemory: true` 和
 `autoResume: { enabled: true }`。
 
+## 列表分页
+
+`client.listSandboxes` 使用 `GET /v2/sandboxes`，返回 `{ items, nextToken }`。
+`client.list` 是同一接口的短名。`nextToken` 为空表示没有下一页；续查时将其传回：
+
+```js
+let nextToken;
+do {
+    const page = await client.listSandboxes({ limit: 10, nextToken });
+    console.log(page.items);
+    nextToken = page.nextToken;
+} while (nextToken);
+```
+
+`qiniu.Sandbox.list({ client, limit: 10 })` 返回管理游标的分页器；
+`nextItems()` 返回当前页的 `Sandbox` 实例数组，`hasNext` 表示是否可继续。
+
 ## 持久快照
 
 ```js
@@ -74,9 +91,9 @@ while (paginator.hasNext) {
 }
 // 指定单次调用的游标可覆盖当前分页位置；后续调用继续使用服务端返回的游标。
 const resumed = await sandbox.listSnapshots({ limit: 10 }).nextItems({ nextToken: 'saved-cursor' });
-// 底层列表返回数组；分页接口额外读取 X-Next-Token 响应头。
-const items = await client.listSnapshots({ sandboxID: sandbox.sandboxID });
-const page = await client.listSnapshotsPage({ name: 'demo:v1', limit: 10 });
+// 底层列表同样返回 { items, nextToken }，游标从 X-Next-Token 响应头读取。
+const page = await client.listSnapshots({ sandboxID: sandbox.sandboxID, name: 'demo:v1', limit: 10 });
+console.log(page.items, page.nextToken);
 // 不再需要快照时，删除对应的模板。
 await client.deleteSnapshot(snapshot.snapshotID);
 ```

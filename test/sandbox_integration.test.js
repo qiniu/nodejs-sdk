@@ -450,7 +450,7 @@ describeIntegration('sandbox integration', function () {
             }).then(tags => {
                 tags.some(tag => tag.tag === 'v1').should.eql(true);
                 stage = 'list snapshots';
-                return client.listSnapshotsPage({ sandboxID: source.sandboxID, name: `${runID}:v1`, limit: 10 });
+                return client.listSnapshots({ sandboxID: source.sandboxID, name: `${runID}:v1`, limit: 10 });
             }).then(page => {
                 page.items.some(item => item.snapshotID === snapshotID).should.eql(true);
                 stage = 'pause source';

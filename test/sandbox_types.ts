@@ -78,8 +78,10 @@ async function useSandboxTypes () {
         }
     });
     const serviceToken: string | undefined = sandbox.trafficAccessToken;
-    const sandboxPage = await client.listSandboxesPage({ limit: 2 });
+    const sandboxPage = await client.listSandboxes({ limit: 2 });
+    const sandboxPageIsTyped: AssertFalse<IsAny<typeof sandboxPage>> = false;
     const sandboxCursor: string | undefined = sandboxPage.nextToken;
+    const sandboxAliasPage: qiniu.sandbox.SandboxPage = await client.list({ limit: 2 });
     await qiniu.Sandbox.list({ client }).nextItems({ nextToken: 'saved-cursor' });
 
     const timeoutMs: number = qiniu.DEFAULT_SANDBOX_TIMEOUT_MS;
@@ -92,8 +94,9 @@ async function useSandboxTypes () {
     const snapshot = await sandbox.createSnapshot({ name: 'demo:v1', memory: false, idempotencyKey: 'capture-key' });
     const snapshotID: string = snapshot.snapshotID;
     const snapshotNames: string[] = snapshot.names;
-    const snapshotPage: qiniu.sandbox.SnapshotPage = await client.listSnapshotsPage({ name: 'demo:v1', sandboxID: sandbox.sandboxID });
-    const snapshots: qiniu.sandbox.SnapshotInfo[] = await client.listSnapshots({ limit: 10 });
+    const snapshotPage = await client.listSnapshots({ name: 'demo:v1', sandboxID: sandbox.sandboxID });
+    const snapshotPageIsTyped: AssertFalse<IsAny<typeof snapshotPage>> = false;
+    const snapshots: qiniu.sandbox.SnapshotInfo[] = snapshotPage.items;
     const snapshotItems: qiniu.sandbox.SnapshotInfo[] = await sandbox.listSnapshots({ limit: 10 }).nextItems();
     await sandbox.listSnapshots({ limit: 10 }).nextItems({ nextToken: 'saved-cursor' });
     type Snapshot = typeof snapshotItems[number];
@@ -106,6 +109,9 @@ async function useSandboxTypes () {
     }
     snapshotNames.length;
     snapshotPage.items.length;
+    sandboxPageIsTyped.valueOf();
+    snapshotPageIsTyped.valueOf();
+    sandboxAliasPage.items.length;
     snapshots.length;
     tags[0].createdAt.length;
     snapshotIsTyped.valueOf();
