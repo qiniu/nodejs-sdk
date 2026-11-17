@@ -40,26 +40,24 @@ function prematureCloseError (source) {
     }
 }
 
-const legacyClosingSources = new WeakSet();
+const closingSources = new WeakSet();
 
 function cleanupClosedSource (source, cleanup) {
     const state = source._readableState;
     if (state && (state.closeEmitted || (state.closed && state.emitClose === false && (!state.errored || state.errorEmitted)))) {
         cleanup();
-    } else if (state && typeof state.closeEmitted === 'boolean' && state.emitClose !== false) {
-        // Native destroy() still has an error/close event pending.
     } else if ((typeof source._destroy === 'function' && source._destroy === Readable.prototype._destroy) || (typeof source._destroy !== 'function' && typeof source.close !== 'function')) {
         // The native Readable destroy callback is synchronous, including Node
         // 8/10/12 without closeEmitted. Keep protection for its queued events.
         process.nextTick(cleanup);
     } else {
         cleanup();
-        // Old fs streams cannot distinguish closed from closing. Keep one guard,
-        // without retaining any failed request, until the pending event arrives.
-        if (legacyClosingSources.has(source)) return;
-        legacyClosingSources.add(source);
+        // Some fs streams emit only error when opening fails. Keep one guard,
+        // without retaining the request, until either terminal event arrives.
+        if (closingSources.has(source)) return;
+        closingSources.add(source);
         const finished = () => {
-            legacyClosingSources.delete(source);
+            closingSources.delete(source);
             source.removeListener('error', finished);
             source.removeListener('close', finished);
         };
