@@ -99,7 +99,7 @@ function basicAuth (user) {
 
 function fileSignature (path, operation, user, accessToken, expiration) {
     const raw = `${path}:${operation}:${user}:${accessToken}:${expiration}`;
-    return `v1_${crypto.createHash('sha256').update(raw).digest('hex')}`;
+    return `v1_${crypto.createHash('sha256').update(raw).digest('base64').replace(/=+$/, '')}`;
 }
 
 function rawRequest (requestUrl, options) {

@@ -53,6 +53,70 @@ describe('test sandbox filesystem module', function () {
             });
         }
 
+        ['multipart', 'octet', 'gzip', 'batch', 'queued'].forEach(mode => {
+            it(`rejects prematurely closed ${mode} upload sources with the deadline disabled`, function () {
+                const sockets = [];
+                const source = new stream.Readable({ read: function () {} });
+                source.push('partial');
+                const server = http.createServer((req, res) => {
+                    req.resume();
+                    req.on('end', () => res.end('[]'));
+                });
+                server.on('connection', socket => sockets.push(socket));
+                return new Promise(resolve => server.listen(0, '127.0.0.1', resolve)).then(() => {
+                    fixture = { server };
+                    sandbox = new qiniu.sandbox.Sandbox({
+                        sandboxId: 'premature-source',
+                        envdUrl: `http://127.0.0.1:${server.address().port}`,
+                        info: { envdAccessToken: 'token', envdVersion: '0.5.7' }
+                    });
+                    const opts = { requestTimeoutMs: 0, useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                    const files = mode === 'queued'
+                        ? [{ path: '/blocked', data: new stream.Readable({ read: function () {} }) }, { path: '/partial', data: source }]
+                        : [{ path: '/partial', data: source }];
+                    const transfer = mode === 'batch' || mode === 'queued'
+                        ? sandbox.files.writeFiles(files, opts)
+                        : sandbox.files.write('/partial', source, opts);
+                    setTimeout(() => source.emit('close'), 10);
+                    return new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('upload did not settle after source close')), 200);
+                        transfer.then(() => {
+                            clearTimeout(timer);
+                            reject(new Error('expected prematurely closed upload to fail'));
+                        }, err => {
+                            clearTimeout(timer);
+                            resolve(err);
+                        });
+                    });
+                }).then(err => {
+                    err.message.should.match(/upload.*closed/i);
+                    source.destroyed.should.eql(true);
+                }).then(() => sockets.forEach(socket => socket.destroy()), err => {
+                    sockets.forEach(socket => socket.destroy());
+                    throw err;
+                });
+            });
+        });
+
+        ['multipart', 'octet', 'gzip', 'batch'].forEach(mode => {
+            it(`accepts ${mode} sources that close during their normal end event`, function () {
+                return serve((req, res) => {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify([{ path: '/complete', type: 'file' }]));
+                }).then(() => {
+                    const source = readable('complete');
+                    source.once('end', () => source.emit('close'));
+                    const opts = { requestTimeoutMs: 0, useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                    return mode === 'batch'
+                        ? sandbox.files.writeFiles([{ path: '/complete', data: source }], opts)
+                        : sandbox.files.write('/complete', source, opts);
+                }).then(result => {
+                    const entry = Array.isArray(result) ? result[0] : result;
+                    entry.path.should.eql('/complete');
+                });
+            });
+        });
+
         it('rejects overflowing file deadlines before opening read or upload requests', function () {
             return serve((req, res) => { res.setHeader('Content-Type', 'application/json'); res.end('[]'); })
                 .then(() => {
@@ -171,6 +235,44 @@ describe('test sandbox filesystem module', function () {
                     err.response.statusCode.should.eql(404);
                     err.data.toString().should.eql('missing');
                 });
+        });
+
+        it('preserves parsed JSON error bodies for single and batch uploads', function () {
+            const body = { code: 'permission_denied', message: 'forbidden' };
+            return serve((req, res) => {
+                res.statusCode = 403;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(body));
+            }).then(() => Promise.all([
+                sandbox.files.write('/denied', 'data'),
+                sandbox.files.writeFiles([{ path: '/denied', data: 'data' }])
+            ].map(call => call.then(() => {
+                throw new Error('expected HTTP failure');
+            }, err => {
+                err.name.should.eql('SandboxError');
+                err.response.statusCode.should.eql(403);
+                err.data.should.eql(body);
+            }))));
+        });
+
+        ['upstream unavailable', '{"message":'].forEach(body => {
+            it(`preserves the HTTP failure and raw body when upload error JSON is invalid: ${body}`, function () {
+                return serve((req, res) => {
+                    res.statusCode = 502;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(body);
+                }).then(() => Promise.all([
+                    sandbox.files.write('/failed', 'data', { useOctetStream: true }),
+                    sandbox.files.writeFiles([{ path: '/failed', data: 'data' }])
+                ].map(call => call.then(() => {
+                    throw new Error('expected HTTP failure');
+                }, err => {
+                    err.name.should.eql('SandboxError');
+                    err.response.statusCode.should.eql(502);
+                    err.data.toString().should.eql(body);
+                    Buffer.isBuffer(err.data).should.eql(true);
+                }))));
+            });
         });
 
         it('keeps empty JSON upload responses compatible with buffered transfers', function () {
@@ -384,6 +486,23 @@ describe('test sandbox filesystem module', function () {
                 return closeServer(fixture.server).then(() => { throw err; });
             });
         });
+    });
+
+    it('matches envd raw base64 SHA256 signatures in public file URLs', function () {
+        const sandbox = new qiniu.sandbox.Sandbox({
+            sandboxId: 'signed-files',
+            envdUrl: 'http://127.0.0.1',
+            info: { envdAccessToken: 'fixture-access-token' }
+        });
+        // Independent vectors for envd's path:operation:user:token:expiration protocol.
+        const opts = { user: 'alice', signatureExpiration: 2000000000 };
+        const path = '/tmp/中文 +/=0';
+        parseUrl(sandbox.downloadUrl(path, opts)).searchParams.get('signature')
+            .should.eql('v1_vMc5DhN8mQzFJHNDUzyMQoClUDxCzQFGp1VrwNgM/+8');
+        parseUrl(sandbox.uploadUrl(path, opts)).searchParams.get('signature')
+            .should.eql('v1_fS58L05gcCT2OQ99JleKHrs8V9wzJr+1WHndD9t73ZY');
+        parseUrl(sandbox.batchUploadUrl(opts)).searchParams.get('signature')
+            .should.eql('v1_FxtqpIN8eaJJ0MCInhlsYzfSfIwT3r37pcHngfMa1Bs');
     });
 
     it('builds envd hosts and signed file urls', function () {

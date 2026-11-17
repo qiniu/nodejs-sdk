@@ -24,6 +24,11 @@ function isReadable (value) {
     return value && typeof value.pipe === 'function' && typeof value.read === 'function';
 }
 
+function readableEnded (source) {
+    // endEmitted covers Node 6/8 and close emitted by an earlier end listener.
+    return source.readableEnded || !!(source._readableState && source._readableState.endEmitted);
+}
+
 function makeDestroyable (source) {
     // SDK memory streams need error-before-close and idempotent destruction.
     // Node 8's default _destroy ends without close; Node 10/12 can emit a late
@@ -142,8 +147,17 @@ function sequenceStream (parts) {
     });
     parts.forEach(part => {
         if (isReadable(part)) {
+            let partEnded = false;
+            const onEnd = () => { partEnded = true; };
+            part.once('end', onEnd);
             part.on('error', fail);
-            part.once('close', () => part.removeListener('error', fail));
+            part.once('close', () => {
+                if (!partEnded && !readableEnded(part) && !stopped && !output.destroyed) {
+                    fail(new Error('Sandbox file upload source closed before completion'));
+                }
+                part.removeListener('end', onEnd);
+                part.removeListener('error', fail);
+            });
         }
     });
     return output;
@@ -262,18 +276,20 @@ function requestFile (requestUrl, options) {
             decoded.on('end', () => {
                 if (failed) return;
                 const body = Buffer.concat(chunks);
-                if (!successful) {
-                    fail(new SandboxError(`Sandbox envd request failed with status ${res.statusCode}`, res, body));
-                    return;
-                }
                 let data = body;
                 if (options.dataType === 'json') {
                     try {
                         data = body.length ? JSON.parse(body.toString()) : null;
                     } catch (err) {
-                        fail(err);
-                        return;
+                        if (successful) {
+                            fail(err);
+                            return;
+                        }
                     }
+                }
+                if (!successful) {
+                    fail(new SandboxError(`Sandbox envd request failed with status ${res.statusCode}`, res, data));
+                    return;
                 }
                 pendingResult = { data, resp: res };
                 completeResponse();
@@ -292,8 +308,17 @@ function requestFile (requestUrl, options) {
             timer = setTimeout(() => fail(new TimeoutError('Sandbox file request timed out')), timeout);
         }
         if (options.stream) {
+            let uploadEnded = false;
+            const onEnd = () => { uploadEnded = true; };
+            options.stream.once('end', onEnd);
             options.stream.on('error', fail);
-            options.stream.once('close', () => options.stream.removeListener('error', fail));
+            options.stream.once('close', () => {
+                if (!uploadEnded && !readableEnded(options.stream) && !failed && !ended) {
+                    fail(new Error('Sandbox file upload source closed before completion'));
+                }
+                options.stream.removeListener('end', onEnd);
+                options.stream.removeListener('error', fail);
+            });
             if (options.gzipUpload) {
                 uploadStream = zlib.createGzip();
                 uploadStream.on('error', fail);

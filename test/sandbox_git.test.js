@@ -1,9 +1,101 @@
 const {
     should,
-    qiniu
+    qiniu,
+    startServer,
+    closeServer,
+    parseUrl
 } = require('./sandbox_helpers');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { exec, execFileSync } = require('child_process');
 
 describe('test sandbox git module', function () {
+    it('isolates temporary credentials from inherited stores and preserves uncredentialed Git configuration', function () {
+        const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'qiniu-git-credentials-'));
+        const credentialFile = path.join(temporary, 'credentials');
+        const configFile = path.join(temporary, 'gitconfig');
+        const config = `[credential]\n\thelper = store --file=${credentialFile}\n`;
+        fs.writeFileSync(configFile, config);
+        const env = Object.assign({}, process.env, {
+            GIT_CONFIG_GLOBAL: configFile,
+            GIT_CONFIG_NOSYSTEM: '1',
+            GIT_TERMINAL_PROMPT: '0',
+            XDG_CONFIG_HOME: path.join(temporary, 'xdg'),
+            NO_PROXY: '127.0.0.1',
+            no_proxy: '127.0.0.1'
+        });
+        let fixture;
+        let authenticatedRequests = 0;
+        const expectedAuth = 'Basic ' + Buffer.from('fixture-user:fixture-password').toString('base64');
+        const git = new qiniu.sandbox.Git({
+            run: function (cmd, opts) {
+                return new Promise((resolve, reject) => {
+                    exec(cmd, { cwd: temporary, env: Object.assign({}, env, opts.envs) }, (err, stdout, stderr) => {
+                        if (err) return reject(new Error(stderr));
+                        resolve({ exitCode: 0, stdout, stderr });
+                    });
+                });
+            }
+        });
+
+        function removeDirectory (directory) {
+            fs.readdirSync(directory).forEach(name => {
+                const entry = path.join(directory, name);
+                if (fs.lstatSync(entry).isDirectory()) removeDirectory(entry);
+                else fs.unlinkSync(entry);
+            });
+            fs.rmdirSync(directory);
+        }
+
+        function cleanup () {
+            const closed = fixture ? closeServer(fixture.server) : Promise.resolve();
+            return closed.then(() => removeDirectory(temporary));
+        }
+
+        return Promise.resolve().then(() => {
+            const repository = path.join(temporary, 'repo.git');
+            execFileSync('git', ['init', '--bare', repository], { cwd: temporary, env, stdio: 'pipe' });
+            execFileSync('git', ['--git-dir=' + repository, 'update-server-info'], { cwd: temporary, env, stdio: 'pipe' });
+            return startServer((req, res) => {
+                if (req.headers.authorization !== expectedAuth) {
+                    res.statusCode = 401;
+                    res.setHeader('WWW-Authenticate', 'Basic realm="fixture"');
+                    res.end('authentication required');
+                    return;
+                }
+                authenticatedRequests++;
+                const target = path.resolve(temporary, '.' + parseUrl(req.url).pathname);
+                if (!target.startsWith(temporary + path.sep)) {
+                    res.statusCode = 403;
+                    res.end();
+                    return;
+                }
+                fs.readFile(target, (err, data) => {
+                    res.statusCode = err ? 404 : 200;
+                    res.end(err ? 'missing' : data);
+                });
+            });
+        }).then(value => {
+            fixture = value;
+            return git.clone(fixture.endpoint + '/repo.git', path.join(temporary, 'temporary-clone'), {
+                username: 'fixture-user', password: 'fixture-password'
+            });
+        }).then(() => {
+            authenticatedRequests.should.be.above(0);
+            fs.existsSync(credentialFile).should.eql(false);
+            fs.readFileSync(configFile, 'utf8').should.eql(config);
+            const storedCredential = fixture.endpoint.replace('http://', 'http://fixture-user:fixture-password@') + '/repo.git\n';
+            fs.writeFileSync(credentialFile, storedCredential);
+            authenticatedRequests = 0;
+            return git.clone(fixture.endpoint + '/repo.git', path.join(temporary, 'configured-clone'));
+        }).then(() => {
+            authenticatedRequests.should.be.above(0);
+            fs.readFileSync(configFile, 'utf8').should.eql(config);
+            fs.readFileSync(credentialFile, 'utf8').should.containEql('fixture-password');
+        }).then(cleanup, err => cleanup().then(() => { throw err; }));
+    });
+
     it('supports E2B git auth, branches, reset, restore, and safe remote cleanup', function () {
         const commandsSeen = [];
         const git = new qiniu.sandbox.Git({
@@ -44,7 +136,7 @@ describe('test sandbox git module', function () {
             .then(() => git.setConfig('/repo', 'user.name', 'Alice', { scope: 'global' }))
             .then(() => {
                 const commandText = commandsSeen.map(item => item.cmd).join('\n');
-                commandText.should.containEql('credential.helper=');
+                commandText.should.match(/-c 'credential\.helper=' -c 'credential\.helper=!/);
                 commandText.should.containEql('clone \'https://github.com/acme/repo.git\'');
                 commandText.should.not.containEql('u:p');
                 commandsSeen[0].opts.envs.should.eql({
@@ -126,7 +218,7 @@ describe('test sandbox git module', function () {
         }, err => {
             err.message.should.eql('push failed');
             commandsSeen.length.should.eql(1);
-            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.match(/-c 'credential\.helper=' -c 'credential\.helper=!/);
             commandsSeen[0].cmd.should.containEql('printf "username=%s\\npassword=%s\\n" "$GIT_USERNAME" "$GIT_PASSWORD"');
             commandsSeen[0].cmd.should.containEql('push \'origin\' \'main\'');
             commandsSeen[0].cmd.should.not.containEql('u:p');
@@ -153,7 +245,7 @@ describe('test sandbox git module', function () {
             branch: 'main'
         }).then(() => {
             commandsSeen.length.should.eql(1);
-            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.match(/-c 'credential\.helper=' -c 'credential\.helper=!/);
             commandsSeen[0].cmd.should.containEql('pull \'origin\' \'main\'');
             commandsSeen[0].cmd.should.not.containEql('u:p');
             commandsSeen[0].opts.envs.should.eql({
@@ -177,7 +269,7 @@ describe('test sandbox git module', function () {
             password: 'p'
         }).then(() => {
             commandsSeen.length.should.eql(1);
-            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.match(/-c 'credential\.helper=' -c 'credential\.helper=!/);
             commandsSeen[0].cmd.should.containEql('clone \'https://github.com/acme/private.git\'');
             commandsSeen[0].cmd.should.not.containEql('u:p');
             commandsSeen[0].opts.envs.should.eql({
@@ -217,7 +309,7 @@ describe('test sandbox git module', function () {
             password: 'p'
         }).then(() => {
             commandsSeen.length.should.eql(1);
-            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.match(/-c 'credential\.helper=' -c 'credential\.helper=!/);
             commandsSeen[0].cmd.should.containEql('clone \'http://git.example.com/acme/private.git\'');
             commandsSeen[0].cmd.should.not.containEql('u:p');
             commandsSeen[0].opts.envs.should.eql({
@@ -360,7 +452,7 @@ describe('test sandbox git module', function () {
         }, err => {
             err.message.should.eql('push failed');
             commandsSeen.length.should.eql(1);
-            commandsSeen[0].cmd.should.containEql('credential.helper=');
+            commandsSeen[0].cmd.should.match(/-c 'credential\.helper=' -c 'credential\.helper=!/);
             commandsSeen[0].cmd.should.containEql('push \'origin\' \'main\'');
             commandsSeen[0].cmd.should.not.containEql('remote set-url');
         });
