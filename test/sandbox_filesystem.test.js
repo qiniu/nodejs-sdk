@@ -16,6 +16,7 @@ const {
 } = require('./sandbox_helpers');
 const { execFile } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
 describe('test sandbox filesystem module', function () {
     describe('stream transfer lifecycle', function () {
@@ -52,6 +53,206 @@ describe('test sandbox filesystem module', function () {
                 source.on('end', () => resolve(Buffer.concat(chunks).toString()));
             });
         }
+
+        ['multipart', 'octet', 'gzip', 'batch', 'queued'].forEach(mode => {
+            it(`rejects ${mode} sources closed before upload starts`, function () {
+                const sockets = [];
+                const source = new stream.Readable({ read: function () {} });
+                const sourceClosed = new Promise(resolve => source.once('close', resolve));
+                if (typeof source.destroy === 'function') {
+                    source.destroy();
+                } else {
+                    source.destroyed = true;
+                    source.emit('close');
+                }
+                const server = http.createServer((req, res) => {
+                    req.resume();
+                    req.on('end', () => res.end('[]'));
+                });
+                server.on('connection', socket => {
+                    sockets.push(socket);
+                    socket.on('close', () => sockets.splice(sockets.indexOf(socket), 1));
+                });
+                return new Promise(resolve => server.listen(0, '127.0.0.1', resolve)).then(() => sourceClosed).then(() => {
+                    fixture = { server };
+                    sandbox = new qiniu.sandbox.Sandbox({
+                        sandboxId: 'closed-source',
+                        envdUrl: `http://127.0.0.1:${server.address().port}`,
+                        info: { envdAccessToken: 'token', envdVersion: '0.5.7' }
+                    });
+                    const opts = { requestTimeoutMs: 0, useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                    const files = mode === 'queued'
+                        ? [{ path: '/blocked', data: new stream.Readable({ read: function () {} }) }, { path: '/closed', data: source }]
+                        : [{ path: '/closed', data: source }];
+                    const transfer = mode === 'batch' || mode === 'queued'
+                        ? sandbox.files.writeFiles(files, opts)
+                        : sandbox.files.write('/closed', source, opts);
+                    return new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('already closed upload did not settle')), 200);
+                        transfer.then(() => {
+                            clearTimeout(timer);
+                            reject(new Error('expected already closed upload to fail'));
+                        }, err => {
+                            clearTimeout(timer);
+                            resolve(err);
+                        });
+                    });
+                }).then(err => {
+                    err.message.should.match(/upload.*closed/i);
+                    return new Promise(resolve => setTimeout(resolve, 10));
+                }).then(() => sockets.length.should.eql(0)).then(null, err => {
+                    sockets.forEach(socket => socket.destroy());
+                    throw err;
+                });
+            });
+        });
+
+        ['multipart', 'octet', 'gzip', 'batch'].forEach(mode => {
+            it(`removes listeners when reusing an already closed ${mode} source`, function () {
+                const source = new stream.Readable({ read: function () {} });
+                const closed = new Promise(resolve => source.once('close', resolve));
+                if (typeof source.destroy === 'function') {
+                    source.destroy();
+                } else {
+                    source.destroyed = true;
+                    source.emit('close');
+                }
+                const sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'closed-source', envdUrl: 'http://127.0.0.1:1', info: { envdVersion: '0.5.7' }
+                });
+                return closed.then(() => {
+                    const counts = ['end', 'error', 'close'].map(event => source.listenerCount(event));
+                    return [1, 2, 3].reduce(previous => previous.then(() => {
+                        const opts = { requestTimeoutMs: 0, useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                        const transfer = mode === 'batch'
+                            ? sandbox.files.writeFiles([{ path: '/closed', data: source }], opts)
+                            : sandbox.files.write('/closed', source, opts);
+                        return transfer.then(() => { throw new Error('expected closed source failure'); }, err => {
+                            err.message.should.match(/upload.*closed/i);
+                        }).then(() => new Promise(resolve => setImmediate(resolve))).then(() => {
+                            ['end', 'error', 'close'].map(event => source.listenerCount(event)).should.eql(counts);
+                        });
+                    }), Promise.resolve());
+                });
+            });
+
+            it(`owns an error still pending from destroying a ${mode} source`, function () {
+                const source = new stream.Readable({ read: function () {} });
+                const error = new Error('source was already destroyed');
+                if (typeof source.destroy === 'function') {
+                    source.destroy(error);
+                } else {
+                    source.destroyed = true;
+                    process.nextTick(() => {
+                        source.emit('error', error);
+                        source.emit('close');
+                    });
+                }
+                const sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'closed-source', envdUrl: 'http://127.0.0.1:1', info: { envdVersion: '0.5.7' }
+                });
+                const opts = { requestTimeoutMs: 0, useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                const transfer = mode === 'batch'
+                    ? sandbox.files.writeFiles([{ path: '/closed', data: source }], opts)
+                    : sandbox.files.write('/closed', source, opts);
+                return transfer.then(() => { throw new Error('expected destroyed source failure'); }, err => {
+                    if (source.errored) err.should.equal(error);
+                    else err.message.should.match(/upload.*closed|already destroyed/i);
+                }).then(() => new Promise(resolve => setImmediate(resolve))).then(() => {
+                    ['end', 'error', 'close'].map(event => source.listenerCount(event)).should.eql([0, 0, 0]);
+                });
+            });
+        });
+
+        ['multipart', 'octet'].forEach(mode => {
+            it(`bounds guards when retrying a closed native file in ${mode} mode`, function () {
+                const source = fs.createReadStream(__filename);
+                const closed = new Promise(resolve => source.once('close', resolve));
+                source.destroy();
+                const sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'closed-file', envdUrl: 'http://127.0.0.1:1', info: { envdVersion: '0.5.7' }
+                });
+                return closed.then(() => {
+                    const originalCounts = ['end', 'error', 'close'].map(event => source.listenerCount(event));
+                    let previousCounts;
+                    return [1, 2, 3].reduce(previous => previous.then(() => {
+                        return sandbox.files.write('/closed', source, { requestTimeoutMs: 0, useOctetStream: mode === 'octet' })
+                            .then(() => { throw new Error('expected closed file failure'); }, err => {
+                                err.message.should.match(/upload.*closed/i);
+                            }).then(() => new Promise(resolve => setImmediate(resolve))).then(() => {
+                                const counts = ['end', 'error', 'close'].map(event => source.listenerCount(event));
+                                counts[0].should.eql(originalCounts[0]);
+                                counts[1].should.be.belowOrEqual(originalCounts[1] + 1);
+                                counts[2].should.be.belowOrEqual(originalCounts[2] + 1);
+                                if (source._readableState.closeEmitted) counts.should.eql(originalCounts);
+                                if (previousCounts) counts.should.eql(previousCounts);
+                                previousCounts = counts;
+                            });
+                    }), Promise.resolve());
+                });
+            });
+
+            it(`owns a pending native file open error in ${mode} mode`, function () {
+                const source = fs.createReadStream(path.join(__dirname, 'missing-source-' + Date.now()));
+                const originalCounts = ['end', 'error', 'close'].map(event => source.listenerCount(event));
+                source.destroy();
+                const sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'closed-file', envdUrl: 'http://127.0.0.1:1', info: { envdVersion: '0.5.7' }
+                });
+                return sandbox.files.write('/closed', source, { requestTimeoutMs: 0, useOctetStream: mode === 'octet' })
+                    .then(() => { throw new Error('expected destroyed file failure'); }, err => {
+                        err.message.should.match(/upload.*closed/i);
+                    }).then(() => new Promise(resolve => setTimeout(resolve, 20))).then(() => {
+                        ['end', 'error', 'close'].map(event => source.listenerCount(event)).should.eql(originalCounts);
+                    });
+            });
+        });
+
+        ['multipart', 'octet', 'gzip', 'batch'].forEach(mode => {
+            it(`accepts already ended empty ${mode} sources`, function () {
+                const source = readable(null);
+                const sourceEnded = new Promise(resolve => source.once('end', resolve));
+                source.resume();
+                return sourceEnded.then(() => serve((req, res) => {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify([{ path: '/empty', type: 'file' }]));
+                })).then(() => {
+                    const opts = { requestTimeoutMs: 1000, useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                    return mode === 'batch'
+                        ? sandbox.files.writeFiles([{ path: '/empty', data: source }], opts)
+                        : sandbox.files.write('/empty', source, opts);
+                }).then(result => {
+                    const entry = Array.isArray(result) ? result[0] : result;
+                    entry.path.should.eql('/empty');
+                });
+            });
+        });
+
+        ['multipart', 'octet', 'gzip', 'batch'].forEach(mode => {
+            it(`reuses completed empty ${mode} sources without retaining request listeners`, function () {
+                const source = readable(null);
+                const ended = new Promise(resolve => source.once('end', resolve));
+                source.resume();
+                return ended.then(() => new Promise(resolve => setImmediate(resolve))).then(() => serve((req, res) => {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify([{ path: '/empty', type: 'file' }]));
+                })).then(() => {
+                    const counts = ['end', 'error', 'close'].map(event => source.listenerCount(event));
+                    return [1, 2, 3].reduce(previous => previous.then(() => {
+                        const opts = { requestTimeoutMs: 1000, useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                        const transfer = mode === 'batch'
+                            ? sandbox.files.writeFiles([{ path: '/empty', data: source }], opts)
+                            : sandbox.files.write('/empty', source, opts);
+                        return transfer.then(result => {
+                            const entry = Array.isArray(result) ? result[0] : result;
+                            entry.path.should.eql('/empty');
+                        }).then(() => new Promise(resolve => setImmediate(resolve))).then(() => {
+                            ['end', 'error', 'close'].map(event => source.listenerCount(event)).should.eql(counts);
+                        });
+                    }), Promise.resolve());
+                });
+            });
+        });
 
         ['multipart', 'octet', 'gzip', 'batch', 'queued'].forEach(mode => {
             it(`rejects prematurely closed ${mode} upload sources with the deadline disabled`, function () {

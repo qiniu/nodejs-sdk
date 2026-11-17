@@ -29,6 +29,45 @@ function readableEnded (source) {
     return source.readableEnded || !!(source._readableState && source._readableState.endEmitted);
 }
 
+function readableClosed (source) {
+    const state = source._readableState;
+    return source.destroyed || source.closed || !!(state && (state.destroyed || state.closed));
+}
+
+function prematureCloseError (source) {
+    if (!readableEnded(source) && readableClosed(source)) {
+        return source.errored || new Error('Sandbox file upload source closed before completion');
+    }
+}
+
+const legacyClosingSources = new WeakSet();
+
+function cleanupClosedSource (source, cleanup) {
+    const state = source._readableState;
+    if (state && (state.closeEmitted || (state.closed && state.emitClose === false && (!state.errored || state.errorEmitted)))) {
+        cleanup();
+    } else if (state && typeof state.closeEmitted === 'boolean' && state.emitClose !== false) {
+        // Native destroy() still has an error/close event pending.
+    } else if (typeof source._destroy !== 'function' && typeof source.close !== 'function') {
+        // Legacy generic Readables have no asynchronous destroy/close operation.
+        // Keep the error listener through errors already queued by destroy().
+        process.nextTick(cleanup);
+    } else {
+        cleanup();
+        // Old fs streams cannot distinguish closed from closing. Keep one guard,
+        // without retaining any failed request, until the pending event arrives.
+        if (legacyClosingSources.has(source)) return;
+        legacyClosingSources.add(source);
+        const finished = () => {
+            legacyClosingSources.delete(source);
+            source.removeListener('error', finished);
+            source.removeListener('close', finished);
+        };
+        source.once('error', finished);
+        source.once('close', finished);
+    }
+}
+
 function makeDestroyable (source) {
     // SDK memory streams need error-before-close and idempotent destruction.
     // Node 8's default _destroy ends without close; Node 10/12 can emit a late
@@ -76,6 +115,7 @@ function sequenceStream (parts) {
     let reading = false;
     let stopped = false;
     let demand = false;
+    let initialError;
     const output = makeDestroyable(new Readable({
         read: function () {
             demand = true;
@@ -104,6 +144,7 @@ function sequenceStream (parts) {
         if (reading || stopped || !demand) return;
         reading = true;
         try {
+            if (initialError) throw initialError;
             while (index < parts.length) {
                 const part = parts[index];
                 if (!isReadable(part)) {
@@ -119,7 +160,14 @@ function sequenceStream (parts) {
                         current.once('end', nextPart);
                     }
                     const chunk = current.read();
-                    if (chunk === null) break;
+                    if (chunk === null) {
+                        if (!readableEnded(part)) break;
+                        if (current) {
+                            detach();
+                            index++;
+                        }
+                        continue;
+                    }
                     if (!output.push(chunk)) {
                         demand = false;
                         break;
@@ -147,17 +195,25 @@ function sequenceStream (parts) {
     });
     parts.forEach(part => {
         if (isReadable(part)) {
+            const sourceError = prematureCloseError(part);
+            initialError = initialError || sourceError;
             let partEnded = false;
             const onEnd = () => { partEnded = true; };
-            part.once('end', onEnd);
-            part.on('error', fail);
-            part.once('close', () => {
+            const cleanup = () => {
+                part.removeListener('end', onEnd);
+                part.removeListener('error', fail);
+                part.removeListener('close', onClose);
+            };
+            const onClose = () => {
                 if (!partEnded && !readableEnded(part) && !stopped && !output.destroyed) {
                     fail(new Error('Sandbox file upload source closed before completion'));
                 }
-                part.removeListener('end', onEnd);
-                part.removeListener('error', fail);
-            });
+                cleanup();
+            };
+            part.once('end', onEnd);
+            part.on('error', fail);
+            part.once('close', onClose);
+            if (readableClosed(part)) cleanupClosedSource(part, cleanup);
         }
     });
     return output;
@@ -180,7 +236,8 @@ function requestFile (requestUrl, options) {
         let requestFinished = false;
         let pendingResult;
         let uploadStream = options.stream;
-        const req = transport.request({
+        const sourceError = options.stream && prematureCloseError(options.stream);
+        const req = sourceError ? null : transport.request({
             method: options.method,
             protocol: target.protocol,
             hostname: target.hostname,
@@ -205,7 +262,7 @@ function requestFile (requestUrl, options) {
         }
 
         function abort () {
-            req.destroy();
+            if (req) req.destroy();
             destroyStream(response);
             if (decoded !== response) destroyStream(decoded);
             destroyStream(options.stream);
@@ -224,6 +281,31 @@ function requestFile (requestUrl, options) {
                 output.destroy(err);
             }
             abort();
+        }
+
+        if (options.stream) {
+            let uploadEnded = false;
+            const onEnd = () => { uploadEnded = true; };
+            const cleanupSource = () => {
+                options.stream.removeListener('end', onEnd);
+                options.stream.removeListener('error', fail);
+                options.stream.removeListener('close', onClose);
+            };
+            const onClose = () => {
+                if (!uploadEnded && !readableEnded(options.stream) && !failed && !ended) {
+                    fail(new Error('Sandbox file upload source closed before completion'));
+                }
+                cleanupSource();
+            };
+            options.stream.once('end', onEnd);
+            options.stream.on('error', fail);
+            options.stream.once('close', onClose);
+            if (sourceError) {
+                fail(sourceError);
+                cleanupClosedSource(options.stream, cleanupSource);
+                return;
+            }
+            if (readableClosed(options.stream)) cleanupClosedSource(options.stream, cleanupSource);
         }
 
         req.on('error', fail);
@@ -308,17 +390,6 @@ function requestFile (requestUrl, options) {
             timer = setTimeout(() => fail(new TimeoutError('Sandbox file request timed out')), timeout);
         }
         if (options.stream) {
-            let uploadEnded = false;
-            const onEnd = () => { uploadEnded = true; };
-            options.stream.once('end', onEnd);
-            options.stream.on('error', fail);
-            options.stream.once('close', () => {
-                if (!uploadEnded && !readableEnded(options.stream) && !failed && !ended) {
-                    fail(new Error('Sandbox file upload source closed before completion'));
-                }
-                options.stream.removeListener('end', onEnd);
-                options.stream.removeListener('error', fail);
-            });
             if (options.gzipUpload) {
                 uploadStream = zlib.createGzip();
                 uploadStream.on('error', fail);
