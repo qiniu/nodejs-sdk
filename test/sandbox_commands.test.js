@@ -14,6 +14,155 @@ const {
 } = require('./sandbox_helpers');
 
 describe('test sandbox commands module', function () {
+    it('rejects overflowing execution deadlines before opening command or PTY requests', function () {
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/connect+json');
+            res.write(encodeConnectEnvelope({ event: { start: { pid: 775 } } }));
+            res.end(encodeConnectEnvelope({ event: { end: { exitCode: 0 } } }));
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'overflow-deadline',
+                envdUrl: fixture.endpoint,
+                info: { envdAccessToken: 'token' }
+            });
+            const calls = [];
+            [2147483648, Number.MAX_VALUE].forEach(executionTimeoutMs => {
+                calls.push(sandbox.commands.start('task', { executionTimeoutMs }));
+                calls.push(sandbox.pty.create({ executionTimeoutMs }));
+            });
+            return Promise.all(calls.map(call => call.then(handle => {
+                return handle.disconnect().then(() => { throw new Error('expected out-of-range deadline'); });
+            }, err => {
+                err.name.should.eql('RangeError');
+                err.message.should.match(/2147483647/);
+            }))).then(() => fixture.requests.length.should.eql(0))
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => { throw err; });
+                });
+        });
+    });
+
+    it('bounds process termination when the kill endpoint never responds', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.write(encodeConnectEnvelope({ event: { start: { pid: 774 } } }));
+            }
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'bounded-kill',
+                envdUrl: fixture.endpoint,
+                info: { envdAccessToken: 'token' }
+            });
+            return sandbox.commands.start('task', { executionTimeoutMs: 10 })
+                .then(handle => handle.wait()).then(() => { throw new Error('expected execution timeout'); }, err => {
+                    err.name.should.eql('TimeoutError');
+                    err.killError.should.be.instanceOf(Error);
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => { throw err; });
+                });
+        });
+    });
+
+    it('rejects invalid execution deadlines before opening command or PTY requests', function () {
+        return startServer((req, res) => res.end()).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'invalid-deadline',
+                envdUrl: fixture.endpoint,
+                info: { envdAccessToken: 'token' }
+            });
+            const calls = [];
+            [-1, NaN, Infinity, '1', null].forEach(executionTimeoutMs => {
+                calls.push(sandbox.commands.start('task', { executionTimeoutMs }));
+                calls.push(sandbox.pty.create({ executionTimeoutMs }));
+            });
+            return Promise.all(calls.map(call => call.then(() => { throw new Error('expected invalid deadline'); }, err => {
+                err.name.should.eql('TypeError');
+                err.message.should.match(/executionTimeoutMs/);
+            }))).then(() => fixture.requests.length.should.eql(0))
+                .then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => { throw err; });
+                });
+        });
+    });
+
+    ['commands', 'pty'].forEach(kind => {
+        ['completed', 'disabled', 'disconnected'].forEach(mode => {
+            it(`keeps ${kind} execution deadlines compatible when ${mode}`, function () {
+                return startServer((req, res) => {
+                    res.setHeader('Content-Type', 'application/connect+json');
+                    res.write(encodeConnectEnvelope({ event: { start: { pid: 773 } } }));
+                    const timer = setTimeout(() => {
+                        res.end(encodeConnectEnvelope({ event: { end: { exitCode: 0 } } }));
+                    }, mode === 'completed' ? 5 : 250);
+                    res.on('close', () => clearTimeout(timer));
+                }).then(fixture => {
+                    const sandbox = new qiniu.sandbox.Sandbox({
+                        sandboxId: 'compatible-deadline',
+                        envdUrl: fixture.endpoint,
+                        info: { envdAccessToken: 'token' }
+                    });
+                    const opts = { executionTimeoutMs: mode === 'disabled' ? 0 : 20, timeoutMs: 200 };
+                    if (mode === 'completed') opts.executionTimeoutMs = 2147483647;
+                    const start = kind === 'commands' ? sandbox.commands.start('task', opts) : sandbox.pty.create(opts);
+                    return start.then(handle => {
+                        if (mode === 'disconnected') return handle.disconnect().then(() => handle.wait());
+                        return handle.wait();
+                    }).then(result => {
+                        result.exitCode.should.eql(0);
+                        return new Promise(resolve => setTimeout(resolve, 30));
+                    }).then(() => {
+                        fixture.requests.filter(req => req.url === '/process.Process/SendSignal').length.should.eql(0);
+                    }).then(() => closeServer(fixture.server), err => {
+                        return closeServer(fixture.server).then(() => { throw err; });
+                    });
+                });
+            });
+        });
+    });
+
+    it('ends command waits at an explicit execution deadline and terminates the process', function () {
+        let output = '';
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/connect+json');
+            if (req.url === '/process.Process/Start') {
+                res.write(encodeConnectEnvelope({ event: { start: { pid: 771 } } }));
+                const timer = setInterval(() => {
+                    res.write(encodeConnectEnvelope({ event: { data: { stdout: Buffer.from('tick').toString('base64') } } }));
+                }, 5);
+                const endTimer = setTimeout(() => {
+                    res.end(encodeConnectEnvelope({ event: { end: { exitCode: 0 } } }));
+                }, 150);
+                res.on('close', () => { clearInterval(timer); clearTimeout(endTimer); });
+            } else {
+                res.end(encodeConnectEnvelope({}));
+            }
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'execution-deadline',
+                envdUrl: fixture.endpoint,
+                info: { envdAccessToken: 'token' }
+            });
+            return sandbox.commands.run('long task', {
+                background: true,
+                executionTimeoutMs: 30,
+                requestTimeoutMs: 200,
+                onStdout: text => { output += text; }
+            }).then(handle => handle.wait()).then(() => {
+                throw new Error('expected execution timeout');
+            }, err => {
+                err.name.should.eql('TimeoutError');
+                err.pid.should.eql(771);
+                output.should.containEql('tick');
+                const signal = fixture.requests.filter(req => req.url === '/process.Process/SendSignal');
+                signal.length.should.eql(1);
+                JSON.parse(signal[0].body).process.selector.pid.should.eql(771);
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => { throw err; });
+            });
+        });
+    });
+
     it('runs commands and git operations through process RPC', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start') {

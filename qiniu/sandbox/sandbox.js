@@ -60,11 +60,14 @@ Object.defineProperty(SandboxPaginator.prototype, 'hasNext', {
 });
 
 SandboxPaginator.prototype.nextItems = function (opts) {
-    const requestOpts = Object.assign({}, this.opts, opts || {});
-    if (this._nextToken && requestOpts.nextToken === undefined) {
-        requestOpts.nextToken = this._nextToken;
+    const hasExplicitCursor = opts && opts.nextToken !== undefined;
+    if (!this.hasNext && !hasExplicitCursor) {
+        return Promise.resolve([]);
     }
-    return this.client.listSandboxesV2(requestOpts).then(data => {
+    const requestOpts = Object.assign({}, this.opts, opts || {});
+    requestOpts.nextToken = hasExplicitCursor ? opts.nextToken : this._nextToken;
+    const listPage = this.client.listSandboxesPage || this.client.listSandboxesV2;
+    return listPage.call(this.client, requestOpts).then(data => {
         const page = normalizeItems(data);
         this._nextToken = page.nextToken;
         this._hasNext = !!page.nextToken;
@@ -256,6 +259,7 @@ Sandbox.prototype.updateInfo = function (info) {
     if (info) {
         this.info = info;
         this.envdAccessToken = getInfoValue(info, 'envdAccessToken', 'envd_access_token') || this.envdAccessToken;
+        this.trafficAccessToken = getInfoValue(info, 'trafficAccessToken', 'traffic_access_token') || this.trafficAccessToken;
         this.envdVersion = getInfoValue(info, 'envdVersion', 'envd_version') || this.envdVersion;
         this.domain = info.domain || info.sandboxDomain || info.sandbox_domain || this.domain;
         this.sandboxDomain = this.domain;

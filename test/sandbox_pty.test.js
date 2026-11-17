@@ -12,6 +12,36 @@ const {
 } = require('./sandbox_helpers');
 
 describe('test sandbox pty module', function () {
+    it('ends PTY waits at an explicit execution deadline and reports kill failures', function () {
+        return startServer((req, res) => {
+            if (req.url === '/process.Process/Start') {
+                res.setHeader('Content-Type', 'application/connect+json');
+                res.write(encodeConnectEnvelope({ event: { start: { pid: 772 } } }));
+                const timer = setTimeout(() => {
+                    res.end(encodeConnectEnvelope({ event: { end: { exitCode: 0 } } }));
+                }, 150);
+                res.on('close', () => clearTimeout(timer));
+            } else {
+                res.statusCode = 500;
+                res.end('kill unavailable');
+            }
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'pty-execution-deadline',
+                envdUrl: fixture.endpoint,
+                info: { envdAccessToken: 'token' }
+            });
+            return sandbox.pty.create({ executionTimeoutMs: 20 }).then(handle => handle.wait())
+                .then(() => { throw new Error('expected execution timeout'); }, err => {
+                    err.name.should.eql('TimeoutError');
+                    err.pid.should.eql(772);
+                    err.killError.message.should.match(/500/);
+                }).then(() => closeServer(fixture.server), err => {
+                    return closeServer(fixture.server).then(() => { throw err; });
+                });
+        });
+    });
+
     it('supports E2B style PTY connect, input, resize, and kill operations', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Start' || req.url === '/process.Process/Connect') {

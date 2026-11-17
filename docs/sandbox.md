@@ -136,6 +136,42 @@ JSON body 匹配和注入仅支持 `type: 'http'`，不适用于各服务商专�
 无效或不支持的请求体，以及已有注入目标字段不是字符串的情况，会产生错误。
 创建 Sandbox、更新运行时注入、创建或更新注入规则均支持这些字段。
 
+## 文件流与请求时限
+
+`files.read(path, { format: 'stream' })` 在响应建立后返回真正的 `Readable`，
+不会先缓冲整个文件。消费时监听流的 `error`；提前结束下载可调用 `destroy()`。
+`files.write` 和 `writeFiles` 同时接受字符串、Buffer 和 `Readable`，混合批次保留输入顺序。
+
+```js
+const fs = require('fs');
+await sandbox.files.write('/tmp/input.bin', fs.createReadStream('./input.bin'), {
+    requestTimeoutMs: 30000
+});
+```
+
+文件读写的单次请求时限覆盖完整传输，优先级为 `requestTimeoutMs`、`timeoutMs`、
+`timeout`（秒）；显式设置为 `0` 禁用该时限。流式读取返回后发生的超时通过流的 `error` 报告。
+所选时限须不超过 `2147483647` 毫秒（`timeout` 为 `2147483.647` 秒）；超过时在发出请求前以 `RangeError` 拒绝。
+`signatureExpiration` 控制 URL 签名有效期，与传输时限分别设置。
+
+## 进程执行期限
+
+Commands／PTY 的既有 `requestTimeoutMs`、`timeoutMs`、`timeout` 保持启动等待语义。
+需要限制启动后的执行时长时，显式传入 `executionTimeoutMs`（`0` 至 `2147483647` 毫秒，`0` 禁用）；超过上限时在发出请求前以 `RangeError` 拒绝：
+
+```js
+const handle = await sandbox.commands.start('long-running-command', {
+    requestTimeoutMs: 10000,
+    executionTimeoutMs: 60000
+});
+await handle.wait();
+```
+
+执行期限从收到 PID 后开始计时；到期后关闭本地流并尝试终止该 PID。
+终止请求完成或最多等待 5 秒后，`wait()` 以带 `pid` 的 `TimeoutError` 拒绝；
+终止失败时，`error.killError` 保留原因，此时应核实远端进程状态。
+自然结束会取消计时；`disconnect()` 取消本地期限并断开流，保留远端进程。
+
 ## 示例与验证
 
 运行示例前设置 `QINIU_SANDBOX_API_KEY`，按需设置 `QINIU_SANDBOX_ENDPOINT` 和

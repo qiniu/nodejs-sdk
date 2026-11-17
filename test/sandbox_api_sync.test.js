@@ -28,6 +28,107 @@ describe('sandbox public API contract updates', function () {
         res.end(JSON.stringify(value));
     }
 
+    it('uses sandbox header cursors without changing raw list array responses', function () {
+        let paginator;
+        return serve((req, res) => {
+            const cursor = parseUrl(req.url).searchParams.get('nextToken');
+            if (!cursor) {
+                res.setHeader('X-Next-Token', 'page+/=2');
+            }
+            json(res, [{ sandboxID: cursor ? 'second' : 'first' }]);
+        }).then(() => {
+            paginator = qiniu.sandbox.Sandbox.list({ client, limit: 1 });
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'first');
+            assert.strictEqual(paginator.nextToken, 'page+/=2');
+            assert.strictEqual(paginator.hasNext, true);
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'second');
+            assert.strictEqual(paginator.hasNext, false);
+            assert.strictEqual(paginator.nextToken, undefined);
+            return paginator.nextItems();
+        }).then(items => {
+            assert.deepStrictEqual(items, []);
+            assert.strictEqual(fixture.requests.length, 2);
+            return client.listSandboxesV2({ limit: 1 });
+        }).then(items => {
+            assert.ok(Array.isArray(items));
+            assert.strictEqual(items[0].sandboxID, 'first');
+        });
+    });
+
+    it('encodes sandbox metadata filters as one nested query string', function () {
+        const metadata = { app: 'reports &= +', 空: '值/=', empty: '' };
+        return serve((req, res) => json(res, []))
+            .then(() => client.listSandboxesV2({ query: { metadata } }))
+            .then(() => {
+                const parsed = parseUrl(fixture.requests[0].url);
+                assert.strictEqual(parsed.searchParams.get('metadata'), 'app=reports%20%26%3D%20%2B&%E7%A9%BA=%E5%80%BC%2F%3D&empty=');
+                assert.strictEqual(parsed.searchParams.get('metadata[app]'), null);
+                assert.deepStrictEqual(metadata, { app: 'reports &= +', 空: '值/=', empty: '' });
+            });
+    });
+
+    it('continues sandbox pagination after initial and explicit cursors', function () {
+        let paginator;
+        return serve((req, res) => {
+            const cursor = parseUrl(req.url).searchParams.get('nextToken');
+            res.setHeader('X-Next-Token', cursor === 'saved' ? 'after-saved' : 'after-override');
+            json(res, [{ sandboxID: cursor }]);
+        }).then(() => {
+            paginator = qiniu.sandbox.Sandbox.list({ client, nextToken: 'saved', limit: 2 });
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'saved');
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'after-saved');
+            return paginator.nextItems({ nextToken: 'override' });
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'override');
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'after-override');
+        });
+    });
+
+    it('retains service tokens across readiness and updates them on reconnect', function () {
+        let sandbox;
+        return serve((req, res) => {
+            const info = { sandboxID: 'service', state: 'running', envdAccessToken: 'envd-token' };
+            if (req.method === 'POST') {
+                info.traffic_access_token = 'reconnected-token';
+            }
+            json(res, info);
+        }).then(() => {
+            sandbox = new qiniu.sandbox.Sandbox({
+                client,
+                info: { sandboxID: 'service', trafficAccessToken: 'created-token' }
+            });
+            return sandbox.waitForReady();
+        }).then(() => {
+            assert.strictEqual(sandbox.trafficAccessToken, 'created-token');
+            return sandbox.connect();
+        }).then(() => {
+            assert.strictEqual(sandbox.trafficAccessToken, 'reconnected-token');
+        });
+    });
+
+    it('keeps custom sandbox list clients compatible with envelope responses', function () {
+        const client = {
+            listSandboxesV2: function () {
+                return Promise.resolve({ items: [{ sandboxID: 'custom' }], nextToken: 'next' });
+            }
+        };
+        const paginator = qiniu.sandbox.Sandbox.list({ client });
+        return paginator.nextItems().then(items => {
+            assert.strictEqual(items[0].sandboxID, 'custom');
+            assert.strictEqual(paginator.nextToken, 'next');
+        });
+    });
+
     it('forwards auto-pause, auto-resume and body injection options without mutating callers', function () {
         const injection = { type: 'http', ifBody: { model: 'demo' }, body: { token: 'secret' } };
         return serve((req, res) => json(res, { sandboxID: 'sbx' }, 201))

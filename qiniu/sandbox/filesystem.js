@@ -1,10 +1,10 @@
 const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYTES } = require('./envd');
 const { SandboxError } = require('./errors');
-const { agentFromClient, millisecondsFromOptions, parseRequestUrl, rawRequest } = require('./util');
-const { Readable } = require('stream');
+const { agentFromClient, millisecondsFromOptions, parseRequestUrl } = require('./util');
 const zlib = require('zlib');
 const http = require('http');
 const https = require('https');
+const { requestFile, requestTimeout, isReadable, sequenceStream } = require('./file_streams');
 
 const FileType = {
     FILE: 'file',
@@ -154,11 +154,11 @@ function multipartBody (boundary, parts) {
         chunks.push(Buffer.from(`--${boundary}\r\n`));
         chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.field}"; filename="${multipartFilename(part.filename)}"\r\n`));
         chunks.push(Buffer.from('Content-Type: application/octet-stream\r\n\r\n'));
-        chunks.push(dataToUploadBuffer(part.data));
+        chunks.push(isReadable(part.data) ? part.data : dataToUploadBuffer(part.data));
         chunks.push(Buffer.from('\r\n'));
     });
     chunks.push(Buffer.from(`--${boundary}--\r\n`));
-    return Buffer.concat(chunks);
+    return chunks.some(isReadable) ? sequenceStream(chunks) : Buffer.concat(chunks);
 }
 
 function Filesystem (sandbox) {
@@ -171,16 +171,6 @@ function formatReadResult (data, opts) {
     const format = opts.format || 'text';
     if (format === 'bytes') {
         return buffer;
-    }
-    if (format === 'stream') {
-        if (typeof Readable.from === 'function') {
-            return Readable.from([buffer]);
-        }
-        const stream = new Readable();
-        stream._read = function () {};
-        stream.push(buffer);
-        stream.push(null);
-        return stream;
     }
     if (format === 'blob') {
         return typeof global.Blob !== 'undefined' ? new global.Blob([buffer]) : buffer;
@@ -206,18 +196,25 @@ function gzipAsync (content) {
 
 Filesystem.prototype.read = function (path, opts) {
     opts = opts || {};
+    let timeout;
+    try {
+        timeout = requestTimeout(opts);
+    } catch (err) {
+        return Promise.reject(err);
+    }
     const headers = {};
     if (opts.gzip) {
         headers['Accept-Encoding'] = 'gzip';
     }
     const requestUrl = this.sandbox.downloadUrl(path, opts);
-    return rawRequest(requestUrl, {
+    return requestFile(requestUrl, {
         method: 'GET',
         dataType: 'buffer',
+        streamResponse: opts.format === 'stream',
         headers,
         agent: envdAgent(this.sandbox, requestUrl),
-        gzip: !!opts.gzip
-    }).then(({ data }) => formatReadResult(data, opts));
+        timeout
+    }).then(({ data }) => opts.format === 'stream' ? data : formatReadResult(data, opts));
 };
 
 Filesystem.prototype.readText = function (path, opts) {
@@ -231,32 +228,41 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
 
     const path = pathOrFiles;
     const opts = maybeOpts || {};
-    if (dataOrOpts && typeof dataOrOpts === 'object' && !Buffer.isBuffer(dataOrOpts) && typeof dataOrOpts.pipe === 'function') {
-        return Promise.reject(new TypeError('Streams are not supported as data in filesystem.write'));
+    let timeout;
+    try {
+        timeout = requestTimeout(opts);
+    } catch (err) {
+        return Promise.reject(err);
     }
     const supportsEncodedUpload = versionGte(this.sandbox.envdVersion, '0.5.7');
     if (opts.useOctetStream && supportsEncodedUpload) {
         const headers = {
             'Content-Type': 'application/octet-stream'
         };
-        const content = dataToUploadBuffer(dataOrOpts);
-        const compressed = opts.gzip && supportsEncodedUpload
+        const content = isReadable(dataOrOpts) ? dataOrOpts : dataToUploadBuffer(dataOrOpts);
+        const compressed = opts.gzip && supportsEncodedUpload && !isReadable(content)
             ? gzipAsync(content).then(result => {
                 headers['Content-Encoding'] = 'gzip';
                 return result;
             })
             : Promise.resolve(content);
 
-        return compressed.then(content => {
+        const send = content => {
             const requestUrl = this.sandbox.uploadUrl(path, opts);
-            return rawRequest(requestUrl, {
+            if (opts.gzip && isReadable(content)) headers['Content-Encoding'] = 'gzip';
+            return requestFile(requestUrl, {
                 method: 'POST',
-                content,
+                content: isReadable(content) ? undefined : content,
+                stream: isReadable(content) ? content : undefined,
+                gzipUpload: !!opts.gzip,
                 dataType: 'json',
                 agent: envdAgent(this.sandbox, requestUrl),
-                headers
+                headers,
+                timeout
             });
-        }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
+        };
+        const transfer = isReadable(content) ? send(content) : compressed.then(send);
+        return transfer.then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
     }
 
     const boundary = `qiniu-sandbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -268,27 +274,39 @@ Filesystem.prototype.write = function (pathOrFiles, dataOrOpts, maybeOpts) {
     const headers = {
         'Content-Type': `multipart/form-data; boundary=${boundary}`
     };
-    const compressed = opts.gzip && supportsEncodedUpload
+    const compressed = opts.gzip && supportsEncodedUpload && !isReadable(body)
         ? gzipAsync(body).then(result => {
             headers['Content-Encoding'] = 'gzip';
             return result;
         })
         : Promise.resolve(body);
 
-    return compressed.then(body => {
+    const send = body => {
         const requestUrl = this.sandbox.uploadUrl(path, opts);
-        return rawRequest(requestUrl, {
+        if (opts.gzip && supportsEncodedUpload && isReadable(body)) headers['Content-Encoding'] = 'gzip';
+        return requestFile(requestUrl, {
             method: 'POST',
-            content: body,
+            content: isReadable(body) ? undefined : body,
+            stream: isReadable(body) ? body : undefined,
+            gzipUpload: !!opts.gzip && supportsEncodedUpload,
             dataType: 'json',
             agent: envdAgent(this.sandbox, requestUrl),
-            headers
+            headers,
+            timeout
         });
-    }).then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
+    };
+    const transfer = isReadable(body) ? send(body) : compressed.then(send);
+    return transfer.then(({ data }) => Array.isArray(data) ? normalizeEntry(data[0]) : normalizeEntry(data));
 };
 
 Filesystem.prototype.writeFiles = function (files, opts) {
     opts = opts || {};
+    let timeout;
+    try {
+        timeout = requestTimeout(opts);
+    } catch (err) {
+        return Promise.reject(err);
+    }
     if (!Array.isArray(files)) {
         return Promise.reject(new TypeError('files must be an array'));
     }
@@ -296,9 +314,6 @@ Filesystem.prototype.writeFiles = function (files, opts) {
         const file = files[i];
         if (!file || typeof file !== 'object') {
             return Promise.reject(new TypeError('Each file must be an object'));
-        }
-        if (file.data && typeof file.data === 'object' && !Buffer.isBuffer(file.data) && typeof file.data.pipe === 'function') {
-            return Promise.reject(new TypeError('Streams are not supported as data in filesystem.writeFiles'));
         }
     }
     const boundary = `qiniu-sandbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -309,11 +324,14 @@ Filesystem.prototype.writeFiles = function (files, opts) {
     }));
 
     const requestUrl = this.sandbox.batchUploadUrl(opts);
-    return rawRequest(requestUrl, {
+    const body = multipartBody(boundary, parts);
+    return requestFile(requestUrl, {
         method: 'POST',
-        content: multipartBody(boundary, parts),
+        content: isReadable(body) ? undefined : body,
+        stream: isReadable(body) ? body : undefined,
         dataType: 'json',
         agent: envdAgent(this.sandbox, requestUrl),
+        timeout,
         headers: {
             'Content-Type': `multipart/form-data; boundary=${boundary}`
         }

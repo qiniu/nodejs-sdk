@@ -2,6 +2,7 @@ const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYT
 const { agentFromClient, millisecondsFromOptions, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
+const { validateExecutionTimeout, startExecutionTimeout } = require('./execution_timeout');
 
 function encodeConnectEnvelope (message) {
     const payload = Buffer.from(JSON.stringify(message || {}));
@@ -53,12 +54,13 @@ LivePtyHandle.prototype.kill = function () {
 };
 
 LivePtyHandle.prototype.disconnect = function () {
+    if (this._executionDeadline) this._executionDeadline.cancel();
     this._disconnected = true;
     if (this._request) {
         this._request.destroy();
         this._request = null;
     }
-    if (this._resolveWait) {
+    if (this._resolveWait && !(this._executionDeadline && this._executionDeadline.expired)) {
         const result = {
             exitCode: 0,
             stdout: this.stdout,
@@ -73,6 +75,7 @@ LivePtyHandle.prototype.disconnect = function () {
 function connectLivePty (sandbox, procedure, body, opts, pty) {
     opts = opts || {};
     return new Promise((resolve, reject) => {
+        validateExecutionTimeout(opts.executionTimeoutMs);
         const target = parseRequestUrl(sandbox.envdUrl() + procedure);
         const transport = target.protocol === 'https:' ? https : http;
         const headers = Object.assign({
@@ -105,6 +108,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
         });
         waitPromise.catch(() => {});
         let startTimer;
+        let executionDeadline;
 
         function cleanupStartTimer () {
             if (startTimer) {
@@ -114,7 +118,9 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
         }
 
         function fail (err) {
+            if (executionDeadline && executionDeadline.expired) return;
             cleanupStartTimer();
+            if (executionDeadline) executionDeadline.cancel();
             if (handle && handle._disconnected) {
                 if (result.exitCode === -1) {
                     result.exitCode = 0;
@@ -135,6 +141,13 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 cleanupStartTimer();
                 handle = new LivePtyHandle(pty, event.start.pid, req, waitPromise, opts);
                 handle._resolveWait = resolveWait;
+                executionDeadline = startExecutionTimeout(opts.executionTimeoutMs, handle.pid,
+                    timeout => pty.kill(handle.pid, { user: opts.user, requestTimeoutMs: timeout }),
+                    () => req.destroy(), err => {
+                        handle._resolveWait = null;
+                        rejectWait(err);
+                    });
+                handle._executionDeadline = executionDeadline;
                 settled = true;
                 resolve(handle);
             }
@@ -158,6 +171,8 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 }
             }
             if (event.end) {
+                if (executionDeadline && executionDeadline.expired) return;
+                if (executionDeadline) executionDeadline.cancel();
                 result = Object.assign(result, {
                     exitCode: event.end.exitCode === undefined ? 0 : event.end.exitCode,
                     error: event.end.error || ''
@@ -287,7 +302,8 @@ Pty.prototype.create = function (opts) {
         onData: opts.onData,
         requestTimeoutMs: opts.requestTimeoutMs,
         timeoutMs: opts.timeoutMs,
-        timeout: opts.timeout
+        timeout: opts.timeout,
+        executionTimeoutMs: opts.executionTimeoutMs
     }, this);
 };
 
@@ -302,7 +318,8 @@ Pty.prototype.connect = function (pid, opts) {
         onData: opts.onData,
         requestTimeoutMs: opts.requestTimeoutMs,
         timeoutMs: opts.timeoutMs,
-        timeout: opts.timeout
+        timeout: opts.timeout,
+        executionTimeoutMs: opts.executionTimeoutMs
     }, this);
 };
 

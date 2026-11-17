@@ -1,5 +1,6 @@
 const {
     should,
+    http,
     stream,
     zlib,
     qiniu,
@@ -13,8 +14,344 @@ const {
     encodeOversizedConnectHeader,
     encodeTruncatedConnectHeader
 } = require('./sandbox_helpers');
+const { execFile } = require('child_process');
 
 describe('test sandbox filesystem module', function () {
+    describe('stream transfer lifecycle', function () {
+        let fixture;
+        let sandbox;
+
+        afterEach(function () {
+            if (fixture) return closeServer(fixture.server).then(() => { fixture = null; });
+        });
+
+        function serve (handler) {
+            return startServer(handler).then(value => {
+                fixture = value;
+                sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'transfer',
+                    envdUrl: fixture.endpoint,
+                    info: { envdAccessToken: 'token', envdVersion: '0.5.7' }
+                });
+            });
+        }
+
+        function readable (text) {
+            const source = new stream.Readable({ read: function () {} });
+            source.push(text);
+            source.push(null);
+            return source;
+        }
+
+        function consume (source) {
+            return new Promise((resolve, reject) => {
+                const chunks = [];
+                source.on('data', chunk => chunks.push(chunk));
+                source.on('error', reject);
+                source.on('end', () => resolve(Buffer.concat(chunks).toString()));
+            });
+        }
+
+        it('rejects overflowing file deadlines before opening read or upload requests', function () {
+            return serve((req, res) => { res.setHeader('Content-Type', 'application/json'); res.end('[]'); })
+                .then(() => {
+                    const calls = [];
+                    [{ requestTimeoutMs: 2147483648 }, { timeoutMs: 2147483648 }, { timeout: 2147483.648 }].forEach(opts => {
+                        calls.push(sandbox.files.read('/x', opts));
+                        calls.push(sandbox.files.write('/x', 'data', opts));
+                        calls.push(sandbox.files.writeFiles([{ path: '/x', data: 'data' }], opts));
+                    });
+                    return Promise.all(calls.map(call => call.then(() => {
+                        throw new Error('expected out-of-range file deadline');
+                    }, err => {
+                        err.name.should.eql('RangeError');
+                        err.message.should.match(/2147483647/);
+                    })));
+                }).then(() => fixture.requests.length.should.eql(0));
+        });
+
+        it('accepts the maximum file deadline before overflowing lower-priority aliases', function () {
+            return serve((req, res) => res.end('maximum deadline'))
+                .then(() => sandbox.files.read('/x', {
+                    requestTimeoutMs: 2147483647, timeoutMs: 2147483648, timeout: 2147483.648
+                })).then(text => text.should.eql('maximum deadline'));
+        });
+
+        it('owns early and cancellation errors from every upload source', function () {
+            return Promise.all(['multipart', 'octet', 'batch', 'queued', 'cleanup'].map(mode => {
+                const script = [
+                    'const http = require(\'http\'); const Readable = require(\'stream\').Readable; const qiniu = require(\'./index\');',
+                    `const mode = ${JSON.stringify(mode)}; const uncaught = [];`,
+                    'process.on(\'uncaughtException\', err => uncaught.push(err.message));',
+                    'const server = http.createServer((req, res) => {});',
+                    'server.listen(0, \'127.0.0.1\', () => {',
+                    'const sandbox = new qiniu.sandbox.Sandbox({ sandboxId:\'early\', envdUrl:\'http://127.0.0.1:\'+server.address().port, info:{envdAccessToken:\'token\',envdVersion:\'0.5.7\'} });',
+                    'const source = new Readable({ read:function(){}, destroy:function(err,done){done(mode===\'cleanup\'?new Error(\'cleanup failed\'):err);} });',
+                    'if(mode!==\'cleanup\') process.nextTick(()=>{const err=new Error(\'early failure\');if(source.destroy)source.destroy(err);else source.emit(\'error\',err);});',
+                    'const opts={requestTimeoutMs:30,useOctetStream:mode===\'octet\'};',
+                    'const files=mode===\'queued\'?[{path:\'/blocked\',data:new Readable({read:function(){}})},{path:\'/x\',data:source}]:[{path:\'/x\',data:source}];',
+                    'const call=mode===\'batch\'||mode===\'queued\'?sandbox.files.writeFiles(files,opts):sandbox.files.write(\'/x\',source,opts);',
+                    'call.then(()=>{console.log(JSON.stringify({error:\'unexpected success\',uncaught}));server.close();},err=>{setTimeout(()=>{console.log(JSON.stringify({error:err.message,name:err.name,uncaught}));server.close();},10);});',
+                    '});'
+                ].join('\n');
+                return new Promise((resolve, reject) => {
+                    execFile(process.execPath, ['-e', script], { timeout: 2000 }, (err, stdout) => {
+                        if (err) return reject(err);
+                        try {
+                            const result = JSON.parse(stdout.trim());
+                            result.uncaught.should.eql([]);
+                            if (mode === 'cleanup') result.name.should.eql('TimeoutError');
+                            else result.error.should.eql('early failure');
+                            resolve();
+                        } catch (failure) { reject(failure); }
+                    });
+                });
+            }));
+        });
+
+        it('keeps the default connection timeout while custom DNS lookup is pending', function () {
+            const script = [
+                'const http=require(\'http\'); const qiniu=require(\'./index\'); let error;',
+                'process.on(\'exit\',()=>console.log(JSON.stringify({error})));',
+                'const client=new qiniu.sandbox.SandboxClient({httpAgent:new http.Agent({lookup:function(){}})});',
+                'const sandbox=new qiniu.sandbox.Sandbox({client,sandboxId:\'dns\',envdUrl:\'http://lookup.invalid\',info:{envdAccessToken:\'token\'}});',
+                'sandbox.files.read(\'/x\').catch(err=>{error=err.name;});'
+            ].join('\n');
+            return new Promise((resolve, reject) => {
+                execFile(process.execPath, ['-e', script], { timeout: 7000 }, (err, stdout) => {
+                    if (err) return reject(err);
+                    try {
+                        should(JSON.parse(stdout.trim()).error).eql('TimeoutError');
+                        resolve();
+                    } catch (failure) { reject(failure); }
+                });
+            });
+        });
+
+        it('keeps the upload deadline until an early successful response and input both complete', function () {
+            let timer;
+            let socket;
+            const source = new stream.Readable({ read: function () {} });
+            const server = http.createServer((req, res) => { socket = req.socket; res.end('{}'); });
+            return new Promise(resolve => server.listen(0, '127.0.0.1', resolve)).then(() => {
+                fixture = { server };
+                sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'early-response',
+                    envdUrl: `http://127.0.0.1:${server.address().port}`,
+                    info: { envdAccessToken: 'token', envdVersion: '0.5.7' }
+                });
+                timer = setInterval(() => source.push(Buffer.alloc(1024)), 5);
+                source.on('close', () => clearInterval(timer));
+                return sandbox.files.write('/unfinished', source, { useOctetStream: true, requestTimeoutMs: 30 });
+            }).then(() => { throw new Error('expected incomplete upload to fail'); }, err => {
+                err.message.should.match(/upload|timed out/);
+                source.destroyed.should.eql(true);
+            }).then(() => { clearInterval(timer); }, err => {
+                clearInterval(timer);
+                source.destroy();
+                if (socket) socket.destroy();
+                throw err;
+            });
+        });
+
+        it('decodes compressed downloads without buffering the response', function () {
+            return serve((req, res) => {
+                res.setHeader('Content-Encoding', 'gzip');
+                res.end(zlib.gzipSync(Buffer.from('compressed download')));
+            }).then(() => sandbox.files.read('/gzip', { format: 'stream' }))
+                .then(consume).then(text => text.should.eql('compressed download'));
+        });
+
+        it('reports HTTP errors before returning a download stream', function () {
+            return serve((req, res) => { res.statusCode = 404; res.end('missing'); })
+                .then(() => sandbox.files.read('/missing', { format: 'stream' }))
+                .then(() => { throw new Error('expected HTTP error'); }, err => {
+                    err.name.should.eql('SandboxError');
+                    err.response.statusCode.should.eql(404);
+                    err.data.toString().should.eql('missing');
+                });
+        });
+
+        it('keeps empty JSON upload responses compatible with buffered transfers', function () {
+            return serve((req, res) => { res.statusCode = 204; res.end(); })
+                .then(() => sandbox.files.writeFiles([{ path: '/empty', data: '' }]))
+                .then(items => items.should.eql([]));
+        });
+
+        it('reports interrupted download bodies through the returned stream', function () {
+            return serve((req, res) => {
+                res.write('partial');
+                setTimeout(() => res.destroy(), 10);
+            }).then(() => sandbox.files.read('/truncated', { format: 'stream' }))
+                .then(consume).then(() => { throw new Error('expected interrupted stream'); }, err => {
+                    err.message.should.match(/aborted|closed/);
+                });
+        });
+
+        it('closes the connection when a download consumer destroys its stream', function () {
+            let closed;
+            const connectionClosed = new Promise(resolve => { closed = resolve; });
+            return serve((req, res) => {
+                res.write('first');
+                res.on('close', closed);
+            }).then(() => sandbox.files.read('/cancel', { format: 'stream' }))
+                .then(source => { source.destroy(); return connectionClosed; });
+        });
+
+        it('applies a file deadline after download headers and gives requestTimeoutMs precedence', function () {
+            return serve((req, res) => { res.write('first'); })
+                .then(() => sandbox.files.read('/slow', {
+                    format: 'stream', requestTimeoutMs: 20, timeoutMs: 200, timeout: 1
+                })).then(consume).then(() => { throw new Error('expected timeout'); }, err => {
+                    err.name.should.eql('TimeoutError');
+                });
+        });
+
+        it('accepts zero to disable the file deadline and supports buffered timeout aliases', function () {
+            return serve((req, res) => {
+                res.write('first');
+                const timer = setTimeout(() => res.end('second'), 50);
+                res.on('close', () => clearTimeout(timer));
+            }).then(() => sandbox.files.read('/slow', { requestTimeoutMs: 0, timeoutMs: 2147483648 }))
+                .then(text => {
+                    text.should.eql('firstsecond');
+                    return sandbox.files.read('/slow', { timeout: 0.01 });
+                }).then(() => { throw new Error('expected buffered timeout'); }, err => {
+                    err.name.should.eql('TimeoutError');
+                });
+        });
+
+        it('uploads mixed batch data in order and compresses readable octet-stream bodies', function () {
+            return serve((req, res) => {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify([{ path: '/uploaded', type: 'file' }]));
+            }).then(() => sandbox.files.writeFiles([
+                { path: '/one', data: 'one' },
+                { path: '/two', data: readable('two') },
+                { path: '/three', data: 'three' }
+            ])).then(() => {
+                const body = fixture.requests[0].body;
+                body.indexOf('filename="/one"').should.be.below(body.indexOf('filename="/two"'));
+                body.indexOf('filename="/two"').should.be.below(body.indexOf('filename="/three"'));
+                return sandbox.files.write('/gzip', readable('gzip upload'), { useOctetStream: true, gzip: true });
+            }).then(() => {
+                fixture.requests[1].headers['content-encoding'].should.eql('gzip');
+                zlib.gunzipSync(fixture.requests[1].rawBody).toString().should.eql('gzip upload');
+            });
+        });
+
+        it('applies upload deadlines and closes an unfinished input stream', function () {
+            const source = new stream.Readable({ read: function () {} });
+            const server = http.createServer((req, res) => {});
+            return new Promise(resolve => server.listen(0, '127.0.0.1', resolve)).then(() => {
+                fixture = { server };
+                sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'upload-timeout',
+                    envdUrl: `http://127.0.0.1:${server.address().port}`,
+                    info: { envdAccessToken: 'token' }
+                });
+                return sandbox.files.write('/slow', source, { requestTimeoutMs: 20 });
+            }).then(() => { throw new Error('expected upload timeout'); }, err => {
+                err.name.should.eql('TimeoutError');
+                source.destroyed.should.eql(true);
+            });
+        });
+
+        it('preserves upload backpressure while the server is not reading', function () {
+            const size = 16 * 1024 * 1024;
+            let supplied = 0;
+            let suppliedBeforeRead;
+            let received = 0;
+            const source = new stream.Readable({
+                read: function () {
+                    if (supplied === size) return this.push(null);
+                    supplied += 65536;
+                    this.push(Buffer.alloc(65536, 97));
+                }
+            });
+            const server = http.createServer((req, res) => {
+                req.pause();
+                setTimeout(() => {
+                    suppliedBeforeRead = supplied;
+                    req.on('data', chunk => { received += chunk.length; });
+                    req.on('end', () => {
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify([{ path: '/large', type: 'file' }]));
+                    });
+                    req.resume();
+                }, 40);
+            });
+            return new Promise(resolve => server.listen(0, '127.0.0.1', resolve)).then(() => {
+                fixture = { server };
+                sandbox = new qiniu.sandbox.Sandbox({
+                    sandboxId: 'backpressure',
+                    envdUrl: `http://127.0.0.1:${server.address().port}`,
+                    info: { envdAccessToken: 'token' }
+                });
+                return sandbox.files.write('/large', source);
+            }).then(() => {
+                suppliedBeforeRead.should.be.below(size);
+                received.should.be.above(size);
+            });
+        });
+    });
+
+    it('accepts readable file uploads and preserves multipart filenames', function () {
+        const path = '/unsafe\\"\r\nfile.txt';
+        return startServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify([{ path, type: 'file' }]));
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_upload_stream',
+                envdUrl: fixture.endpoint,
+                info: { envdAccessToken: 'token' }
+            });
+            const source = new stream.Readable({ read: function () {} });
+            source.push('first');
+            source.push('second');
+            source.push(null);
+            return sandbox.files.write(path, source).then(info => {
+                info.path.should.eql(path);
+                fixture.requests[0].body.should.containEql('firstsecond');
+                fixture.requests[0].body.should.containEql('filename="/unsafe\\\\\\"%0D%0Afile.txt"');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => { throw err; });
+            });
+        });
+    });
+
+    it('returns download streams before the response body completes', function () {
+        let responseEnded = false;
+        return startServer((req, res) => {
+            res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+            res.write('first');
+            setTimeout(() => {
+                responseEnded = true;
+                res.end('second');
+            }, 100);
+        }).then(fixture => {
+            const sandbox = new qiniu.sandbox.Sandbox({
+                sandboxId: 'sbx_stream_download',
+                envdUrl: fixture.endpoint,
+                info: { envdAccessToken: 'token' }
+            });
+            return sandbox.files.read('/download', { format: 'stream' }).then(result => {
+                responseEnded.should.eql(false);
+                return new Promise((resolve, reject) => {
+                    const chunks = [];
+                    result.on('data', chunk => chunks.push(chunk));
+                    result.on('error', reject);
+                    result.on('end', () => resolve(Buffer.concat(chunks).toString()));
+                });
+            }).then(content => {
+                content.should.eql('firstsecond');
+            }).then(() => closeServer(fixture.server), err => {
+                return closeServer(fixture.server).then(() => { throw err; });
+            });
+        });
+    });
+
     it('builds envd hosts and signed file urls', function () {
         const sandbox = new qiniu.sandbox.Sandbox({
             sandboxId: 'sbx_3',
@@ -194,7 +531,7 @@ describe('test sandbox filesystem module', function () {
         });
     });
 
-    it('rejects Readable streams passed directly to filesystem write', function () {
+    it('closes upload streams when the destination cannot connect', function () {
         const sandbox = new qiniu.sandbox.Sandbox({
             sandboxId: 'sbx_stream_write',
             envdUrl: 'http://127.0.0.1:9',
@@ -203,12 +540,14 @@ describe('test sandbox filesystem module', function () {
             }
         });
 
-        return sandbox.files.write('/stream.txt', new stream.Readable({
+        const source = new stream.Readable({
             read: function () {}
-        })).then(() => {
+        });
+        return sandbox.files.write('/stream.txt', source).then(() => {
             throw new Error('expected stream write to reject');
         }, err => {
-            err.message.should.eql('Streams are not supported as data in filesystem.write');
+            err.code.should.eql('ECONNREFUSED');
+            source.destroyed.should.eql(true);
         });
     });
 
@@ -607,12 +946,16 @@ describe('test sandbox filesystem module', function () {
                 })
                 .then(() => {
                     return sandbox.files.writeFiles([
-                        { path: '/stream.txt', data: new stream.Readable() }
+                        {
+                            path: '/stream.txt',
+                            data: new stream.Readable({
+                                read: function () { this.emit('error', new Error('source read failed')); }
+                            })
+                        }
                     ]).then(() => {
                         throw new Error('expected writeFiles stream data to fail');
                     }, err => {
-                        err.name.should.eql('TypeError');
-                        err.message.should.match(/Streams are not supported/);
+                        err.message.should.eql('source read failed');
                     });
                 })
                 .then(() => {

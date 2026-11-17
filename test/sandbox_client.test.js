@@ -983,7 +983,7 @@ describe('test sandbox client module', function () {
         let tokenReads = 0;
         return startServer((req, res) => {
             res.setHeader('Content-Type', 'application/json');
-            if (req.method === 'GET' && req.url === '/v2/sandboxes?limit=2&nextToken=n1&metadata%5Buser%5D=alice&state=running') {
+            if (req.method === 'GET' && req.url === '/v2/sandboxes?limit=2&nextToken=n1&metadata=user%3Dalice&state=running') {
                 res.statusCode = 200;
                 res.end(JSON.stringify({
                     items: [{ sandboxID: 'sbx_page', domain: 'page.example.com' }],

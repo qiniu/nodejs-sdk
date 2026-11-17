@@ -1,4 +1,5 @@
 import * as qiniu from '../index';
+import {Readable} from 'stream';
 
 type IsAny<T> = 0 extends (1 & T) ? true : false;
 type AssertFalse<T extends false> = T;
@@ -76,6 +77,10 @@ async function useSandboxTypes () {
             allowOut: [qiniu.sandbox.ALL_TRAFFIC]
         }
     });
+    const serviceToken: string | undefined = sandbox.trafficAccessToken;
+    const sandboxPage = await client.listSandboxesPage({ limit: 2 });
+    const sandboxCursor: string | undefined = sandboxPage.nextToken;
+    await qiniu.Sandbox.list({ client }).nextItems({ nextToken: 'saved-cursor' });
 
     const timeoutMs: number = qiniu.DEFAULT_SANDBOX_TIMEOUT_MS;
     const fileType: 'file' = qiniu.FileType.FILE;
@@ -107,6 +112,11 @@ async function useSandboxTypes () {
     const bytes: Buffer = await sandbox.files.read('/tmp/a.bin', { format: 'bytes' });
     const text: string = await sandbox.files.read('/tmp/a.txt', { format: 'text' });
     const stream: NodeJS.ReadableStream = await sandbox.files.read('/tmp/a.txt', { format: 'stream' });
+    const upload = new Readable({read() {}});
+    const download: Readable = await sandbox.files.read('/tmp/a.txt', {format: 'stream', requestTimeoutMs: 1000});
+    await sandbox.files.readText('/tmp/a.txt', {timeout: 1});
+    await sandbox.files.write('/tmp/a.txt', upload, {timeoutMs: 1000});
+    await sandbox.files.writeFiles([{path: '/tmp/a.txt', data: upload}], {requestTimeoutMs: 0});
     const watchHandle = await sandbox.files.watchDir('/tmp', event => {
         const eventName: string = event.name;
         const eventKind: 'create' | 'write' | 'remove' | 'rename' | 'chmod' = event.type;
@@ -123,6 +133,8 @@ async function useSandboxTypes () {
     });
     await watchHandle.stop();
     const handle = await sandbox.commands.connect(123);
+    await sandbox.commands.run('long task', {executionTimeoutMs: 1000});
+    await sandbox.pty.create({executionTimeoutMs: 1000});
     await handle.disconnect();
     await sandbox.commands.run('false', {
         requestTimeoutMs: 1000,
@@ -183,6 +195,8 @@ async function useSandboxTypes () {
         .gitClone('https://github.com/qiniu/nodejs-sdk.git', '/src/sdk', { branch: 'sandbox', depth: 1 })
         .runCmd(['echo one', 'echo two'], { user: 'root' });
     await template.build({ client, ...templateCreateOptions });
+    const templateSteps: qiniu.sandbox.TemplateBuildStep[] = template.buildConfig.steps;
+    const templateStepCount: number = templateSteps.length;
     await client.createTemplate(templateCreateOptions);
     await sandbox.updateNetwork({ allowOut: [qiniu.sandbox.ALL_TRAFFIC] });
     const injections: qiniu.sandbox.SandboxInjection[] = (await sandbox.getInjections()).injections;

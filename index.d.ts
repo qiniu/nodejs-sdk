@@ -189,6 +189,30 @@ export declare namespace sandbox {
         [key: string]: any;
     }
 
+    interface TemplateBuildStep {
+        type: string;
+        args?: string[];
+        cmd?: string;
+        packages?: string[];
+        src?: string;
+        dest?: string;
+        force?: boolean;
+        forceUpload?: boolean;
+        resolveSymlinks?: boolean;
+        [key: string]: unknown;
+    }
+
+    interface TemplateBuildConfig {
+        steps: TemplateBuildStep[];
+        fromImage?: string;
+        fromTemplate?: string;
+        fromImageRegistry?: {type: string; [key: string]: unknown};
+        startCmd?: string;
+        readyCmd?: string;
+        force?: boolean;
+        [key: string]: unknown;
+    }
+
     interface DefaultTemplateInfo extends TemplateInfo {
         buildStatus: TemplateBuildStatus;
     }
@@ -261,6 +285,15 @@ export declare namespace sandbox {
         useOctetStream?: boolean;
     }
 
+    interface FileRequestOptions extends FileUrlOptions {
+        /** Complete file request deadline in milliseconds, from 0 to 2147483647; 0 disables it. */
+        requestTimeoutMs?: number;
+        /** Millisecond deadline from 0 to 2147483647; requestTimeoutMs takes precedence. */
+        timeoutMs?: number;
+        /** Complete file request deadline in seconds, from 0 to 2147483.647; requestTimeoutMs/timeoutMs take precedence. */
+        timeout?: number;
+    }
+
     interface EntryInfo {
         name?: string;
         type?: string;
@@ -306,6 +339,8 @@ export declare namespace sandbox {
         timeout?: number;
         timeoutMs?: number;
         requestTimeoutMs?: number;
+        /** Opt-in process deadline after start, from 0 to 2147483647 milliseconds; 0 disables it. Expiry kills the PID and rejects wait(). */
+        executionTimeoutMs?: number;
         throwOnError?: boolean;
         config?: {[key: string]: string | number | boolean};
         onStdout?: (data: string) => void;
@@ -373,7 +408,7 @@ export declare namespace sandbox {
     class SandboxPaginator {
         readonly hasNext: boolean;
         readonly nextToken?: string;
-        nextItems(options?: SandboxClientOptions): Promise<Sandbox[]>;
+        nextItems(options?: SandboxClientOptions & {limit?: number; nextToken?: string; query?: any}): Promise<Sandbox[]>;
         then<TResult1 = Sandbox[], TResult2 = never>(
             onfulfilled?: ((value: Sandbox[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
             onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
@@ -391,11 +426,12 @@ export declare namespace sandbox {
     }
 
     class Filesystem {
-        read(path: string, options?: FileUrlOptions & {format?: string}): Promise<any>;
-        readText(path: string, options?: FileUrlOptions): Promise<string>;
-        write(path: string, data: string | Buffer, options?: FileUrlOptions): Promise<EntryInfo>;
-        write(files: Array<{path: string; data: string | Buffer}>, options?: FileUrlOptions): Promise<EntryInfo[]>;
-        writeFiles(files: Array<{path: string; data: string | Buffer}>, options?: FileUrlOptions): Promise<EntryInfo[]>;
+        read(path: string, options: FileRequestOptions & {format: 'stream'}): Promise<Readable>;
+        read(path: string, options?: FileRequestOptions & {format?: string}): Promise<any>;
+        readText(path: string, options?: FileRequestOptions): Promise<string>;
+        write(path: string, data: string | Buffer | Readable, options?: FileRequestOptions): Promise<EntryInfo>;
+        write(files: Array<{path: string; data: string | Buffer | Readable}>, options?: FileRequestOptions): Promise<EntryInfo[]>;
+        writeFiles(files: Array<{path: string; data: string | Buffer | Readable}>, options?: FileRequestOptions): Promise<EntryInfo[]>;
         getInfo(path: string, options?: {user?: string}): Promise<EntryInfo>;
         stat(path: string, options?: {user?: string}): Promise<EntryInfo>;
         list(path: string, options?: {user?: string; depth?: number}): Promise<EntryInfo[]>;
@@ -493,7 +529,12 @@ export declare namespace sandbox {
         stderr: string;
     }
 
-    class TimeoutError extends Error {}
+    class TimeoutError extends Error {
+        pid?: number;
+        timeoutMs?: number;
+        /** Present when terminating the process after its execution deadline fails. */
+        killError?: Error;
+    }
     class NotImplementedError extends Error {}
     class InvalidArgumentError extends Error {}
     class NotFoundError extends Error {}
@@ -504,6 +545,7 @@ export declare namespace sandbox {
     class TemplateBuildError extends Error {}
 
     interface TemplateBuilder {
+        buildConfig: TemplateBuildConfig;
         fromImage(image: string, credentials?: {username: string; password: string}): this;
         fromAWSRegistry(image: string, credentials: {accessKeyId: string; secretAccessKey: string; region: string}): this;
         fromGCPRegistry(image: string, credentials: {serviceAccountJSON: string | object}): this;
@@ -555,6 +597,7 @@ export declare namespace sandbox {
 
         listSandboxes(options?: any): Promise<any>;
         listSandboxesV2(options?: any): Promise<any>;
+        listSandboxesPage(options?: any): Promise<{items: any[]; nextToken?: string}>;
         createSandbox(options?: SandboxCreateOptions): Promise<any>;
         getSandboxesMetrics(sandboxIDs: string[] | any): Promise<any>;
         getSandboxLogs(sandboxID: string, options?: any): Promise<any>;
@@ -622,6 +665,7 @@ export declare namespace sandbox {
         sandboxID: string;
         sandboxDomain?: string;
         domain?: string;
+        trafficAccessToken?: string;
         info: any;
         client: SandboxClient;
         files: Filesystem;

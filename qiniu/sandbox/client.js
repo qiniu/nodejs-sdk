@@ -1,6 +1,7 @@
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
+const querystring = require('querystring');
 
 const { HttpClient } = require('../httpc/client');
 const { QiniuAuthMiddleware } = require('../httpc/middleware/qiniuAuth');
@@ -145,9 +146,7 @@ function normalizeSandboxListOptions (opts) {
     delete opts.query;
 
     if (query && query.metadata) {
-        Object.keys(query.metadata).forEach(key => {
-            opts[`metadata[${key}]`] = query.metadata[key];
-        });
+        opts.metadata = querystring.stringify(query.metadata);
     }
     if (query && query.state) {
         opts.state = query.state;
@@ -364,6 +363,12 @@ SandboxClient.prototype.listSandboxes = function (opts) {
 
 SandboxClient.prototype.listSandboxesV2 = function (opts) {
     return this._request('GET', appendQuery('/v2/sandboxes', normalizeSandboxListOptions(opts)));
+};
+
+SandboxClient.prototype.listSandboxesPage = function (opts) {
+    return this._request('GET', appendQuery('/v2/sandboxes', normalizeSandboxListOptions(opts)), {
+        paginated: true
+    });
 };
 
 SandboxClient.prototype.createSandbox = function (opts) {
