@@ -122,7 +122,7 @@ describe('sandbox desktop', function () {
         const url = 'https://example.com/?q=\'$(id)\'';
         return Promise.all([f.desktop.open(url), f.desktop.launch('firefox-esr', '--new-window', url)]).then(() => {
             assert.strictEqual(f.calls[0].cmd, 'xdg-open ' + shellQuote(url));
-            assert.strictEqual(f.calls[1].cmd, 'gtk-launch ' + ['firefox-esr', '--new-window', url].map(shellQuote).join(' '));
+            assert.strictEqual(f.calls[1].cmd, 'exec -- ' + ['firefox-esr', '--new-window', url].map(shellQuote).join(' '));
             assert(f.handles.every(handle => handle.disconnected));
         });
     });
@@ -221,5 +221,34 @@ describe('sandbox desktop', function () {
             assert.strictEqual(params.templateID, 'custom-desktop');
             assert.deepStrictEqual(params.envs, { KEEP: 'yes', DISPLAY: ':0' });
         }).then(() => { qiniu.Desktop.prototype.start = start; }, err => { qiniu.Desktop.prototype.start = start; throw err; });
+    });
+    it('reports early application failures instead of detaching silently', function () {
+        const f = fixture(() => ({ exitCode: 127, stderr: 'executable not found' }));
+        return rejects(f.desktop.launch('missing-application', '--flag'), err => {
+            assert(err instanceof qiniu.DesktopCommandError);
+            assert.strictEqual(err.operation, 'launch application');
+            assert.strictEqual(err.result.exitCode, 127);
+            assert(f.handles[0].disconnected);
+        });
+    });
+
+    it('passes empty arguments and shell metacharacters to the executable literally', function () {
+        const childProcess = require('child_process');
+        const f = fixture();
+        const args = ['--new-window', '', 'a\'b $(printf unsafe); x', 'two words'];
+        return f.desktop.launch(process.execPath, '-e', 'process.stdout.write(JSON.stringify(process.argv.slice(1)))', '--', ...args).then(() => {
+            const output = childProcess.execFileSync('/bin/bash', ['-c', f.calls[0].cmd], { encoding: 'utf8' });
+            assert.deepStrictEqual(JSON.parse(output), args);
+        });
+    });
+
+    it('detaches a long-lived application after the startup observation window', function () {
+        const f = fixture();
+        let disconnected = false;
+        f.sandbox.commands.start = () => Promise.resolve({
+            wait: () => new Promise(() => {}),
+            disconnect: () => { disconnected = true; }
+        });
+        return f.desktop.launch('long-lived').then(() => assert(disconnected));
     });
 });

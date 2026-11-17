@@ -708,6 +708,7 @@ export declare namespace sandbox {
         typeText(text: string, options?: TypeTextOptions): Promise<void>;
         press(...keys: string[]): Promise<void>;
         open(pathOrURL: string): Promise<void>;
+        /** Launch an executable with literal argv; checks early failure for up to 250 ms, then detaches. */
         launch(application: string, ...args: string[]): Promise<void>;
         activeWindowID(): Promise<string>;
         applicationWindows(application: string): Promise<string[]>;

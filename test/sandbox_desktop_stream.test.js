@@ -109,7 +109,7 @@ describe('sandbox desktop stream', function () {
         f.sandbox.commands.sendStdin = () => Promise.reject(new Error('stdin failed'));
         return rejects(f.desktop.stream.start(), err => {
             assert.strictEqual(err.message, 'stdin failed');
-            const helper = f.handles[1];
+            const helper = f.handles[2];
             assert(helper.killed && helper.disconnected);
             assert(f.calls.some(call => call.cmd.indexOf('rm -f') === 0));
             assert(!f.calls.some(call => call.cmd.indexOf('x11vnc -bg') === 0));
@@ -119,7 +119,7 @@ describe('sandbox desktop stream', function () {
     it('rolls back all started processes after a readiness failure and supports retry', function () {
         let fail = true;
         const f = fixture(cmd => {
-            if (cmd.indexOf('netstat') === 0 && fail) throw new Error('probe offline');
+            if (cmd.indexOf('listeners=$(') === 0 && fail) throw new Error('probe offline');
             return streamResponse(cmd);
         });
         return rejects(f.desktop.stream.start(), err => assert.strictEqual(err.message, 'probe offline')).then(() => {
@@ -147,8 +147,42 @@ describe('sandbox desktop stream', function () {
         const f = fixture(cmd => cmd.indexOf('storepasswd') >= 0 ? { exitCode: 2, stderr: 'cannot store password' } : streamResponse(cmd));
         return rejects(f.desktop.stream.start(), err => {
             assert(err instanceof qiniu.DesktopCommandError);
-            assert(f.handles[1].disconnected);
+            assert(f.handles[2].disconnected);
             assert(f.calls.some(call => call.cmd.indexOf('rm -f') === 0));
         });
+    });
+    it('rejects occupied web ports before creating passwords or starting processes', function () {
+        const f = fixture(cmd => cmd.indexOf('set -o pipefail; netstat -ltn ') === 0 ? { stdout: ':::6080\n' } : streamResponse(cmd));
+        return rejects(f.desktop.stream.start({ vncPort: 5901 }), err => {
+            assert(/web port is already in use/.test(err.message));
+            assert.strictEqual(f.calls.length, 2);
+            assert.strictEqual(f.stdin.length, 0);
+            assert(!f.calls.some(call => /pkill|rm -f/.test(call.cmd)));
+            assert.throws(() => f.desktop.stream.url(), /not running/);
+        });
+    });
+
+    it('rejects a competing listener that appears after the preflight check', function () {
+        const f = fixture(cmd => cmd.indexOf('listeners=$(') === 0 ? { stdout: 'foreign\n' } : streamResponse(cmd));
+        return rejects(f.desktop.stream.start(), err => {
+            assert(/owned by another process/.test(err.message));
+            assert(f.calls.some(call => call.cmd.indexOf('kill ') === 0));
+            assert(!f.calls.some(call => call.cmd.indexOf('pkill') === 0 && call.cmd.indexOf('novnc_proxy') >= 0));
+            assert.throws(() => f.desktop.stream.url(), /not running/);
+        });
+    });
+
+    it('reports proxy exit even if a listener appears ready', function () {
+        const f = fixture(cmd => cmd.indexOf('exec ./novnc_proxy') >= 0 ? { exitCode: 1, stderr: 'address in use' } : streamResponse(cmd));
+        return rejects(f.desktop.stream.start(), err => {
+            assert(err instanceof qiniu.DesktopCommandError);
+            assert.strictEqual(err.operation, 'start noVNC');
+            assert.throws(() => f.desktop.stream.authKey(), /not running/);
+        });
+    });
+
+    it('fails when the proxy exits successfully without serving a listener', function () {
+        const f = fixture(cmd => cmd.indexOf('exec ./novnc_proxy') >= 0 ? { exitCode: 0 } : streamResponse(cmd));
+        return rejects(f.desktop.stream.start(), err => assert(/exited before becoming ready/.test(err.message)));
     });
 });

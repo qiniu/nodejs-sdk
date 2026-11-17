@@ -327,8 +327,27 @@ Desktop.prototype.open = function (pathOrURL) {
 };
 
 Desktop.prototype.launch = function (application, ...args) {
-    const parts = [text(application, 'application')].concat(args.map(arg => text(arg, 'application argument')));
-    return this._startProcess('gtk-launch ' + parts.map(shellQuote).join(' ')).then(() => undefined);
+    const parts = [text(application, 'application')].concat(args.map(arg => {
+        if (typeof arg !== 'string' || arg.indexOf('\0') >= 0) throw new InvalidArgumentError('Invalid desktop application argument');
+        return arg;
+    }));
+    // Execute argv directly: gtk-launch interprets arguments as its own options or URIs.
+    return this.sandbox.commands.start('exec -- ' + parts.map(shellQuote).join(' '), this._commandOptions()).then(handle => {
+        return new Promise((resolve, reject) => {
+            // Catch executable/argument failures before detaching a long-lived application.
+            const timer = setTimeout(resolve, 250);
+            handle.wait().then(result => {
+                clearTimeout(timer);
+                try {
+                    this._checkResult('launch application', result);
+                    resolve();
+                } catch (err) { reject(err); }
+            }, err => { clearTimeout(timer); reject(err); });
+        }).then(() => handle.disconnect(), err => {
+            handle.disconnect();
+            throw err;
+        });
+    });
 };
 
 Desktop.prototype.activeWindowID = function () {

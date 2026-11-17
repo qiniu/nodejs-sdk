@@ -49,7 +49,7 @@ describe('sandbox desktop integration', function () {
             .then(() => desktop.mouseUp('right'))
             .then(() => desktop.drag({ x: 100, y: 100 }, { x: 120, y: 120 }))
             .then(() => desktop.scroll('down', 1))
-            .then(() => desktop.launch('xfce4-terminal'))
+            .then(() => desktop.launch('xfce4-terminal', '--title', 'Desktop argv acceptance'))
             .then(() => {
                 const deadline = Date.now() + 15000;
                 function windows () {
@@ -61,20 +61,33 @@ describe('sandbox desktop integration', function () {
                 }
                 return windows();
             }).then(ids => desktop.windowTitle(ids[0]))
-            .then(title => assert.strictEqual(typeof title, 'string'))
+            .then(title => assert(title.indexOf('Desktop argv acceptance') >= 0))
             .then(() => desktop.activeWindowID())
             .then(id => assert(/^\d+$/.test(id)))
             .then(() => desktop.typeText('echo desktop-integration', { delayMs: 5 }))
             .then(() => desktop.press('enter'))
             .then(() => desktop.open('https://example.com'))
-            .then(() => { console.log('    keyboard and windows verified'); return desktop.stream.start(); })
+            .then(() => desktop.launch('/bin/sh', '-c', 'printf "%s\\n" "$@" > /tmp/desktop-argv', 'sh', '--new-window', '', 'a\'b $(printf unsafe); x'))
+            .then(() => desktop.sandbox.files.read('/tmp/desktop-argv'))
+            .then(output => assert.strictEqual(output, '--new-window\n\na\'b $(printf unsafe); x\n'))
+            .then(() => desktop.launch('qiniu-desktop-missing-executable').then(
+                () => { throw new Error('Missing executable should fail'); },
+                err => assert(err instanceof qiniu.DesktopCommandError)
+            ))
+            .then(() => { console.log('    keyboard, windows and launch argv verified'); return desktop.stream.start(); })
             .then(() => {
                 assert(/^[A-Za-z0-9]{16}$/.test(desktop.stream.authKey()));
                 assert(desktop.stream.url().indexOf('password=') < 0);
                 return rawRequest(desktop.stream.url(), { method: 'GET', dataType: 'text', timeout: 15000 });
             }).then(response => {
                 assert(/noVNC/i.test(response.data));
-                return desktop.stream.stop();
+                const competing = new qiniu.Desktop(desktop.sandbox);
+                return competing.stream.start({ vncPort: 5902, webPort: 6080 }).then(
+                    () => { throw new Error('Occupied web port should fail'); },
+                    err => assert(/web port is already in use/.test(err.message))
+                ).then(() => rawRequest(desktop.stream.url(), { method: 'GET', dataType: 'text', timeout: 15000 }))
+                    .then(active => assert(/noVNC/i.test(active.data)))
+                    .then(() => desktop.stream.stop());
             }).then(() => {
                 assert.throws(() => desktop.stream.url(), /not running/);
                 return desktop.stream.start({ requireAuth: false, vncPort: 5901, webPort: 6081 });

@@ -14,7 +14,9 @@ function fixture (respond) {
                     pid: 100 + handles.length,
                     disconnected: false,
                     killed: false,
-                    wait: () => Promise.resolve(Object.assign({ exitCode: 0, stdout: '', stderr: '' }, result)),
+                    wait: () => cmd.indexOf('exec ./novnc_proxy') >= 0 && !result
+                        ? new Promise(() => {})
+                        : Promise.resolve(Object.assign({ exitCode: 0, stdout: '', stderr: '' }, result)),
                     disconnect: function () { this.disconnected = true; },
                     kill: function () { this.killed = true; return Promise.resolve(); }
                 };
@@ -36,7 +38,7 @@ function fixture (respond) {
 
 function streamResponse (cmd) {
     if (cmd.indexOf('pgrep -f') === 0) return { exitCode: 1 };
-    if (cmd.indexOf('netstat') === 0) return { stdout: 'tcp 0 0 0.0.0.0:6080 LISTEN' };
+    if (cmd.indexOf('listeners=$(') === 0) return { stdout: 'owned\n' };
 }
 
 exports.fixture = fixture;
