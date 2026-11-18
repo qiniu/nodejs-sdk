@@ -217,7 +217,9 @@ describe('test sandbox commands module', function () {
                 .then(() => sandbox.commands.kill(12))
                 .then(() => {
                     JSON.parse(fixture.requests[4].body).process.should.eql({ pid: 12 });
-                    JSON.parse(fixture.requests[5].body).process.should.eql({ pid: 12 });
+                    const killBody = JSON.parse(fixture.requests[5].body);
+                    killBody.process.should.eql({ pid: 12 });
+                    killBody.signal.should.eql('SIGNAL_SIGKILL');
                     return handleGitAndPty(git, sandbox.pty, commandsSeen, fixture);
                 })
                 .then(() => closeServer(fixture.server), err => {

@@ -701,3 +701,7 @@ SandboxClient.prototype.rebuildTemplate = function (templateID, opts) {
 SandboxClient.prototype.startTemplateBuild = SandboxClient.prototype.startTemplateBuildV2;
 
 exports.SandboxClient = SandboxClient;
+
+SandboxClient.prototype.createDesktop = function (opts) {
+    return require('./desktop').Desktop.create(Object.assign({}, opts, { client: this }));
+};

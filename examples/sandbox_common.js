@@ -120,6 +120,7 @@ function runExample (fn) {
 }
 
 module.exports = {
+    loadDotEnvIfPresent,
     qiniu,
     shellQuote,
     env,

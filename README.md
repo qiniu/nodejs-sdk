@@ -32,7 +32,7 @@ $ npm install qiniu
 
 参考文档：[七牛云存储 Node.js SDK 使用指南](http://developer.qiniu.com/kodo/sdk/nodejs)
 
-Sandbox SDK 的连接、暂停、快照、模板和资源用法见 [Sandbox 使用指南](docs/sandbox.md)。
+Sandbox SDK 的连接、暂停、快照、模板、资源和 Desktop 桌面操作用法见 [Sandbox 使用指南](docs/sandbox.md)。
 
 ## 测试
 ```
