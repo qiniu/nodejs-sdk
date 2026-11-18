@@ -3,6 +3,7 @@ const { CommandExitError } = require('./errors');
 const { agentFromClient, millisecondsFromOptions, parseJSON, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
+const { executionTimeoutHeaders } = require('./execution_timeout');
 
 function eventPayload (event) {
     return event.event || event;
@@ -167,7 +168,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         const headers = Object.assign({
             'Content-Type': 'application/connect+json',
             'Keepalive-Ping-Interval': '50'
-        }, envdHeaders(commands.sandbox, opts.user));
+        }, envdHeaders(commands.sandbox, opts.user), executionTimeoutHeaders(procedure, opts.executionTimeoutMs));
         const req = transport.request({
             method: 'POST',
             protocol: target.protocol,
@@ -199,6 +200,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         });
         waitPromise.catch(() => {});
         let startTimer;
+        let receivedEnd = false;
 
         function cleanupStartTimer () {
             if (startTimer) {
@@ -261,6 +263,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
         }
 
         function finish (end) {
+            receivedEnd = true;
             result.exitCode = end && end.exitCode !== undefined ? end.exitCode : 0;
             result.error = end && end.error ? end.error : '';
             if (handle) {
@@ -294,6 +297,11 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             if (!isConnectStream) {
                 cleanupStartTimer();
             }
+            let responseEnded = false;
+            res.on('aborted', () => fail(new Error('Command stream aborted')));
+            res.on('close', () => {
+                if (!responseEnded) fail(new Error('Command stream closed before response end'));
+            });
             res.on('data', chunk => {
                 if (!isConnectStream) {
                     jsonChunks.push(chunk);
@@ -344,6 +352,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
             });
             res.on('error', fail);
             res.on('end', () => {
+                responseEnded = true;
                 if (responseBuffer.length - responseOffset > 0) {
                     fail(new Error('Sandbox envd stream truncated unexpectedly'));
                     return;
@@ -370,7 +379,7 @@ function connectLiveCommand (commands, procedure, body, opts, fallbackPid) {
                     fail(new Error('Command stream ended before process start'));
                     return;
                 }
-                if (result.exitCode === -1) {
+                if (!receivedEnd) {
                     fail(new Error('Command stream ended before process end'));
                 }
             });
@@ -437,7 +446,7 @@ Commands.prototype.connect = function (pid, opts) {
     opts = opts || {};
     return connectLiveCommand(this, '/process.Process/Connect', {
         process: {
-            selector: { pid }
+            pid
         }
     }, Object.assign({}, opts, {
         requestTimeoutMs: requestTimeout(opts)
@@ -457,7 +466,7 @@ Commands.prototype.sendStdin = function (pid, data, opts) {
 Commands.prototype.closeStdin = function (pid, opts) {
     return connectRPC(this.sandbox, '/process.Process/CloseStdin', {
         process: {
-            selector: { pid }
+            pid
         }
     }, opts).then(() => null);
 };

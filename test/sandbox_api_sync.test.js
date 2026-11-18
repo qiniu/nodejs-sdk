@@ -28,6 +28,136 @@ describe('sandbox public API contract updates', function () {
         res.end(JSON.stringify(value));
     }
 
+    it('returns sandbox pages and follows header cursors through one list entry point', function () {
+        let paginator;
+        return serve((req, res) => {
+            const cursor = parseUrl(req.url).searchParams.get('nextToken');
+            if (!cursor) {
+                res.setHeader('X-Next-Token', 'page+/=2');
+            }
+            json(res, [{ sandboxID: cursor ? 'second' : 'first' }]);
+        }).then(() => {
+            paginator = qiniu.sandbox.Sandbox.list({ client, limit: 1 });
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'first');
+            assert.strictEqual(paginator.nextToken, 'page+/=2');
+            assert.strictEqual(paginator.hasNext, true);
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'second');
+            assert.strictEqual(paginator.hasNext, false);
+            assert.strictEqual(paginator.nextToken, undefined);
+            return paginator.nextItems();
+        }).then(items => {
+            assert.deepStrictEqual(items, []);
+            assert.strictEqual(fixture.requests.length, 2);
+            return client.listSandboxes({ limit: 1 });
+        }).then(page => {
+            assert.deepStrictEqual(page.items, [{ sandboxID: 'first' }]);
+            assert.strictEqual(page.nextToken, 'page+/=2');
+            fixture.requests.forEach(req => assert.strictEqual(parseUrl(req.url).pathname, '/v2/sandboxes'));
+            return client.list({ limit: 1, nextToken: page.nextToken });
+        }).then(page => {
+            assert.deepStrictEqual(page.items, [{ sandboxID: 'second' }]);
+            assert.strictEqual(page.nextToken, undefined);
+        });
+    });
+
+    it('normalizes object sandbox and snapshot responses at the client boundary', function () {
+        return serve((req, res) => {
+            if (parseUrl(req.url).pathname === '/v2/sandboxes') {
+                json(res, { sandboxes: [{ sandboxID: 'sandbox' }], next_token: 'sandbox-next' });
+            } else {
+                json(res, { snapshots: [{ snapshotID: 'snapshot', names: [] }], next_token: 'snapshot-next' });
+            }
+        }).then(() => Promise.all([client.listSandboxes(), client.listSnapshots()]))
+            .then(pages => {
+                assert.deepStrictEqual(pages, [
+                    { items: [{ sandboxID: 'sandbox' }], nextToken: 'sandbox-next' },
+                    { items: [{ snapshotID: 'snapshot', names: [] }], nextToken: 'snapshot-next' }
+                ]);
+            });
+    });
+
+    it('encodes sandbox metadata filters for both server decoding stages', function () {
+        const metadata = { app: 'reports &= +', 空: '值/=', empty: '' };
+        return serve((req, res) => json(res, []))
+            .then(() => client.listSandboxes({ query: { metadata } }))
+            .then(() => {
+                const parsed = parseUrl(fixture.requests[0].url);
+                const queryUnescape = value => decodeURIComponent(value.replace(/\+/g, ' '));
+                const filter = queryUnescape(parsed.searchParams.get('metadata'));
+                const decoded = {};
+                filter.split('&').forEach(pair => {
+                    const parts = pair.split('=');
+                    assert.strictEqual(parts.length, 2);
+                    decoded[queryUnescape(parts[0])] = queryUnescape(parts[1]);
+                });
+                assert.deepStrictEqual(decoded, metadata);
+                assert.strictEqual(parsed.searchParams.get('metadata[app]'), null);
+                assert.deepStrictEqual(metadata, { app: 'reports &= +', 空: '值/=', empty: '' });
+            });
+    });
+
+    it('continues sandbox pagination after initial and explicit cursors', function () {
+        let paginator;
+        return serve((req, res) => {
+            const cursor = parseUrl(req.url).searchParams.get('nextToken');
+            res.setHeader('X-Next-Token', cursor === 'saved' ? 'after-saved' : 'after-override');
+            json(res, [{ sandboxID: cursor }]);
+        }).then(() => {
+            paginator = qiniu.sandbox.Sandbox.list({ client, nextToken: 'saved', limit: 2 });
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'saved');
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'after-saved');
+            return paginator.nextItems({ nextToken: 'override' });
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'override');
+            return paginator.nextItems();
+        }).then(items => {
+            assert.strictEqual(items[0].sandboxID, 'after-override');
+        });
+    });
+
+    it('retains service tokens across readiness and updates them on reconnect', function () {
+        let sandbox;
+        return serve((req, res) => {
+            const info = { sandboxID: 'service', state: 'running', envdAccessToken: 'envd-token' };
+            if (req.method === 'POST') {
+                info.traffic_access_token = 'reconnected-token';
+            }
+            json(res, info);
+        }).then(() => {
+            sandbox = new qiniu.sandbox.Sandbox({
+                client,
+                info: { sandboxID: 'service', trafficAccessToken: 'created-token' }
+            });
+            return sandbox.waitForReady();
+        }).then(() => {
+            assert.strictEqual(sandbox.trafficAccessToken, 'created-token');
+            return sandbox.connect();
+        }).then(() => {
+            assert.strictEqual(sandbox.trafficAccessToken, 'reconnected-token');
+        });
+    });
+
+    it('uses the same page contract for custom sandbox list clients', function () {
+        const client = {
+            listSandboxes: function () {
+                return Promise.resolve({ items: [{ sandboxID: 'custom' }], nextToken: 'next' });
+            }
+        };
+        const paginator = qiniu.sandbox.Sandbox.list({ client });
+        return paginator.nextItems().then(items => {
+            assert.strictEqual(items[0].sandboxID, 'custom');
+            assert.strictEqual(paginator.nextToken, 'next');
+        });
+    });
+
     it('forwards auto-pause, auto-resume and body injection options without mutating callers', function () {
         const injection = { type: 'http', ifBody: { model: 'demo' }, body: { token: 'secret' } };
         return serve((req, res) => json(res, { sandboxID: 'sbx' }, 201))
@@ -196,8 +326,9 @@ describe('sandbox public API contract updates', function () {
                 });
                 assert.strictEqual(parseUrl(fixture.requests[1].url).searchParams.get('nextToken'), 'next+/=');
                 return client.listSnapshots({ sandboxId: 'alias' });
-            }).then(items => {
-                assert.ok(Array.isArray(items));
+            }).then(page => {
+                assert.deepStrictEqual(page.items, [{ snapshotID: 'snap2', names: ['team/demo:v1'] }]);
+                assert.strictEqual(page.nextToken, undefined);
                 assert.strictEqual(parseUrl(fixture.requests[2].url).searchParams.get('sandboxID'), 'alias');
             });
         });

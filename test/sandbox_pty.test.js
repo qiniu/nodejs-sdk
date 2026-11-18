@@ -20,7 +20,7 @@ describe('test sandbox pty module', function () {
                     body.pty.size.should.eql({ cols: 80, rows: 24 });
                     body.process.envs.TERM.should.eql('xterm-256color');
                 } else {
-                    body.process.selector.pid.should.eql(44);
+                    body.process.should.eql({ pid: 44 });
                 }
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/connect+json');
@@ -32,6 +32,7 @@ describe('test sandbox pty module', function () {
                 return;
             }
             if (req.url === '/process.Process/SendInput' || req.url === '/process.Process/Update' || req.url === '/process.Process/SendSignal') {
+                JSON.parse(req.rawBody.toString()).process.should.eql({ pid: 44 });
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
                 res.end('{}');
@@ -453,7 +454,7 @@ describe('test sandbox pty module', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/SendSignal') {
                 const body = JSON.parse(req.body);
-                if (body.process.selector.pid === 404) {
+                if (body.process.pid === 404) {
                     res.statusCode = 404;
                     res.end('missing');
                     return;

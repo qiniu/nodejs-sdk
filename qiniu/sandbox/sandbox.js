@@ -14,19 +14,6 @@ function getInfoValue (info, camelKey, snakeKey) {
     return info && (info[camelKey] !== undefined ? info[camelKey] : info[snakeKey]);
 }
 
-function normalizeItems (data) {
-    if (Array.isArray(data)) {
-        return {
-            items: data
-        };
-    }
-    data = data || {};
-    return {
-        items: data.items || data.sandboxes || data.snapshots || [],
-        nextToken: data.nextToken || data.next_token
-    };
-}
-
 function normalizeSnapshot (info) {
     info = info || {};
     if (info.snapshotId === undefined && info.snapshotID !== undefined) {
@@ -60,12 +47,13 @@ Object.defineProperty(SandboxPaginator.prototype, 'hasNext', {
 });
 
 SandboxPaginator.prototype.nextItems = function (opts) {
-    const requestOpts = Object.assign({}, this.opts, opts || {});
-    if (this._nextToken && requestOpts.nextToken === undefined) {
-        requestOpts.nextToken = this._nextToken;
+    const hasExplicitCursor = opts && opts.nextToken !== undefined;
+    if (!this.hasNext && !hasExplicitCursor) {
+        return Promise.resolve([]);
     }
-    return this.client.listSandboxesV2(requestOpts).then(data => {
-        const page = normalizeItems(data);
+    const requestOpts = Object.assign({}, this.opts, opts || {});
+    requestOpts.nextToken = hasExplicitCursor ? opts.nextToken : this._nextToken;
+    return this.client.listSandboxes(requestOpts).then(page => {
         this._nextToken = page.nextToken;
         this._hasNext = !!page.nextToken;
         return page.items.map(info => new Sandbox({ client: this.client, info }));
@@ -102,8 +90,7 @@ SnapshotPaginator.prototype.nextItems = function (opts) {
     }
     const requestOpts = Object.assign({}, this.opts, opts || {});
     requestOpts.nextToken = hasExplicitCursor ? opts.nextToken : this._nextToken;
-    return this.client.listSnapshotsPage(requestOpts).then(data => {
-        const page = normalizeItems(data);
+    return this.client.listSnapshots(requestOpts).then(page => {
         this._nextToken = page.nextToken;
         this._hasNext = !!page.nextToken;
         return page.items.map(normalizeSnapshot);
@@ -256,6 +243,7 @@ Sandbox.prototype.updateInfo = function (info) {
     if (info) {
         this.info = info;
         this.envdAccessToken = getInfoValue(info, 'envdAccessToken', 'envd_access_token') || this.envdAccessToken;
+        this.trafficAccessToken = getInfoValue(info, 'trafficAccessToken', 'traffic_access_token') || this.trafficAccessToken;
         this.envdVersion = getInfoValue(info, 'envdVersion', 'envd_version') || this.envdVersion;
         this.domain = info.domain || info.sandboxDomain || info.sandbox_domain || this.domain;
         this.sandboxDomain = this.domain;

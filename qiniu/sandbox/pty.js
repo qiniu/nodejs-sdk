@@ -2,6 +2,7 @@ const { connectEndStreamError, connectRPC, envdHeaders, MAX_CONNECT_ENVELOPE_BYT
 const { agentFromClient, millisecondsFromOptions, parseRequestUrl } = require('./util');
 const http = require('http');
 const https = require('https');
+const { executionTimeoutHeaders } = require('./execution_timeout');
 
 function encodeConnectEnvelope (message) {
     const payload = Buffer.from(JSON.stringify(message || {}));
@@ -78,7 +79,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
         const headers = Object.assign({
             'Content-Type': 'application/connect+json',
             'Keepalive-Ping-Interval': '50'
-        }, envdHeaders(sandbox, opts.user));
+        }, envdHeaders(sandbox, opts.user), executionTimeoutHeaders(procedure, opts.executionTimeoutMs));
         const req = transport.request({
             method: 'POST',
             protocol: target.protocol,
@@ -105,6 +106,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
         });
         waitPromise.catch(() => {});
         let startTimer;
+        let receivedEnd = false;
 
         function cleanupStartTimer () {
             if (startTimer) {
@@ -158,6 +160,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 }
             }
             if (event.end) {
+                receivedEnd = true;
                 result = Object.assign(result, {
                     exitCode: event.end.exitCode === undefined ? 0 : event.end.exitCode,
                     error: event.end.error || ''
@@ -175,6 +178,11 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                 res.resume();
                 return;
             }
+            let responseEnded = false;
+            res.on('aborted', () => fail(new Error('PTY stream aborted')));
+            res.on('close', () => {
+                if (!responseEnded) fail(new Error('PTY stream closed before response end'));
+            });
             res.on('data', chunk => {
                 responseBuffer = Buffer.concat([responseBuffer, chunk]);
                 while (responseBuffer.length >= 5) {
@@ -218,6 +226,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
             });
             res.on('error', fail);
             res.on('end', () => {
+                responseEnded = true;
                 if (responseBuffer.length > 0) {
                     fail(new Error('Sandbox envd stream truncated unexpectedly'));
                     return;
@@ -226,7 +235,7 @@ function connectLivePty (sandbox, procedure, body, opts, pty) {
                     fail(new Error('PTY stream ended before process start'));
                     return;
                 }
-                if (result.exitCode === -1) {
+                if (!receivedEnd) {
                     fail(new Error('PTY stream ended before process end'));
                     return;
                 }
@@ -287,7 +296,8 @@ Pty.prototype.create = function (opts) {
         onData: opts.onData,
         requestTimeoutMs: opts.requestTimeoutMs,
         timeoutMs: opts.timeoutMs,
-        timeout: opts.timeout
+        timeout: opts.timeout,
+        executionTimeoutMs: opts.executionTimeoutMs
     }, this);
 };
 
@@ -295,21 +305,22 @@ Pty.prototype.connect = function (pid, opts) {
     opts = opts || {};
     return connectLivePty(this.sandbox, '/process.Process/Connect', {
         process: {
-            selector: { pid }
+            pid
         }
     }, {
         user: opts.user,
         onData: opts.onData,
         requestTimeoutMs: opts.requestTimeoutMs,
         timeoutMs: opts.timeoutMs,
-        timeout: opts.timeout
+        timeout: opts.timeout,
+        executionTimeoutMs: opts.executionTimeoutMs
     }, this);
 };
 
 Pty.prototype.sendInput = function (pid, data, opts) {
     return connectRPC(this.sandbox, '/process.Process/SendInput', {
         process: {
-            selector: { pid }
+            pid
         },
         input: {
             pty: Buffer.isBuffer(data) ? data.toString('base64') : Buffer.from(String(data)).toString('base64')
@@ -320,7 +331,7 @@ Pty.prototype.sendInput = function (pid, data, opts) {
 Pty.prototype.resize = function (pid, size, opts) {
     return connectRPC(this.sandbox, '/process.Process/Update', {
         process: {
-            selector: { pid }
+            pid
         },
         pty: {
             size
@@ -331,7 +342,7 @@ Pty.prototype.resize = function (pid, size, opts) {
 Pty.prototype.kill = function (pid, opts) {
     return connectRPC(this.sandbox, '/process.Process/SendSignal', {
         process: {
-            selector: { pid }
+            pid
         },
         signal: 'SIGNAL_SIGKILL'
     }, opts).then(() => true, err => {

@@ -1,6 +1,7 @@
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
+const querystring = require('querystring');
 
 const { HttpClient } = require('../httpc/client');
 const { QiniuAuthMiddleware } = require('../httpc/middleware/qiniuAuth');
@@ -145,8 +146,9 @@ function normalizeSandboxListOptions (opts) {
     delete opts.query;
 
     if (query && query.metadata) {
-        Object.keys(query.metadata).forEach(key => {
-            opts[`metadata[${key}]`] = query.metadata[key];
+        // The API unescapes the filter before splitting it, then decodes each key/value.
+        opts.metadata = querystring.stringify(query.metadata, '&', '=', {
+            encodeURIComponent: value => encodeURIComponent(encodeURIComponent(value))
         });
     }
     if (query && query.state) {
@@ -298,11 +300,12 @@ SandboxClient.prototype._request = function (method, path, options) {
         urllibOptions
     }).then(wrapper => {
         const data = this._handleResponse(wrapper, options.empty);
-        if (options.paginated && Array.isArray(data)) {
+        if (options.paginated) {
             const headers = (wrapper.resp && wrapper.resp.headers) || {};
+            const page = Array.isArray(data) ? { items: data } : (data || {});
             return {
-                items: data,
-                nextToken: headers['x-next-token'] || headers['X-Next-Token']
+                items: page.items || page.sandboxes || page.snapshots || [],
+                nextToken: headers['x-next-token'] || headers['X-Next-Token'] || page.nextToken || page.next_token
             };
         }
         return data;
@@ -359,11 +362,9 @@ SandboxClient.prototype._retryCall = function (fn) {
 };
 
 SandboxClient.prototype.listSandboxes = function (opts) {
-    return this._request('GET', appendQuery('/sandboxes', opts));
-};
-
-SandboxClient.prototype.listSandboxesV2 = function (opts) {
-    return this._request('GET', appendQuery('/v2/sandboxes', normalizeSandboxListOptions(opts)));
+    return this._request('GET', appendQuery('/v2/sandboxes', normalizeSandboxListOptions(opts)), {
+        paginated: true
+    });
 };
 
 SandboxClient.prototype.createSandbox = function (opts) {
@@ -551,14 +552,10 @@ function snapshotListOptions (opts) {
     return opts;
 }
 
-SandboxClient.prototype.listSnapshotsPage = function (opts) {
+SandboxClient.prototype.listSnapshots = function (opts) {
     return this._request('GET', appendQuery('/snapshots', snapshotListOptions(opts)), {
         paginated: true
     });
-};
-
-SandboxClient.prototype.listSnapshots = function (opts) {
-    return this._request('GET', appendQuery('/snapshots', snapshotListOptions(opts)));
 };
 
 SandboxClient.prototype.deleteSnapshot = function (snapshotID) {
@@ -665,7 +662,7 @@ SandboxClient.prototype.deleteInjectionRule = function (ruleID) {
 
 SandboxClient.prototype.create = SandboxClient.prototype.createSandbox;
 SandboxClient.prototype.connect = SandboxClient.prototype.connectSandbox;
-SandboxClient.prototype.list = SandboxClient.prototype.listSandboxesV2;
+SandboxClient.prototype.list = SandboxClient.prototype.listSandboxes;
 SandboxClient.prototype.kill = SandboxClient.prototype.deleteSandbox;
 SandboxClient.prototype.setTimeout = SandboxClient.prototype.updateSandboxTimeout;
 SandboxClient.prototype.getInfo = SandboxClient.prototype.getSandbox;

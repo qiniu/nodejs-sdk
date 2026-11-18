@@ -36,6 +36,23 @@ await sandbox.connect({ timeout: 300 });
 需要流量自动恢复时，可使用 `autoPause: true`、`autoPauseMemory: true` 和
 `autoResume: { enabled: true }`。
 
+## 列表分页
+
+`client.listSandboxes` 使用 `GET /v2/sandboxes`，返回 `{ items, nextToken }`。
+`client.list` 是同一接口的短名。`nextToken` 为空表示没有下一页；续查时将其传回：
+
+```js
+let nextToken;
+do {
+    const page = await client.listSandboxes({ limit: 10, nextToken });
+    console.log(page.items);
+    nextToken = page.nextToken;
+} while (nextToken);
+```
+
+`qiniu.Sandbox.list({ client, limit: 10 })` 返回管理游标的分页器；
+`nextItems()` 返回当前页的 `Sandbox` 实例数组，`hasNext` 表示是否可继续。
+
 ## 持久快照
 
 ```js
@@ -74,9 +91,9 @@ while (paginator.hasNext) {
 }
 // 指定单次调用的游标可覆盖当前分页位置；后续调用继续使用服务端返回的游标。
 const resumed = await sandbox.listSnapshots({ limit: 10 }).nextItems({ nextToken: 'saved-cursor' });
-// 底层列表返回数组；分页接口额外读取 X-Next-Token 响应头。
-const items = await client.listSnapshots({ sandboxID: sandbox.sandboxID });
-const page = await client.listSnapshotsPage({ name: 'demo:v1', limit: 10 });
+// 底层列表同样返回 { items, nextToken }，游标从 X-Next-Token 响应头读取。
+const page = await client.listSnapshots({ sandboxID: sandbox.sandboxID, name: 'demo:v1', limit: 10 });
+console.log(page.items, page.nextToken);
 // 不再需要快照时，删除对应的模板。
 await client.deleteSnapshot(snapshot.snapshotID);
 ```
@@ -135,6 +152,54 @@ JSON body 匹配和注入仅支持 `type: 'http'`，不适用于各服务商专�
 条件和注入字段各最多 20 项；仅支持不压缩、至多 1 MiB 的 `application/json` 请求。
 无效或不支持的请求体，以及已有注入目标字段不是字符串的情况，会产生错误。
 创建 Sandbox、更新运行时注入、创建或更新注入规则均支持这些字段。
+
+## 文件流与请求时限
+
+`files.read(path, { format: 'stream' })` 在响应建立后返回真正的 `Readable`，
+不会先缓冲整个文件。消费时监听流的 `error`；提前结束下载可调用 `destroy()`。
+`files.write` 和 `writeFiles` 同时接受字符串、Buffer 和 `Readable`，混合批次保留输入顺序。
+成功上传后，使用 `autoClose: false` 的文件流仍由调用方关闭文件描述符。
+
+```js
+const fs = require('fs');
+await sandbox.files.write('/tmp/input.bin', fs.createReadStream('./input.bin'), {
+    requestTimeoutMs: 30000
+});
+```
+
+文件读写的单次请求时限覆盖完整传输，优先级为 `requestTimeoutMs`、`timeoutMs`、
+`timeout`（秒）；显式设置为 `0` 禁用该时限。流式读取返回后发生的超时通过流的 `error` 报告。
+未指定时限时，连接等待与连接建立后的响应各有 5 秒上限。持续接收数据不会重置响应时限。
+所选时限必须是有限非负数，且不超过 `2147483647` 毫秒（`timeout` 为 `2147483.647` 秒）；非法值在发出请求前以 `RangeError` 拒绝。
+`signatureExpiration` 控制 URL 签名有效期，与传输时限分别设置。
+
+## 进程执行期限
+
+Commands／PTY 的既有 `requestTimeoutMs`、`timeoutMs`、`timeout` 保持启动等待语义。
+创建新命令或 PTY 时，可用 `executionTimeoutMs` 限制执行时长（整数毫秒，`0` 至 `9999999999`，`0` 禁用）。
+该上限来自 Connect 协议的十位 timeout Header；非法值在发出请求前拒绝：
+
+```js
+const handle = await sandbox.commands.start('long-running-command', {
+    requestTimeoutMs: 10000,
+    executionTimeoutMs: 60000
+});
+const result = await handle.wait();
+if (result.exitCode !== 0) {
+    console.error(result.exitCode, result.error);
+}
+```
+
+SDK 在初次 `Start` 请求中通过 `Connect-Timeout-Ms` 将期限交给 Envd；期限从服务端创建进程时开始，
+客户端断连、退出或网络中断都不会撤销。到期由 Envd 终止进程，SDK 不依赖客户端计时或另发 kill 请求。
+省略该选项或传 `0` 时不发送这个 Header，沿用服务端的默认执行生命周期。
+
+`wait()` 保留 Envd 实际返回的结束结果；被终止时退出码可能是 `-1`，应检查 `exitCode` 和 `error`。
+命令启用 `throwOnError` 时，非零退出抛出 `CommandExitError`；协议层的 `deadline_exceeded` 等错误按原样传播，
+不承诺统一抛出 `TimeoutError`。
+
+`commands.connect`／`pty.connect` 只连接已有进程，不接受 `executionTimeoutMs`，也不重设原进程的期限。
+`disconnect()` 只结束本次输出订阅；创建时已经交给 Envd 的执行期限仍然有效。
 
 ## 示例与验证
 

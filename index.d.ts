@@ -189,6 +189,30 @@ export declare namespace sandbox {
         [key: string]: any;
     }
 
+    interface TemplateBuildStep {
+        type: string;
+        args?: string[];
+        cmd?: string;
+        packages?: string[];
+        src?: string;
+        dest?: string;
+        force?: boolean;
+        forceUpload?: boolean;
+        resolveSymlinks?: boolean;
+        [key: string]: unknown;
+    }
+
+    interface TemplateBuildConfig {
+        steps: TemplateBuildStep[];
+        fromImage?: string;
+        fromTemplate?: string;
+        fromImageRegistry?: {type: string; [key: string]: unknown};
+        startCmd?: string;
+        readyCmd?: string;
+        force?: boolean;
+        [key: string]: unknown;
+    }
+
     interface DefaultTemplateInfo extends TemplateInfo {
         buildStatus: TemplateBuildStatus;
     }
@@ -261,6 +285,15 @@ export declare namespace sandbox {
         useOctetStream?: boolean;
     }
 
+    interface FileRequestOptions extends FileUrlOptions {
+        /** Complete file request deadline in milliseconds, from 0 to 2147483647; 0 disables it. */
+        requestTimeoutMs?: number;
+        /** Millisecond deadline from 0 to 2147483647; requestTimeoutMs takes precedence. */
+        timeoutMs?: number;
+        /** Complete file request deadline in seconds, from 0 to 2147483.647; requestTimeoutMs/timeoutMs take precedence. */
+        timeout?: number;
+    }
+
     interface EntryInfo {
         name?: string;
         type?: string;
@@ -306,11 +339,17 @@ export declare namespace sandbox {
         timeout?: number;
         timeoutMs?: number;
         requestTimeoutMs?: number;
+        /** Server-enforced execution limit for a new process, in integer milliseconds (0..9999999999). Zero disables it. Survives client disconnection. */
+        executionTimeoutMs?: number;
         throwOnError?: boolean;
         config?: {[key: string]: string | number | boolean};
         onStdout?: (data: string) => void;
         onStderr?: (data: string) => void;
     }
+
+    type CommandConnectOptions = Pick<CommandOptions,
+        'user' | 'timeout' | 'timeoutMs' | 'requestTimeoutMs' | 'throwOnError' | 'onStdout' | 'onStderr'
+    > & {executionTimeoutMs?: never};
 
     interface GitStatus {
         currentBranch: string;
@@ -359,6 +398,11 @@ export declare namespace sandbox {
         nextToken?: string;
     }
 
+    interface SandboxPage {
+        items: any[];
+        nextToken?: string;
+    }
+
     interface SnapshotPage {
         items: SnapshotInfo[];
         nextToken?: string;
@@ -373,7 +417,7 @@ export declare namespace sandbox {
     class SandboxPaginator {
         readonly hasNext: boolean;
         readonly nextToken?: string;
-        nextItems(options?: SandboxClientOptions): Promise<Sandbox[]>;
+        nextItems(options?: SandboxClientOptions & {limit?: number; nextToken?: string; query?: any}): Promise<Sandbox[]>;
         then<TResult1 = Sandbox[], TResult2 = never>(
             onfulfilled?: ((value: Sandbox[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
             onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
@@ -391,11 +435,12 @@ export declare namespace sandbox {
     }
 
     class Filesystem {
-        read(path: string, options?: FileUrlOptions & {format?: string}): Promise<any>;
-        readText(path: string, options?: FileUrlOptions): Promise<string>;
-        write(path: string, data: string | Buffer, options?: FileUrlOptions): Promise<EntryInfo>;
-        write(files: Array<{path: string; data: string | Buffer}>, options?: FileUrlOptions): Promise<EntryInfo[]>;
-        writeFiles(files: Array<{path: string; data: string | Buffer}>, options?: FileUrlOptions): Promise<EntryInfo[]>;
+        read(path: string, options: FileRequestOptions & {format: 'stream'}): Promise<Readable>;
+        read(path: string, options?: FileRequestOptions & {format?: string}): Promise<any>;
+        readText(path: string, options?: FileRequestOptions): Promise<string>;
+        write(path: string, data: string | Buffer | Readable, options?: FileRequestOptions): Promise<EntryInfo>;
+        write(files: Array<{path: string; data: string | Buffer | Readable}>, options?: FileRequestOptions): Promise<EntryInfo[]>;
+        writeFiles(files: Array<{path: string; data: string | Buffer | Readable}>, options?: FileRequestOptions): Promise<EntryInfo[]>;
         getInfo(path: string, options?: {user?: string}): Promise<EntryInfo>;
         stat(path: string, options?: {user?: string}): Promise<EntryInfo>;
         list(path: string, options?: {user?: string; depth?: number}): Promise<EntryInfo[]>;
@@ -424,7 +469,7 @@ export declare namespace sandbox {
         run(command: string, options?: CommandOptions & {background?: false}): Promise<CommandResult>;
         run(command: string, options: CommandOptions & {background: true}): Promise<CommandHandle>;
         start(command: string, options?: CommandOptions): Promise<CommandHandle>;
-        connect(pid: number, options?: CommandOptions): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandConnectOptions): Promise<CommandHandle>;
         list(options?: {user?: string}): Promise<any[]>;
         sendStdin(pid: number, data: string | Buffer, options?: {user?: string}): Promise<null>;
         closeStdin(pid: number, options?: {user?: string}): Promise<null>;
@@ -459,7 +504,7 @@ export declare namespace sandbox {
 
     class Pty {
         create(options?: CommandOptions & {cmd?: string; args?: string[]; cols?: number; rows?: number; onData?: (data: Buffer) => void}): Promise<CommandHandle>;
-        connect(pid: number, options?: CommandOptions & {onData?: (data: Buffer) => void}): Promise<CommandHandle>;
+        connect(pid: number, options?: CommandConnectOptions & {onData?: (data: Buffer) => void}): Promise<CommandHandle>;
         sendInput(pid: number, data: string | Buffer, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
         resize(pid: number, size: {cols: number; rows: number}, options?: {user?: string; requestTimeoutMs?: number}): Promise<null>;
         kill(pid: number, options?: {user?: string; requestTimeoutMs?: number}): Promise<boolean>;
@@ -493,7 +538,10 @@ export declare namespace sandbox {
         stderr: string;
     }
 
-    class TimeoutError extends Error {}
+    class TimeoutError extends Error {
+        pid?: number;
+        timeoutMs?: number;
+    }
     class NotImplementedError extends Error {}
     class InvalidArgumentError extends Error {}
     class NotFoundError extends Error {}
@@ -504,6 +552,7 @@ export declare namespace sandbox {
     class TemplateBuildError extends Error {}
 
     interface TemplateBuilder {
+        buildConfig: TemplateBuildConfig;
         fromImage(image: string, credentials?: {username: string; password: string}): this;
         fromAWSRegistry(image: string, credentials: {accessKeyId: string; secretAccessKey: string; region: string}): this;
         fromGCPRegistry(image: string, credentials: {serviceAccountJSON: string | object}): this;
@@ -554,8 +603,7 @@ export declare namespace sandbox {
 
         constructor(options?: SandboxClientOptions);
 
-        listSandboxes(options?: any): Promise<any>;
-        listSandboxesV2(options?: any): Promise<any>;
+        listSandboxes(options?: any): Promise<SandboxPage>;
         createSandbox(options?: SandboxCreateOptions): Promise<any>;
         getSandboxesMetrics(sandboxIDs: string[] | any): Promise<any>;
         getSandboxLogs(sandboxID: string, options?: any): Promise<any>;
@@ -601,7 +649,7 @@ export declare namespace sandbox {
 
         create(options?: SandboxCreateOptions): Promise<any>;
         connect(sandboxID: string, options?: SandboxConnectOptions): Promise<any>;
-        list(options?: any): Promise<any>;
+        list(options?: any): Promise<SandboxPage>;
         kill(sandboxID: string): Promise<null>;
         setTimeout(sandboxID: string, timeoutOrOptions: number | {timeout?: number; timeoutMs?: number}): Promise<null>;
         getInfo(sandboxID: string): Promise<any>;
@@ -613,8 +661,7 @@ export declare namespace sandbox {
         waitForBuild(templateID: string, buildID: string, options?: PollOptions): Promise<any>;
         createSnapshot(sandboxID: string, options?: SnapshotCreateOptions): Promise<SnapshotInfo>;
         createSandboxSnapshot(sandboxID: string, options?: SnapshotCreateOptions): Promise<SnapshotInfo>;
-        listSnapshots(options?: SnapshotListOptions): Promise<SnapshotInfo[]>;
-        listSnapshotsPage(options?: SnapshotListOptions): Promise<SnapshotPage>;
+        listSnapshots(options?: SnapshotListOptions): Promise<SnapshotPage>;
         deleteSnapshot(snapshotID: string): Promise<null>;
     }
 
@@ -721,6 +768,7 @@ export declare namespace sandbox {
         sandboxID: string;
         sandboxDomain?: string;
         domain?: string;
+        trafficAccessToken?: string;
         info: any;
         client: SandboxClient;
         files: Filesystem;

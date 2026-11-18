@@ -253,6 +253,68 @@ describeIntegration('sandbox integration', function () {
         });
     });
 
+    it('connects processes, sends stdin, resizes PTYs, and kills them', function () {
+        const client = sandboxClient();
+        let createdSandbox;
+        let command;
+        let connected;
+        let terminal;
+        const terminalOutput = [];
+        const opts = { requestTimeoutMs: 30000 };
+        const ptyOpts = Object.assign({ onData: data => terminalOutput.push(data) }, opts);
+        const cleanup = () => createdSandbox ? createdSandbox.kill() : Promise.resolve();
+
+        return qiniu.sandbox.Sandbox.create({
+            client,
+            template: config.template,
+            timeout: 120,
+            secure: true,
+            metadata: { sdk: 'qiniu-nodejs-sdk', test: 'process-selectors' }
+        }).then(created => {
+            createdSandbox = created;
+            return created.commands.run('cat', Object.assign({ background: true, stdin: true }, opts));
+        }).then(handle => {
+            command = handle;
+            return createdSandbox.commands.connect(command.pid, opts);
+        }).then(handle => {
+            connected = handle;
+            return createdSandbox.commands.sendStdin(command.pid, 'qiniu-stdin-ready\n', opts);
+        }).then(() => createdSandbox.commands.closeStdin(command.pid, opts))
+            .then(() => Promise.all([command.wait(), connected.wait()]))
+            .then(results => {
+                results.forEach(result => {
+                    result.exitCode.should.eql(0);
+                    result.stdout.should.containEql('qiniu-stdin-ready');
+                });
+                return createdSandbox.commands.run('exec sleep 60', Object.assign({ background: true }, opts));
+            }).then(handle => {
+                command = handle;
+                return command.kill();
+            }).then(() => command.wait())
+            .then(result => {
+                result.exitCode.should.not.eql(0);
+                return createdSandbox.pty.create(Object.assign({ rows: 24, cols: 80 }, opts));
+            }).then(handle => {
+                terminal = handle;
+                terminal.disconnect();
+                return createdSandbox.pty.connect(terminal.pid, ptyOpts);
+            }).then(handle => {
+                terminal = handle;
+                return createdSandbox.pty.resize(terminal.pid, { rows: 30, cols: 100 }, opts);
+            }).then(() => createdSandbox.pty.sendInput(terminal.pid, 'echo qiniu-pty-ready\nexit\n', opts))
+            .then(() => terminal.wait())
+            .then(result => {
+                result.exitCode.should.eql(0);
+                Buffer.concat(terminalOutput).toString().should.containEql('qiniu-pty-ready');
+                return createdSandbox.pty.create(Object.assign({ rows: 24, cols: 80 }, opts));
+            }).then(handle => {
+                terminal = handle;
+                return terminal.kill();
+            }).then(() => terminal.wait())
+            .then(result => result.exitCode.should.not.eql(0))
+            .then(cleanup, err => cleanup().then(() => { throw err; }));
+    });
+
     it('creates and deletes an injection rule when AK/SK is configured', function () {
         if (!hasQiniuCredentials()) {
             this.skip();
@@ -450,7 +512,7 @@ describeIntegration('sandbox integration', function () {
             }).then(tags => {
                 tags.some(tag => tag.tag === 'v1').should.eql(true);
                 stage = 'list snapshots';
-                return client.listSnapshotsPage({ sandboxID: source.sandboxID, name: `${runID}:v1`, limit: 10 });
+                return client.listSnapshots({ sandboxID: source.sandboxID, name: `${runID}:v1`, limit: 10 });
             }).then(page => {
                 page.items.some(item => item.snapshotID === snapshotID).should.eql(true);
                 stage = 'pause source';

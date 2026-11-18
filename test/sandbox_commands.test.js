@@ -216,6 +216,7 @@ describe('test sandbox commands module', function () {
             })
                 .then(() => sandbox.commands.kill(12))
                 .then(() => {
+                    JSON.parse(fixture.requests[4].body).process.should.eql({ pid: 12 });
                     const killBody = JSON.parse(fixture.requests[5].body);
                     killBody.process.should.eql({ pid: 12 });
                     killBody.signal.should.eql('SIGNAL_SIGKILL');
@@ -958,7 +959,7 @@ describe('test sandbox commands module', function () {
         return startServer((req, res) => {
             if (req.url === '/process.Process/Connect') {
                 const body = decodeConnectEnvelope(req.rawBody);
-                body.process.selector.pid.should.eql(55);
+                body.process.should.eql({ pid: 55 });
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/connect+json');
                 res.end(Buffer.concat([
