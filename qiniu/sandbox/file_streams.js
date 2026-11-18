@@ -381,6 +381,11 @@ function requestFile (requestUrl, options) {
         });
 
         const timeout = options.timeout;
+        if (timeout !== undefined) {
+            // The full-transfer deadline owns explicit timeouts (including zero).
+            // Override inherited Agent idle timeouts on new and reused sockets.
+            req.once('socket', socket => socket.setTimeout(0));
+        }
         if (timeout === undefined) {
             connectionTimer = setTimeout(() => fail(new TimeoutError('Sandbox file connection timed out')), 5000);
             req.once('socket', socket => {

@@ -17,13 +17,19 @@ const {
 const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const KeepAliveAgent = require('agentkeepalive');
 
 describe('test sandbox filesystem module', function () {
     describe('stream transfer lifecycle', function () {
         let fixture;
         let sandbox;
+        let transferAgent;
 
         afterEach(function () {
+            if (transferAgent) {
+                transferAgent.destroy();
+                transferAgent = null;
+            }
             if (fixture) return closeServer(fixture.server).then(() => { fixture = null; });
         });
 
@@ -593,6 +599,50 @@ describe('test sandbox filesystem module', function () {
                 }).then(() => { throw new Error('expected buffered timeout'); }, err => {
                     err.name.should.eql('TimeoutError');
                 });
+        });
+
+        ['read', 'stream', 'write', 'batch'].forEach(mode => {
+            [500, 0].forEach(requestTimeoutMs => {
+                it(`overrides short Agent timeouts for ${mode} with requestTimeoutMs=${requestTimeoutMs}`, function () {
+                    let connections = 0;
+                    return serve((req, res) => {
+                        if (mode === 'read' || mode === 'stream') res.write('first');
+                        const timer = setTimeout(() => {
+                            res.end(mode === 'read' || mode === 'stream' ? 'second' : '[{"path":"/uploaded","type":"file"}]');
+                        }, 100);
+                        res.on('close', () => clearTimeout(timer));
+                    }).then(() => {
+                        transferAgent = new KeepAliveAgent({ timeout: 20, freeSocketTimeout: 40, maxSockets: 1 });
+                        sandbox.client = new qiniu.sandbox.SandboxClient({ httpAgent: transferAgent });
+                        fixture.server.on('connection', () => { connections++; });
+                        const transfer = () => {
+                            const opts = { requestTimeoutMs };
+                            if (mode === 'stream') {
+                                return sandbox.files.read('/slow', Object.assign({ format: 'stream' }, opts)).then(consume)
+                                    .then(text => text.should.eql('firstsecond'));
+                            }
+                            if (mode === 'read') {
+                                return sandbox.files.read('/slow', opts).then(text => text.should.eql('firstsecond'));
+                            }
+                            if (mode === 'write') return sandbox.files.write('/slow', readable('upload'), opts);
+                            return sandbox.files.writeFiles([{ path: '/slow', data: readable('upload') }], opts);
+                        };
+                        // Both a new socket and the same socket reused by the Agent
+                        // must honor the file deadline rather than its 20 ms idle timeout.
+                        return transfer().then(transfer);
+                    }).then(() => {
+                        connections.should.eql(1);
+                        fixture.requests.length.should.eql(2);
+                        if (mode === 'write' || mode === 'batch') {
+                            fixture.requests.forEach(req => req.body.should.containEql('upload'));
+                        }
+                        transferAgent.options.timeout.should.eql(20);
+                        // Returning the socket to the pool must restore the Agent's
+                        // free-socket timeout, including when requestTimeoutMs is zero.
+                        return new Promise(resolve => setTimeout(resolve, 100));
+                    }).then(() => Object.keys(transferAgent.freeSockets).length.should.eql(0));
+                });
+            });
         });
 
         it('uploads mixed batch data in order and compresses readable octet-stream bodies', function () {
