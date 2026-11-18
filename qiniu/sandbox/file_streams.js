@@ -71,6 +71,14 @@ function cleanupClosedSource (source, cleanup) {
     }
 }
 
+function cleanupFinishedSource (source, cleanup) {
+    const state = source._readableState;
+    const writable = source._writableState;
+    const autoClosing = state && state.autoDestroy && (!writable || (writable.autoDestroy && writable.finished));
+    if (readableClosed(source) || autoClosing) cleanupClosedSource(source, cleanup);
+    else cleanup();
+}
+
 function makeDestroyable (source) {
     // SDK memory streams need error-before-close and idempotent destruction.
     // Node 8's default _destroy ends without close; Node 10/12 can emit a late
@@ -111,6 +119,8 @@ function destroyStream (source) {
     }
 }
 
+const multipartSources = new WeakMap();
+
 // Pull one part at a time so queued files and a slow receiver apply backpressure.
 function sequenceStream (parts) {
     let index = 0;
@@ -120,6 +130,7 @@ function sequenceStream (parts) {
     let demand = false;
     let initialError;
     const releaseSources = [];
+    let reportSourceError;
     const output = makeDestroyable(new Readable({
         read: function () {
             demand = true;
@@ -135,7 +146,7 @@ function sequenceStream (parts) {
     }
 
     function fail (err) {
-        output.destroy(err);
+        reportSourceError(err);
     }
 
     function nextPart () {
@@ -194,8 +205,13 @@ function sequenceStream (parts) {
         releaseSources.splice(0).forEach(releaseSource => releaseSource());
     }
 
-    output.once('end', release);
-    output.once('close', release);
+    // The request owns the sources until it settles, even after the multipart
+    // output ends. An input can still report an asynchronous close failure.
+    multipartSources.set(output, {
+        setErrorHandler: handler => { reportSourceError = handler; },
+        release
+    });
+    reportSourceError = err => output.destroy(err);
     parts.forEach(part => {
         if (isReadable(part)) {
             const sourceError = prematureCloseError(part);
@@ -218,7 +234,7 @@ function sequenceStream (parts) {
             part.once('close', onClose);
             releaseSources.push(() => {
                 if (partEnded || readableEnded(part)) {
-                    cleanup();
+                    cleanupFinishedSource(part, cleanup);
                 } else {
                     destroyStream(part);
                     cleanupClosedSource(part, cleanup);
@@ -248,6 +264,7 @@ function requestFile (requestUrl, options) {
         let pendingResult;
         let uploadStream = options.stream;
         let cleanupUploadSource;
+        const parts = multipartSources.get(options.stream);
         const sourceError = options.stream && prematureCloseError(options.stream);
         const req = sourceError ? null : transport.request({
             method: options.method,
@@ -269,8 +286,16 @@ function requestFile (requestUrl, options) {
             ended = true;
             settled = true;
             cleanup();
-            if (cleanupUploadSource) cleanupUploadSource();
+            finishUpload();
             resolve(pendingResult);
+        }
+
+        function finishUpload () {
+            if (parts) {
+                parts.release();
+                multipartSources.delete(options.stream);
+            }
+            if (cleanupUploadSource) cleanupUploadSource();
         }
 
         function abort () {
@@ -278,7 +303,7 @@ function requestFile (requestUrl, options) {
             destroyStream(response);
             if (decoded !== response) destroyStream(decoded);
             if (options.stream && !readableEnded(options.stream)) destroyStream(options.stream);
-            if (cleanupUploadSource) cleanupUploadSource(true);
+            finishUpload();
             if (uploadStream !== options.stream) destroyStream(uploadStream);
         }
 
@@ -296,6 +321,7 @@ function requestFile (requestUrl, options) {
             abort();
         }
 
+        if (parts) parts.setErrorHandler(fail);
         if (options.stream) {
             let uploadEnded = false;
             const onEnd = () => { uploadEnded = true; };
@@ -313,15 +339,12 @@ function requestFile (requestUrl, options) {
             options.stream.once('end', onEnd);
             options.stream.on('error', fail);
             options.stream.once('close', onClose);
-            cleanupUploadSource = aborted => {
-                if (aborted && !readableEnded(options.stream)) cleanupClosedSource(options.stream, cleanupSource);
-                else cleanupSource();
-            };
+            cleanupUploadSource = () => cleanupFinishedSource(options.stream, cleanupSource);
             if (sourceError) {
                 fail(sourceError);
                 return;
             }
-            if (readableClosed(options.stream)) cleanupUploadSource(true);
+            if (readableClosed(options.stream)) cleanupUploadSource();
         }
 
         req.on('error', fail);

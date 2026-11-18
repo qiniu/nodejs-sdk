@@ -384,6 +384,59 @@ describe('test sandbox filesystem module', function () {
             });
         });
 
+        ['multipart', 'octet', 'batch'].forEach(mode => {
+            [false, true].forEach(afterResponse => {
+                const stage = afterResponse ? 'after' : 'before';
+                it(`owns ${mode} auto-close failures ${stage} the HTTP response`, function () {
+                    let onDestroy;
+                    let onBody;
+                    const destroying = new Promise(resolve => { onDestroy = resolve; });
+                    const receivedBody = new Promise(resolve => { onBody = resolve; });
+                    const source = new stream.Readable({
+                        autoDestroy: true,
+                        read: function () {
+                            this.push('payload');
+                            this.push(null);
+                        },
+                        destroy: (cause, callback) => onDestroy(callback)
+                    });
+                    if (!source._readableState.autoDestroy) this.skip();
+
+                    return serve((req, res) => {
+                        if (afterResponse) {
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end('[{"path":"/upload","type":"file"}]');
+                        }
+                        onBody();
+                    }).then(() => {
+                        const opts = { useOctetStream: mode === 'octet' };
+                        const upload = mode === 'batch'
+                            ? sandbox.files.writeFiles([{ path: '/upload', data: source }], opts)
+                            : sandbox.files.write('/upload', source, opts);
+                        const result = upload.then(() => null, error => error);
+
+                        return Promise.all([destroying, receivedBody]).then(values => {
+                            const finishDestroy = values[0];
+                            return (afterResponse ? result : Promise.resolve()).then(() => {
+                                const closeError = new Error('source auto-close failed');
+                                const hasErrorListener = source.listenerCount('error') > 0;
+                                // Let the fixture shut down cleanly if the regression returns.
+                                if (!hasErrorListener) source.once('error', () => {});
+                                const closed = new Promise(resolve => source.once('close', resolve));
+                                finishDestroy(closeError);
+                                return Promise.all([closed, result]).then(outcomes => {
+                                    hasErrorListener.should.eql(true);
+                                    if (afterResponse) should(outcomes[1]).equal(null);
+                                    else outcomes[1].should.equal(closeError);
+                                    source.listenerCount('error').should.eql(0);
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+
         it('rejects invalid deadlines before opening file requests', function () {
             return serve((req, res) => res.end('[]')).then(() => {
                 const calls = [];
