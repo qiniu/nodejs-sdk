@@ -361,6 +361,61 @@ describe('test sandbox filesystem module', function () {
             });
         });
 
+        ['multipart', 'octet', 'gzip', 'batch'].forEach(mode => {
+            it(`preserves caller-owned file descriptors after successful ${mode} uploads`, function () {
+                return serve((req, res) => {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end('[{"path":"/upload","type":"file"}]');
+                }).then(() => {
+                    const fd = fs.openSync(__filename, 'r');
+                    const source = fs.createReadStream(__filename, { fd, autoClose: false, end: 15 });
+                    const opts = { useOctetStream: mode === 'octet' || mode === 'gzip', gzip: mode === 'gzip' };
+                    const uploading = mode === 'batch'
+                        ? sandbox.files.writeFiles([{ path: '/upload', data: source }], opts)
+                        : sandbox.files.write('/upload', source, opts);
+                    return uploading.then(() => {
+                        fs.fstatSync(fd).isFile().should.eql(true);
+                        fs.closeSync(fd);
+                    }, err => {
+                        try { fs.closeSync(fd); } catch (closeError) {}
+                        throw err;
+                    });
+                });
+            });
+        });
+
+        it('rejects invalid deadlines before opening file requests', function () {
+            return serve((req, res) => res.end('[]')).then(() => {
+                const calls = [];
+                [{ requestTimeoutMs: -1 }, { requestTimeoutMs: NaN }, { timeoutMs: Infinity }, { timeout: null }].forEach(opts => {
+                    calls.push(sandbox.files.read('/x', opts));
+                    calls.push(sandbox.files.write('/x', 'data', opts));
+                    calls.push(sandbox.files.writeFiles([{ path: '/x', data: 'data' }], opts));
+                });
+                return Promise.all(calls.map(call => call.then(() => {
+                    throw new Error('expected an invalid deadline error');
+                }, err => {
+                    err.name.should.eql('RangeError');
+                })));
+            }).then(() => fixture.requests.length.should.eql(0));
+        });
+
+        it('enforces the default response deadline while the server keeps sending data', function () {
+            return serve((req, res) => {
+                res.write('first');
+                const chunks = setInterval(() => res.write('more'), 250);
+                const end = setTimeout(() => res.end('last'), 6500);
+                res.once('close', () => {
+                    clearInterval(chunks);
+                    clearTimeout(end);
+                });
+            }).then(() => sandbox.files.read('/slow')).then(() => {
+                throw new Error('expected default response timeout');
+            }, err => {
+                err.message.should.match(/timed out/);
+            });
+        });
+
         it('rejects overflowing file deadlines before opening read or upload requests', function () {
             return serve((req, res) => { res.setHeader('Content-Type', 'application/json'); res.end('[]'); })
                 .then(() => {

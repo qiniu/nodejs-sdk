@@ -4,18 +4,23 @@ const zlib = require('zlib');
 const { PassThrough, Readable } = require('stream');
 const destroy = require('destroy');
 const { SandboxError, TimeoutError } = require('./errors');
-const { millisecondsFromOptions, parseRequestUrl } = require('./util');
+const { parseRequestUrl } = require('./util');
 
 function validateRequestTimeout (timeoutMs) {
+    if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs < 0)) {
+        throw new RangeError('File request timeout must be a finite, non-negative number');
+    }
     if (timeoutMs > 2147483647) {
         throw new RangeError('File request timeout must not exceed 2147483647 milliseconds');
     }
 }
 
 function requestTimeout (opts) {
-    const timeout = opts.requestTimeoutMs !== undefined
-        ? opts.requestTimeoutMs
-        : millisecondsFromOptions(opts, 'timeout');
+    let timeout = opts.requestTimeoutMs;
+    if (timeout === undefined) timeout = opts.timeoutMs;
+    if (timeout === undefined && opts.timeout !== undefined) {
+        timeout = Number.isFinite(opts.timeout) ? opts.timeout * 1000 : NaN;
+    }
     validateRequestTimeout(timeout);
     return timeout;
 }
@@ -114,7 +119,7 @@ function sequenceStream (parts) {
     let stopped = false;
     let demand = false;
     let initialError;
-    const destroySources = [];
+    const releaseSources = [];
     const output = makeDestroyable(new Readable({
         read: function () {
             demand = true;
@@ -183,11 +188,14 @@ function sequenceStream (parts) {
         reading = false;
     }
 
-    output.on('close', () => {
+    function release () {
         stopped = true;
         detach();
-        destroySources.forEach(destroySource => destroySource());
-    });
+        releaseSources.splice(0).forEach(releaseSource => releaseSource());
+    }
+
+    output.once('end', release);
+    output.once('close', release);
     parts.forEach(part => {
         if (isReadable(part)) {
             const sourceError = prematureCloseError(part);
@@ -208,9 +216,13 @@ function sequenceStream (parts) {
             part.once('end', onEnd);
             part.on('error', fail);
             part.once('close', onClose);
-            destroySources.push(() => {
-                destroyStream(part);
-                cleanupClosedSource(part, cleanup);
+            releaseSources.push(() => {
+                if (partEnded || readableEnded(part)) {
+                    cleanup();
+                } else {
+                    destroyStream(part);
+                    cleanupClosedSource(part, cleanup);
+                }
             });
             if (readableClosed(part)) cleanupClosedSource(part, cleanup);
         }
@@ -257,7 +269,6 @@ function requestFile (requestUrl, options) {
             ended = true;
             settled = true;
             cleanup();
-            destroyStream(options.stream);
             if (cleanupUploadSource) cleanupUploadSource();
             resolve(pendingResult);
         }
@@ -266,8 +277,8 @@ function requestFile (requestUrl, options) {
             if (req) req.destroy();
             destroyStream(response);
             if (decoded !== response) destroyStream(decoded);
-            destroyStream(options.stream);
-            if (cleanupUploadSource) cleanupUploadSource();
+            if (options.stream && !readableEnded(options.stream)) destroyStream(options.stream);
+            if (cleanupUploadSource) cleanupUploadSource(true);
             if (uploadStream !== options.stream) destroyStream(uploadStream);
         }
 
@@ -302,12 +313,15 @@ function requestFile (requestUrl, options) {
             options.stream.once('end', onEnd);
             options.stream.on('error', fail);
             options.stream.once('close', onClose);
-            cleanupUploadSource = () => cleanupClosedSource(options.stream, cleanupSource);
+            cleanupUploadSource = aborted => {
+                if (aborted && !readableEnded(options.stream)) cleanupClosedSource(options.stream, cleanupSource);
+                else cleanupSource();
+            };
             if (sourceError) {
                 fail(sourceError);
                 return;
             }
-            if (readableClosed(options.stream)) cleanupUploadSource();
+            if (readableClosed(options.stream)) cleanupUploadSource(true);
         }
 
         req.on('error', fail);
@@ -389,8 +403,14 @@ function requestFile (requestUrl, options) {
         if (timeout === undefined) {
             connectionTimer = setTimeout(() => fail(new TimeoutError('Sandbox file connection timed out')), 5000);
             req.once('socket', socket => {
-                if (socket.connecting) socket.once('connect', () => clearTimeout(connectionTimer));
-                else clearTimeout(connectionTimer);
+                const startResponseTimer = () => {
+                    clearTimeout(connectionTimer);
+                    if (!failed && !ended) {
+                        timer = setTimeout(() => fail(new TimeoutError('Sandbox file request timed out')), 5000);
+                    }
+                };
+                if (socket.connecting) socket.once('connect', startResponseTimer);
+                else startResponseTimer();
             });
             req.setTimeout(5000, () => fail(new TimeoutError('Sandbox file request timed out')));
         } else if (timeout > 0) {
