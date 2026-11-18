@@ -1,5 +1,13 @@
 ## CHANGE LOG
 
+## 8.0.0
+
+- **不兼容变更**：Sandbox 客户端的 `listSandboxes()`、`list()` 和 `listSnapshots()` 现在返回 `{ items, nextToken }`。使用 `page.items` 访问列表，将 `page.nextToken` 传给下一次调用以读取下一页。
+- `client.listSandboxesV2()` 已移除，请改用 `client.listSandboxes()`。原先调用 `client.listSnapshotsPage()` 的代码请改用 `client.listSnapshots()`。高层分页器仍可通过 `nextItems()` 获取当前页数组。
+- Sandbox 文件读写支持流式传输、取消和完整请求时限，并修复文件 URL 签名。
+- 创建命令或 PTY 时可通过 `executionTimeoutMs` 设置服务端执行期限，断连后仍生效。修复进程重连、输入、终止和 PTY 缩放的 PID 请求格式。
+- 修复含特殊字符的 Sandbox metadata 筛选和临时 Git 凭据隔离，补全 Sandbox 相关 TypeScript 类型。
+
 ## 7.15.7
 - 新增 Sandbox Desktop，支持创建桌面环境、截图、键鼠操作、应用启动与窗口查询
 - 新增 noVNC 流管理，支持密码认证、自定义端口和单窗口参数，并校验监听进程归属、隔离并发流与清理过程
