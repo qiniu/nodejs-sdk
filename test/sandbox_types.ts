@@ -228,3 +228,49 @@ async function useSandboxTypes () {
 }
 
 void useSandboxTypes;
+
+async function useDesktopTypes () {
+    const client = new qiniu.SandboxClient({ apiKey: 'key' });
+    const desktop = await client.createDesktop({
+        resolution: { width: 1280, height: 720 },
+        dpi: 96,
+        display: ':0',
+        pollOptions: { timeoutMs: 60000 }
+    });
+    const wrapped: qiniu.sandbox.Desktop = new qiniu.Desktop(desktop.sandbox);
+    await wrapped.start();
+    const size: qiniu.sandbox.ScreenSize = await desktop.screenSize();
+    const point: qiniu.sandbox.Point = await desktop.cursorPosition();
+    const png: Buffer = await desktop.screenshot();
+    await desktop.click('left', point);
+    await desktop.doubleClick(point);
+    await desktop.moveMouse({ x: 0, y: 0 });
+    await desktop.drag(point, { x: size.width - 1, y: size.height - 1 });
+    await desktop.mouseDown('middle');
+    await desktop.mouseUp('middle');
+    await desktop.scroll('down', 2);
+    await desktop.typeText('你好', { chunkSize: 25, delayMs: 75 });
+    await desktop.press('ctrl', 'a');
+    await desktop.open('https://example.com');
+    await desktop.launch('xfce4-terminal');
+    const ids: string[] = await desktop.applicationWindows('xfce4-terminal');
+    const id: string = await desktop.activeWindowID();
+    const title: string = await desktop.windowTitle(id);
+    await desktop.wait(10);
+    await desktop.stream.start({ vncPort: 5901, webPort: 6081, requireAuth: true, windowID: ids[0] });
+    const key: string = desktop.stream.authKey();
+    const url: string = desktop.stream.url({ authKey: key, viewOnly: true, resize: 'scale', autoConnect: true });
+    await desktop.stream.stop();
+    await desktop.sandbox.kill();
+    await qiniu.Desktop.create('desktop', { client });
+    const failure = new qiniu.DesktopCommandError('screenshot', { exitCode: 1, stdout: '', stderr: 'failed' });
+    const result: qiniu.sandbox.CommandResult = failure.result;
+    // @ts-expect-error Unknown mouse buttons must be rejected by the public type.
+    desktop.click('invalid');
+    // @ts-expect-error Screenshots have a concrete Buffer result.
+    const invalid: string = png;
+    // @ts-expect-error Only documented resize modes are accepted.
+    desktop.stream.url({ resize: 'invalid' });
+    return { size, png, title, url, result, invalid };
+}
+void useDesktopTypes;

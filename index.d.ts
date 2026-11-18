@@ -546,6 +546,7 @@ export declare namespace sandbox {
     }
 
     class SandboxClient {
+        createDesktop(options?: DesktopCreateOptions): Promise<Desktop>;
         endpoint: string;
         apiKey?: string;
         accessToken?: string;
@@ -615,6 +616,104 @@ export declare namespace sandbox {
         listSnapshots(options?: SnapshotListOptions): Promise<SnapshotInfo[]>;
         listSnapshotsPage(options?: SnapshotListOptions): Promise<SnapshotPage>;
         deleteSnapshot(snapshotID: string): Promise<null>;
+    }
+
+    interface ScreenSize {
+        width: number;
+        height: number;
+    }
+
+    interface Point {
+        x: number;
+        y: number;
+    }
+
+    interface DesktopOptions {
+        /** Defaults to 1024 x 768. */
+        resolution?: ScreenSize;
+        /** Defaults to 96. */
+        dpi?: number;
+        /** Defaults to :0. */
+        display?: string;
+    }
+
+    interface DesktopCreateOptions extends SandboxCreateOptions, DesktopOptions {
+        pollOptions?: PollOptions;
+    }
+
+    type MouseButton = 'left' | 'middle' | 'right';
+    type ScrollDirection = 'up' | 'down';
+    type DesktopStreamResizeMode = 'off' | 'scale' | 'remote';
+
+    interface TypeTextOptions {
+        /** Unicode code points per command; defaults to 25. */
+        chunkSize?: number;
+        /** Milliseconds per character; defaults to 75. Zero disables the delay. */
+        delayMs?: number;
+    }
+
+    interface DesktopStreamOptions {
+        vncPort?: number;
+        webPort?: number;
+        /** Defaults to true. */
+        requireAuth?: boolean;
+        windowID?: string;
+    }
+
+    interface DesktopStreamURLOptions {
+        autoConnect?: boolean;
+        viewOnly?: boolean;
+        resize?: DesktopStreamResizeMode;
+        /** Explicit opt-in: this password may appear in browser history and proxy logs. */
+        authKey?: string;
+    }
+
+    const DEFAULT_DESKTOP_TEMPLATE: 'desktop';
+
+    class DesktopCommandError extends CommandExitError {
+        constructor(operation: string, result: CommandResult);
+        operation: string;
+        result: CommandResult;
+        cleanupError?: Error;
+    }
+
+    class DesktopStream {
+        constructor(desktop: Desktop);
+        start(options?: DesktopStreamOptions): Promise<void>;
+        stop(): Promise<void>;
+        authKey(): string;
+        url(options?: DesktopStreamURLOptions): string;
+    }
+
+    class Desktop {
+        /** Existing lifecycle, filesystem, command and other Sandbox APIs. */
+        readonly sandbox: Sandbox;
+        readonly display: string;
+        readonly stream: DesktopStream;
+        /** Wraps an existing Sandbox without starting desktop processes. */
+        constructor(sandbox: Sandbox, options?: DesktopOptions);
+        static create(options?: DesktopCreateOptions): Promise<Desktop>;
+        static create(template: string, options?: DesktopCreateOptions): Promise<Desktop>;
+        start(): Promise<void>;
+        screenSize(): Promise<ScreenSize>;
+        cursorPosition(): Promise<Point>;
+        screenshot(): Promise<Buffer>;
+        moveMouse(point: Point): Promise<void>;
+        click(button?: MouseButton, point?: Point): Promise<void>;
+        doubleClick(point?: Point): Promise<void>;
+        mouseDown(button: MouseButton): Promise<void>;
+        mouseUp(button: MouseButton): Promise<void>;
+        drag(from: Point, to: Point): Promise<void>;
+        scroll(direction: ScrollDirection, amount: number): Promise<void>;
+        typeText(text: string, options?: TypeTextOptions): Promise<void>;
+        press(...keys: string[]): Promise<void>;
+        open(pathOrURL: string): Promise<void>;
+        /** Launch an executable with literal argv; checks early failure for up to 250 ms, then detaches. */
+        launch(application: string, ...args: string[]): Promise<void>;
+        activeWindowID(): Promise<string>;
+        applicationWindows(application: string): Promise<string[]>;
+        windowTitle(windowID: string): Promise<string>;
+        wait(durationMs: number): Promise<void>;
     }
 
     class Sandbox {
@@ -2638,3 +2737,6 @@ export declare namespace sms {
         ): void;
     }
 }
+
+export declare const Desktop: typeof sandbox.Desktop;
+export declare const DesktopCommandError: typeof sandbox.DesktopCommandError;
