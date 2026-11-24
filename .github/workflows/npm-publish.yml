@@ -12,11 +12,16 @@ on:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    if: >-
+      (github.event_name == 'release' && github.event.release.prerelease == false) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
     concurrency:
       group: npm-publish-qiniu
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       id-token: write
@@ -52,20 +57,35 @@ jobs:
             process.exitCode = 1
           }
           NODE
-      - run: npm install --global npm@11
-      - run: npm install
-      - run: npm pack --dry-run
-      - name: Check npm latest version
+      - name: Install npm CLI
+        env:
+          NPM_VERSION: '11.16.0'
+        run: |
+          npm install --global --ignore-scripts "npm@$NPM_VERSION"
+          installed_version="$(npm --version)"
+          if [[ "$installed_version" != "$NPM_VERSION" ]]; then
+            echo "::error::Expected npm $NPM_VERSION, found $installed_version."
+            exit 1
+          fi
+      - run: npm pack --dry-run --ignore-scripts
+      - name: Check npm registry versions
         env:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
-          latest="$(npm view qiniu@latest version --json --prefer-online --registry=https://registry.npmjs.org)"
-          LATEST="$latest" node <<'NODE'
-          const latest = JSON.parse(process.env.LATEST)
+          metadata="$(npm view qiniu dist-tags versions --json --prefer-online --registry=https://registry.npmjs.org)"
+          NPM_METADATA="$metadata" node <<'NODE'
+          const { 'dist-tags': tags, versions } = JSON.parse(process.env.NPM_METADATA)
+          if (!Array.isArray(versions)) {
+            throw new Error('Expected a version list for qiniu on npm.')
+          }
+          const version = process.env.TAG.slice(1)
+          if (versions.includes(version)) {
+            throw new Error(`qiniu@${version} is already published on npm. npm versions cannot be overwritten.`)
+          }
+          const latest = tags?.latest
           if (typeof latest !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(latest)) {
             throw new Error('Expected a stable version for npm latest.')
           }
-          const version = process.env.TAG.slice(1)
           const candidate = version.split('.').map(BigInt)
           const current = latest.split('.').map(BigInt)
           const difference = candidate.findIndex((part, index) => part !== current[index])
@@ -82,6 +102,11 @@ jobs:
           provenance_args=()
           # npm uses the event ref and SHA for automatic provenance.
           if [[ "$GITHUB_REF" != "refs/tags/$TAG" || "$GITHUB_SHA" != "$checkout_sha" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+              echo "::error::The checked-out tag does not match the Release event ref and commit."
+              exit 1
+            fi
+            echo "::warning::Publishing without npm provenance because the dispatch ref and commit differ from the release tag."
             provenance_args+=(--provenance=false)
           fi
-          npm publish --access public --tag latest "${provenance_args[@]}"
+          npm publish --access public --tag latest --ignore-scripts "${provenance_args[@]}"
