@@ -3,17 +3,53 @@ name: Npm publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable release tag (for example, v8.0.0)
+        required: true
+        type: string
 
 jobs:
   publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 12
-          registry-url: https://registry.npmjs.org/
-      - run: npm install
-      - run: npm publish
+      - name: Select stable release tag
+        id: release
+        shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+          TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Expected a stable release tag such as v8.0.0." >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Verify package identity
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          node <<'NODE'
+          const { name, version } = require('./package.json')
+          if (name !== 'qiniu' || `v${version}` !== process.env.TAG) {
+            console.error(`Expected qiniu at ${process.env.TAG}, found ${name}@${version}.`)
+            process.exitCode = 1
+          }
+          NODE
+      - run: npm install --global npm@11
+      - run: npm install
+      - run: npm pack --dry-run
+      - run: npm publish --access public --tag latest
