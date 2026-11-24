@@ -37,11 +37,29 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v6
+      - name: Verify backfill release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if ! release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")"; then
+            echo "::error::Could not look up GitHub Release $TAG. Backfill requires a published stable Release."
+            exit 1
+          fi
+          if ! jq -e --arg tag "$TAG" '
+            .tag_name == $tag and .draft == false and .prerelease == false and
+            (.published_at | type == "string" and length > 0)
+          ' <<< "$release" >/dev/null; then
+            echo "::error::GitHub Release $TAG must be published and marked as stable before backfill."
+            exit 1
+          fi
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: refs/tags/${{ steps.release.outputs.tag }}
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
           registry-url: https://registry.npmjs.org

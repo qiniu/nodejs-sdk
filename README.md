@@ -57,7 +57,7 @@ $ mocha --grep 'bucketinfo'
 
 正式 GitHub Release 会触发自动发布并生成来源证明（provenance），包括使用正式版本标签、从预发布转为正式发布的 Release。工作流只接受与包版本一致的 `vX.Y.Z` 标签。目标版本已存在或低于 npm 的 `latest` 时，工作流会拒绝发布。自动发布和手动补发都适用此规则。
 
-如需补发已有标签，从 `master` 手动触发工作流。执行记录会提示该次发布未生成 provenance，因为触发工作流的提交与打包标签来源不同。
+如需补发已发布的正式 GitHub Release，从 `master` 手动触发工作流。工作流在检出源码前确认标签对应的 Release 已发布，且已标记为正式版。执行记录会提示该次发布未生成 provenance，因为触发工作流的提交与打包标签来源不同。
 
 ```bash
 gh workflow run npm-publish.yml --repo qiniu/nodejs-sdk --ref master -f tag=v8.0.0
