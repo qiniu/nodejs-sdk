@@ -55,7 +55,7 @@ $ mocha --grep 'bucketinfo'
 
 在 npm 的 `qiniu` 包设置中配置 GitHub Actions Trusted Publisher。组织填 `qiniu`，仓库填 `nodejs-sdk`，工作流文件填 `npm-publish.yml`，Environment 填 `npm`，允许执行 `npm publish`。
 
-发布正式 GitHub Release 会自动发布 npm 包并生成来源证明（provenance）。工作流只接受与包版本一致的 `vX.Y.Z` 标签，拒绝覆盖已有版本或将 `latest` 回退到更低版本。
+正式 GitHub Release 会触发自动发布并生成来源证明（provenance），包括使用正式版本标签、从预发布转为正式发布的 Release。工作流只接受与包版本一致的 `vX.Y.Z` 标签。目标版本已存在或低于 npm 的 `latest` 时，工作流会拒绝发布。自动发布和手动补发都适用此规则。
 
 如需补发已有标签，从 `master` 手动触发工作流。执行记录会提示该次发布未生成 provenance，因为触发工作流的提交与打包标签来源不同。
 
