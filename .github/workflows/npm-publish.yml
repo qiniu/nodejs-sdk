@@ -14,6 +14,9 @@ jobs:
   publish:
     if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
     runs-on: ubuntu-latest
+    concurrency:
+      group: npm-publish-qiniu
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -52,4 +55,33 @@ jobs:
       - run: npm install --global npm@11
       - run: npm install
       - run: npm pack --dry-run
-      - run: npm publish --access public --tag latest
+      - name: Check npm latest version
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          latest="$(npm view qiniu@latest version --json --prefer-online --registry=https://registry.npmjs.org)"
+          LATEST="$latest" node <<'NODE'
+          const latest = JSON.parse(process.env.LATEST)
+          if (typeof latest !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(latest)) {
+            throw new Error('Expected a stable version for npm latest.')
+          }
+          const version = process.env.TAG.slice(1)
+          const candidate = version.split('.').map(BigInt)
+          const current = latest.split('.').map(BigInt)
+          const difference = candidate.findIndex((part, index) => part !== current[index])
+          if (difference !== -1 && candidate[difference] < current[difference]) {
+            throw new Error(`Refusing to move npm latest from ${latest} back to ${version}.`)
+          }
+          NODE
+      - name: Publish to npm
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          checkout_sha="$(git rev-parse HEAD)"
+          provenance_args=()
+          # npm uses the event ref and SHA for automatic provenance.
+          if [[ "$GITHUB_REF" != "refs/tags/$TAG" || "$GITHUB_SHA" != "$checkout_sha" ]]; then
+            provenance_args+=(--provenance=false)
+          fi
+          npm publish --access public --tag latest "${provenance_args[@]}"
