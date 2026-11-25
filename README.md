@@ -49,6 +49,20 @@ $ mocha --grep 'bucketinfo'
 4. 将您的修改记录提交到远程 `git` 仓库 (`git push origin my-new-feature`)
 5. 然后到 github 网站的该 `git` 远程仓库的 `my-new-feature` 分支下发起 Pull Request
 
+## 维护者发布 npm 包
+
+在 GitHub 仓库设置中创建 `npm` Environment，将部署分支限制为 `master`，部署标签限制为 `v*`。配置发布审核人，并用标签规则集限制版本标签的创建、修改和删除。
+
+在 npm 的 `qiniu` 包设置中配置 GitHub Actions Trusted Publisher。组织填 `qiniu`，仓库填 `nodejs-sdk`，工作流文件填 `npm-publish.yml`，Environment 填 `npm`，允许执行 `npm publish`。
+
+正式 GitHub Release 会触发自动发布并生成来源证明（provenance），包括使用正式版本标签、从预发布转为正式发布的 Release。工作流只接受与包版本一致的 `vX.Y.Z` 标签。目标版本已存在或低于 npm 的 `latest` 时，工作流会拒绝发布。自动发布和手动补发都适用此规则。
+
+如需补发已发布的正式 GitHub Release，从 `master` 手动触发工作流。工作流在检出源码前确认标签对应的 Release 已发布，且已标记为正式版。执行记录会提示该次发布未生成 provenance，因为触发工作流的提交与打包标签来源不同。
+
+```bash
+gh workflow run npm-publish.yml --repo qiniu/nodejs-sdk --ref master -f tag=v8.0.0
+```
+
 ## 许可证
 
 Copyright (c) 2015 qiniu.com
