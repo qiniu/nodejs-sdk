@@ -117,14 +117,14 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           checkout_sha="$(git rev-parse HEAD)"
-          provenance_args=()
-          # npm uses the event ref and SHA for automatic provenance.
+          # Require provenance when the run and the checkout identify the same source.
+          provenance_args=(--provenance)
           if [[ "$GITHUB_REF" != "refs/tags/$TAG" || "$GITHUB_SHA" != "$checkout_sha" ]]; then
             if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
               echo "::error::The checked-out tag does not match the Release event ref and commit."
               exit 1
             fi
             echo "::warning::Publishing without npm provenance because the dispatch ref and commit differ from the release tag."
-            provenance_args+=(--provenance=false)
+            provenance_args=(--provenance=false)
           fi
           npm publish --access public --tag latest --ignore-scripts "${provenance_args[@]}"
