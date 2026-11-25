@@ -1,5 +1,9 @@
 ## CHANGE LOG
 
+## 8.0.1
+
+- npm 正式发布改用 GitHub Actions Trusted Publishing（OIDC），并要求生成来源证明（provenance）。维护者可从已发布的正式 GitHub Release 手动补发。
+
 ## 8.0.0
 
 - **不兼容变更**：Sandbox 客户端的 `listSandboxes()`、`list()` 和 `listSnapshots()` 现在返回 `{ items, nextToken }`。使用 `page.items` 访问列表，将 `page.nextToken` 传给下一次调用以读取下一页。
